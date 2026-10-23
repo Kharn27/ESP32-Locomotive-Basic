@@ -288,7 +288,8 @@ BLStatus bl_list_program(const BasicProgram *program,
     if (bp_validate(program) != BP_OK) {
         return BL_BAD_PROGRAM;
     }
-    if (overlaps(program, sizeof(*program), destination, destination_capacity) ||
+    if (overlaps(written, sizeof(*written), destination, destination_capacity) ||
+        overlaps(program, sizeof(*program), destination, destination_capacity) ||
         overlaps(program, sizeof(*program), written, sizeof(*written)) ||
         overlaps(program->data, program->capacity, destination, destination_capacity) ||
         overlaps(program->data, program->capacity, written, sizeof(*written))) {

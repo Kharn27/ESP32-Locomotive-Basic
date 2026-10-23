@@ -7,8 +7,8 @@
 | Jalon | Périmètre | État | Livrable |
 |---|---|---|---|
 | **J0.1** | Cartographie statique des sous-systèmes Locomotive BASIC 1.1 | **Accepté et intégré dans `main` via [PR #1](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/1)** | [J0.1](J0.1-architecture-locomotive-basic-1.1.md) |
-| **J0.2** | Format binaire lignes numérotées, tokens, références, flux, erreurs et vecteurs | **En cours de validation** — PR dédiée, ne pas fusionner sans accord | [J0.2](J0.2-format-binaire-tokens.md) |
-| **J0.3 (pressenti)** | Stockage/lecture du flux tokenisé en C portable sur Linux, tests de sérialisation et validation des enregistrements ; éventuellement premier noyau lexical selon la revue | **Non lancé** | Aucun |
+| **J0.2** | Format binaire lignes numérotées, tokens, références, flux, erreurs et vecteurs | **Accepté et intégré dans `main` via [PR #2](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/2)** | [J0.2](J0.2-format-binaire-tokens.md) |
+| **J0.3 (pressenti)** | Stockage/lecture du flux tokenisé en C portable sur Linux, tests de sérialisation et validation des enregistrements ; éventuellement premier noyau lexical selon la revue | **Prêt à démarrer** — prompt J0.3 défini par Pilotage | Aucun |
 | Étapes ultérieures | LIST/RUN/NEW, interpréteur minimum, console série, puis écran CYD | **Non lancées** | Aucun |
 
 ## Décisions techniques actées
@@ -16,8 +16,8 @@
 1. Projet = **réimplémentation native en C**, pas d'émulation CPC ou Z80.
 2. Le **cœur BASIC est indépendant du matériel** et validé sous Linux avant ESP32 ; architecture en composants tokenizer, programme, interpréteur, runtime, graphique, stockage et HAL.
 3. **Mode de référence** : Locomotive BASIC 1.1 ; le désassemblage `basic.asm` est la source primaire. Les adaptations ESP32 doivent être explicitement séparées des comportements CPC.
-4. **J0.2 propose** un flux tokenisé canonique : longueur `u16 LE`, numéro `u16 LE`, corps tokenisé, `00`, puis sentinelle `00 00`, sans sauvegarder l'octet de garde RAM. Décision définitivement acquise **après acceptation de J0.2**.
-5. **J0.2 propose** de conserver les références de ligne sous forme `1E` dans le format persistant et de gérer les résolutions par offsets/caches invalidables, sans y placer des pointeurs C.
+4. **J0.2 valide comme spécification de travail** un flux tokenisé canonique : longueur `u16 LE`, numéro `u16 LE`, corps tokenisé, `00`, puis sentinelle `00 00`, sans sauvegarder l'octet de garde RAM. La compatibilité binaire exacte des variantes lexicales reste à confirmer par des captures CPC.
+5. **Décision J0.2 :** conserver les références de ligne sous forme `1E` dans le format persistant et de gérer les résolutions par offsets/caches invalidables, sans y placer des pointeurs C.
 6. Pas d'optimisation de références `1D` historique tant que le comportement `record_begin-1` n'est pas validé sur CPC/émulateur de référence.
 7. Dans les docs, séparer preuve directe du code Z80 **[C]**, déduction **[D]**, point à vérifier **[V]**, blocage **[B]**. Aucun vecteur déduit du désassemblage n'est automatiquement une « golden reference ».
 
@@ -35,9 +35,9 @@
 
 ## Barrières de livraison et plan pressenti
 
-**Avant J0.3 :** revue explicite de la PR J0.2 ; vérification de la cohérence des tables/tokens, du format, des cinq investigations et des quatre vecteurs. L'absence de validation matérielle doit rester signalée, pas masquée par des tests fabriqués.
+**J0.2 accepté via PR #2 :** revue technique réalisée, correction des chaînes non fermées intégrée, fil Codex résolu. L'absence de validation matérielle reste signalée ; les vecteurs déduits ne sont pas des références CPC indépendantes.
 
-**J0.3 pressenti (proposition au chef de projet, non autorisation de codage) :** coder un seul module `basic_program` portable C99, capable de lire, valider, insérer, remplacer, supprimer et exporter une image de lignes tokenisées ; tests Linux de bornes, d'offsets, d'ordre et de sentinelle, y compris entrées malformées ; un jeu de vecteurs de test marqué « déduit » tant qu'il n'est pas validé indépendamment. Aucun pilote graphique, firmware ni moteur d'exécution. Le périmètre définitif sera fixé par le chef de projet après J0.2.
+**J0.3 décidé par Pilotage (prompt à transmettre au développeur) :** coder un seul module `basic_program` portable C99, capable de lire, valider, insérer, remplacer, supprimer et exporter une image de lignes tokenisées ; tests Linux de bornes, d'offsets, d'ordre et de sentinelle, y compris entrées malformées ; un jeu de vecteurs de test marqué « déduit » tant qu'il n'est pas validé indépendamment. Aucun pilote graphique, firmware ni moteur d'exécution. Le périmètre définitif sera fixé par le chef de projet après J0.2.
 
 ## Gouvernance GitHub
 

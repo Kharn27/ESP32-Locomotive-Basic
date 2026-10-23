@@ -17,6 +17,10 @@ endif()
 add_library(basic_program STATIC core/basic_program.c)
 target_include_directories(basic_program PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
 
+add_library(basic_listing STATIC core/basic_listing.c)
+target_include_directories(basic_listing PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
+target_link_libraries(basic_listing PUBLIC basic_program)
+
 add_library(basic_tokenizer STATIC core/basic_tokenizer.c)
 target_include_directories(basic_tokenizer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
 
@@ -29,4 +33,8 @@ if(BUILD_TESTING)
     add_executable(test_basic_tokenizer tests/test_basic_tokenizer.c)
     target_link_libraries(test_basic_tokenizer PRIVATE basic_tokenizer basic_program)
     add_test(NAME basic_tokenizer COMMAND test_basic_tokenizer)
+
+    add_executable(test_basic_listing tests/test_basic_listing.c)
+    target_link_libraries(test_basic_listing PRIVATE basic_listing basic_tokenizer)
+    add_test(NAME basic_listing COMMAND test_basic_listing)
 endif()

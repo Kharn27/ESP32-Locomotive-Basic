@@ -8,7 +8,7 @@
 |---|---|---|---|
 | **J0.1** | Cartographie statique des sous-systèmes Locomotive BASIC 1.1 | **Accepté et intégré dans `main` via [PR #1](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/1)** | [J0.1](J0.1-architecture-locomotive-basic-1.1.md) |
 | **J0.2** | Format binaire lignes numérotées, tokens, références, flux, erreurs et vecteurs | **Accepté et intégré dans `main` via [PR #2](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/2)** | [J0.2](J0.2-format-binaire-tokens.md) |
-| **J0.3 (pressenti)** | Stockage/lecture du flux tokenisé en C portable sur Linux, tests de sérialisation et validation des enregistrements ; éventuellement premier noyau lexical selon la revue | **Prêt à démarrer** — prompt J0.3 défini par Pilotage | Aucun |
+| **J0.3** | Module `basic_program` C99 portable : stockage, validation, mutations, import/export d'images tokenisées et tests Linux ; sans tokenizer | **Prêt à démarrer** — prompt J0.3 défini par Pilotage | Aucun |
 | Étapes ultérieures | LIST/RUN/NEW, interpréteur minimum, console série, puis écran CYD | **Non lancées** | Aucun |
 
 ## Décisions techniques actées
@@ -17,7 +17,7 @@
 2. Le **cœur BASIC est indépendant du matériel** et validé sous Linux avant ESP32 ; architecture en composants tokenizer, programme, interpréteur, runtime, graphique, stockage et HAL.
 3. **Mode de référence** : Locomotive BASIC 1.1 ; le désassemblage `basic.asm` est la source primaire. Les adaptations ESP32 doivent être explicitement séparées des comportements CPC.
 4. **J0.2 valide comme spécification de travail** un flux tokenisé canonique : longueur `u16 LE`, numéro `u16 LE`, corps tokenisé, `00`, puis sentinelle `00 00`, sans sauvegarder l'octet de garde RAM. La compatibilité binaire exacte des variantes lexicales reste à confirmer par des captures CPC.
-5. **Décision J0.2 :** conserver les références de ligne sous forme `1E` dans le format persistant et de gérer les résolutions par offsets/caches invalidables, sans y placer des pointeurs C.
+5. **Décision J0.2 :** conserver les références de ligne sous forme `1E` dans le format persistant et gérer les résolutions par offsets/caches invalidables, sans y placer des pointeurs C.
 6. Pas d'optimisation de références `1D` historique tant que le comportement `record_begin-1` n'est pas validé sur CPC/émulateur de référence.
 7. Dans les docs, séparer preuve directe du code Z80 **[C]**, déduction **[D]**, point à vérifier **[V]**, blocage **[B]**. Aucun vecteur déduit du désassemblage n'est automatiquement une « golden reference ».
 

@@ -8,7 +8,7 @@
 |---|---|---|---|
 | **J0.1** | Cartographie statique des sous-systèmes Locomotive BASIC 1.1 | **Accepté et intégré dans `main` via [PR #1](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/1)** | [J0.1](J0.1-architecture-locomotive-basic-1.1.md) |
 | **J0.2** | Format binaire lignes numérotées, tokens, références, flux, erreurs et vecteurs | **Accepté et intégré dans `main` via [PR #2](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/2)** | [J0.2](J0.2-format-binaire-tokens.md) |
-| **J0.3** | Module `basic_program` C99 portable : stockage, validation, mutations, import/export d'images tokenisées et tests Linux ; sans tokenizer | **Prêt à démarrer** — prompt J0.3 défini par Pilotage | Aucun |
+| **J0.3** | Module `basic_program` C99 portable : stockage, validation, mutations, import/export d'images tokenisées et tests Linux ; sans tokenizer | **En revue** — PR dédiée, ni acceptée ni fusionnée | [J0.3](J0.3-basic-program.md) |
 | Étapes ultérieures | LIST/RUN/NEW, interpréteur minimum, console série, puis écran CYD | **Non lancées** | Aucun |
 
 ## Décisions techniques actées
@@ -37,7 +37,7 @@
 
 **J0.2 accepté via PR #2 :** revue technique réalisée, correction des chaînes non fermées intégrée, fil Codex résolu. L'absence de validation matérielle reste signalée ; les vecteurs déduits ne sont pas des références CPC indépendantes.
 
-**J0.3 décidé par Pilotage (prompt à transmettre au développeur) :** coder un seul module `basic_program` portable C99, capable de lire, valider, insérer, remplacer, supprimer et exporter une image de lignes tokenisées ; tests Linux de bornes, d'offsets, d'ordre et de sentinelle, y compris entrées malformées ; un jeu de vecteurs de test marqué « déduit » tant qu'il n'est pas validé indépendamment. Aucun pilote graphique, firmware ni moteur d'exécution. Le périmètre définitif sera fixé par le chef de projet après J0.2.
+**J0.3 en revue :** le module `basic_program` C99 et ses tests Linux sont livrés dans la PR J0.3. Les tests de structure, mutations, capacités et import/export, avec instrumentation ASan/UBSan et CI Linux, sont inclus. **Aucune acceptation avant la revue de Pilotage.** Aucun firmware, tokenizer ou exécuteur.
 
 ## Gouvernance GitHub
 

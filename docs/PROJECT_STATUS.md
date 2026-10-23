@@ -8,7 +8,8 @@
 |---|---|---|---|
 | **J0.1** | Cartographie statique des sous-systèmes Locomotive BASIC 1.1 | **Accepté et intégré dans `main` via [PR #1](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/1)** | [J0.1](J0.1-architecture-locomotive-basic-1.1.md) |
 | **J0.2** | Format binaire lignes numérotées, tokens, références, flux, erreurs et vecteurs | **Accepté et intégré dans `main` via [PR #2](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/2)** | [J0.2](J0.2-format-binaire-tokens.md) |
-| **J0.3** | Module `basic_program` C99 portable : stockage, validation, mutations, import/export d'images tokenisées et tests Linux ; sans tokenizer | **En revue** — PR dédiée, ni acceptée ni fusionnée | [J0.3](J0.3-basic-program.md) |
+| **J0.3** | Module `basic_program` C99 portable : stockage, validation, mutations, import/export d'images tokenisées et tests Linux ; sans tokenizer | **Accepté et intégré dans `main` via [PR #3](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/3)** | [J0.3](J0.3-basic-program.md) |
+| **J0.4 (prochain)** | Tokeniseur lexical natif C99, sous-ensemble strictement borné, tests Linux et intégration avec `basic_program` | **À démarrer** — prompt Pilotage fourni | Aucun |
 | Étapes ultérieures | LIST/RUN/NEW, interpréteur minimum, console série, puis écran CYD | **Non lancées** | Aucun |
 
 ## Décisions techniques actées
@@ -37,7 +38,7 @@
 
 **J0.2 accepté via PR #2 :** revue technique réalisée, correction des chaînes non fermées intégrée, fil Codex résolu. L'absence de validation matérielle reste signalée ; les vecteurs déduits ne sont pas des références CPC indépendantes.
 
-**J0.3 en revue :** le module `basic_program` C99 et ses tests Linux sont livrés dans la PR J0.3. Les tests de structure, mutations, capacités et import/export, avec instrumentation ASan/UBSan et CI Linux, sont inclus. **Aucune acceptation avant la revue de Pilotage.** Aucun firmware, tokenizer ou exécuteur.
+**J0.3 accepté via PR #3 :** revue des modifications réelles, CI Linux standard et ASan/UBSan réussies, tests d'invariants et de corruption vérifiés. Le module `basic_program` est intégré à `main`, sans tokenizer, firmware ni exécuteur. **J0.4 prochain :** construire un tokeniseur lexical C99 minimal avec interfaces et tests Linux, sans prétendre à la fidélité binaire complète tant que les captures CPC manquent.
 
 ## Gouvernance GitHub
 

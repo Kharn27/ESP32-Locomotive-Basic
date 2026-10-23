@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 3.13)
+project(loco_cyd_basic_program C)
+
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+
+option(BP_SANITIZERS "Enable address/undefined sanitizers on GCC/Clang" OFF)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Werror)
+    if(BP_SANITIZERS)
+        add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address,undefined)
+    endif()
+endif()
+
+add_library(basic_program STATIC core/basic_program.c)
+target_include_directories(basic_program PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(test_basic_program tests/test_basic_program.c)
+    target_link_libraries(test_basic_program PRIVATE basic_program)
+    add_test(NAME basic_program COMMAND test_basic_program)
+endif()

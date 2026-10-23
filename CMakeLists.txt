@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(loco_cyd_basic_program C)
+project(loco_cyd_basic_core C)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -17,9 +17,16 @@ endif()
 add_library(basic_program STATIC core/basic_program.c)
 target_include_directories(basic_program PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
 
+add_library(basic_tokenizer STATIC core/basic_tokenizer.c)
+target_include_directories(basic_tokenizer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
+
 include(CTest)
 if(BUILD_TESTING)
     add_executable(test_basic_program tests/test_basic_program.c)
     target_link_libraries(test_basic_program PRIVATE basic_program)
     add_test(NAME basic_program COMMAND test_basic_program)
+
+    add_executable(test_basic_tokenizer tests/test_basic_tokenizer.c)
+    target_link_libraries(test_basic_tokenizer PRIVATE basic_tokenizer basic_program)
+    add_test(NAME basic_tokenizer COMMAND test_basic_tokenizer)
 endif()

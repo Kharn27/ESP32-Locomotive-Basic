@@ -10,8 +10,9 @@
 | **J0.2** | Format binaire lignes numérotées, tokens, références, flux, erreurs et vecteurs | **Accepté et intégré dans `main` via [PR #2](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/2)** | [J0.2](J0.2-format-binaire-tokens.md) |
 | **J0.3** | Module `basic_program` C99 portable : stockage, validation, mutations, import/export d'images tokenisées et tests Linux ; sans tokenizer | **Accepté et intégré dans `main` via [PR #3](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/3)** | [J0.3](J0.3-basic-program.md) |
 | **J0.4** | Tokeniseur natif C99, mots-clés/chaînes/entiers/références GOTO, tests et intégration `basic_program` | **Accepté et intégré dans `main` via [PR #4](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/4)** (squash `c774a700`)  | [J0.4](J0.4-basic-tokenizer.md) |
-| **J0.5** | Détokéniseur et listing C99 du sous-ensemble J0.4, sans exécution ni firmware | **En revue — PR J0.5** | [J0.5](J0.5-basic-listing.md) |
-| Étapes ultérieures | RUN/NEW, interpréteur minimum, console série, puis écran CYD | **Non lancées** | Aucun |
+| **J0.5** | Détokéniseur et listing C99 du sous-ensemble J0.4, sans exécution ni firmware | **Accepté et intégré dans `main` via [PR #5](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/5)** (squash `d25cc9ad`) | [J0.5](J0.5-basic-listing.md) |
+| **J0.6 (proposé)** | Saisie et édition minimales de lignes BASIC ; commandes directes LIST/NEW, sans RUN | **À développer** | Prompt Pilotage J0.6 |
+| Étapes ultérieures | RUN/PRINT/GOTO, interpréteur minimum, console série, puis écran CYD | **Non lancées** | Aucun |
 
 ## Décisions techniques actées
 
@@ -39,7 +40,7 @@
 
 **J0.2 accepté via PR #2 :** revue technique réalisée, correction des chaînes non fermées intégrée, fil Codex résolu. L'absence de validation matérielle reste signalée ; les vecteurs déduits ne sont pas des références CPC indépendantes.
 
-**J0.3 accepté via PR #3 :** revue des modifications réelles, CI Linux standard et ASan/UBSan réussies, tests d'invariants et de corruption vérifiés. Le module `basic_program` est intégré à `main`, sans tokenizer, firmware ni exécuteur. **J0.4 accepté et fusionné via PR #4 :** revue du code, intégration `basic_program` et CI Linux standard + ASan/UBSan (2/2 tests pour chaque job). Merge squash `c774a70085bbf46ed288998e6fe85d3442191918`. Fidélité binaire toujours à vérifier sur CPC. **J0.5 en revue :** module `basic_listing` C99, détokénisation et listing limité aux formes J0.4, validation en deux passes, tests de round-trip, sans exécution ni dépendance matérielle. En attente de revue Pilotage ; ne pas fusionner automatiquement.
+**J0.3 accepté via PR #3 :** revue des modifications réelles, CI Linux standard et ASan/UBSan réussies, tests d'invariants et de corruption vérifiés. Le module `basic_program` est intégré à `main`, sans tokenizer, firmware ni exécuteur. **J0.4 accepté et fusionné via PR #4 :** revue du code, intégration `basic_program` et CI Linux standard + ASan/UBSan (2/2 tests pour chaque job). Merge squash `c774a70085bbf46ed288998e6fe85d3442191918`. Fidélité binaire toujours à vérifier sur CPC. **J0.5 accepté et fusionné via PR #5 :** revue du code et CI Linux standard + ASan/UBSan (3/3 tests par job) ; merge squash `d25cc9ad4958787e1a3811f2ec29b8fa52e2c849`. Décodage des formes J0.4 et listing ordonné, sans exécution. Les tests aller-retour prouvent une cohérence interne, pas une fidélité CPC indépendante. **J0.6 proposé :** interface de saisie/édition et commandes directes `LIST`/`NEW`, sans `RUN`.
 
 ## Gouvernance GitHub
 

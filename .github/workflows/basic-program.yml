@@ -1,7 +1,7 @@
-name: C99 basic_program
+name: C99 BASIC core
 on:
   push:
-    branches: [main, 'feat/j0-3-basic-program']
+    branches: [main, 'feat/j0-4-basic-tokenizer']
   pull_request:
 
 jobs:

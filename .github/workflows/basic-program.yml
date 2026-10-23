@@ -1,0 +1,21 @@
+name: C99 basic_program
+on:
+  push:
+    branches: [main, 'feat/j0-3-basic-program']
+  pull_request:
+
+jobs:
+  linux-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizers: [OFF, ON]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBP_SANITIZERS=${{ matrix.sanitizers }}
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure

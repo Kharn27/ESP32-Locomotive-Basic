@@ -19,10 +19,11 @@ target_include_directories(basic_program PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core
 
 add_library(basic_listing STATIC core/basic_listing.c)
 target_include_directories(basic_listing PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
-target_link_libraries(basic_listing PUBLIC basic_program)
+target_link_libraries(basic_listing PUBLIC basic_program basic_variable_ref)
 
 add_library(basic_tokenizer STATIC core/basic_tokenizer.c)
 target_include_directories(basic_tokenizer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
+target_link_libraries(basic_tokenizer PUBLIC basic_variable_ref)
 
 add_library(basic_executor STATIC core/basic_executor.c)
 target_include_directories(basic_executor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
@@ -119,4 +120,13 @@ if(BUILD_TESTING)
     add_executable(test_basic_variable_store tests/test_basic_variable_store.c)
     target_link_libraries(test_basic_variable_store PRIVATE basic_variable_store)
     add_test(NAME basic_variable_store COMMAND test_basic_variable_store)
+endif()
+
+
+# J0.16: thirteenth suite, explicit scalar references in PRINT/LIST only.
+if(BUILD_TESTING)
+    add_executable(test_basic_explicit_variable_tokens tests/test_basic_explicit_variable_tokens.c)
+    target_link_libraries(test_basic_explicit_variable_tokens PRIVATE
+                          basic_variable_ref basic_session_runtime)
+    add_test(NAME explicit_variable_tokens COMMAND test_basic_explicit_variable_tokens)
 endif()

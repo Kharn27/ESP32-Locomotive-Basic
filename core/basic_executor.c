@@ -163,6 +163,10 @@ static BEStatus execute_line(const BasicProgram *program,
                     if (status != BE_OK) {
                         return status;
                     }
+                } else if (token >= 0x02u && token <= 0x04u) {
+                    /* Valid explicit scalar syntax is stored/listed only.
+                     * Never resolve caches or read the variable store here. */
+                    return BE_UNSUPPORTED;
                 } else {
                     return unexpected(token);
                 }

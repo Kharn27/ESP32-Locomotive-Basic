@@ -1,4 +1,5 @@
 #include "basic_listing.h"
+#include "basic_variable_ref.h"
 
 #include <stdint.h>
 
@@ -184,17 +185,64 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                         break;
                     }
                 }
-            } else if (t >= 0x0eu && t <= 0x17u) {
+            } else if (t >= 0x02u && t <= 0x04u) {
+                BasicVariableRef ref;
+                BVRStatus ref_status = bvr_decode(body, length, pos - 1u, &ref);
+                size_t i;
+                uint8_t suffix;
+                if (ref_status == BVR_TRUNCATED) {
+                    return BL_TRUNCATED;
+                }
+                if (ref_status != BVR_OK || ref.family != BVR_FAMILY_EXPLICIT) {
+                    return BL_BAD_SEQUENCE;
+                }
+                switch (ref.explicit_type) {
+                case BVR_TYPE_INTEGER: suffix = (uint8_t)'%'; break;
+                case BVR_TYPE_STRING: suffix = (uint8_t)'$'; break;
+                case BVR_TYPE_REAL: suffix = (uint8_t)'!'; break;
+                default: return BL_BAD_SEQUENCE;
+                }
+                /* The '?' alias can store BF 02/03/04 with no separating
+                 * space. LIST writes PRINT, so make its textual operand
+                 * boundary unambiguous without rewriting the CPC bytes. */
                 if (space_start == pos - 1u) {
-                    return BL_BAD_SEQUENCE; /* PRINT0 wouldn't retokenize */
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) {
+                        return status;
+                    }
+                }
+                /* The two CPC cache bytes are not pointers; LIST never changes them. */
+                for (i = 0u; i < ref.name_length; ++i) {
+                    status = append_byte(out,
+                        (uint8_t)(body[ref.name_offset + i] & 0x7fu));
+                    if (status != BL_OK) {
+                        return status;
+                    }
+                }
+                status = append_byte(out, suffix);
+                pos = ref.reference_offset + ref.consumed;
+            } else if (t >= 0x0eu && t <= 0x17u) {
+                /* As for explicit variables, ?0..9 need a printable
+                 * separator after LIST expands the alias to PRINT. */
+                if (space_start == pos - 1u) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) {
+                        return status;
+                    }
                 }
                 status = append_decimal(out, (unsigned int)(t - 0x0eu));
             } else if (t == 0x19u) {
                 if (pos == length) {
                     return BL_TRUNCATED;
                 }
-                if (space_start == pos - 1u || body[pos] < 10u) {
+                if (body[pos] < 10u) {
                     return BL_BAD_SEQUENCE; /* J0.4 emits small digits as 0E..17 */
+                }
+                if (space_start == pos - 1u) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) {
+                        return status;
+                    }
                 }
                 status = append_decimal(out, (unsigned int)body[pos++]);
             } else {

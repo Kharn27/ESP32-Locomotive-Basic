@@ -1,4 +1,5 @@
 #include "basic_tokenizer.h"
+#include "basic_variable_ref.h"
 
 #include <stdint.h>
 
@@ -163,6 +164,51 @@ static BTStatus quoted_string(const uint8_t *source, size_t length,
     return BT_OK;
 }
 
+
+/* The only new lexical operand: a suffix-marked scalar in PRINT. */
+static BTStatus explicit_print_variable(const uint8_t *source, size_t length,
+                                        size_t *index, BTEmitter *out)
+{
+    size_t start = *index;
+    size_t end = start + 1u;
+    size_t encoded_length = 0u;
+    size_t i;
+    uint8_t encoded[3u + BVR_MAX_NAME_LENGTH];
+    BVRExplicitType type;
+    BVRStatus ref_status;
+    while (end < length &&
+           (ascii_letter(source[end]) || ascii_digit(source[end]) ||
+            source[end] == (uint8_t)'.')) {
+        ++end;
+    }
+    if (end == length || end - start > BVR_MAX_NAME_LENGTH) {
+        return BT_UNSUPPORTED_CONSTRUCT;
+    }
+    switch (source[end]) {
+    case (uint8_t)'%': type = BVR_TYPE_INTEGER; break;
+    case (uint8_t)'$': type = BVR_TYPE_STRING; break;
+    case (uint8_t)'!': type = BVR_TYPE_REAL; break;
+    default: return BT_UNSUPPORTED_CONSTRUCT;
+    }
+    /* Never tokenise A%%, A%1, A%_ or any other proper prefix. */
+    if (end + 1u < length && identifier_continuation(source[end + 1u])) {
+        return BT_UNSUPPORTED_CONSTRUCT;
+    }
+    ref_status = bvr_encode_explicit(source + start, end - start, type,
+                                     encoded, sizeof(encoded), &encoded_length);
+    if (ref_status != BVR_OK) {
+        return BT_UNSUPPORTED_CONSTRUCT;
+    }
+    for (i = 0u; i < encoded_length; ++i) {
+        BTStatus status = emit(out, encoded[i]);
+        if (status != BT_OK) {
+            return status;
+        }
+    }
+    *index = end + 1u;
+    return BT_OK;
+}
+
 static BTStatus one_pass(const uint8_t *source, size_t length,
                          BTEmitter *out)
 {
@@ -238,6 +284,8 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             source[index] != (uint8_t)'\'') {
             if (source[index] == (uint8_t)'"') {
                 status = quoted_string(source, length, &index, out);
+            } else if (ascii_letter(source[index])) {
+                status = explicit_print_variable(source, length, &index, out);
             } else if (ascii_digit(source[index])) {
                 unsigned int number;
                 status = decimal(source, length, &index, 255u, &number);

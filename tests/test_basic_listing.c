@@ -57,6 +57,16 @@ static int test_keywords_and_numbers(void)
                                 (const uint8_t *)cases[i].text, strlen(cases[i].text)) == 0);
         }
     }
+    /* J0.16-C1: valid '?' aliases have no mandatory operand space.
+     * LIST expands the mnemonic to PRINT and writes a textual separator. */
+    {
+        static const uint8_t short_alias[] = {0xbfu, 0x0eu};
+        static const uint8_t long_alias[] = {0xbfu, 0x19u, 42u};
+        CHECK(expect_decode(short_alias, sizeof(short_alias),
+                            (const uint8_t *)"PRINT 0", 7u) == 0);
+        CHECK(expect_decode(long_alias, sizeof(long_alias),
+                            (const uint8_t *)"PRINT 42", 8u) == 0);
+    }
     {
         static const struct {uint16_t line; const char *text;} refs[] = {
             {1u, "GOTO 1"}, {20u, "GOTO 20"},
@@ -116,7 +126,6 @@ static int test_decode_failures(void)
         {{0xa0u, ' ', 0x1eu, 1u}, 4u, BL_TRUNCATED},
         {{0xa0u, ' ', 0x1eu, 0u, 0u}, 5u, BL_BAD_SEQUENCE},
         {{0xa0u, 0x1eu, 1u, 0u}, 4u, BL_BAD_SEQUENCE},
-        {{0xbfu, 0x0eu}, 2u, BL_BAD_SEQUENCE},
         {{0xbfu, ' ', 0x19u, 5u}, 4u, BL_BAD_SEQUENCE},
         {{0xbfu, ' ', 0u}, 3u, BL_BAD_SEQUENCE},
         {{0xbfu, ' ', '"', 0u}, 4u, BL_BAD_SEQUENCE},

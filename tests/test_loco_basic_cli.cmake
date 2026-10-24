@@ -115,4 +115,23 @@ check_case("comments-rem-and-apostrophe"
     "${banner}${ok}${ok}${ok}${listed}${running}${step1}${step1}${step1}${ended}${byebye}"
 )
 
-message(STATUS "host_cli: eleven black-box scenarios passed")
+# J0.11 END: numbered statement only, no new direct command.
+check_case("end-program"
+    "10 PRINT \"AVANT\"\n20 END\n30 PRINT \"INTERDIT\"\nLIST\nRUN\n:step\n:step\n:step\nLIST\n:quit\n"
+    "10 PRINT \"AVANT\"\n20 END\n30 PRINT \"INTERDIT\"\nAVANT\n10 PRINT \"AVANT\"\n20 END\n30 PRINT \"INTERDIT\"\n"
+    "${banner}${ok}${ok}${ok}${listed}${running}${step1}${step1}${ended}${listed}${byebye}"
+)
+
+check_case("end-colon-and-goto"
+    "10 GOTO 30:END\n20 PRINT \"SKIP\"\n30 PRINT \"A\":END:PRINT \"B\"\n40 PRINT \"C\"\nRUN\n:step\n:step\n:step\n:quit\n"
+    "A\n"
+    "${banner}${ok}${ok}${ok}${ok}${running}${step1}${step1}${ended}${byebye}"
+)
+
+check_case("end-comments-and-direct-rejection"
+    "END\n10 PRINT \"END\":REM END:PRINT \"HIDDEN\"\n20 ' END:PRINT \"HIDDEN\"\n30 END\n40 PRINT \"SKIP\"\nRUN\n:step\n:step\n:step\n:step\n:quit\n"
+    "END\n"
+    "${banner}${session_unsupported}${ok}${ok}${ok}${ok}${running}${step1}${step1}${step1}${ended}${byebye}"
+)
+
+message(STATUS "host_cli: fourteen black-box scenarios passed")

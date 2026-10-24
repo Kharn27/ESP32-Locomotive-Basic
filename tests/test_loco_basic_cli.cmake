@@ -134,4 +134,11 @@ check_case("end-comments-and-direct-rejection"
     "${banner}${session_unsupported}${ok}${ok}${ok}${ok}${running}${step1}${step1}${step1}${ended}${byebye}"
 )
 
-message(STATUS "host_cli: fourteen black-box scenarios passed")
+# J0.16: CLI stores/lists CPC explicit variables, without running them.
+check_case("explicit-variable-list-unsupported-run"
+    "10 PRINT A%\n20 PRINT B!\n30 PRINT S$\n40 END\nLIST\nRUN\n:step\n:quit\n"
+    "10 PRINT A%\n20 PRINT B!\n30 PRINT S$\n40 END\n"
+    "${banner}${ok}${ok}${ok}${ok}${listed}${running}[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_UNSUPPORTED\n${byebye}"
+)
+
+message(STATUS "host_cli: fifteen black-box scenarios passed")

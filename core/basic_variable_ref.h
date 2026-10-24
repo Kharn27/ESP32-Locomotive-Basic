@@ -63,4 +63,22 @@ typedef struct {
 BVRStatus bvr_decode(const uint8_t *source, size_t source_length,
                      size_t offset, BasicVariableRef *result);
 
+/*
+ * Encode only explicit scalar references (02 INTEGER %, 03 STRING $,
+ * 04 REAL !). name is the UNSUFFIXED byte sequence, with explicit length.
+ * One letter followed by 0..39 letters/digits/dots; case is preserved.
+ * The wire representation is marker, 00 00 CPC cache, name bytes with
+ * bit 7 set ONLY on the last byte. Required capacity is 3 + name_length.
+ *
+ * All buffers and written must be disjoint, including unused destination
+ * capacity. On error destination, name and *written are unchanged.
+ * BVR_LIMIT_EXCEEDED means a name over 40 bytes or insufficient capacity;
+ * BVR_MALFORMED means an empty/invalid name.
+ * Neither this API nor bvr_decode converts a CPC cache to a host pointer.
+ */
+BVRStatus bvr_encode_explicit(const uint8_t *name, size_t name_length,
+                              BVRExplicitType explicit_type,
+                              uint8_t *destination, size_t destination_capacity,
+                              size_t *written);
+
 #endif

@@ -355,8 +355,179 @@ static int test_session_integration(void)
     return 0;
 }
 
+
+/* J0.16-C1: the '?' alias can store a reference immediately after BF.
+ * LIST must be total on that accepted subset, and its canonical text
+ * must retokenize into a stable wire representation. */
+static int c1_roundtrip(const char *input, const char *listed,
+                        const uint8_t *raw, size_t raw_len,
+                        const uint8_t *canonical, size_t canonical_len)
+{
+    uint8_t body[96], saved[96], text[96], again[96], stable[96];
+    uint8_t failed[96], before_failure[96];
+    size_t body_len = 123u, text_len = 234u, again_len = 345u;
+    size_t stable_len = 456u;
+    size_t failure_len = 789u;
+    CHECK(strlen(listed) <= sizeof(text));
+    CHECK(bt_tokenize((const uint8_t *)input, strlen(input),
+                      body, sizeof(body), &body_len) == BT_OK);
+    CHECK(body_len == raw_len && memcmp(body, raw, raw_len) == 0);
+    memcpy(saved, body, sizeof(body));
+    CHECK(bl_detokenize(body, body_len, text, sizeof(text), &text_len) == BL_OK);
+    CHECK(text_len == strlen(listed) && memcmp(text, listed, text_len) == 0);
+    CHECK(memcmp(body, saved, sizeof(body)) == 0);
+    CHECK(bt_tokenize(text, text_len, again, sizeof(again), &again_len) == BT_OK);
+    CHECK(again_len == canonical_len &&
+          memcmp(again, canonical, canonical_len) == 0);
+    CHECK(bl_detokenize(again, again_len, stable,
+                        sizeof(stable), &stable_len) == BL_OK);
+    CHECK(stable_len == text_len && memcmp(stable, text, text_len) == 0);
+    memset(failed, 0x5a, sizeof(failed));
+    memcpy(before_failure, failed, sizeof(failed));
+    CHECK(bl_detokenize(body, body_len, failed,
+                        text_len - 1u, &failure_len) == BL_NO_SPACE);
+    CHECK(failure_len == 789u &&
+          memcmp(failed, before_failure, sizeof(failed)) == 0);
+    CHECK(memcmp(body, saved, sizeof(body)) == 0);
+    return 0;
+}
+
+static int test_c1_alias_roundtrips(void)
+{
+    static const uint8_t unspaced_int[] = {0xbfu,0x02u,0,0,0xc1u};
+    static const uint8_t spaced_int[] = {0xbfu,' ',0x02u,0,0,0xc1u};
+    static const uint8_t unspaced_real[] = {0xbfu,0x04u,0,0,0xc2u};
+    static const uint8_t spaced_real[] = {0xbfu,' ',0x04u,0,0,0xc2u};
+    static const uint8_t unspaced_string[] = {0xbfu,0x03u,0,0,0xd3u};
+    static const uint8_t spaced_string[] = {0xbfu,' ',0x03u,0,0,0xd3u};
+    static const uint8_t two_spaces[] = {0xbfu,' ',' ',0x02u,0,0,0xc1u};
+    static const uint8_t unspaced_colon[] = {0xbfu,0x02u,0,0,0xc1u,0x01u,0x98u};
+    static const uint8_t spaced_colon[] = {0xbfu,' ',0x02u,0,0,0xc1u,0x01u,0x98u};
+    static const uint8_t short_number[] = {0xbfu,0x13u};
+    static const uint8_t spaced_short[] = {0xbfu,' ',0x13u};
+    static const uint8_t long_number[] = {0xbfu,0x19u,0x2au};
+    static const uint8_t spaced_long[] = {0xbfu,' ',0x19u,0x2au};
+    static const uint8_t short_colon[] = {0xbfu,0x13u,0x01u,0x98u};
+    static const uint8_t spaced_short_colon[] = {0xbfu,' ',0x13u,0x01u,0x98u};
+    static const uint8_t quote[] = {0xbfu,'"','A','%','"'};
+    static const uint8_t quote_space[] = {0xbfu,' ','"','A','%','"'};
+    static const uint8_t invalid_import[] = {0xbfu,0x02u,0,0,'1'|0x80};
+    uint8_t dest[96], before[96];
+    size_t n = 4321u;
+
+    CHECK(c1_roundtrip("?A%", "PRINT A%",
+          unspaced_int, sizeof(unspaced_int),
+          spaced_int, sizeof(spaced_int)) == 0);
+    CHECK(c1_roundtrip("?B!", "PRINT B!",
+          unspaced_real, sizeof(unspaced_real),
+          spaced_real, sizeof(spaced_real)) == 0);
+    CHECK(c1_roundtrip("?S$", "PRINT S$",
+          unspaced_string, sizeof(unspaced_string),
+          spaced_string, sizeof(spaced_string)) == 0);
+    CHECK(c1_roundtrip("PRINT A%", "PRINT A%",
+          spaced_int, sizeof(spaced_int),
+          spaced_int, sizeof(spaced_int)) == 0);
+    CHECK(c1_roundtrip("? A%", "PRINT A%",
+          spaced_int, sizeof(spaced_int),
+          spaced_int, sizeof(spaced_int)) == 0);
+    CHECK(c1_roundtrip("PRINT  A%", "PRINT  A%",
+          two_spaces, sizeof(two_spaces),
+          two_spaces, sizeof(two_spaces)) == 0);
+    CHECK(c1_roundtrip("?A%:END", "PRINT A%:END",
+          unspaced_colon, sizeof(unspaced_colon),
+          spaced_colon, sizeof(spaced_colon)) == 0);
+    CHECK(c1_roundtrip("PRINT A%:END", "PRINT A%:END",
+          spaced_colon, sizeof(spaced_colon),
+          spaced_colon, sizeof(spaced_colon)) == 0);
+    CHECK(c1_roundtrip("?5", "PRINT 5",
+          short_number, sizeof(short_number),
+          spaced_short, sizeof(spaced_short)) == 0);
+    CHECK(c1_roundtrip("?42", "PRINT 42",
+          long_number, sizeof(long_number),
+          spaced_long, sizeof(spaced_long)) == 0);
+    CHECK(c1_roundtrip("?5:END", "PRINT 5:END",
+          short_colon, sizeof(short_colon),
+          spaced_short_colon, sizeof(spaced_short_colon)) == 0);
+    CHECK(c1_roundtrip("?\"A%\"", "PRINT\"A%\"",
+          quote, sizeof(quote), quote, sizeof(quote)) == 0);
+    CHECK(c1_roundtrip("? \"A%\"", "PRINT \"A%\"",
+          quote_space, sizeof(quote_space),
+          quote_space, sizeof(quote_space)) == 0);
+
+    /* PRINTA% must never become a recognized keyword (or prefix). */
+    memset(dest, 0x39, sizeof(dest));
+    memcpy(before, dest, sizeof(dest));
+    CHECK(bt_tokenize((const uint8_t *)"PRINTA%", 7u, dest,
+                      sizeof(dest), &n) == BT_UNSUPPORTED_CONSTRUCT);
+    CHECK(n == 4321u && memcmp(dest, before, sizeof(dest)) == 0);
+    /* Import-time malformed references still fail atomically. */
+    CHECK(bl_detokenize(invalid_import, sizeof(invalid_import),
+                        dest, sizeof(dest), &n) == BL_BAD_SEQUENCE);
+    CHECK(n == 4321u && memcmp(dest, before, sizeof(dest)) == 0);
+    return 0;
+}
+
+static int test_c1_program_list_and_imported_cache(void)
+{
+    BasicProgram program;
+    uint8_t store[2048], body[96], out[1024], snapshot[1024];
+    uint8_t exported[2048], exported_again[2048];
+    static const struct {
+        uint16_t line;
+        const char *text;
+    } cases[] = {
+        {10u,"?A%"}, {20u,"?B!"}, {30u,"?S$"},
+        {40u,"PRINT A%"}, {50u,"?A%:END"},
+        {60u,"?5"}, {70u,"?42"}, {80u,"?\"Q\""}
+    };
+    static const uint8_t imported[] = {0xbfu,0x03u,0x56u,0x34u,0xd3u};
+    static const char *expected =
+        "10 PRINT A%\n20 PRINT B!\n30 PRINT S$\n40 PRINT A%\n"
+        "50 PRINT A%:END\n60 PRINT 5\n70 PRINT 42\n"
+        "80 PRINT\"Q\"\n90 PRINT S$\n";
+    static const uint8_t malformed[] = {0xbfu,0x02u,0u,0u,'A'};
+    size_t n, before_n, after_n, i;
+    BasicProgramLine line;
+    BasicVariableRef ref;
+    size_t bad_written = 555u;
+
+    CHECK(bp_init(&program, store, sizeof(store)) == BP_OK);
+    for (i = 0u; i < sizeof(cases)/sizeof(cases[0]); ++i) {
+        CHECK(bt_tokenize((const uint8_t *)cases[i].text,
+                          strlen(cases[i].text), body, sizeof(body), &n) == BT_OK);
+        CHECK(bp_put(&program, cases[i].line, body, n) == BP_OK);
+    }
+    CHECK(bp_put(&program, 90u, imported, sizeof(imported)) == BP_OK);
+    CHECK(bp_export(&program, exported, sizeof(exported), &before_n) == BP_OK);
+    CHECK(bl_list_program(&program, out, sizeof(out), &n) == BL_OK);
+    CHECK(n == strlen(expected) && memcmp(out, expected, n) == 0);
+    CHECK(bp_export(&program, exported_again, sizeof(exported_again),
+                    &after_n) == BP_OK);
+    CHECK(before_n == after_n && memcmp(exported, exported_again, before_n) == 0);
+    CHECK(bp_find(&program, 90u, &line) == BP_OK);
+    CHECK(memcmp(program.data + line.body_offset, imported, sizeof(imported)) == 0);
+    CHECK(bvr_decode(program.data + line.body_offset, line.body_length,
+                     1u, &ref) == BVR_OK);
+    CHECK(ref.cache_low == 0x56u && ref.cache_high == 0x34u);
+
+    /* A later malformed line invalidates the entire LIST atomically. */
+    CHECK(bp_put(&program, 100u, malformed, sizeof(malformed)) == BP_OK);
+    memset(out, 0x74, sizeof(out));
+    memcpy(snapshot, out, sizeof(out));
+    CHECK(bl_list_program(&program, out, sizeof(out),
+                          &bad_written) == BL_TRUNCATED);
+    CHECK(bad_written == 555u && memcmp(out, snapshot, sizeof(out)) == 0);
+    CHECK(bp_delete(&program, 100u) == BP_OK);
+    CHECK(bp_export(&program, exported_again, sizeof(exported_again),
+                    &after_n) == BP_OK);
+    CHECK(before_n == after_n && memcmp(exported, exported_again, before_n) == 0);
+    return 0;
+}
+
 int main(void)
 {
+    CHECK(test_c1_alias_roundtrips() == 0);
+    CHECK(test_c1_program_list_and_imported_cache() == 0);
     CHECK(test_encoder() == 0);
     CHECK(test_encoder_errors() == 0);
     CHECK(test_tokenizer_and_listing() == 0);

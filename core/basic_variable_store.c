@@ -132,6 +132,12 @@ BVSStatus bvs_init(BasicVariableStore *store, BasicVariableEntry *entries,
     return BVS_OK;
 }
 
+BVSStatus bvs_validate(const BasicVariableStore *store)
+{
+    size_t bytes;
+    return check_store(store, &bytes, 1);
+}
+
 BVSStatus bvs_reset(BasicVariableStore *store)
 {
     size_t bytes;
@@ -270,5 +276,50 @@ BVSStatus bvs_set(BasicVariableStore *store, const BasicVariableKey *key,
         return BVS_NOT_FOUND;
     }
     store->entries[index].value = *value;
+    return BVS_OK;
+}
+
+/* Validate every aspect before the sole commit. Unlike create+set there is
+ * no externally visible half-created entry when the store is exhausted. */
+BVSStatus bvs_assign(BasicVariableStore *store, const BasicVariableKey *key,
+                     const BasicVariableValue *value)
+{
+    size_t bytes, index;
+    BVSStatus status;
+    BasicVariableEntry entry;
+    if (store == NULL || key == NULL || value == NULL) {
+        return BVS_INVALID_ARGUMENT;
+    }
+    status = check_store(store, &bytes, 1);
+    if (status != BVS_OK) {
+        return status;
+    }
+    if (unsafe(store, bytes, key, sizeof(*key)) ||
+        unsafe(store, bytes, value, sizeof(*value)) ||
+        overlaps(key, sizeof(*key), value, sizeof(*value))) {
+        return BVS_OVERLAPPING_MEMORY;
+    }
+    if (!valid_key(key)) {
+        return BVS_INVALID_KEY;
+    }
+    if (!valid_type(value->type) || value->type != key->type) {
+        return BVS_INVALID_TYPE;
+    }
+    if (!valid_value(value)) {
+        return BVS_UNSUPPORTED_STRING;
+    }
+    index = locate(store, key);
+    if (index == store->count) {
+        if (index == store->capacity) {
+            return BVS_FULL;
+        }
+        memset(&entry, 0, sizeof(entry));
+        entry.key = *key;
+        entry.value = *value;
+        store->entries[index] = entry;
+        store->count = index + 1u;
+    } else {
+        store->entries[index].value = *value;
+    }
     return BVS_OK;
 }

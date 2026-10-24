@@ -55,7 +55,7 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 
 ## Où en sommes-nous ?
 
-Les **jalons J0.1 à J0.11 sont acceptés et fusionnés**. Ils constituent un **socle minimal**, pas encore le langage complet :
+Les **jalons J0.1 à J0.12 sont acceptés et fusionnés** (J0.12 est une étude de conception, pas une nouvelle fonctionnalité BASIC). Ils constituent un **socle minimal**, pas encore le langage complet :
 
 | Domaine | État du projet |
 | --- | --- |
@@ -67,6 +67,7 @@ Les **jalons J0.1 à J0.11 sont acceptés et fusionnés**. Ils constituent un **
 | Console de démonstration Linux | **J0.9 livré** : `loco_basic_cli`, méta-commandes `:help`, `:step`, `:stop`, `:quit` |
 | Commentaires BASIC historiques | **J0.10 livré** : `REM` et apostrophe `'` tokenisés, conservés par `LIST` et ignorés correctement par `RUN` |
 | Fin explicite d'exécution | **J0.11 livré** : `END` historique (`0x98`), prise en charge par tokenizer, `LIST` et exécution `RUN` |
+| Variables et expressions CPC | **J0.12 : architecture et spécification ROM documentées**, implémentation non commencée ; types INT16 / REAL5 / STRING et contraintes de fidélité identifiés |
 | Variables, expressions générales, autres commandes, nombres réels CPC | **À développer** |
 | Graphismes CPC, interface CYD, microSD et firmware autonome | **À développer** |
 | Validation différentielle complète face au CPC 6128 | **À réaliser** |
@@ -115,7 +116,7 @@ ctest --test-dir build-asan --output-on-failure
 
 Les commandes BASIC prises en charge dans ce prototype sont notamment les lignes numérotées, `LIST`, `NEW`, `RUN`, `PRINT` simple, `GOTO`, `END`, `REM` et les commentaires par apostrophe (`'`). Les méta-commandes **propres à l'outil Linux** (`:help`, `:step`, `:stop`, `:quit`) ne font pas partie du Locomotive BASIC historique. L'exécution de `RUN` nécessite un pilotage explicite par `:step` à ce stade.
 
-Les tests du jalon J0.11 ont validé **9/9 suites** dans chacune des deux configurations CI ([GitHub Actions #40086783912](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40086783912)). Cette validation interne ne certifie pas encore la compatibilité binaire avec un CPC 6128 de référence.
+La CI du jalon documentaire J0.12 a confirmé **9/9 suites** dans chacune des deux configurations CI ([GitHub Actions #40088544353](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40088544353)). Cette validation interne ne certifie pas encore la compatibilité binaire avec un CPC 6128 de référence.
 
 ## Ligne directrice du projet
 

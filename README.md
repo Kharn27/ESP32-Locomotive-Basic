@@ -55,7 +55,7 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 
 ## Où en sommes-nous ?
 
-Les **jalons J0.1 à J0.9 sont acceptés et fusionnés**. Ils constituent un **socle minimal**, pas encore le langage complet :
+Les **jalons J0.1 à J0.10 sont acceptés et fusionnés**. Ils constituent un **socle minimal**, pas encore le langage complet :
 
 | Domaine | État du projet |
 | --- | --- |
@@ -65,6 +65,7 @@ Les **jalons J0.1 à J0.9 sont acceptés et fusionnés**. Ils constituent un **s
 | `PRINT` (formes simples) et `GOTO` | Exécuteur natif pas-à-pas implémenté |
 | `RUN`, reprise depuis le début, arrêt externe et état de session | Orchestration native non bloquante implémentée |
 | Console de démonstration Linux | **J0.9 livré** : `loco_basic_cli`, méta-commandes `:help`, `:step`, `:stop`, `:quit` |
+| Commentaires BASIC historiques | **J0.10 livré** : `REM` et apostrophe `'` tokenisés, conservés par `LIST` et ignorés correctement par `RUN` |
 | Variables, expressions générales, autres commandes, nombres réels CPC | **À développer** |
 | Graphismes CPC, interface CYD, microSD et firmware autonome | **À développer** |
 | Validation différentielle complète face au CPC 6128 | **À réaliser** |
@@ -111,9 +112,9 @@ ctest --test-dir build-asan --output-on-failure
 ./build/loco_basic_cli
 ```
 
-Les commandes BASIC prises en charge dans ce prototype sont notamment les lignes numérotées, `LIST`, `NEW`, `RUN`, `PRINT` simple et `GOTO`. Les méta-commandes **propres à l'outil Linux** (`:help`, `:step`, `:stop`, `:quit`) ne font pas partie du Locomotive BASIC historique. L'exécution de `RUN` nécessite un pilotage explicite par `:step` à ce stade.
+Les commandes BASIC prises en charge dans ce prototype sont notamment les lignes numérotées, `LIST`, `NEW`, `RUN`, `PRINT` simple, `GOTO`, `REM` et les commentaires par apostrophe (`'`). Les méta-commandes **propres à l'outil Linux** (`:help`, `:step`, `:stop`, `:quit`) ne font pas partie du Locomotive BASIC historique. L'exécution de `RUN` nécessite un pilotage explicite par `:step` à ce stade.
 
-Les tests du jalon J0.9 ont validé **7/7 suites** dans chacune des deux configurations CI ([GitHub Actions #40083698694](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40083698694)).
+Les tests du jalon J0.10 ont validé **8/8 suites** dans chacune des deux configurations CI ([GitHub Actions #40085113134](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40085113134)). Cette validation interne ne certifie pas encore la compatibilité binaire avec un CPC 6128 de référence.
 
 ## Ligne directrice du projet
 

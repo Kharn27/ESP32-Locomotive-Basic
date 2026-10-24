@@ -144,6 +144,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         switch (token) {
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
         case 0xa0u: statement = BL_ST_GOTO; status = append_word(out, "GOTO"); break;
+        case 0x98u: status = append_word(out, "END"); break;
         case 0xa7u: status = append_word(out, "LIST"); break;
         case 0xcau: status = append_word(out, "RUN"); break;
         case 0xb1u: status = append_word(out, "NEW"); break;

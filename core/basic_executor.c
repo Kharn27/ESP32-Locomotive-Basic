@@ -206,6 +206,17 @@ static BEStatus execute_line(const BasicProgram *program,
             }
             *next = target.offset;
             return BE_OK;
+        } else if (token == 0x98u) { /* END — basic.asm E663, CC31. */
+            /* Validate only the reached statement's syntax. As for GOTO,
+             * a suffix after an explicit colon is never executed here. */
+            skip_spaces(body, length, &pos);
+            if (pos < length && body[pos] != 0x01u) {
+                return unexpected(body[pos]);
+            }
+            /* bp_next() sees this program's terminal 00 00 at size - 2.
+             * The host observes BE_OK now, BE_END on its next call. */
+            *next = program->size - 2u;
+            return BE_OK;
         } else if (token == 0xa7u || token == 0xb1u || token == 0xcau) {
             return BE_UNSUPPORTED; /* LIST, NEW, RUN in stored programs. */
         } else {

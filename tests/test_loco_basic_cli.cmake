@@ -109,4 +109,10 @@ check_case("crlf-unterminated"
     "${banner}${ok}${running}${step1}${byebye}"
 )
 
-message(STATUS "host_cli: ten black-box scenarios passed")
+check_case("comments-rem-and-apostrophe"
+    "10 PRINT \"BONJOUR\":REM PRINT \"INTERDIT\"\n20 ' : PRINT \"HIDDEN\"\n30 PRINT 42\nLIST\nRUN\n:step\n:step\n:step\n:step\n:quit\n"
+    "10 PRINT \"BONJOUR\":REM PRINT \"INTERDIT\"\n20 ' : PRINT \"HIDDEN\"\n30 PRINT 42\nBONJOUR\n42\n"
+    "${banner}${ok}${ok}${ok}${listed}${running}${step1}${step1}${step1}${ended}${byebye}"
+)
+
+message(STATUS "host_cli: eleven black-box scenarios passed")

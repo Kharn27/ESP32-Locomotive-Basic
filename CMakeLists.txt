@@ -74,3 +74,10 @@ if(BUILD_TESTING)
         "-DTEST_TEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_loco_basic_cli.cmake")
 endif()
+
+# J0.10: end-to-end numbered comments on the existing native stack.
+if(BUILD_TESTING)
+    add_executable(test_basic_comments tests/test_basic_comments.c)
+    target_link_libraries(test_basic_comments PRIVATE basic_session_runtime)
+    add_test(NAME comments COMMAND test_basic_comments)
+endif()

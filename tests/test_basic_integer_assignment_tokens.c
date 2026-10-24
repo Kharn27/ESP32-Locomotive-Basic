@@ -149,6 +149,27 @@ static int test_imported_and_bad_listing(void)
     return 0;
 }
 
+static int test_program_imported_caches(void)
+{
+    /* Cache values are opaque: even 20 (space) and EF (=) MUST NOT be
+     * consumed as syntax. The same rule holds for imported programme lines. */
+    static const uint8_t implicit[] = {2,0x20,0xef,0xc1,0xef,0x10};
+    static const uint8_t explicit_let[] = {0xa5,' ',2,0x20,0x20,0xc2,0xef,0x11};
+    static const char *expected = "10 A%=2\n20 LET B%=3\n";
+    uint8_t storage[128], image[128], before[128], output[128];
+    size_t bytes, listed, saved;
+    BasicProgram program;
+    CHECK(bp_init(&program, storage, sizeof(storage)) == BP_OK);
+    CHECK(bp_put(&program, 10u, implicit, sizeof(implicit)) == BP_OK);
+    CHECK(bp_put(&program, 20u, explicit_let, sizeof(explicit_let)) == BP_OK);
+    CHECK(bp_export(&program, before, sizeof(before), &saved) == BP_OK);
+    CHECK(bl_list_program(&program, output, sizeof(output), &listed) == BL_OK);
+    CHECK(listed == strlen(expected) && memcmp(output, expected, listed) == 0);
+    CHECK(bp_export(&program, image, sizeof(image), &bytes) == BP_OK);
+    CHECK(bytes == saved && memcmp(image, before, saved) == 0);
+    return 0;
+}
+
 static int test_capacity(void)
 {
     static const char *input = "LET ABC.2% = 255:END";
@@ -182,7 +203,7 @@ static int test_program_and_run(void)
     BasicProgram program;
     BasicExecutor executor;
     BasicVariableStore store;
-    BasicVariableEntry entries[2];
+    BasicVariableEntry entries[2], entries_before[2];
     size_t n, image_length, before_length, listed, i, at = 0u;
     BasicProgramLine line;
     CHECK(bp_init(&program, storage, sizeof(storage)) == BP_OK);
@@ -209,8 +230,10 @@ static int test_program_and_run(void)
         at = end + 1u;
     }
     CHECK(at == listed);
+    memset(entries, 0xa8, sizeof(entries));
     CHECK(bvs_init(&store, entries, 2u) == BVS_OK);
     CHECK(store.count == 0u);
+    memcpy(entries_before, entries, sizeof(entries));
     CHECK(be_init(&executor, &program) == BE_OK);
     memset(output, 0x35, sizeof(output));
     memcpy(snapshot, output, sizeof(output));
@@ -218,7 +241,8 @@ static int test_program_and_run(void)
     CHECK(be_step(&executor, output, sizeof(output), &n) == BE_UNSUPPORTED);
     CHECK(executor.cursor == 0u && n == 987u &&
           memcmp(output, snapshot, sizeof(output)) == 0);
-    CHECK(store.count == 0u);
+    CHECK(store.count == 0u &&
+          memcmp(entries_before, entries, sizeof(entries)) == 0);
     CHECK(bp_export(&program, image, sizeof(image), &image_length) == BP_OK);
     CHECK(image_length == before_length &&
           memcmp(saved, image, image_length) == 0);
@@ -242,6 +266,7 @@ int main(void)
     CHECK(test_naming() == 0);
     CHECK(test_rejections() == 0);
     CHECK(test_imported_and_bad_listing() == 0);
+    CHECK(test_program_imported_caches() == 0);
     CHECK(test_capacity() == 0);
     CHECK(test_program_and_run() == 0);
     puts("J0.18 INTEGER assignment tokens: OK (synthetic vectors)");

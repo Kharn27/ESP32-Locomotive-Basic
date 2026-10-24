@@ -279,7 +279,7 @@ static int test_run_new_and_regressions(void)
     CHECK(put(&h, 60u, "REM IGNORE") == 0);
     CHECK(put(&h, 70u, "END") == 0);
     CHECK(put(&h, 80u, "PRINT \"NEVER\"") == 0);
-    CHECK(bsr_init_with_store(&rt, &h.program, &h.store) == BSR_OK);
+    CHECK(bsr_init_with_store(&rt, &h.program, &h.store).status == BSR_OK);
     h.written = 10u;
     CHECK(submit(&h, &rt, "RUN", BSR_OK) == 0);
     CHECK(h.written == 0u && h.store.count == 0u);

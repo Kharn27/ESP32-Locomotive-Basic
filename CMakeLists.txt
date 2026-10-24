@@ -130,3 +130,16 @@ if(BUILD_TESTING)
                           basic_variable_ref basic_session_runtime)
     add_test(NAME explicit_variable_tokens COMMAND test_basic_explicit_variable_tokens)
 endif()
+
+
+# J0.17: native, side-effect-free explicit scalar reference to store binding.
+add_library(basic_variable_binding STATIC core/basic_variable_binding.c)
+target_include_directories(basic_variable_binding PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
+target_link_libraries(basic_variable_binding PUBLIC basic_variable_ref
+                      basic_variable_types basic_variable_store)
+
+if(BUILD_TESTING)
+    add_executable(test_basic_variable_binding tests/test_basic_variable_binding.c)
+    target_link_libraries(test_basic_variable_binding PRIVATE basic_variable_binding)
+    add_test(NAME basic_variable_binding COMMAND test_basic_variable_binding)
+endif()

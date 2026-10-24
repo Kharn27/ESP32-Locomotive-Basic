@@ -255,6 +255,40 @@ static int test_program_cache_and_run(void)
     CHECK(bp_export(&program, image, sizeof(image), &w) == BP_OK);
     CHECK(bl_list_program(&program, listing, sizeof(listing), &n) == BL_OK);
     CHECK(n == strlen(expected) && memcmp(listing, expected, n) == 0);
+    /* Genuine tokenize -> numbered program -> LIST -> tokenize roundtrip. */
+    {
+        size_t offset = 0u;
+        for (i = 0u; i < 4u; ++i) {
+            size_t end = offset;
+            size_t again = 0u;
+            BasicProgramLine line;
+            while (end < n && listing[end] != (uint8_t)'\n') {
+                ++end;
+            }
+            CHECK(end < n && end >= offset + 3u);
+            CHECK(bt_tokenize(listing + offset + 3u,
+                              end - offset - 3u, body,
+                              sizeof(body), &again) == BT_OK);
+            CHECK(bp_find(&program, (uint16_t)((i + 1u) * 10u), &line) == BP_OK);
+            CHECK(again == line.body_length);
+            CHECK(memcmp(body, program.data + line.body_offset, again) == 0);
+            offset = end + 1u;
+        }
+    }
+    /* Program-wide LIST errors must be atomic even after valid lines. */
+    {
+        const uint8_t broken[] = {0xbfu, ' ', 0x02u, 0u, 0u, 'A'};
+        uint8_t before[sizeof(listing)];
+        size_t failed_written = 556u;
+        CHECK(bp_put(&program, 60u, broken, sizeof(broken)) == BP_OK);
+        memset(listing, 0x39, sizeof(listing));
+        memcpy(before, listing, sizeof(listing));
+        CHECK(bl_list_program(&program, listing, sizeof(listing),
+                              &failed_written) == BL_TRUNCATED);
+        CHECK(failed_written == 556u);
+        CHECK(memcmp(listing, before, sizeof(listing)) == 0);
+        CHECK(bp_delete(&program, 60u) == BP_OK);
+    }
     {
         uint8_t after[1024];
         size_t a;

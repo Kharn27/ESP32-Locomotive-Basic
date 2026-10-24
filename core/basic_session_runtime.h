@@ -36,6 +36,7 @@ typedef struct {
  * borrowed. Do not modify the public fields except via bsr_* calls. */
 typedef struct BasicSessionRuntime {
     BasicProgram *program;
+    BasicVariableStore *variables; /* NULL: legacy runtime, no assignment. */
     BasicExecutor executor;
     BSRState state;
 } BasicSessionRuntime;
@@ -43,6 +44,10 @@ typedef struct BasicSessionRuntime {
 /* Validate program and initialize IDLE. Any failure preserves runtime.
  * runtime, program descriptor and entire program storage must be disjoint. */
 BSRResult bsr_init(BasicSessionRuntime *runtime, BasicProgram *program);
+/* Optional variable store; borrowed, never allocated. Store validated but not
+ * reset here. A successful RUN or NEW clears it; STOP preserves its values. */
+BSRResult bsr_init_with_store(BasicSessionRuntime *runtime, BasicProgram *program,
+                              BasicVariableStore *variables);
 
 /* Submit exactly source_length bytes. RUN (any ASCII case, with outer
  * ASCII spaces) validates and resets executor without executing a line.
@@ -52,6 +57,8 @@ BSRResult bsr_init(BasicSessionRuntime *runtime, BasicProgram *program);
  *
  * On failure: output, *written, program, runtime remain unchanged; the
  * caller-provided temporary buffer may change if tokenization was reached.
+ * When configured, the store descriptor/entries are also disjoint from all
+ * argument regions and fully validated before any program mutation.
  * All full-capacity regions (runtime descriptor, program descriptor,
  * program storage, source, temporary, output and *written) must be pairwise
  * disjoint. Non-NULL pointers are required even for zero capacities.

@@ -213,6 +213,12 @@ static int test_program_and_run(void)
         CHECK(bp_put(&program, (uint16_t)((i+1u)*10u), body, n) == BP_OK);
     }
     CHECK(bp_export(&program, saved, sizeof(saved), &before_length) == BP_OK);
+    memset(listing, 0x2b, sizeof(listing));
+    memset(output, 0x2b, sizeof(output));
+    listed = 12345u;
+    CHECK(bl_list_program(&program, output, 4u, &listed) == BL_NO_SPACE);
+    CHECK(listed == 12345u);
+    for (i = 0u; i < sizeof(output); ++i) CHECK(output[i] == 0x2bu);
     CHECK(bl_list_program(&program, listing, sizeof(listing), &listed) == BL_OK);
     CHECK(listed == strlen(expected) && memcmp(listing, expected, listed) == 0);
     CHECK(bp_export(&program, image, sizeof(image), &image_length) == BP_OK);
@@ -260,6 +266,26 @@ static int test_program_and_run(void)
     return 0;
 }
 
+static int test_run_no_partial_print(void)
+{
+    static const char *line = "PRINT \"INTERDIT\":A%=2";
+    uint8_t storage[128], body[128], output[128], before[128];
+    BasicProgram program;
+    BasicExecutor executor;
+    size_t n, written = 77u;
+    CHECK(bp_init(&program, storage, sizeof(storage)) == BP_OK);
+    CHECK(bt_tokenize((const uint8_t *)line, strlen(line),
+                      body, sizeof(body), &n) == BT_OK);
+    CHECK(bp_put(&program, 10u, body, n) == BP_OK);
+    CHECK(be_init(&executor, &program) == BE_OK);
+    memset(output, 0x7au, sizeof(output));
+    memcpy(before, output, sizeof(before));
+    CHECK(be_step(&executor, output, sizeof(output), &written) == BE_UNSUPPORTED);
+    CHECK(written == 77u && executor.cursor == 0u &&
+          memcmp(before, output, sizeof(before)) == 0);
+    return 0;
+}
+
 int main(void)
 {
     CHECK(test_vectors() == 0);
@@ -269,6 +295,7 @@ int main(void)
     CHECK(test_program_imported_caches() == 0);
     CHECK(test_capacity() == 0);
     CHECK(test_program_and_run() == 0);
+    CHECK(test_run_no_partial_print() == 0);
     puts("J0.18 INTEGER assignment tokens: OK (synthetic vectors)");
     return 0;
 }

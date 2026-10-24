@@ -74,6 +74,22 @@ static BEStatus unexpected(uint8_t token)
     return BE_BAD_SEQUENCE;
 }
 
+/* A comment terminates this numbered line even if its tail appears to
+ * contain further statements. Reject forbidden input control bytes in
+ * manually imported bodies as well. */
+static BEStatus comment_end(const uint8_t *body, size_t length, size_t pos,
+                            size_t next_line, size_t *next)
+{
+    while (pos < length) {
+        uint8_t c = body[pos++];
+        if (c == 0u || c == (uint8_t)'\r' || c == (uint8_t)'\n') {
+            return BE_BAD_SEQUENCE;
+        }
+    }
+    *next = next_line;
+    return BE_OK;
+}
+
 /* Parse/execute precisely the reached prefix of one numbered line.
  * A successful GOTO returns immediately; the suffix is not inspected.
  * next is written only on success. No output passes occur before validation. */
@@ -95,6 +111,14 @@ static BEStatus execute_line(const BasicProgram *program,
             return BE_OK;
         }
         token = body[pos++];
+        if (token == 0xc5u) { /* REM */
+            return comment_end(body, length, pos, line->next_offset, next);
+        }
+        if (token == 0x01u && pos < length && body[pos] == 0xc0u) {
+            /* Apostrophe marker E1BC: 01 C0, not an empty statement. */
+            return comment_end(body, length, pos + 1u,
+                               line->next_offset, next);
+        }
         if (token == 0xbfu) { /* PRINT */
             argument_start = pos;
             skip_spaces(body, length, &pos);
@@ -195,11 +219,18 @@ static BEStatus execute_line(const BasicProgram *program,
         if (body[pos] != 0x01u) {
             return unexpected(body[pos]);
         }
+        if (pos + 1u < length && body[pos + 1u] == 0xc0u) {
+            return comment_end(body, length, pos + 2u,
+                               line->next_offset, next);
+        }
         ++pos;
         {
             size_t following = pos;
             skip_spaces(body, length, &following);
-            if (following == length || body[following] == 0x01u) {
+            if (following == length ||
+                (body[following] == 0x01u &&
+                 (following + 1u == length ||
+                  body[following + 1u] != 0xc0u))) {
                 return BE_BAD_SEQUENCE;
             }
         }

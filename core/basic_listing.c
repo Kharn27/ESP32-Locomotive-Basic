@@ -11,6 +11,7 @@ typedef struct {
 typedef enum {
     BL_ST_PRINT,
     BL_ST_GOTO,
+    BL_ST_ASSIGN,
     BL_ST_EMPTY
 } BLStatement;
 
@@ -143,6 +144,8 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             return append_comment(body, length, pos, out);
         }
         switch (token) {
+        case 0x02u: statement = BL_ST_ASSIGN; status = BL_OK; break;
+        case 0xa5u: statement = BL_ST_ASSIGN; status = append_word(out, "LET"); break;
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
         case 0xa0u: statement = BL_ST_GOTO; status = append_word(out, "GOTO"); break;
         case 0x98u: status = append_word(out, "END"); break;
@@ -163,7 +166,92 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             return status;
         }
 
-        if (statement == BL_ST_PRINT && pos < length && body[pos] != 0x01u) {
+        if (statement == BL_ST_ASSIGN) {
+            BasicVariableRef ref;
+            BVRStatus ref_status;
+            size_t ref_start = token == 0x02u ? pos - 1u : pos;
+            size_t i;
+            uint8_t t;
+            unsigned int number;
+            /* A5 is explicit LET, 02 begins implicit LET; both reuse the
+             * CPC explicit INTEGER reference decoder, ignoring cache values. */
+            if (ref_start >= length) {
+                return BL_TRUNCATED;
+            }
+            if (body[ref_start] != 0x02u) {
+                return body[ref_start] >= 0x80u ?
+                       BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
+            }
+            ref_status = bvr_decode(body, length, ref_start, &ref);
+            if (ref_status == BVR_TRUNCATED) {
+                return BL_TRUNCATED;
+            }
+            if (ref_status != BVR_OK ||
+                ref.family != BVR_FAMILY_EXPLICIT ||
+                ref.explicit_type != BVR_TYPE_INTEGER) {
+                return BL_BAD_SEQUENCE;
+            }
+            /* A5 02 without an intervening space is valid imported binary;
+             * spelling LET A% makes the listing retokenisable. */
+            if (token == 0xa5u && ref_start == space_start) {
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) {
+                    return status;
+                }
+            }
+            for (i = 0u; i < ref.name_length; ++i) {
+                status = append_byte(out,
+                    (uint8_t)(body[ref.name_offset + i] & 0x7fu));
+                if (status != BL_OK) {
+                    return status;
+                }
+            }
+            status = append_byte(out, (uint8_t)'%');
+            if (status != BL_OK) {
+                return status;
+            }
+            pos = ref.reference_offset + ref.consumed;
+            status = append_spaces(body, length, &pos, out);
+            if (status != BL_OK) {
+                return status;
+            }
+            if (pos >= length) {
+                return BL_BAD_SEQUENCE;
+            }
+            if (body[pos++] != 0xefu) {
+                return BL_BAD_SEQUENCE;
+            }
+            status = append_byte(out, (uint8_t)'=');
+            if (status != BL_OK) {
+                return status;
+            }
+            status = append_spaces(body, length, &pos, out);
+            if (status != BL_OK) {
+                return status;
+            }
+            if (pos >= length) {
+                return BL_TRUNCATED;
+            }
+            t = body[pos++];
+            if (t >= 0x0eu && t <= 0x17u) {
+                number = (unsigned int)(t - 0x0eu);
+            } else if (t == 0x19u) {
+                if (pos == length) {
+                    return BL_TRUNCATED;
+                }
+                number = (unsigned int)body[pos++];
+                if (number < 10u) {
+                    return BL_BAD_SEQUENCE;
+                }
+            } else {
+                return t >= 0x80u || (t >= 0x0eu && t <= 0x1fu)
+                        ? BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
+            }
+            status = append_decimal(out, number);
+            if (status != BL_OK) {
+                return status;
+            }
+        } else if (statement == BL_ST_PRINT && pos < length && body[pos] != 0x01u) {
             uint8_t t = body[pos++];
             if (t == (uint8_t)'"') {
                 status = append_byte(out, t);

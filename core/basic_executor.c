@@ -101,9 +101,10 @@ static BEStatus execute_line(const BasicProgram *program,
             if (pos < length && body[pos] != 0x01u) {
                 token = body[pos++];
                 if (token == (uint8_t)'"') {
-                    /* Raw colon (3A) belongs to the string, unlike 01.
-                     * A missing quote ends at the statement boundary. */
-                    while (pos < length && body[pos] != 0x01u) {
+                    /* A quoted string may contain raw 0x01 (or ':').
+                     * Only the closing quote or end of body terminates it.
+                     * 0x01 separates statements only outside strings. */
+                    while (pos < length) {
                         uint8_t c = body[pos++];
                         if (c == (uint8_t)'"') {
                             break;

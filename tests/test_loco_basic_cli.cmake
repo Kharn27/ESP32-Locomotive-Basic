@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.13)
+
 # J0.9 black-box integration: launch the real CLI with scripted stdin.
 if(NOT DEFINED CLI OR NOT EXISTS "${CLI}")
     message(FATAL_ERROR "CLI executable missing: ${CLI}")
@@ -45,7 +47,7 @@ set(executor_missing "[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_
 check_case("run-list-end"
     "20 PRINT 42\n10 PRINT \"HELLO\"\nLIST\nRUN\n:step\n:step\n:step\n:quit\n"
     "10 PRINT \"HELLO\"\n20 PRINT 42\nHELLO\n42\n"
-    "${banner}${ok}${ok}${listed}${running}@step1@@step1@${ended}${byebye}"
+    "${banner}${ok}${ok}${listed}${running}${step1}${step1}${ended}${byebye}"
 )
 
 check_case("loop-stop-new"
@@ -57,7 +59,7 @@ check_case("loop-stop-new"
 check_case("edit-new-restart"
     "10 PRINT 1\n10 PRINT 2\nRUN\n:step\n:step\nNEW\n10 PRINT 3\nRUN\n:step\n:step\n:quit\n"
     "2\n3\n"
-    "${banner}${ok}${ok}${running}@step1@${ended}${ok}${ok}${running}@step1@${ended}${byebye}"
+    "${banner}${ok}${ok}${running}${step1}${ended}${ok}${ok}${running}${step1}${ended}${byebye}"
 )
 
 set(invalid "[cli:error] INVALID_STEP (expected 1..100)\n")
@@ -80,13 +82,13 @@ endforeach()
 check_case("long-line-resync"
     "${long_line}\n20 PRINT \"OK\"\nLIST\nRUN\n:step\n:step\n:quit\n"
     "20 PRINT \"OK\"\nOK\n"
-    "${banner}[cli:error] INPUT_TOO_LONG\n${ok}${listed}${running}@step1@${ended}${byebye}"
+    "${banner}[cli:error] INPUT_TOO_LONG\n${ok}${listed}${running}${step1}${ended}${byebye}"
 )
 
 check_case("executor-error-and-eof"
     "10 PRINT 9\n20 GOTO 999\nRUN\n:step\n:step\n:step\n:stop\nRUN\n:step\n:step\n:stop\n"
     "9\n9\n"
-    "${banner}${ok}${ok}${running}@step1@${executor_missing}${executor_missing}${stopped}${running}@step1@${executor_missing}${stopped}${eof}"
+    "${banner}${ok}${ok}${running}${step1}${executor_missing}${executor_missing}${stopped}${running}${step1}${executor_missing}${stopped}${eof}"
 )
 
 check_case("busy-list"
@@ -104,7 +106,7 @@ check_case("help"
 check_case("crlf-unterminated"
     "10 PRINT 5\r\nRUN\r\n:step\r\n:quit"
     "5\n"
-    "${banner}${ok}${running}@step1@${byebye}"
+    "${banner}${ok}${running}${step1}${byebye}"
 )
 
 message(STATUS "host_cli: ten black-box scenarios passed")

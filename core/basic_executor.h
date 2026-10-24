@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "basic_program.h"
+#include "basic_variable_store.h"
 
 /* J0.7 host diagnostics, not Locomotive BASIC error codes. */
 typedef enum {
@@ -17,12 +18,17 @@ typedef enum {
     BE_UNSUPPORTED,
     BE_MISSING_TARGET,
     BE_NO_SPACE,
-    BE_OVERLAP
+    BE_OVERLAP,
+    BE_STORE_FULL,
+    BE_INVALID_STORE,
+    BE_INVALID_KEY,
+    BE_INVALID_TYPE
 } BEStatus;
 
 typedef struct {
     const BasicProgram *program; /* Borrowed; immutable through execution. */
     size_t cursor;               /* Offset of next record (or sentinel). */
+    BasicVariableStore *variables; /* Optional borrowed caller-owned store. */
 } BasicExecutor;
 
 /* Validate a program and reset execution to its first line.
@@ -30,6 +36,10 @@ typedef struct {
  * program storage must be disjoint, including unused storage capacity.
  */
 BEStatus be_init(BasicExecutor *executor, const BasicProgram *program);
+/* Explicit store variant. Does not clear the store; legacy be_init has no
+ * store and continues returning BE_UNSUPPORTED for INTEGER assignment. */
+BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program,
+                            BasicVariableStore *variables);
 
 /* Execute at most ONE numbered line. END commits the reached prefix's output
  * and moves the cursor to the program sentinel; the NEXT be_step returns

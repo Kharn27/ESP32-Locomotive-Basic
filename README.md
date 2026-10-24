@@ -55,26 +55,23 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 
 ## Où en sommes-nous ?
 
-Les **jalons J0.1 à J0.12 sont acceptés et fusionnés** (J0.12 est une étude de conception, pas une nouvelle fonctionnalité BASIC). Ils constituent un **socle minimal**, pas encore le langage complet :
+**Jalons J0.1 à J0.18 acceptés et fusionnés.** Le projet possède un socle Linux C99 testable, mais **ne sait pas encore exécuter un programme CPC 6128 arbitraire**. Le jalon J0 (socle exécutable cohérent) n'est **pas terminé** : il manque notamment l'exécution des variables et affectations, les expressions, la confrontation indépendante au CPC et une estimation du budget mémoire CYD.
 
-| Domaine | État du projet |
+| Domaine | État vérifié sur `main` |
 | --- | --- |
-| Analyse du BASIC 1.1, format des lignes et tokens | Documentation et spécification de travail disponibles |
-| Stockage de programme, tokeniseur, détokéniseur et `LIST` | Sous-ensemble implémenté, testé sous Linux |
-| Édition des lignes et `NEW` | Sous-ensemble implémenté |
-| `PRINT` (formes simples) et `GOTO` | Exécuteur natif pas-à-pas implémenté |
-| `RUN`, reprise depuis le début, arrêt externe et état de session | Orchestration native non bloquante implémentée |
-| Console de démonstration Linux | **J0.9 livré** : `loco_basic_cli`, méta-commandes `:help`, `:step`, `:stop`, `:quit` |
-| Commentaires BASIC historiques | **J0.10 livré** : `REM` et apostrophe `'` tokenisés, conservés par `LIST` et ignorés correctement par `RUN` |
-| Fin explicite d'exécution | **J0.11 livré** : `END` historique (`0x98`), prise en charge par tokenizer, `LIST` et exécution `RUN` |
-| Variables et expressions CPC | **J0.12 : architecture et spécification ROM documentées**, implémentation non commencée ; types INT16 / REAL5 / STRING et contraintes de fidélité identifiés |
-| Variables, expressions générales, autres commandes, nombres réels CPC | **À développer** |
-| Graphismes CPC, interface CYD, microSD et firmware autonome | **À développer** |
-| Validation différentielle complète face au CPC 6128 | **À réaliser** |
+| Programme et représentation CPC | Stockage, édition de lignes numérotées, import/export tokenisé, tokeniseur, détokéniseur, `LIST` et `NEW` pour un **sous-ensemble** (J0.1–J0.6) |
+| Exécution BASIC native | `PRINT` littéral ou constante simple, `GOTO`, `END`, `REM`, apostrophe ; `RUN` piloté pas à pas et arrêt externe (J0.7–J0.11) |
+| Environnement de test | Console Linux `loco_basic_cli` avec `:help`, `:step`, `:stop`, `:quit`, exclusivement pour le développement (J0.9) |
+| Types, références et magasin | Spécification de la représentation CPC, décodage borné des références, types implicites et clés canoniques, magasin scalaire INT16 / REAL5 / STRING vide, résolution et lecture **hors exécution BASIC** (J0.12–J0.15, J0.17) |
+| Variables dans `PRINT` | Références suffixées `%`, `$`, `!` tokenisées et listables ; **la valeur n'est pas encore évaluée ni imprimée par `RUN`** (J0.16) |
+| Affectations INTEGER | `A%=2` et `LET A%=2` : représentation CPC et `LIST` ; constantes décimales 0 à 255 seulement ; **`RUN` renvoie `BE_UNSUPPORTED`** (J0.18) |
+| Évaluateur complet, nombres CPC5, autres commandes | **Non implémentés** ; ni expressions générales, ni affectations exécutables, ni support intégral du dialecte |
+| Écran et périphériques ESP32 CYD | **Non intégrés** : pas encore de firmware autonome, graphismes CPC, tactile ou microSD |
+| Compatibilité historique validée sur CPC indépendant | **Non acquise** : les vecteurs actuellement utilisés sont principalement des tests internes dérivés du désassemblage |
 
-Le projet **ne peut pas encore faire tourner arbitrairement un programme CPC 6128**. Certains formats et comportements sont des hypothèses de travail à confirmer sur une référence indépendante.
+Les résultats internes du dernier jalon vérifié sont **15/15 suites CTest sous Linux et 15/15 sous ASan/UBSan** ([GitHub Actions #40142218739](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40142218739)). Ils démontrent le succès des tests de ce périmètre, **pas une compatibilité CPC 6128 complète**.
 
-Consulter les [décisions, PR fusionnées, risques et jalons](docs/PROJECT_STATUS.md) et les spécifications `docs/J0.*` pour connaître le périmètre exact de chaque livraison.
+Voir le [suivi des jalons et des risques](docs/PROJECT_STATUS.md), les [barrières J0 → J1](docs/ROADMAP_GATES.md) et les spécifications dans `docs/J0.*` pour la portée exacte et les preuves de chaque mission.
 
 ## Architecture du dépôt
 
@@ -114,9 +111,9 @@ ctest --test-dir build-asan --output-on-failure
 ./build/loco_basic_cli
 ```
 
-Les commandes BASIC prises en charge dans ce prototype sont notamment les lignes numérotées, `LIST`, `NEW`, `RUN`, `PRINT` simple, `GOTO`, `END`, `REM` et les commentaires par apostrophe (`'`). Les méta-commandes **propres à l'outil Linux** (`:help`, `:step`, `:stop`, `:quit`) ne font pas partie du Locomotive BASIC historique. L'exécution de `RUN` nécessite un pilotage explicite par `:step` à ce stade.
+Ce prototype accepte les lignes numérotées, `LIST`, `NEW`, `RUN`, `PRINT` sur littéral ou constante simple, `GOTO`, `END`, `REM` et l'apostrophe (`'`). Les références de variables explicites dans `PRINT` et les affectations `INTEGER` avec/sans `LET` sont **tokenisées et listées mais ne sont pas encore exécutables**. Les méta-commandes Linux (`:help`, `:step`, `:stop`, `:quit`) ne font **pas** partie du Locomotive BASIC historique ; `RUN` est piloté explicitement par `:step`.
 
-La CI du jalon documentaire J0.12 a confirmé **9/9 suites** dans chacune des deux configurations CI ([GitHub Actions #40088544353](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40088544353)). Cette validation interne ne certifie pas encore la compatibilité binaire avec un CPC 6128 de référence.
+Pour J0.18, la CI a validé **15/15 suites** dans chaque configuration ([GitHub Actions #40142218739](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40142218739)). Ces tests n'établissent pas, à eux seuls, la fidélité binaire à un CPC 6128 de référence.
 
 ## Ligne directrice du projet
 

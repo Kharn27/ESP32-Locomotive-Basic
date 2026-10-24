@@ -207,8 +207,10 @@ BSRResult bsr_step(BasicSessionRuntime *runtime,
     }
     status = be_step(&runtime->executor, output, output_capacity, written);
     if (status == BE_END) {
+        BSRResult ended = simple(BSR_END);
         runtime->state = BSR_IDLE;
-        return simple(BSR_END);
+        ended.executor_status = BE_END;
+        return ended;
     }
     if (status != BE_OK) {
         return from_executor(status);

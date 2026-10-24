@@ -27,7 +27,7 @@ target_link_libraries(basic_tokenizer PUBLIC basic_variable_ref)
 
 add_library(basic_executor STATIC core/basic_executor.c)
 target_include_directories(basic_executor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
-target_link_libraries(basic_executor PUBLIC basic_program)
+target_link_libraries(basic_executor PUBLIC basic_program basic_variable_binding)
 
 add_library(basic_session_runtime STATIC core/basic_session_runtime.c)
 target_include_directories(basic_session_runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
@@ -151,4 +151,13 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_integer_assignment_tokens PRIVATE
                           basic_variable_store basic_session_runtime)
     add_test(NAME integer_assignment_tokens COMMAND test_basic_integer_assignment_tokens)
+endif()
+
+# J0.19: sixteenth suite, execution of standalone INTEGER assignments.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_assignment_runtime
+                   tests/test_basic_integer_assignment_runtime.c)
+    target_link_libraries(test_basic_integer_assignment_runtime PRIVATE
+                          basic_session_runtime basic_variable_binding)
+    add_test(NAME integer_assignment_runtime COMMAND test_basic_integer_assignment_runtime)
 endif()

@@ -47,7 +47,7 @@ static int token_case(const char *s, const uint8_t *expected, size_t n)
 
 static int test_cpc_markers(void)
 {
-    static const uint8_t rem[] = {0xc5u, ' ', 'P', 'R', 'I', 'N', ':', '"'};
+    static const uint8_t rem[] = {0xc5u, ' ', 'P', 'R', 'I', 'N', 'T', ':', '"'};
     static const uint8_t apostrophe[] = {0x01u, 0xc0u, ' ', 'P', 'R', 'I', 'N', 'T', ':', '"'};
     static const uint8_t after_rem[] = {0xbfu, ' ', 0x19u, 42u,
                                         0x01u, 0xc5u, ' ', ':', 'G', 'O', 'T', 'O'};

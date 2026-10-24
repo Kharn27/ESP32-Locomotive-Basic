@@ -9,7 +9,8 @@ typedef struct {
 } BTEmitter;
 
 typedef enum {
-    ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE
+    ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
+    ST_ASSIGN
 } BTStatement;
 
 typedef struct {
@@ -26,7 +27,8 @@ static const BTKeyword keywords[] = {
     {"NEW",   0xb1u, ST_NEW},
     {"GOTO",  0xa0u, ST_GOTO},
     {"END",   0x98u, ST_END},
-    {"REM",   0xc5u, ST_REM}
+    {"REM",   0xc5u, ST_REM},
+    {"LET",   0xa5u, ST_ASSIGN}
 };
 
 static int ascii_letter(uint8_t c)
@@ -165,9 +167,10 @@ static BTStatus quoted_string(const uint8_t *source, size_t length,
 }
 
 
-/* The only new lexical operand: a suffix-marked scalar in PRINT. */
-static BTStatus explicit_print_variable(const uint8_t *source, size_t length,
-                                        size_t *index, BTEmitter *out)
+/* Shared CPC encoder for explicit scalars. Assignment restricts type to INTEGER. */
+static BTStatus explicit_variable(const uint8_t *source, size_t length,
+                                        size_t *index, BTEmitter *out,
+                                         BVRExplicitType required_type)
 {
     size_t start = *index;
     size_t end = start + 1u;
@@ -189,6 +192,9 @@ static BTStatus explicit_print_variable(const uint8_t *source, size_t length,
     case (uint8_t)'$': type = BVR_TYPE_STRING; break;
     case (uint8_t)'!': type = BVR_TYPE_REAL; break;
     default: return BT_UNSUPPORTED_CONSTRUCT;
+    }
+    if (required_type != BVR_TYPE_UNDETERMINED && type != required_type) {
+        return BT_UNSUPPORTED_CONSTRUCT;
     }
     /* Never tokenise A%%, A%1, A%_ or any other proper prefix. */
     if (end + 1u < length && identifier_continuation(source[end + 1u])) {
@@ -252,11 +258,18 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 }
             }
             if (!keyword) {
-                return BT_UNSUPPORTED_CONSTRUCT;
+                /* An implicit LET begins with the CPC variable reference,
+                 * not an inserted LET token. */
+                if (!ascii_letter(source[index])) {
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                }
+                statement = ST_ASSIGN;
+                status = BT_OK;
+            } else {
+                index += count;
+                statement = keyword->statement;
+                status = emit(out, keyword->token);
             }
-            index += count;
-            statement = keyword->statement;
-            status = emit(out, keyword->token);
         }
         if (status != BT_OK) {
             return status;
@@ -285,7 +298,8 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (source[index] == (uint8_t)'"') {
                 status = quoted_string(source, length, &index, out);
             } else if (ascii_letter(source[index])) {
-                status = explicit_print_variable(source, length, &index, out);
+                status = explicit_variable(source, length, &index, out,
+                                           BVR_TYPE_UNDETERMINED);
             } else if (ascii_digit(source[index])) {
                 unsigned int number;
                 status = decimal(source, length, &index, 255u, &number);
@@ -301,6 +315,42 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 }
             } else {
                 return BT_UNSUPPORTED_CONSTRUCT;
+            }
+        } else if (statement == ST_ASSIGN) {
+            unsigned int number;
+            /* E03A-E0A4: explicit INTEGER variable 02, cache 00 00,
+             * high-bit terminated name. E736: '=' is operator EF. */
+            if (index == length || !ascii_letter(source[index])) {
+                return BT_UNSUPPORTED_CONSTRUCT;
+            }
+            status = explicit_variable(source, length, &index, out,
+                                       BVR_TYPE_INTEGER);
+            if (status == BT_OK) {
+                status = spaces(source, length, &index, out);
+            }
+            if (status != BT_OK) {
+                return status;
+            }
+            if (index == length || source[index] != (uint8_t)'=') {
+                return BT_UNSUPPORTED_CONSTRUCT;
+            }
+            status = emit(out, 0xefu);
+            ++index;
+            if (status == BT_OK) {
+                status = spaces(source, length, &index, out);
+            }
+            if (status == BT_OK) {
+                status = decimal(source, length, &index, 255u, &number);
+            }
+            if (status == BT_OK) {
+                if (number < 10u) {
+                    status = emit(out, (uint8_t)(0x0eu + number));
+                } else {
+                    status = emit(out, 0x19u);
+                    if (status == BT_OK) {
+                        status = emit(out, (uint8_t)number);
+                    }
+                }
             }
         } else if (statement == ST_GOTO) {
             unsigned int line;

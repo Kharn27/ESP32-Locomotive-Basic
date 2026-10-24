@@ -143,3 +143,12 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_variable_binding PRIVATE basic_variable_binding)
     add_test(NAME basic_variable_binding COMMAND test_basic_variable_binding)
 endif()
+
+# J0.18: fifteenth CTest suite, CPC INTEGER assignment token representations.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_assignment_tokens
+                   tests/test_basic_integer_assignment_tokens.c)
+    target_link_libraries(test_basic_integer_assignment_tokens PRIVATE
+                          basic_variable_store basic_session_runtime)
+    add_test(NAME integer_assignment_tokens COMMAND test_basic_integer_assignment_tokens)
+endif()

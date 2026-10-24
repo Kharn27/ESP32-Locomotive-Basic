@@ -221,6 +221,10 @@ static BEStatus execute_line(const BasicProgram *program,
              * The host observes BE_OK now, BE_END on its next call. */
             *next = program->size - 2u;
             return BE_OK;
+        } else if (token == 0x02u || token == 0xa5u) {
+            /* J0.18: implicit/explicit INTEGER assignments are stored and
+             * listed, but not executable. No cursor or output is committed. */
+            return BE_UNSUPPORTED;
         } else if (token == 0xa7u || token == 0xb1u || token == 0xcau) {
             return BE_UNSUPPORTED; /* LIST, NEW, RUN in stored programs. */
         } else {

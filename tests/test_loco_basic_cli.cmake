@@ -156,4 +156,11 @@ check_case("c1-printa-is-not-a-keyword"
     "${banner}[cli:error] BSR_SESSION_ERROR BS_TOKENIZER_ERROR BT_UNSUPPORTED_CONSTRUCT BP_OK BL_OK BE_OK\n${listed}${byebye}"
 )
 
-message(STATUS "host_cli: seventeen black-box scenarios passed")
+# J0.18: multiple implicit/explicit INTEGER assignments are listable only.
+check_case("integer-assignment-list-unsupported-run"
+    "10 A%=2\n20 LET B%=5\n30 A% = 10\n40 PRINT A%\n50 END\nLIST\nRUN\n:step\n:quit\n"
+    "10 A%=2\n20 LET B%=5\n30 A% = 10\n40 PRINT A%\n50 END\n"
+    "${banner}${ok}${ok}${ok}${ok}${ok}${listed}${running}[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_UNSUPPORTED\n${byebye}"
+)
+
+message(STATUS "host_cli: eighteen black-box scenarios passed")

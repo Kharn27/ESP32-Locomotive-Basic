@@ -98,3 +98,14 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_variable_ref PRIVATE basic_variable_ref)
     add_test(NAME basic_variable_ref COMMAND test_basic_variable_ref)
 endif()
+
+# J0.14: independent implicit type table and typed canonical variable names.
+add_library(basic_variable_types STATIC core/basic_variable_types.c)
+target_include_directories(basic_variable_types PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
+target_link_libraries(basic_variable_types PUBLIC basic_variable_ref)
+
+if(BUILD_TESTING)
+    add_executable(test_basic_variable_types tests/test_basic_variable_types.c)
+    target_link_libraries(test_basic_variable_types PRIVATE basic_variable_types)
+    add_test(NAME basic_variable_types COMMAND test_basic_variable_types)
+endif()

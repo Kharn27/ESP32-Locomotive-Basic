@@ -177,7 +177,11 @@ static int test_direct_commands_and_restart(void)
     CHECK(submit(&f, "LIST").status == BSR_OK);
     CHECK(f.written == strlen("10 PRINT 9\n"));
     CHECK(f.runtime.executor.cursor == s.runtime.executor.cursor);
-    CHECK(step_output(&f, "") == 0); /* Last position points at sentinel? */
+    save(&f, &s);
+    CHECK(advance(&f, sizeof(f.output)).status == BSR_END);
+    CHECK(f.runtime.state == BSR_IDLE);
+    CHECK(f.written == s.written &&
+          memcmp(f.output, s.output, sizeof(f.output)) == 0);
     return 0;
 }
 

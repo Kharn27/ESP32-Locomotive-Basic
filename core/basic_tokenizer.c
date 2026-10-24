@@ -8,7 +8,7 @@ typedef struct {
 } BTEmitter;
 
 typedef enum {
-    ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO
+    ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_REM, ST_APOSTROPHE
 } BTStatement;
 
 typedef struct {
@@ -23,7 +23,8 @@ static const BTKeyword keywords[] = {
     {"LIST",  0xa7u, ST_LIST},
     {"RUN",   0xcau, ST_RUN},
     {"NEW",   0xb1u, ST_NEW},
-    {"GOTO",  0xa0u, ST_GOTO}
+    {"GOTO",  0xa0u, ST_GOTO},
+    {"REM",   0xc5u, ST_REM}
 };
 
 static int ascii_letter(uint8_t c)
@@ -183,7 +184,15 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
         if (!expecting_statement) {
             return BT_MALFORMED_INPUT;
         }
-        if (source[index] == (uint8_t)'?') {
+        /* E1BC-E1C3: CPC inserts 01 C0 for apostrophe comments. */
+        if (source[index] == (uint8_t)'\'') {
+            statement = ST_APOSTROPHE;
+            ++index;
+            status = emit(out, 0x01u);
+            if (status == BT_OK) {
+                status = emit(out, 0xc0u);
+            }
+        } else if (source[index] == (uint8_t)'?') {
             statement = ST_PRINT;
             ++index;
             status = emit(out, 0xbfu);
@@ -206,12 +215,26 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             return status;
         }
 
+        /* DFF0-E1C3: after REM or ', the remainder is opaque source
+         * bytes. In particular colons, quotes and keyword spellings
+         * are not scanned again. Input control bytes were prechecked. */
+        if (statement == ST_REM || statement == ST_APOSTROPHE) {
+            while (index < length) {
+                status = emit(out, source[index++]);
+                if (status != BT_OK) {
+                    return status;
+                }
+            }
+            return BT_OK;
+        }
+
         status = spaces(source, length, &index, out);
         if (status != BT_OK) {
             return status;
         }
         if (statement == ST_PRINT && index < length &&
-            source[index] != (uint8_t)':') {
+            source[index] != (uint8_t)':' &&
+            source[index] != (uint8_t)'\'') {
             if (source[index] == (uint8_t)'"') {
                 status = quoted_string(source, length, &index, out);
             } else if (ascii_digit(source[index])) {
@@ -258,6 +281,11 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
         }
         if (index == length) {
             return BT_OK;
+        }
+        /* An apostrophe also carries its own statement separator in
+         * the CPC encoding; unlike REM it needs no explicit colon. */
+        if (source[index] == (uint8_t)'\'') {
+            continue;
         }
         if (source[index] != (uint8_t)':') {
             return BT_UNSUPPORTED_CONSTRUCT;

@@ -88,6 +88,25 @@ static BLStatus append_spaces(const uint8_t *body, size_t length,
     return BL_OK;
 }
 
+/* Copy raw bytes after a CPC comment marker, without interpreting token
+ * values, colons, or quotes. Source-control bytes remain invalid. */
+static BLStatus append_comment(const uint8_t *body, size_t length,
+                               size_t pos, BLEmitter *out)
+{
+    while (pos < length) {
+        uint8_t c = body[pos++];
+        BLStatus status;
+        if (c == 0u || c == (uint8_t)'\r' || c == (uint8_t)'\n') {
+            return BL_BAD_SEQUENCE;
+        }
+        status = append_byte(out, c);
+        if (status != BL_OK) {
+            return status;
+        }
+    }
+    return BL_OK;
+}
+
 /* A strict inverse of the representable J0.4 grammar, not a CPC parser.
  * The token bytes are unambiguous only outside quoted strings. */
 static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
@@ -105,6 +124,23 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             return status;
         }
         token = body[pos++];
+        /* E1BC emits 01 C0 for ', including at the beginning of a
+         * line. The prefixed 01 is not an explicit source colon. */
+        if (token == 0x01u && pos < length && body[pos] == 0xc0u) {
+            ++pos;
+            status = append_byte(out, (uint8_t)'\'');
+            if (status != BL_OK) {
+                return status;
+            }
+            return append_comment(body, length, pos, out);
+        }
+        if (token == 0xc5u) {
+            status = append_word(out, "REM");
+            if (status != BL_OK) {
+                return status;
+            }
+            return append_comment(body, length, pos, out);
+        }
         switch (token) {
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
         case 0xa0u: statement = BL_ST_GOTO; status = append_word(out, "GOTO"); break;
@@ -198,6 +234,10 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             return body[pos] >= 0x80u || (body[pos] >= 0x0eu && body[pos] <= 0x1fu)
                     ? BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
         }
+        if (pos + 1u < length && body[pos + 1u] == 0xc0u) {
+            /* Implicit 01 belonging to an apostrophe, not a colon. */
+            continue;
+        }
         ++pos;
         status = append_byte(out, (uint8_t)':');
         if (status != BL_OK) {
@@ -207,7 +247,10 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         while (space_start < length && body[space_start] == (uint8_t)' ') {
             ++space_start;
         }
-        if (space_start == length || body[space_start] == 0x01u) {
+        if (space_start == length ||
+            (body[space_start] == 0x01u &&
+             (space_start + 1u == length ||
+              body[space_start + 1u] != 0xc0u))) {
             return BL_BAD_SEQUENCE;
         }
     }

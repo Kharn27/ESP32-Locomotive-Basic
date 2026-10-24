@@ -92,3 +92,50 @@ BVRStatus bvr_decode(const uint8_t *source, size_t source_length,
     return name_available > BVR_MAX_NAME_LENGTH ?
            BVR_LIMIT_EXCEEDED : BVR_TRUNCATED;
 }
+
+
+BVRStatus bvr_encode_explicit(const uint8_t *name, size_t name_length,
+                              BVRExplicitType explicit_type,
+                              uint8_t *destination, size_t destination_capacity,
+                              size_t *written)
+{
+    size_t i;
+    uint8_t marker;
+    if (name == NULL || destination == NULL || written == NULL) {
+        return BVR_INVALID_ARGUMENT;
+    }
+    if (ranges_overlap(name, name_length, destination, destination_capacity) ||
+        ranges_overlap(written, sizeof(*written), destination, destination_capacity) ||
+        ranges_overlap(written, sizeof(*written), name, name_length)) {
+        return BVR_OVERLAPPING_MEMORY;
+    }
+    switch (explicit_type) {
+    case BVR_TYPE_INTEGER: marker = 0x02u; break;
+    case BVR_TYPE_STRING: marker = 0x03u; break;
+    case BVR_TYPE_REAL: marker = 0x04u; break;
+    default: return BVR_INVALID_ARGUMENT;
+    }
+    if (name_length == 0u) {
+        return BVR_MALFORMED;
+    }
+    if (name_length > BVR_MAX_NAME_LENGTH) {
+        return BVR_LIMIT_EXCEEDED;
+    }
+    for (i = 0u; i < name_length; ++i) {
+        if (i == 0u ? !is_letter(name[i]) : !is_name_tail(name[i])) {
+            return BVR_MALFORMED;
+        }
+    }
+    if (destination_capacity < 3u + name_length) {
+        return BVR_LIMIT_EXCEEDED;
+    }
+    destination[0] = marker;
+    destination[1] = 0u;
+    destination[2] = 0u;
+    for (i = 0u; i < name_length; ++i) {
+        destination[3u + i] = name[i];
+    }
+    destination[2u + name_length] |= 0x80u;
+    *written = 3u + name_length;
+    return BVR_OK;
+}

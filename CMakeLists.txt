@@ -121,3 +121,12 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_variable_store PRIVATE basic_variable_store)
     add_test(NAME basic_variable_store COMMAND test_basic_variable_store)
 endif()
+
+
+# J0.16: thirteenth suite, explicit scalar references in PRINT/LIST only.
+if(BUILD_TESTING)
+    add_executable(test_basic_explicit_variable_tokens tests/test_basic_explicit_variable_tokens.c)
+    target_link_libraries(test_basic_explicit_variable_tokens PRIVATE
+                          basic_variable_ref basic_session_runtime)
+    add_test(NAME explicit_variable_tokens COMMAND test_basic_explicit_variable_tokens)
+endif()

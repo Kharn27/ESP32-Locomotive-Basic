@@ -163,7 +163,7 @@ check_case("integer-assignment-list-unsupported-run"
     "${banner}${ok}${ok}${ok}${ok}${ok}${listed}${running}${step1}${byebye}"
 )
 
-message(STATUS "host_cli: eighteen black-box scenarios passed")
+# J0.19 also exercises successful assignment steps below.
 
 # J0.19: no BASIC-introspection extension; the host step protocol is enough.
 check_case("integer-assignment-step"
@@ -171,3 +171,5 @@ check_case("integer-assignment-step"
     ""
     "${banner}${ok}${ok}${ok}${running}${step1}${step1}${step1}${ended}${byebye}"
 )
+
+message(STATUS "host_cli: nineteen black-box scenarios passed")

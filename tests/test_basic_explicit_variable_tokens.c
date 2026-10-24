@@ -369,6 +369,7 @@ static int c1_roundtrip(const char *input, const char *listed,
     size_t stable_len = 456u;
     size_t failure_len = 789u;
     CHECK(strlen(listed) <= sizeof(text));
+    memset(body, 0x42, sizeof(body));
     CHECK(bt_tokenize((const uint8_t *)input, strlen(input),
                       body, sizeof(body), &body_len) == BT_OK);
     CHECK(body_len == raw_len && memcmp(body, raw, raw_len) == 0);

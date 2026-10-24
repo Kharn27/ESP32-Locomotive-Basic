@@ -103,6 +103,53 @@ static BEStatus binding_error(BVBStatus status)
     }
 }
 
+/* A branch or END may skip a suffix. In J0.19, no numbered line
+ * containing an actual subsequent assignment is executable. Locate only
+ * statement starts, never CPC cache bytes or quoted payloads. */
+static int suffix_assignment(const uint8_t *body, size_t length, size_t pos)
+{
+    while (pos < length && body[pos] == 0x01u) {
+        int quoted = 0;
+        ++pos;
+        skip_spaces(body, length, &pos);
+        if (pos == length || (body[pos] == 0x01u && pos + 1u < length &&
+                               body[pos + 1u] == 0xc0u)) {
+            return 0;
+        }
+        if (body[pos] == 0x02u || body[pos] == 0xa5u) {
+            return 1;
+        }
+        while (pos < length) {
+            uint8_t c = body[pos];
+            if (c == (uint8_t)'"') {
+                quoted = !quoted;
+                ++pos;
+            } else if (!quoted && c == 0xc5u) {
+                return 0; /* REM */
+            } else if (!quoted && c == 0x01u) {
+                if (pos + 1u < length && body[pos + 1u] == 0xc0u) {
+                    return 0; /* apostrophe */
+                }
+                break;
+            } else if (!quoted && ((c >= 0x02u && c <= 0x04u) ||
+                                   (c >= 0x0bu && c <= 0x0du))) {
+                BasicVariableRef ref;
+                if (bvr_decode(body, length, pos, &ref) == BVR_OK) {
+                    pos += ref.consumed;
+                } else {
+                    ++pos;
+                }
+            } else if (!quoted && (c == 0x19u || c == 0x1eu || c == 0x1du)) {
+                size_t payload = c == 0x19u ? 1u : 2u;
+                pos += length - pos > payload ? payload + 1u : length - pos;
+            } else {
+                ++pos;
+            }
+        }
+    }
+    return 0;
+}
+
 /* A comment terminates this numbered line even if its tail appears to
  * contain further statements. Reject forbidden input control bytes in
  * manually imported bodies as well. */
@@ -239,6 +286,9 @@ static BEStatus execute_line(const BasicProgram *program,
             if (bp_status != BP_OK) {
                 return BE_BAD_PROGRAM;
             }
+            if (variables != NULL && suffix_assignment(body, length, pos)) {
+                return BE_UNSUPPORTED;
+            }
             *next = target.offset;
             return BE_OK;
         } else if (token == 0x98u) { /* END — basic.asm E663, CC31. */
@@ -250,11 +300,14 @@ static BEStatus execute_line(const BasicProgram *program,
             }
             /* bp_next() sees this program's terminal 00 00 at size - 2.
              * The host observes BE_OK now, BE_END on its next call. */
+            if (variables != NULL && suffix_assignment(body, length, pos)) {
+                return BE_UNSUPPORTED;
+            }
             *next = program->size - 2u;
             return BE_OK;
         } else if (token == 0x02u || token == 0xa5u) {
             BasicVariableKey key;
-            BasicVariableValue value;
+            BasicVariableValue value = {0};
             size_t consumed, start;
             uint8_t literal;
             BVBStatus resolved;

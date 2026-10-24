@@ -120,7 +120,7 @@ static int test_end_to_end(void)
     memset(f.output, 0x73, sizeof(f.output));
     save(&f, &before);
     r = advance(&f, sizeof(f.output));
-    CHECK(r.status == BSR_END && r.executor_status == BE_OK);
+    CHECK(r.status == BSR_END && r.executor_status == BE_END);
     CHECK(f.runtime.state == BSR_IDLE);
     CHECK(f.runtime.executor.cursor == before.runtime.executor.cursor);
     CHECK(f.written == before.written);

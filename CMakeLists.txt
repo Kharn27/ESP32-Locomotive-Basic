@@ -88,3 +88,13 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_comments PRIVATE basic_session_runtime)
     add_test(NAME comments COMMAND test_basic_comments)
 endif()
+
+# J0.13: isolated, reusable decoder of CPC scalar variable references.
+add_library(basic_variable_ref STATIC core/basic_variable_ref.c)
+target_include_directories(basic_variable_ref PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
+
+if(BUILD_TESTING)
+    add_executable(test_basic_variable_ref tests/test_basic_variable_ref.c)
+    target_link_libraries(test_basic_variable_ref PRIVATE basic_variable_ref)
+    add_test(NAME basic_variable_ref COMMAND test_basic_variable_ref)
+endif()

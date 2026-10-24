@@ -55,7 +55,7 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 
 ## Où en sommes-nous ?
 
-Les **jalons J0.1 à J0.8 sont acceptés et fusionnés**. Ils constituent un **socle minimal**, pas encore le langage complet :
+Les **jalons J0.1 à J0.9 sont acceptés et fusionnés**. Ils constituent un **socle minimal**, pas encore le langage complet :
 
 | Domaine | État du projet |
 | --- | --- |
@@ -64,7 +64,7 @@ Les **jalons J0.1 à J0.8 sont acceptés et fusionnés**. Ils constituent un **s
 | Édition des lignes et `NEW` | Sous-ensemble implémenté |
 | `PRINT` (formes simples) et `GOTO` | Exécuteur natif pas-à-pas implémenté |
 | `RUN`, reprise depuis le début, arrêt externe et état de session | Orchestration native non bloquante implémentée |
-| Console de démonstration Linux | **J0.9 prévu / en développement** |
+| Console de démonstration Linux | **J0.9 livré** : `loco_basic_cli`, méta-commandes `:help`, `:step`, `:stop`, `:quit` |
 | Variables, expressions générales, autres commandes, nombres réels CPC | **À développer** |
 | Graphismes CPC, interface CYD, microSD et firmware autonome | **À développer** |
 | Validation différentielle complète face au CPC 6128 | **À réaliser** |
@@ -77,12 +77,13 @@ Consulter les [décisions, PR fusionnées, risques et jalons](docs/PROJECT_STATU
 
 ```text
 core/                 # Bibliothèques du cœur BASIC, indépendantes du matériel
-tests/                # Tests automatisés du cœur
+host/                 # Console Linux native (outil de développement J0.9)
+tests/                # Tests unitaires et d'intégration CTest
 docs/                 # Spécifications, validations, décisions et suivi
 CMakeLists.txt        # Construction C99 et CTest sur Linux
 ```
 
-Le futur hôte Linux, puis la couche matérielle ESP32, **appellent** le cœur BASIC ; ils ne doivent pas redéfinir la syntaxe ou contourner ses règles pour faciliter une démonstration.
+La console Linux, puis la future couche matérielle ESP32, **appellent** le cœur BASIC ; ils ne doivent pas redéfinir la syntaxe ou contourner ses règles pour faciliter une démonstration.
 
 **Contraintes structurantes :** C99 strict, allocation maîtrisée (pas de tas dynamique dans le cœur actuel), pas de dépendance Arduino/ESP-IDF dans `core/`, contrats mémoire explicites, tests de non-régression et validation systématique des changements.
 
@@ -104,7 +105,15 @@ cmake --build build-asan
 ctest --test-dir build-asan --output-on-failure
 ```
 
-**À ce stade, ces commandes construisent et testent les bibliothèques ; elles ne démarrent pas encore un ordinateur CPC interactif.** La console hôte est le jalon suivant. Les tests de J0.8 ont validé six suites dans chacune des deux configurations CI ([GitHub Actions](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40081828507)).
+**La console hôte Linux est désormais disponible**, mais ce n'est pas encore un ordinateur CPC complet. Après compilation :
+
+```sh
+./build/loco_basic_cli
+```
+
+Les commandes BASIC prises en charge dans ce prototype sont notamment les lignes numérotées, `LIST`, `NEW`, `RUN`, `PRINT` simple et `GOTO`. Les méta-commandes **propres à l'outil Linux** (`:help`, `:step`, `:stop`, `:quit`) ne font pas partie du Locomotive BASIC historique. L'exécution de `RUN` nécessite un pilotage explicite par `:step` à ce stade.
+
+Les tests du jalon J0.9 ont validé **7/7 suites** dans chacune des deux configurations CI ([GitHub Actions #40083698694](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40083698694)).
 
 ## Ligne directrice du projet
 

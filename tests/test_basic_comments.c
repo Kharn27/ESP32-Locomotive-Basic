@@ -118,7 +118,7 @@ static int test_errors_and_atomicity(void)
     memset(output, 0x3au, sizeof(output));
     memcpy(original, output, sizeof(output));
     written = 999u;
-    CHECK(bt_tokenize((const uint8_t *)"REM ABC", 7u, output, 6u,
+    CHECK(bt_tokenize((const uint8_t *)"REM ABC", 7u, output, 4u,
                       &written) == BT_NO_SPACE);
     CHECK(written == 999u && memcmp(output, original, sizeof(output)) == 0);
     CHECK(bt_tokenize(forbidden, sizeof(forbidden), output,

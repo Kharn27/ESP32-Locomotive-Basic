@@ -204,7 +204,11 @@ static int test_full_and_atomic(void)
     CHECK(put(&h, 10u, "A%=2") == 0);
     CHECK(put(&h, 20u, "B%=3") == 0);
     CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
-    CHECK(step_ok(&h, 11u) == 0 || 1); /* Cursor validated below via program. */
+    {
+        BasicProgramLine line;
+        CHECK(bp_find(&h.program, 10u, &line) == BP_OK);
+        CHECK(step_ok(&h, line.next_offset) == 0);
+    }
     CHECK(has(&h, "A", 2) == 0);
     CHECK(failure(&h, BE_STORE_FULL) == 0);
     CHECK(h.store.count == 1u);

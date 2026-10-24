@@ -258,6 +258,35 @@ static int test_overlap_and_legacy(void)
     h.store.capacity = SIZE_MAX;
     CHECK(failure(&h, BE_INVALID_STORE) == 0);
     h.store.capacity = 1u;
+    --h.program.size; /* Damaged record/sentinel, not merely bad body. */
+    CHECK(failure(&h, BE_BAD_PROGRAM) == 0);
+    ++h.program.size;
+    return 0;
+}
+
+static int test_output_capacity(void)
+{
+    Harness h;
+    BasicProgramLine line;
+    CHECK(setup(&h, 1u) == 0);
+    CHECK(put(&h, 10u, "PRINT \"X\"") == 0);
+    CHECK(put(&h, 20u, "A%=255") == 0);
+    CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+    memset(h.output, 0x71, sizeof(h.output));
+    h.written = 333u;
+    CHECK(be_step(&h.executor, h.output, 0u, &h.written) == BE_NO_SPACE);
+    CHECK(h.written == 333u && h.executor.cursor == 0u &&
+          h.store.count == 0u && h.output[0] == 0x71u);
+    CHECK(be_step(&h.executor, h.output, sizeof(h.output),
+                  &h.written) == BE_OK);
+    CHECK(h.written == 2u && memcmp(h.output, "X\n", 2u) == 0);
+    CHECK(bp_find(&h.program, 20u, &line) == BP_OK);
+    h.written = 333u;
+    h.output[0] = 0x71u;
+    CHECK(be_step(&h.executor, h.output, 0u, &h.written) == BE_OK);
+    CHECK(h.written == 0u && h.output[0] == 0x71u &&
+          h.executor.cursor == line.next_offset);
+    CHECK(has(&h, "A", 255) == 0);
     return 0;
 }
 
@@ -332,6 +361,7 @@ int main(void)
     CHECK(test_invalid_images() == 0);
     CHECK(test_full_and_atomic() == 0);
     CHECK(test_overlap_and_legacy() == 0);
+    CHECK(test_output_capacity() == 0);
     CHECK(test_run_new_and_regressions() == 0);
     puts("integer_assignment_runtime: OK (synthetic CPC-derived fixtures)");
     return 0;

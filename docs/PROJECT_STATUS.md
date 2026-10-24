@@ -16,7 +16,7 @@
 | **J0.8** | Orchestration native `RUN`, `bsr_step` non bloquant, arrêt explicite, LIST/NEW pendant exécution, sixième suite CTest | **Accepté et intégré dans `main` via [PR #8](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/8)** (squash `d21af73d`) ; CI 6/6 Linux + 6/6 ASan/UBSan | [J0.8](J0.8-session-runtime.md) |
 | **J0.9** | CLI Linux `loco_basic_cli` : édition/LIST/RUN, pilotage borné `:step`/`:stop`, erreurs et 7e suite CTest | **Accepté et fusionné via [PR #9](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/9)** (squash `2cb55757`) ; CI 7/7 Linux + 7/7 ASan/UBSan | [J0.9](J0.9-host-cli.md) |
 | **J0.10** | Commentaires `REM` et apostrophe : flux tokenizeur → LIST → exécuteur, tests d'intégration natifs + CLI | **Accepté et fusionné via [PR #10](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/10)** (squash `0b2e66ed`) ; CI 8/8 Linux + 8/8 ASan/UBSan | [J0.10](J0.10-comments.md) |
-| **J0.11 (proposé)** | `END` : arrêt explicite du programme, token CPC `98`, LIST/RUN/CLI et tests | **À développer — non lancé** | Prompt Pilotage à transmettre au développeur |
+| **J0.11** | `END` : arrêt explicite, token CPC `98`, LIST/RUN/CLI, 9e suite CTest | **En revue Pilotage** — [PR #11](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/11) | [J0.11](J0.11-end.md) |
 | Étapes ultérieures | Expressions et variables BASIC, console série embarquée, puis écran CYD | **Non lancées** | Aucun |
 
 ## Décisions techniques actées

@@ -31,7 +31,10 @@ typedef struct {
  */
 BEStatus be_init(BasicExecutor *executor, const BasicProgram *program);
 
-/* Execute at most ONE numbered line. BE_OK commits its output and cursor.
+/* Execute at most ONE numbered line. END commits the reached prefix's output
+ * and moves the cursor to the program sentinel; the NEXT be_step returns
+ * BE_END. This is the host step protocol, not CPC console timing.
+ * BE_OK commits its output and cursor.
  * Output is raw bytes, no NUL, one LF per PRINT. On BE_OK *written is the
  * number of bytes emitted (possibly zero). BE_END and every error preserve
  * the entire output buffer, *written and executor, including the cursor.

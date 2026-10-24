@@ -75,6 +75,13 @@ if(BUILD_TESTING)
         -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_loco_basic_cli.cmake")
 endif()
 
+# J0.11: program termination integrated through tokenizer, listing and executor.
+if(BUILD_TESTING)
+    add_executable(test_basic_termination tests/test_basic_termination.c)
+    target_link_libraries(test_basic_termination PRIVATE basic_session_runtime)
+    add_test(NAME termination COMMAND test_basic_termination)
+endif()
+
 # J0.10: end-to-end numbered comments on the existing native stack.
 if(BUILD_TESTING)
     add_executable(test_basic_comments tests/test_basic_comments.c)

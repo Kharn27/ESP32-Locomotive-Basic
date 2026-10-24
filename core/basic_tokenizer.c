@@ -8,7 +8,7 @@ typedef struct {
 } BTEmitter;
 
 typedef enum {
-    ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_REM, ST_APOSTROPHE
+    ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE
 } BTStatement;
 
 typedef struct {
@@ -17,13 +17,14 @@ typedef struct {
     BTStatement statement;
 } BTKeyword;
 
-/* Codes checked against basic.asm: E54A, E5DB, E4FF, E5A6, E63A. */
+/* CPC keyword codes checked against basic.asm: E54A, E5DB, E4FF, E5A6, E63A, E663. */
 static const BTKeyword keywords[] = {
     {"PRINT", 0xbfu, ST_PRINT},
     {"LIST",  0xa7u, ST_LIST},
     {"RUN",   0xcau, ST_RUN},
     {"NEW",   0xb1u, ST_NEW},
     {"GOTO",  0xa0u, ST_GOTO},
+    {"END",   0x98u, ST_END},
     {"REM",   0xc5u, ST_REM}
 };
 
@@ -269,7 +270,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 }
             }
         } else {
-            status = BT_OK; /* LIST, RUN, NEW: no arguments in J0.4. */
+            status = BT_OK; /* LIST, RUN, NEW, END: no arguments in this subset. */
         }
         if (status != BT_OK) {
             return status;

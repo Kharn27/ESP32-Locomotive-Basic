@@ -161,9 +161,13 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         }
 
         space_start = pos;
-        status = append_spaces(body, length, &pos, out);
-        if (status != BL_OK) {
-            return status;
+        /* For implicit LET the initial 02 is already consumed. The next
+         * bytes are opaque CPC caches, NOT lexical spaces (even if 0x20). */
+        if (statement != BL_ST_ASSIGN || token != 0x02u) {
+            status = append_spaces(body, length, &pos, out);
+            if (status != BL_OK) {
+                return status;
+            }
         }
 
         if (statement == BL_ST_ASSIGN) {

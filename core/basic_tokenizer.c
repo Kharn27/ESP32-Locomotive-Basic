@@ -233,7 +233,8 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             return status;
         }
         if (statement == ST_PRINT && index < length &&
-            source[index] != (uint8_t)':') {
+            source[index] != (uint8_t)':' &&
+            source[index] != (uint8_t)'\'') {
             if (source[index] == (uint8_t)'"') {
                 status = quoted_string(source, length, &index, out);
             } else if (ascii_digit(source[index])) {

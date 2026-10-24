@@ -1,6 +1,6 @@
 # État du projet — ESP32 Locomotive BASIC
 
-**Mis à jour :** 23 octobre 2026. **Branche de référence :** `main`. Les jalons marqués « en validation » ne sont pas acquis avant revue/merge du chef de projet.
+**Mis à jour :** 23 octobre 2026. **Branche de référence :** `main`. Les jalons marqués « en revue » ne sont pas acquis avant revue/merge du chef de projet.
 
 ## Suivi des jalons
 
@@ -12,7 +12,7 @@
 | **J0.4** | Tokeniseur natif C99, mots-clés/chaînes/entiers/références GOTO, tests et intégration `basic_program` | **Accepté et intégré dans `main` via [PR #4](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/4)** (squash `c774a700`)  | [J0.4](J0.4-basic-tokenizer.md) |
 | **J0.5** | Détokéniseur et listing C99 du sous-ensemble J0.4, sans exécution ni firmware | **Accepté et intégré dans `main` via [PR #5](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/5)** (squash `d25cc9ad`) | [J0.5](J0.5-basic-listing.md) |
 | **J0.6** | Saisie et édition minimales de lignes BASIC ; commandes directes LIST/NEW, sans RUN | **Accepté et intégré dans `main` via [PR #6](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/6)** (squash `486db356`) | [J0.6](J0.6-basic-session.md) |
-| **J0.7 (proposé)** | Premier exécuteur pas-à-pas C99 de `PRINT` littéral/entier et `GOTO`, sans boucle infinie interne ni E/S matérielles ; `RUN` direct différé | **À développer, non démarré** | Prompt Pilotage J0.7 |
+| **J0.7** | Exécuteur pas-à-pas C99 de `PRINT` littéral/entier et `GOTO`, sortie atomique et diagnostic des erreurs ; `RUN` direct différé | **En revue — PR J0.7 non fusionnée** | [J0.7](J0.7-basic-executor.md) |
 | Étapes ultérieures | RUN direct, console série hôte, autres instructions BASIC, puis écran CYD | **Non lancées** | Aucun |
 
 ## Décisions techniques actées
@@ -41,7 +41,7 @@
 
 **J0.2 accepté via PR #2 :** revue technique réalisée, correction des chaînes non fermées intégrée, fil Codex résolu. L'absence de validation matérielle reste signalée ; les vecteurs déduits ne sont pas des références CPC indépendantes.
 
-**J0.3 accepté via PR #3 :** revue des modifications réelles, CI Linux standard et ASan/UBSan réussies, tests d'invariants et de corruption vérifiés. Le module `basic_program` est intégré à `main`, sans tokenizer, firmware ni exécuteur. **J0.4 accepté et fusionné via PR #4 :** revue du code, intégration `basic_program` et CI Linux standard + ASan/UBSan (2/2 tests pour chaque job). Merge squash `c774a70085bbf46ed288998e6fe85d3442191918`. Fidélité binaire toujours à vérifier sur CPC. **J0.5 accepté et fusionné via PR #5 :** revue du code et CI Linux standard + ASan/UBSan (3/3 tests par job) ; merge squash `d25cc9ad4958787e1a3811f2ec29b8fa52e2c849`. Décodage des formes J0.4 et listing ordonné, sans exécution. Les tests aller-retour prouvent une cohérence interne, pas une fidélité CPC indépendante. **J0.6 accepté et fusionné via PR #6 :** revue des six fichiers modifiés, contrôle des API, contrats d'atomicité et buffers disjoints, CI Linux standard et ASan/UBSan (4/4 tests par job) ; merge squash `486db356117cb36a7533b7477e37f78fe2c34e6f`. Commandes directes `LIST`/`NEW` intégrées, sans exécution. **J0.7 proposé :** construire un exécuteur C99 pas-à-pas sur le sous-ensemble courant, avec pas fini, budget d'itérations contrôlé par l'appelant et sortie déterministe. Aucun nouveau jalon entamé avant lancement par Pilotage.
+**J0.3 accepté via PR #3 :** revue des modifications réelles, CI Linux standard et ASan/UBSan réussies, tests d'invariants et de corruption vérifiés. Le module `basic_program` est intégré à `main`, sans tokenizer, firmware ni exécuteur. **J0.4 accepté et fusionné via PR #4 :** revue du code, intégration `basic_program` et CI Linux standard + ASan/UBSan (2/2 tests pour chaque job). Merge squash `c774a70085bbf46ed288998e6fe85d3442191918`. Fidélité binaire toujours à vérifier sur CPC. **J0.5 accepté et fusionné via PR #5 :** revue du code et CI Linux standard + ASan/UBSan (3/3 tests par job) ; merge squash `d25cc9ad4958787e1a3811f2ec29b8fa52e2c849`. Décodage des formes J0.4 et listing ordonné, sans exécution. Les tests aller-retour prouvent une cohérence interne, pas une fidélité CPC indépendante. **J0.6 accepté et fusionné via PR #6 :** revue des six fichiers modifiés, contrôle des API, contrats d'atomicité et buffers disjoints, CI Linux standard et ASan/UBSan (4/4 tests par job) ; merge squash `486db356117cb36a7533b7477e37f78fe2c34e6f`. Commandes directes `LIST`/`NEW` intégrées, sans exécution. **J0.7 en revue :** modules `basic_executor.h/.c`, cinquième suite CTest, documentation des invariants et divergences CPC proposés en PR ; en attente de revue Pilotage et des preuves CI Linux standard + ASan/UBSan. Aucun RUN direct, aucun J0.8 avant décision de Pilotage.
 
 ## Gouvernance GitHub
 

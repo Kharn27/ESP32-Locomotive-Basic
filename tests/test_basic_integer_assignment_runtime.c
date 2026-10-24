@@ -158,7 +158,7 @@ static int test_invalid_images(void)
 {
     static const uint8_t bad1[] = {2u,0u}; /* truncated cache */
     static const uint8_t bad2[] = {2u,0u,0u}; /* missing name */
-    static const uint8_t bad3[] = {2u,0u,0u,'A',0xefu,0x10u};
+    static const uint8_t bad3[] = {2u,0u,0u,'A','B','C'}; /* unterminated name */
     static const uint8_t bad4[] = {2u,0u,0u,0xc1u,0x10u};
     static const uint8_t bad5[] = {2u,0u,0u,0xc1u,0xefu,0x19u};
     static const uint8_t bad6[] = {2u,0u,0u,0xc1u,0xefu,0x19u,9u};

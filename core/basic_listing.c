@@ -190,9 +190,6 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 BVRStatus ref_status = bvr_decode(body, length, pos - 1u, &ref);
                 size_t i;
                 uint8_t suffix;
-                if (space_start == pos - 1u) {
-                    return BL_BAD_SEQUENCE;
-                }
                 if (ref_status == BVR_TRUNCATED) {
                     return BL_TRUNCATED;
                 }
@@ -205,6 +202,15 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 case BVR_TYPE_REAL: suffix = (uint8_t)'!'; break;
                 default: return BL_BAD_SEQUENCE;
                 }
+                /* The '?' alias can store BF 02/03/04 with no separating
+                 * space. LIST writes PRINT, so make its textual operand
+                 * boundary unambiguous without rewriting the CPC bytes. */
+                if (space_start == pos - 1u) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) {
+                        return status;
+                    }
+                }
                 /* The two CPC cache bytes are not pointers; LIST never changes them. */
                 for (i = 0u; i < ref.name_length; ++i) {
                     status = append_byte(out,
@@ -216,16 +222,27 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 status = append_byte(out, suffix);
                 pos = ref.reference_offset + ref.consumed;
             } else if (t >= 0x0eu && t <= 0x17u) {
+                /* As for explicit variables, ?0..9 need a printable
+                 * separator after LIST expands the alias to PRINT. */
                 if (space_start == pos - 1u) {
-                    return BL_BAD_SEQUENCE; /* PRINT0 wouldn't retokenize */
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) {
+                        return status;
+                    }
                 }
                 status = append_decimal(out, (unsigned int)(t - 0x0eu));
             } else if (t == 0x19u) {
                 if (pos == length) {
                     return BL_TRUNCATED;
                 }
-                if (space_start == pos - 1u || body[pos] < 10u) {
+                if (body[pos] < 10u) {
                     return BL_BAD_SEQUENCE; /* J0.4 emits small digits as 0E..17 */
+                }
+                if (space_start == pos - 1u) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) {
+                        return status;
+                    }
                 }
                 status = append_decimal(out, (unsigned int)body[pos++]);
             } else {

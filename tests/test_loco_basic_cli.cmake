@@ -141,4 +141,19 @@ check_case("explicit-variable-list-unsupported-run"
     "${banner}${ok}${ok}${ok}${ok}${listed}${running}[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_UNSUPPORTED\n${byebye}"
 )
 
-message(STATUS "host_cli: fifteen black-box scenarios passed")
+
+# J0.16-C1: ?A% and its sibling suffixes must survive the entire
+# terminal -> numbered program -> LIST pipeline, without variable evaluation.
+check_case("c1-alias-print-suffix-and-number"
+    "10 ?A%\n20 ?B!\n30 ?S$\n40 PRINT A%\n50 ?A%:END\n60 ?5\n70 ?42\n80 ?\"Q\"\n90 END\nLIST\nRUN\n:step\n:quit\n"
+    "10 PRINT A%\n20 PRINT B!\n30 PRINT S$\n40 PRINT A%\n50 PRINT A%:END\n60 PRINT 5\n70 PRINT 42\n80 PRINT\"Q\"\n90 END\n"
+    "${banner}${ok}${ok}${ok}${ok}${ok}${ok}${ok}${ok}${ok}${listed}${running}[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_UNSUPPORTED\n${byebye}"
+)
+
+check_case("c1-printa-is-not-a-keyword"
+    "10 PRINTA%\nLIST\n:quit\n"
+    ""
+    "${banner}[cli:error] BSR_SESSION_ERROR BS_TOKENIZER_ERROR BT_UNSUPPORTED_CONSTRUCT BP_OK BL_OK BE_OK\n${listed}${byebye}"
+)
+
+message(STATUS "host_cli: seventeen black-box scenarios passed")

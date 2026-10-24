@@ -109,3 +109,14 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_variable_types PRIVATE basic_variable_types)
     add_test(NAME basic_variable_types COMMAND test_basic_variable_types)
 endif()
+
+# J0.15: bounded scalar store, separate from the BASIC runtime.
+add_library(basic_variable_store STATIC core/basic_variable_store.c)
+target_include_directories(basic_variable_store PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
+target_link_libraries(basic_variable_store PUBLIC basic_variable_types)
+
+if(BUILD_TESTING)
+    add_executable(test_basic_variable_store tests/test_basic_variable_store.c)
+    target_link_libraries(test_basic_variable_store PRIVATE basic_variable_store)
+    add_test(NAME basic_variable_store COMMAND test_basic_variable_store)
+endif()

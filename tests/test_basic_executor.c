@@ -149,6 +149,68 @@ static int test_strings_and_numbers(void)
     return 0;
 }
 
+
+/* Regression: 0x01 in source quoted content is NOT the colon separator. */
+static int test_literal_01_in_strings(void)
+{
+    Fixture f;
+    size_t n = 0u;
+    static const uint8_t quoted[] = {
+        'P','R','I','N','T',' ','"','A',0x01u,'B','"'
+    };
+    static const uint8_t expected[] = {'A',0x01u,'B','\n'};
+    static const uint8_t multiple[] = {
+        'P','R','I','N','T',' ','"','A',0x01u,'B','"',
+        ':',
+        'P','R','I','N','T',' ','"','C',0x01u,'D','"'
+    };
+    static const uint8_t multiple_expected[] = {
+        'A',0x01u,'B','\n','C',0x01u,'D','\n'
+    };
+    static const uint8_t unterminated[] = {
+        'P','R','I','N','T',' ','"','E',0x01u,'F'
+    };
+    static const uint8_t unterminated_expected[] = {
+        'E',0x01u,'F','\n'
+    };
+
+    /* Real J0.4 tokenizer -> stored BasicProgram -> J0.7 executor. */
+    CHECK(setup(&f) == 0);
+    CHECK(bt_tokenize(quoted, sizeof(quoted), f.tokens,
+                      sizeof(f.tokens), &n) == BT_OK);
+    CHECK(n == 7u && f.tokens[4] == 0x01u);
+    CHECK(bp_put(&f.program, 10u, f.tokens, n) == BP_OK);
+    CHECK(start(&f) == 0);
+    CHECK(fails(&f, BE_NO_SPACE, sizeof(expected) - 1u) == 0);
+    memset(f.output, 0x69, sizeof(f.output));
+    f.written = 111u;
+    CHECK(be_step(&f.executor, f.output, sizeof(expected),
+                  &f.written) == BE_OK);
+    CHECK(f.written == sizeof(expected));
+    CHECK(memcmp(f.output, expected, sizeof(expected)) == 0);
+    CHECK(f.output[sizeof(expected)] == 0x69u);
+    CHECK(fails(&f, BE_END, sizeof(f.output)) == 0);
+
+    /* Distinguish literal 01 inside strings and tokenized 01 after quotes. */
+    CHECK(setup(&f) == 0);
+    CHECK(bt_tokenize(multiple, sizeof(multiple), f.tokens,
+                      sizeof(f.tokens), &n) == BT_OK);
+    CHECK(bp_put(&f.program, 10u, f.tokens, n) == BP_OK);
+    CHECK(start(&f) == 0);
+    CHECK(step(&f, multiple_expected, sizeof(multiple_expected)) == 0);
+    CHECK(fails(&f, BE_END, sizeof(f.output)) == 0);
+
+    /* Missing closing quote consumes entire body, including any raw 01. */
+    CHECK(setup(&f) == 0);
+    CHECK(bt_tokenize(unterminated, sizeof(unterminated), f.tokens,
+                      sizeof(f.tokens), &n) == BT_OK);
+    CHECK(bp_put(&f.program, 10u, f.tokens, n) == BP_OK);
+    CHECK(start(&f) == 0);
+    CHECK(step(&f, unterminated_expected, sizeof(unterminated_expected)) == 0);
+    CHECK(fails(&f, BE_END, sizeof(f.output)) == 0);
+    return 0;
+}
+
 static int test_branches(void)
 {
     Fixture f;
@@ -313,6 +375,7 @@ int main(void)
     CHECK(test_main_path() == 0);
     CHECK(test_empty_and_natural_end() == 0);
     CHECK(test_strings_and_numbers() == 0);
+    CHECK(test_literal_01_in_strings() == 0);
     CHECK(test_branches() == 0);
     CHECK(test_missing_target_and_short_buffers() == 0);
     CHECK(test_unsupported_and_unreached() == 0);

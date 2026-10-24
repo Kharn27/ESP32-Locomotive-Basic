@@ -191,6 +191,13 @@ static int test_invalid_images(void)
     CHECK(put(&h, 10u, "A%=2:END") == 0);
     CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
     CHECK(failure(&h, BE_UNSUPPORTED) == 0);
+    CHECK(put(&h, 10u, "GOTO 20:A%=2") == 0);
+    CHECK(put(&h, 20u, "END") == 0);
+    CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+    CHECK(failure(&h, BE_UNSUPPORTED) == 0);
+    CHECK(put(&h, 10u, "END:LET A%=2") == 0);
+    CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+    CHECK(failure(&h, BE_UNSUPPORTED) == 0);
     return 0;
 }
 

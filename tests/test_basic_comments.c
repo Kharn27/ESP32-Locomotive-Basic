@@ -57,6 +57,7 @@ static int test_cpc_markers(void)
                                         0x01u, 0xc0u, ' ', 'R', 'U', 'N'};
     static const uint8_t empty_rem[] = {0xc5u};
     static const uint8_t empty_ap[] = {0x01u, 0xc0u};
+    static const uint8_t empty_print_ap[] = {0xbfu, 0x01u, 0xc0u, 'X'};
     CHECK(token_case("REM PRINT:\"", rem, sizeof(rem)) == 0);
     CHECK(token_case("' PRINT:\"", apostrophe, sizeof(apostrophe)) == 0);
     CHECK(token_case("PRINT 42:REM :GOTO", after_rem, sizeof(after_rem)) == 0);
@@ -64,6 +65,7 @@ static int test_cpc_markers(void)
     CHECK(token_case("PRINT \"X\"' RUN", implicit, sizeof(implicit)) == 0);
     CHECK(token_case("REM", empty_rem, sizeof(empty_rem)) == 0);
     CHECK(token_case("'", empty_ap, sizeof(empty_ap)) == 0);
+    CHECK(token_case("PRINT\'X", empty_print_ap, sizeof(empty_print_ap)) == 0);
     return 0;
 }
 
@@ -88,6 +90,7 @@ static int test_roundtrips(void)
         "REM", "REM   ", "REM PRINT:GOTO:RUN \" QUOTES ",
         "'", "'  ", "'PRINT:REM:NEW \"", " PRINT \"HI\":REM \"HELLO:PRINT\"",
         "PRINT 42:'HERE : PRINT 255", "PRINT \"X\"' :IGNORE",
+        "PRINT\' LAST", "PRINT \' SPACE",
         "  REM : PRINT : GOTO 1", "PRINT \"LITERAL:RUN\"",
         "PRINT \"A\":PRINT \"B\":' AFTER"
     };

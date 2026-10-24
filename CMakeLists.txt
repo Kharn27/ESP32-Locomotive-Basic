@@ -62,3 +62,15 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_session PRIVATE basic_session)
     add_test(NAME basic_session COMMAND test_basic_session)
 endif()
+
+# J0.9 Linux host adapter. The core libraries remain platform-independent.
+add_executable(loco_basic_cli host/loco_basic_cli.c)
+target_link_libraries(loco_basic_cli PRIVATE basic_session_runtime)
+
+if(BUILD_TESTING)
+    # One seventh CTest suite, with ten real-process interaction scenarios.
+    add_test(NAME host_cli COMMAND ${CMAKE_COMMAND}
+        "-DCLI=$<TARGET_FILE:loco_basic_cli>"
+        "-DTEST_TEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_loco_basic_cli.cmake")
+endif()

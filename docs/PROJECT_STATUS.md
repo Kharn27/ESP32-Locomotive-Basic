@@ -14,7 +14,7 @@
 | **J0.6** | Saisie et édition minimales de lignes BASIC ; commandes directes LIST/NEW, sans RUN | **Accepté et intégré dans `main` via [PR #6](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/6)** (squash `486db356`) | [J0.6](J0.6-basic-session.md) |
 | **J0.7** | Exécuteur pas-à-pas C99 de `PRINT` littéral/entier et `GOTO`, sortie atomique et diagnostic des erreurs ; `RUN` direct différé | **Accepté et intégré dans `main` via [PR #7](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/7)** (squash `8bb1060e`) | [J0.7](J0.7-basic-executor.md) |
 | **J0.8** | Orchestration native `RUN`, `bsr_step` non bloquant, arrêt explicite, LIST/NEW pendant exécution, sixième suite CTest | **Accepté et intégré dans `main` via [PR #8](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/8)** (squash `d21af73d`) ; CI 6/6 Linux + 6/6 ASan/UBSan | [J0.8](J0.8-session-runtime.md) |
-| **J0.9** | CLI Linux `loco_basic_cli` : édition/LIST/RUN, pilotage borné `:step`/`:stop`, erreurs et 7e suite CTest | **En revue Pilotage** (branche `feat/j0-9-host-cli`, PR en préparation ; non fusionnée) | [J0.9](J0.9-host-cli.md) |
+| **J0.9** | CLI Linux `loco_basic_cli` : édition/LIST/RUN, pilotage borné `:step`/`:stop`, erreurs et 7e suite CTest | **En revue Pilotage** ([PR #9](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/9) ouverte ; non fusionnée) | [J0.9](J0.9-host-cli.md) |
 | Étapes ultérieures | Autres instructions BASIC, console série embarquée, puis écran CYD | **Non lancées** | Aucun |
 
 ## Décisions techniques actées

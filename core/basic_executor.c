@@ -178,6 +178,7 @@ static BEStatus execute_line(const BasicProgram *program,
     const uint8_t *body = program->data + line->body_offset;
     size_t length = line->body_length;
     size_t pos = 0u;
+    int preceding_statement = 0;
     BEStatus status;
 
     for (;;) {
@@ -311,6 +312,11 @@ static BEStatus execute_line(const BasicProgram *program,
             size_t consumed, start;
             uint8_t literal;
             BVBStatus resolved;
+            /* Multi-statement lines must not commit a PRINT prefix or
+             * an assignment on the same line. The probe stays pure. */
+            if (preceding_statement) {
+                return BE_UNSUPPORTED;
+            }
             /* This is intentionally not a general expression evaluator. */
             if (variables == NULL) {
                 return BE_UNSUPPORTED;
@@ -394,6 +400,7 @@ static BEStatus execute_line(const BasicProgram *program,
                                line->next_offset, next);
         }
         ++pos;
+        preceding_statement = 1;
         {
             size_t following = pos;
             skip_spaces(body, length, &following);

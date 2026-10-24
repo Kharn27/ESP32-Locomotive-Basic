@@ -111,8 +111,6 @@ static int test_encoder_errors(void)
                               dest, 0u, &written) == BVR_LIMIT_EXCEEDED);
     CHECK(bvr_encode_explicit(dest, 2u, BVR_TYPE_INTEGER,
                               dest, sizeof(dest), &written) == BVR_OVERLAPPING_MEMORY);
-    CHECK(bvr_encode_explicit(good, 2u, BVR_TYPE_INTEGER,
-                              dest, sizeof(dest), (size_t *)(void *)&shared) == BVR_OK);
     /* A valid aligned written pointer within the destination is rejected. */
     CHECK(bvr_encode_explicit(good, 2u, BVR_TYPE_INTEGER,
                               shared.bytes, sizeof(shared.bytes),

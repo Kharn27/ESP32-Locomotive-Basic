@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""J0.24-C3: ROM-backed CPC BASIC program RAM oracle, independent of the C99 tokenizer.
+"""J0.24-C4: ROM-backed CPC BASIC program RAM oracle, independent of the C99 tokenizer.
 
 Only the delimited BASIC program is exported. Full SNA snapshots exist in a
 TemporaryDirectory outside output/ and are removed, including on error.
@@ -21,6 +21,9 @@ ROM_SHA = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
 CASES = {
     "b_integer_scalar": ("sources/b_integer_scalar.bas", [10, 20, 30]),
     "c_integer_add": ("sources/c_integer_add.bas", [10, 20, 30, 40]),
+    "a_print_constants": ("sources/a_print_constants.bas", [10, 20, 30]),
+    "f_let_spacing": ("sources/f_let_spacing.bas", [10, 20, 30]),
+    "f_mixed_case": ("sources/f_mixed_case.bas", [10, 20, 30]),
 }
 HEADER = 256
 RAM_BYTES = 128 * 1024
@@ -100,7 +103,7 @@ def acquire(cap, romdir, case, source, numbers, image_cli, out):
     work = out / case
     check(not work.exists(), "refusing to reuse output case directory")
     work.mkdir(parents=True)
-    with tempfile.TemporaryDirectory(prefix="loco-c3-sna-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="loco-c4-sna-") as temporary:
         snaps = Path(temporary)
         cfg = configparser.ConfigParser(interpolation=None)
         check(bool(cfg.read(cap / "cap32.cfg")), "Caprice32 config missing")
@@ -272,7 +275,7 @@ def main():
                 "captures": captures}
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print("TOKEN_MANIFEST_JSON=" + json.dumps(manifest, separators=(",", ":")), flush=True)
-    print("COMPLETE 2 CPC RAM-token acquisitions (full SNA erased); "
+    print(f"COMPLETE {len(captures)} CPC RAM-token acquisitions (full SNA erased); "
           "comparisons are observations, not compatibility assertions", flush=True)
 
 if __name__ == "__main__":
@@ -280,5 +283,5 @@ if __name__ == "__main__":
         main()
     except (ValueError, OSError, subprocess.SubprocessError,
             UnicodeError, KeyError) as err:
-        print("J0.24-C3 ACQUISITION FAILED:",err,file=sys.stderr)
+        print("J0.24-C4 ACQUISITION FAILED:",err,file=sys.stderr)
         sys.exit(1)

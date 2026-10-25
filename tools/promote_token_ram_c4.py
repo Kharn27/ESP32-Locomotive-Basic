@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import sys
 
@@ -47,8 +48,12 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--evidence", type=Path, required=True)
     p.add_argument("--run-id", type=int, required=True)
+    p.add_argument("--artifact-id", type=int, required=True)
+    p.add_argument("--artifact-digest", required=True)
     args = p.parse_args()
-    require(args.run_id > 0, "invalid originating CI run")
+    require(args.run_id > 0 and args.artifact_id > 0 and
+            re.fullmatch(r"sha256:[0-9a-f]{64}", args.artifact_digest),
+            "invalid originating CI run / uploaded artifact")
     base = args.evidence.resolve()
     manifest = load(base / "manifest.json")
     evidence.validate(base, manifest)
@@ -128,6 +133,10 @@ def main():
                 "run_id": args.run_id,
                 "run_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/" + str(args.run_id),
                 "artifact_name": "cpc6128-c4-original-evidence",
+        "artifact_id": args.artifact_id,
+        "artifact_digest": args.artifact_digest,
+                "artifact_id": args.artifact_id,
+                "artifact_digest": args.artifact_digest,
                 "captured_at": manifest["generated_at"],
                 "caprice32_commit": ram_oracle.PIN,
                 "rom_sha256": ram_oracle.ROM_SHA,

@@ -237,6 +237,54 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 return BL_TRUNCATED;
             }
             t = body[pos++];
+            if (t == 0x02u) {
+                /* RHS CPC cache bytes remain opaque (20, EF, F4 included). */
+                BasicVariableRef rhs;
+                size_t rhs_start = pos - 1u;
+                ref_status = bvr_decode(body, length, rhs_start, &rhs);
+                if (ref_status == BVR_TRUNCATED) {
+                    return BL_TRUNCATED;
+                }
+                if (ref_status != BVR_OK ||
+                    rhs.family != BVR_FAMILY_EXPLICIT ||
+                    rhs.explicit_type != BVR_TYPE_INTEGER) {
+                    return BL_BAD_SEQUENCE;
+                }
+                for (i = 0u; i < rhs.name_length; ++i) {
+                    status = append_byte(out,
+                        (uint8_t)(body[rhs.name_offset + i] & 0x7fu));
+                    if (status != BL_OK) {
+                        return status;
+                    }
+                }
+                status = append_byte(out, (uint8_t)'%');
+                if (status != BL_OK) {
+                    return status;
+                }
+                pos = rhs.reference_offset + rhs.consumed;
+                status = append_spaces(body, length, &pos, out);
+                if (status != BL_OK) {
+                    return status;
+                }
+                if (pos >= length) {
+                    return BL_TRUNCATED;
+                }
+                if (body[pos++] != 0xf4u) {
+                    return BL_BAD_SEQUENCE;
+                }
+                status = append_byte(out, (uint8_t)'+');
+                if (status != BL_OK) {
+                    return status;
+                }
+                status = append_spaces(body, length, &pos, out);
+                if (status != BL_OK) {
+                    return status;
+                }
+                if (pos >= length) {
+                    return BL_TRUNCATED;
+                }
+                t = body[pos++];
+            }
             if (t >= 0x0eu && t <= 0x17u) {
                 number = (unsigned int)(t - 0x0eu);
             } else if (t == 0x19u) {

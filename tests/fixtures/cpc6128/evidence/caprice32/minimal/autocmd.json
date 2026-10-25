@@ -1,0 +1,11 @@
+{
+  "source": "tests/oracles/inputs/minimal.bas",
+  "source_sha256": "5100b924968fe4e539b3cfbe871508099ce85a8b5c190b873e3c12cd2c95e9cb",
+  "commands": [
+    "10 PRINT 5",
+    "20 END",
+    "RUN",
+    "PRINT #8,5",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ]
+}

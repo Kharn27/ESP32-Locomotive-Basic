@@ -1,0 +1,65 @@
+name: CPC 6128 independent oracle
+
+on:
+  pull_request:
+    paths:
+      - ".gitmodules"
+      - "tests/oracles/**"
+      - ".github/workflows/cpc-oracle.yml"
+      - "docs/J0.24-C1-caprice32-oracle-automation.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  caprice32-oracle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout pinned emulator submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Verify pinned Caprice32 revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+          git ls-tree HEAD tests/oracles/caprice32
+          test "$(git ls-tree HEAD tests/oracles/caprice32 | awk '{print $1}')" = "160000"
+
+      - name: Install upstream Linux build dependencies and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ make pkg-config libsdl2-dev libfreetype6-dev zlib1g-dev libpng-dev xvfb xauth python3
+
+      - name: Build Caprice32 from pinned source
+        working-directory: tests/oracles/caprice32
+        run: |
+          set -euo pipefail
+          make -j 2 WITHOUT_GL=1 APP_PATH="$PWD"
+          ./cap32 --version
+          test -s rom/cpc6128.rom
+          sha256sum rom/cpc6128.rom
+          test -s rom/amsdos.rom
+          sha256sum rom/amsdos.rom
+
+      - name: Acquire CPC 6128 BASIC 1.1 evidence
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/run_caprice32.py \
+            --caprice tests/oracles/caprice32 \
+            --output "${RUNNER_TEMP}/cpc-oracle" \
+            --case minimal --case witness
+
+      - name: Upload independent oracle evidence (never ROMs or full snapshots)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpc6128-caprice32-evidence
+          path: ${{ runner.temp }}/cpc-oracle/
+          if-no-files-found: warn
+          retention-days: 14

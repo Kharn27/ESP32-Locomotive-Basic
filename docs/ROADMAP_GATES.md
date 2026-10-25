@@ -23,10 +23,12 @@ Le passage à J1 marque la **maturité du socle**, pas la fin du projet ni une p
 
 ## Ordre de travail J0 restant (prévision, ajustable après chaque revue)
 
-**Acquis au terme de J0.21 :** stockage scalaire borné, résolution des références explicites, affectations INTEGER constantes autonomes, puis `PRINT A%` et l'alias `?A%` avec lecture du magasin. Ces fonctionnalités sont validées en CI hôte, **pas** encore contre un oracle CPC indépendant.
+**Acquis au terme de J0.22 :** stockage scalaire borné, résolution des références explicites, affectations INTEGER constantes autonomes, puis `PRINT A%` et l'alias `?A%` avec lecture du magasin. Ces fonctionnalités sont validées en CI hôte, **pas** encore contre un oracle CPC indépendant.
 
 - **J0.21 acquis via PR #24** : tokenisation et restitution LIST de `B%=A%+3`, sans exécution ; 18/18 suites Linux et ASan/UBSan, vecteurs ROM-dérivés.
-- **J0.22 prévu** : premier évaluateur INTEGER borné pour référence scalaire explicite et addition d'une constante non signée (0..255), branchement atomique à l'affectation pour faire afficher 5 au programme témoin. Étudier les limites INT16 et le comportement CPC avant de définir les débordements ; les priorités ROM complètes et conversions restent non acquises.
+- **J0.22 acquis via PR #26** : premier évaluateur INTEGER borné ; le programme témoin affiche `5`, atteint `END` et dispose de tests sur débordement/atomicité (19/19 Linux et ASan/UBSan). Les sémantiques CPC exactes restent à confronter à un oracle indépendant.
+- **J0.23 prévu** : audit reproductible des budgets RAM/Flash et de l'empreinte d'objets C99 pour l'ESP32-2432S028R (4 Mo Flash, sans PSRAM) ; étude/prototype de faisabilité cible lorsqu'outillage disponible, sans HAL ni fonctions BASIC supplémentaires.
+- **J0.24 pressenti** : premier banc différentiel indépendant sur CPC 6128 ou émulateur précisément identifié ; comparer tokens/LIST/exécution du sous-ensemble J0 et classifier les écarts. Toute divergence bloquant la tranche verticale doit être corrigée avant clôture J0.
 - **Clôture J0** : tests Linux et sanitizers, vérifications différentielles CPC indépendantes, diagnostics d'écarts, budget RAM/Flash et preuve anticipée de faisabilité CYD. Nombre exact de PR à fixer après revue des résultats.
 
 ## J1 — Développement de la compatibilité Locomotive BASIC 1.1

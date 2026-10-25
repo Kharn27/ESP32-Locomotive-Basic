@@ -21,6 +21,9 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: J0.23 memory audit (Linux host only)
         run: |
+          cc --version | head -n 1
+          cmake --version | head -n 1
+          size --version | head -n 1
           ./build/basic_memory_budget
           echo '--- Host CLI ELF sections (includes libc/host overhead) ---'
           size -A build/loco_basic_cli | grep -E '^\.(text|rodata|data|bss)[[:space:]]|^Total'

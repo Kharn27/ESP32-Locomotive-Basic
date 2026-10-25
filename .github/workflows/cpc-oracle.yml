@@ -6,6 +6,9 @@ on:
       - ".gitmodules"
       - "tests/oracles/**"
       - ".github/workflows/cpc-oracle.yml"
+      - "tools/cpc_token_evidence.py"
+      - "tests/fixtures/cpc6128/**"
+      - "docs/J0.24-C3-cpc-token-memory.md"
       - "docs/J0.24-C1-caprice32-oracle-automation.md"
   workflow_dispatch:
 
@@ -69,6 +72,26 @@ jobs:
             --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
             --output "${RUNNER_TEMP}/cpc-oracle" \
             --case minimal --case witness
+
+      - name: Verify CPC token parser without emulator
+        run: python3 tests/oracles/token_ram_oracle.py --self-test
+
+      - name: Acquire CPC BASIC token RAM images before RUN
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/token_ram_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" \
+            --output "${RUNNER_TEMP}/cpc-token-oracle"
+
+      - name: Upload only delimited BASIC images and their provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpc6128-basic-token-ram-evidence
+          path: ${{ runner.temp }}/cpc-token-oracle/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload independent oracle evidence (never ROMs or full snapshots)
         if: always()

@@ -81,8 +81,7 @@ def main():
         require(name in NEW and evidence.sha(raw_source) == EXPECTED_SOURCES[name],
                 "unexpected or changed C4 source")
         require(cases[name]["source_sha256"] == EXPECTED_SOURCES[name] and
-                cases[name]["observations"] == {} and
-                "TOKENS" not in cases[name]["operations"],
+                cases[name]["observations"] == {},
                 "C4 differential record was already populated")
         rec = cap["region"]
         cpc = (folder / "program.bin").read_bytes()
@@ -136,7 +135,8 @@ def main():
             },
         }
         prior["cases"].append(record)
-        cases[name]["operations"].append("TOKENS")
+        if "TOKENS" not in cases[name]["operations"]:
+            cases[name]["operations"].append("TOKENS")
         cases[name]["observations"]["TOKENS"] = {
             "path": "token_ram/" + name + "/program.bin",
             "sha256": record["program_sha256"],

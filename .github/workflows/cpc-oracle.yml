@@ -10,6 +10,8 @@ on:
       - "tests/fixtures/cpc6128/**"
       - "docs/J0.24-C3-cpc-token-memory.md"
       - "docs/J0.24-C4-extended-token-oracle.md"
+      - "docs/J0.24-C5-eight-case-oracle.md"
+      - "tools/promote_token_ram_c5.py"
       - "tools/promote_token_ram_c4.py"
       - "docs/J0.24-C1-caprice32-oracle-automation.md"
   workflow_dispatch:
@@ -67,22 +69,25 @@ jobs:
             --cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
             --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" --ci
 
-      - name: Verify permanent C3/C4 fixtures against original SHA provenance
+      - name: Verify permanent C3/C4/C5 fixtures against original SHA provenance
         run: python3 tools/cpc_token_evidence.py --permanent --self-test
 
-      - name: Assert J0.24 independent eight-case gate remains closed
+      - name: Check eight-case quantitative threshold (not J0.24 acceptance)
         run: |
           set -euo pipefail
-          if python3 tools/cpc_diff.py \
-               --manifest tests/fixtures/cpc6128/manifest.json \
-               --cli "$RUNNER_TEMP/c99-build/loco_basic_cli" \
-               --image-cli "$RUNNER_TEMP/c99-build/basic_program_image_cli" \
-               --ci --require-independent > "$RUNNER_TEMP/gate.log" 2>&1; then
-            echo "ERROR: J0.24 gate opened before eight verified cases"
-            exit 1
-          fi
+          python3 tools/cpc_diff.py \
+            --manifest tests/fixtures/cpc6128/manifest.json \
+            --cli "$RUNNER_TEMP/c99-build/loco_basic_cli" \
+            --image-cli "$RUNNER_TEMP/c99-build/basic_program_image_cli" \
+            --ci --require-independent > "$RUNNER_TEMP/gate.log" 2>&1 && result=0 || result=$?
           cat "$RUNNER_TEMP/gate.log"
-          grep -q 'VERIFIED_CASES=5 TOKEN_BINARIES=5' "$RUNNER_TEMP/gate.log"
+          if python3 -c 'import json; assert json.load(open("tests/fixtures/cpc6128/token_ram/manifest.json")).get("phase") == "J0.24-C5"'; then
+            test "$result" -eq 0
+            grep -q 'VERIFIED_CASES=8 TOKEN_BINARIES=8' "$RUNNER_TEMP/gate.log"
+          else
+            test "$result" -ne 0
+            grep -q 'VERIFIED_CASES=5 TOKEN_BINARIES=5' "$RUNNER_TEMP/gate.log"
+          fi
 
       - name: Acquire CPC 6128 BASIC 1.1 evidence
         run: |
@@ -95,7 +100,7 @@ jobs:
 
       - name: Verify CPC token parser and archival helper syntax
         run: |
-          python3 -m py_compile tools/promote_token_ram_c4.py
+          python3 -m py_compile tools/promote_token_ram_c4.py tools/promote_token_ram_c5.py
           python3 tests/oracles/token_ram_oracle.py --self-test
 
       - name: Acquire CPC BASIC token RAM images before RUN

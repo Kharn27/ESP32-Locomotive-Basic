@@ -148,6 +148,13 @@ def acquire(cap, romdir, case, source, numbers, image_cli, out):
         screenshot = work / "list.png"
         screenshots[0].rename(screenshot)
         files = list(snaps.glob("*.sna"))
+        if len(files) != 1:
+            print("SNA DIAGNOSTIC: temporary dir:", [p.name for p in snaps.iterdir()],
+                  "config snap_path:", cfg["file"].get("snap_path"),
+                  "cap snap/:", [p.name for p in (cap/"snap").glob("*.sna")],
+                  "cap cwd:", [p.name for p in cap.glob("*.sna")], flush=True)
+            print("SNA DIAGNOSTIC Caprice32 log:",
+                  log[-6000:].decode("utf8","replace"), flush=True)
         check(len(files) == 1, f"expected one temporary snapshot, found {len(files)}")
         snap = files[0].read_bytes()
         program, region = extract_snapshot(snap, numbers)

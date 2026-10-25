@@ -73,6 +73,9 @@ jobs:
       - name: Verify permanent C3/C4/C5 fixtures against original SHA provenance
         run: python3 tools/cpc_token_evidence.py --permanent --self-test
 
+      - name: Verify permanent C6 independent RUN/probe evidence and source provenance
+        run: python3 tests/oracles/cpc_run_evidence.py --evidence tests/fixtures/cpc6128/run_behavior --permanent --self-test
+
       - name: Check eight-case quantitative threshold (not J0.24 acceptance)
         run: |
           set -euo pipefail
@@ -113,23 +116,6 @@ jobs:
           python3 tests/oracles/cpc_run_evidence.py \
             --evidence "${RUNNER_TEMP}/cpc-run-behavior" --self-test
           python3 tools/cpc_token_evidence.py --permanent --self-test
-
-      - name: Export selected evidence bytes for read-only provenance-preserving promotion
-        if: success()
-        run: |
-          python3 - <<'PY'
-          import base64, pathlib, os
-          base = pathlib.Path(os.environ["RUNNER_TEMP"]) / "cpc-run-behavior"
-          names = ["manifest.json"]
-          for case in ("c_integer_add", "d_self_reference"):
-              for member in ("source.bas", "autocmd.json", "cap32.cfg", "caprice.log",
-                             "printer.dat", "native.stdin.bin", "native.stdout.bin",
-                             "native.stderr.bin", "screen.png"):
-                  names.append(case + "/" + member)
-          for name in names:
-              payload = (base / name).read_bytes()
-              print("C6_EVIDENCE|" + name + "|" + base64.b64encode(payload).decode(), flush=True)
-          PY
 
       - name: Upload C6 RUN numeric proof (printer != screen)
         if: always()

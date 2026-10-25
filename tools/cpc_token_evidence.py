@@ -4,6 +4,7 @@ import argparse
 import copy
 import hashlib
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -15,6 +16,10 @@ ALLOWED = {"program.bin", "c99.bin", "cap32.cfg",
            "autocmd.json", "caprice.log", "list.png", "comparison.json"}
 FORBIDDEN_SUFFIXES = {".sna", ".rom", ".dsk", ".cpr", ".zip", ".img"}
 ROM = oracle.ROM_SHA
+C3_SOURCE_SHA = {
+    "b_integer_scalar": "7b000be0cd026bd73e309b24d2f57ab17f2dc6e650278e7e32776ab07a9039f1",
+    "c_integer_add": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+}
 C3_SHA = {
     "b_integer_scalar": "20840377f8ec0181fe572e599f8eb63ab20a6e3edd8b448a201b14e8c23c8ee9",
     "c_integer_add": "931531da119e6c2b794482949b757203f5ddd1b5720694e723e74a97a001d188",
@@ -127,8 +132,8 @@ def validate_permanent(root, manifest):
         p4 = manifest.get("c4_acquisition")
         require(isinstance(p4, dict) and p4.get("workflow") == "J0.24-C4 one-shot import" and
                 isinstance(p4.get("artifact_id"), int) and not isinstance(p4.get("artifact_id"), bool) and
-                p4["artifact_id"] > 0 and p4.get("artifact_digest", "").startswith("sha256:") and
-                len(p4["artifact_digest"]) == 71 and
+                p4["artifact_id"] > 0 and isinstance(p4.get("artifact_digest"), str) and
+                re.fullmatch(r"sha256:[0-9a-f]{64}", p4["artifact_digest"]) and
                 isinstance(p4.get("run_id"), int) and p4["run_id"] > 0,
                 "C4 archival artifact provenance missing")
     require(manifest["schema_version"] == 1 and
@@ -180,7 +185,8 @@ def validate_permanent(root, manifest):
                     sha(binary) == case[sha_key], "binary SHA mismatch")
             expected_files.add(file.relative_to(base).as_posix())
         if name in C3_SHA:
-            require(case["program_sha256"] == C3_SHA[name] and
+            require(case["source_sha256"] == C3_SOURCE_SHA[name] and
+                    case["program_sha256"] == C3_SHA[name] and
                     case["c99_sha256"] == C3_SHA[name] and
                     case["comparison"] == "MATCH_EXACT" and
                     "acquisition" not in case, "immutable C3 evidence changed")

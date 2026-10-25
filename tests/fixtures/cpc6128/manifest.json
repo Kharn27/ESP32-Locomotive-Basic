@@ -1,13 +1,22 @@
 {
   "schema_version": 1,
-  "purpose": "proposed CPC6128 BASIC 1.1 experiments; none is independent evidence until captured",
-  "oracle": null,
+  "purpose": "CPC6128 Locomotive BASIC 1.1 differential corpus: two authentic RAM token captures, remaining planned experiments unverified",
+  "oracle": {
+    "name": "Caprice32",
+    "version": "v4.6.0-8c778bf",
+    "model": "CPC6128",
+    "ram_kb": 128,
+    "basic_rom_version": "1.1",
+    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "input_method": "--autocmd numbered lines, LIST, snapshot before RUN",
+    "capture_method": "SNA v3 temporary 256-byte header + physical RAM, ROM BASIC pointers &AE64/&AE66, original program region only; run 40223535739 artifact 12609729713"
+  },
   "acquisition": {
-    "status": "BLOCKED",
+    "status": "PARTIAL",
     "date": "2026-10-25",
-    "reason": "No runnable CPC6128 or Caprice32 and no verified ROM image available in the execution environment. Network access from the local build container unavailable.",
+    "reason": "Two independent CPC RAM token captures confirmed and archived; other 19 observations remain missing; J0.24 requires >=8 independent cases.",
     "recommended_oracle": "ColinPitrat/caprice32",
-    "reference": "https://github.com/ColinPitrat/caprice32/blob/master/doc/man.html"
+    "reference": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40223535739"
   },
   "cases": [
     {
@@ -29,7 +38,25 @@
         "RUN",
         "TOKENS"
       ],
-      "observations": {}
+      "observations": {
+        "TOKENS": {
+          "path": "token_ram/b_integer_scalar/program.bin",
+          "sha256": "20840377f8ec0181fe572e599f8eb63ab20a6e3edd8b448a201b14e8c23c8ee9",
+          "origin": "cpc6128-rom-basic11",
+          "captured_at": "2026-10-25T19:01:19.685843+00:00",
+          "method": "Caprice32 pinned 8c778bf; LIST then SNA before RUN; pointers &AE64/&AE66; RAM CPC &0170–&018E; GitHub Actions #40223535739; no ROM or full snapshot retained",
+          "media": "binary",
+          "comparison": "exact-bytes",
+          "expected_classification": "MATCH_EXACT",
+          "program_region": {
+            "offset": 0,
+            "length": 30,
+            "container": "raw-ram-export",
+            "header_bytes": 0,
+            "memory_layout": "contiguous-cpc-ram-records"
+          }
+        }
+      }
     },
     {
       "id": "c_integer_add",
@@ -40,7 +67,25 @@
         "RUN",
         "TOKENS"
       ],
-      "observations": {}
+      "observations": {
+        "TOKENS": {
+          "path": "token_ram/c_integer_add/program.bin",
+          "sha256": "931531da119e6c2b794482949b757203f5ddd1b5720694e723e74a97a001d188",
+          "origin": "cpc6128-rom-basic11",
+          "captured_at": "2026-10-25T19:01:19.685843+00:00",
+          "method": "Caprice32 pinned 8c778bf; LIST then SNA before RUN; pointers &AE64/&AE66; RAM CPC &0170–&019E; GitHub Actions #40223535739; no ROM or full snapshot retained",
+          "media": "binary",
+          "comparison": "exact-bytes",
+          "expected_classification": "MATCH_EXACT",
+          "program_region": {
+            "offset": 0,
+            "length": 46,
+            "container": "raw-ram-export",
+            "header_bytes": 0,
+            "memory_layout": "contiguous-cpc-ram-records"
+          }
+        }
+      }
     },
     {
       "id": "d_self_reference",

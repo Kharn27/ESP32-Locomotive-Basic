@@ -52,8 +52,9 @@ static int submit_overlap(const BasicSessionRuntime *runtime,
                           const uint8_t *output, size_t output_capacity,
                           const size_t *written)
 {
-    const void *parts[7];
-    size_t lengths[7];
+    const void *parts[9];
+    size_t lengths[9];
+    size_t count = runtime->variables == NULL ? 7u : 9u;
     size_t i, j;
     parts[0] = runtime;
     lengths[0] = sizeof(*runtime);
@@ -69,8 +70,14 @@ static int submit_overlap(const BasicSessionRuntime *runtime,
     lengths[5] = output_capacity;
     parts[6] = written;
     lengths[6] = sizeof(*written);
-    for (i = 0u; i < 7u; ++i) {
-        for (j = i + 1u; j < 7u; ++j) {
+    if (runtime->variables != NULL) {
+        parts[7] = runtime->variables;
+        lengths[7] = sizeof(*runtime->variables);
+        parts[8] = runtime->variables->entries;
+        lengths[8] = runtime->variables->capacity * sizeof(BasicVariableEntry);
+    }
+    for (i = 0u; i < count; ++i) {
+        for (j = i + 1u; j < count; ++j) {
             if (overlaps(parts[i], lengths[i], parts[j], lengths[j])) {
                 return 1;
             }
@@ -93,7 +100,17 @@ static int step_overlap(const BasicSessionRuntime *runtime,
            overlaps(written, sizeof(*written), runtime, sizeof(*runtime)) ||
            overlaps(written, sizeof(*written), program, sizeof(*program)) ||
            overlaps(written, sizeof(*written), program->data, program->capacity) ||
-           overlaps(written, sizeof(*written), output, capacity);
+           overlaps(written, sizeof(*written), output, capacity) ||
+           (runtime->variables != NULL &&
+           (overlaps(runtime, sizeof(*runtime), runtime->variables, sizeof(*runtime->variables)) ||
+            overlaps(runtime, sizeof(*runtime), runtime->variables->entries,
+                     runtime->variables->capacity * sizeof(BasicVariableEntry)) ||
+            overlaps(output, capacity, runtime->variables, sizeof(*runtime->variables)) ||
+            overlaps(output, capacity, runtime->variables->entries,
+                     runtime->variables->capacity * sizeof(BasicVariableEntry)) ||
+            overlaps(written, sizeof(*written), runtime->variables, sizeof(*runtime->variables)) ||
+            overlaps(written, sizeof(*written), runtime->variables->entries,
+                     runtime->variables->capacity * sizeof(BasicVariableEntry))));
 }
 
 static uint8_t upper(uint8_t c)
@@ -114,27 +131,57 @@ static int command_is(const uint8_t *s, size_t length, const char *literal)
     return i == length;
 }
 
-BSRResult bsr_init(BasicSessionRuntime *runtime, BasicProgram *program)
+/* Store diagnostics remain in the executor namespace, not CPC codes. */
+static BEStatus bsr_store_error(BVSStatus status)
+{
+    switch (status) {
+        case BVS_OK: return BE_OK;
+        case BVS_FULL: return BE_STORE_FULL;
+        case BVS_INVALID_KEY: return BE_INVALID_KEY;
+        case BVS_INVALID_TYPE: return BE_INVALID_TYPE;
+        case BVS_OVERLAPPING_MEMORY: return BE_OVERLAP;
+        default: return BE_INVALID_STORE;
+    }
+}
+
+BSRResult bsr_init_with_store(BasicSessionRuntime *runtime, BasicProgram *program,
+                              BasicVariableStore *variables)
 {
     BasicExecutor candidate;
     BEStatus status;
-
     if (runtime == NULL || program == NULL || program->data == NULL) {
         return simple(BSR_INVALID_ARGUMENT);
+    }
+    if (variables != NULL) {
+        status = bsr_store_error(bvs_validate(variables));
+        if (status != BE_OK) {
+            return from_executor(status);
+        }
+        if (overlaps(runtime, sizeof(*runtime), variables, sizeof(*variables)) ||
+            overlaps(runtime, sizeof(*runtime), variables->entries,
+                     variables->capacity * sizeof(BasicVariableEntry))) {
+            return simple(BSR_OVERLAP);
+        }
     }
     if (overlaps(runtime, sizeof(*runtime), program, sizeof(*program)) ||
         overlaps(runtime, sizeof(*runtime), program->data, program->capacity) ||
         overlaps(program, sizeof(*program), program->data, program->capacity)) {
         return simple(BSR_OVERLAP);
     }
-    status = be_init(&candidate, program);
+    status = be_init_with_store(&candidate, program, variables);
     if (status != BE_OK) {
         return from_executor(status);
     }
     runtime->program = program;
+    runtime->variables = variables;
     runtime->executor = candidate;
     runtime->state = BSR_IDLE;
     return simple(BSR_OK);
+}
+
+BSRResult bsr_init(BasicSessionRuntime *runtime, BasicProgram *program)
+{
+    return bsr_init_with_store(runtime, program, NULL);
 }
 
 BSRResult bsr_submit(BasicSessionRuntime *runtime,
@@ -150,6 +197,12 @@ BSRResult bsr_submit(BasicSessionRuntime *runtime,
         runtime->program->data == NULL || source == NULL ||
         temporary == NULL || output == NULL || written == NULL) {
         return simple(BSR_INVALID_ARGUMENT);
+    }
+    if (runtime->variables != NULL) {
+        BEStatus store_status = bsr_store_error(bvs_validate(runtime->variables));
+        if (store_status != BE_OK) {
+            return from_executor(store_status);
+        }
     }
     if (submit_overlap(runtime, source, source_length, temporary,
                        temporary_capacity, output, output_capacity, written)) {
@@ -171,9 +224,16 @@ BSRResult bsr_submit(BasicSessionRuntime *runtime,
     }
     if (command_is(source + start, end - start, "RUN")) {
         BasicExecutor candidate;
-        BEStatus status = be_init(&candidate, runtime->program);
+        BEStatus status = be_init_with_store(&candidate, runtime->program,
+                                             runtime->variables);
         if (status != BE_OK) {
             return from_executor(status);
+        }
+        if (runtime->variables != NULL) {
+            status = bsr_store_error(bvs_reset(runtime->variables));
+            if (status != BE_OK) {
+                return from_executor(status);
+            }
         }
         runtime->executor = candidate;
         runtime->state = BSR_RUNNING;
@@ -186,6 +246,12 @@ BSRResult bsr_submit(BasicSessionRuntime *runtime,
                                      output, output_capacity, written);
     if (session_result.status == BS_OK &&
         command_is(source + start, end - start, "NEW")) {
+        if (runtime->variables != NULL) {
+            BEStatus store_status = bsr_store_error(bvs_reset(runtime->variables));
+            if (store_status != BE_OK) {
+                return from_executor(store_status);
+            }
+        }
         runtime->state = BSR_IDLE;
     }
     return from_session(session_result);
@@ -198,6 +264,12 @@ BSRResult bsr_step(BasicSessionRuntime *runtime,
     if (runtime == NULL || runtime->program == NULL ||
         runtime->program->data == NULL || output == NULL || written == NULL) {
         return simple(BSR_INVALID_ARGUMENT);
+    }
+    if (runtime->variables != NULL) {
+        BEStatus store_status = bsr_store_error(bvs_validate(runtime->variables));
+        if (store_status != BE_OK) {
+            return from_executor(store_status);
+        }
     }
     if (step_overlap(runtime, output, output_capacity, written)) {
         return simple(BSR_OVERLAP);

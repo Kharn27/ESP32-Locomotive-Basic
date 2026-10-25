@@ -12,10 +12,13 @@
 #define CLI_TEMPORARY_CAPACITY 2048u
 #define CLI_OUTPUT_CAPACITY 131072u
 #define CLI_MAX_STEPS 100u
+#define CLI_VARIABLE_CAPACITY 64u
 
 typedef struct {
     BasicProgram program;
     BasicSessionRuntime runtime;
+    BasicVariableStore variables;
+    BasicVariableEntry variable_entries[CLI_VARIABLE_CAPACITY];
     uint8_t storage[CLI_PROGRAM_CAPACITY];
     uint8_t input[CLI_INPUT_CAPACITY];
     uint8_t temporary[CLI_TEMPORARY_CAPACITY];
@@ -125,6 +128,10 @@ static const char *be_name(BEStatus status)
         STATUS_CASE(BE_MISSING_TARGET);
         STATUS_CASE(BE_NO_SPACE);
         STATUS_CASE(BE_OVERLAP);
+        STATUS_CASE(BE_STORE_FULL);
+        STATUS_CASE(BE_INVALID_STORE);
+        STATUS_CASE(BE_INVALID_KEY);
+        STATUS_CASE(BE_INVALID_TYPE);
         default: return "BE_UNKNOWN";
     }
 }
@@ -351,8 +358,14 @@ int main(void)
         fprintf(stderr, "[cli:error] INIT %s\n", bp_name(initialized));
         return 1;
     }
+    if (bvs_init(&cli.variables, cli.variable_entries,
+                 CLI_VARIABLE_CAPACITY) != BVS_OK) {
+        fputs("[cli:error] VARIABLE_INIT\n", stderr);
+        return 1;
+    }
     {
-        BSRResult r = bsr_init(&cli.runtime, &cli.program);
+        BSRResult r = bsr_init_with_store(&cli.runtime, &cli.program,
+                                           &cli.variables);
         if (r.status != BSR_OK) {
             report_error(r);
             return 1;

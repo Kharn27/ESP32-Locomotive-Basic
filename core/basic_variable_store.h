@@ -52,6 +52,8 @@ typedef struct {
  */
 BVSStatus bvs_init(BasicVariableStore *store, BasicVariableEntry *entries,
                    size_t capacity);
+/* Pure structural validation, including live entries. */
+BVSStatus bvs_validate(const BasicVariableStore *store);
 BVSStatus bvs_reset(BasicVariableStore *store);
 BVSStatus bvs_find(const BasicVariableStore *store, const BasicVariableKey *key,
                    size_t *out_index);
@@ -62,5 +64,8 @@ BVSStatus bvs_get(const BasicVariableStore *store, const BasicVariableKey *key,
                   BasicVariableValue *out_value);
 BVSStatus bvs_set(BasicVariableStore *store, const BasicVariableKey *key,
                   const BasicVariableValue *value);
+/* Atomic create-or-update: no count, entry or value change on failure. */
+BVSStatus bvs_assign(BasicVariableStore *store, const BasicVariableKey *key,
+                     const BasicVariableValue *value);
 
 #endif

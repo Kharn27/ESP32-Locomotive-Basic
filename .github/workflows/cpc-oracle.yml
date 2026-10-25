@@ -9,6 +9,8 @@ on:
       - "tools/cpc_token_evidence.py"
       - "tests/fixtures/cpc6128/**"
       - "docs/J0.24-C3-cpc-token-memory.md"
+      - "docs/J0.24-C4-extended-token-oracle.md"
+      - "tools/promote_token_ram_c4.py"
       - "docs/J0.24-C1-caprice32-oracle-automation.md"
   workflow_dispatch:
 
@@ -57,16 +59,30 @@ jobs:
           cmake --build "${RUNNER_TEMP}/c99-build" -j 2
           ctest --test-dir "${RUNNER_TEMP}/c99-build" --output-on-failure
 
-      - name: Check historical differential manifest (two verified token observations)
-        # Only genuine C3 program RAM records are promoted; no invented LIST or RUN oracles.
+      - name: Check historical differential manifest (only actually promoted token observations)
+        # Only original ROM-backed RAM records are promoted; never fabricate LIST or RUN oracles.
         run: |
           python3 tools/cpc_diff.py \
             --manifest tests/fixtures/cpc6128/manifest.json \
             --cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
             --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" --ci
 
-      - name: Verify permanent CPC token fixtures against original SHA provenance
+      - name: Verify permanent C3/C4 fixtures against original SHA provenance
         run: python3 tools/cpc_token_evidence.py --permanent --self-test
+
+      - name: Assert J0.24 independent eight-case gate remains closed
+        run: |
+          set -euo pipefail
+          if python3 tools/cpc_diff.py \
+               --manifest tests/fixtures/cpc6128/manifest.json \
+               --cli "$RUNNER_TEMP/c99-build/loco_basic_cli" \
+               --image-cli "$RUNNER_TEMP/c99-build/basic_program_image_cli" \
+               --ci --require-independent > "$RUNNER_TEMP/gate.log" 2>&1; then
+            echo "ERROR: J0.24 gate opened before eight verified cases"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/gate.log"
+          grep -q 'VERIFIED_CASES=5 TOKEN_BINARIES=5' "$RUNNER_TEMP/gate.log"
 
       - name: Acquire CPC 6128 BASIC 1.1 evidence
         run: |
@@ -77,8 +93,10 @@ jobs:
             --output "${RUNNER_TEMP}/cpc-oracle" \
             --case minimal --case witness
 
-      - name: Verify CPC token parser without emulator
-        run: python3 tests/oracles/token_ram_oracle.py --self-test
+      - name: Verify CPC token parser and archival helper syntax
+        run: |
+          python3 -m py_compile tools/promote_token_ram_c4.py
+          python3 tests/oracles/token_ram_oracle.py --self-test
 
       - name: Acquire CPC BASIC token RAM images before RUN
         run: |

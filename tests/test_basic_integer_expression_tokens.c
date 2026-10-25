@@ -224,6 +224,9 @@ static int test_atomic_execution(void)
     CHECK(be_init_with_store(&e, &p, &store) == BE_OK);
     memcpy(before, storage, sizeof(before));
     memcpy(entry_copy, entries, sizeof(entries));
+    memset(out, 0x77, sizeof(out));
+    memcpy(out_copy, out, sizeof(out));
+    written = 876u;
     CHECK(be_step(&e, out, sizeof(out), &written) == BE_UNSUPPORTED);
     CHECK(written == 876u && e.cursor == 0u);
     CHECK(memcmp(before, storage, sizeof(before)) == 0);

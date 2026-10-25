@@ -132,6 +132,7 @@ static const char *be_name(BEStatus status)
         STATUS_CASE(BE_INVALID_STORE);
         STATUS_CASE(BE_INVALID_KEY);
         STATUS_CASE(BE_INVALID_TYPE);
+        STATUS_CASE(BE_VARIABLE_NOT_FOUND);
         default: return "BE_UNKNOWN";
     }
 }

@@ -113,7 +113,15 @@ def local_observation(source, operation, cli, image_cli):
         return result
     if operation == "LIST":
         return run_command(cli, source + b"LIST\n:quit\n")
-    return run_command(cli, source + b"RUN\n:step 100\n:step\n:quit\n")
+    return run_command(cli, source + b"RUN\n:step 100\n:quit\n")
+
+
+def checked_local_result(result, case_id, operation):
+    # Process-level failure is an infrastructure error even without an oracle.
+    # Valid BASIC rejections are CLI protocol diagnostics with exit code zero.
+    if result.returncode != 0:
+        details = result.stderr[:180].decode("utf-8", errors="replace")
+        raise HarnessError(f"{case_id}/{operation}: local process exited {result.returncode}: {details}")
 
 
 def compare(actual, expected, mode):
@@ -176,6 +184,7 @@ def evaluate(root, manifest, cli, image_cli, ci):
         source = fixture_bytes(root, {"path": case["source"], "sha256": case["source_sha256"]})
         for op in case["operations"]:
             result = local_observation(source, op, cli, image_cli)
+            checked_local_result(result, case["id"], op)
             observation = case["observations"].get(op)
             if observation is None:
                 status = "BLOCKED" if manifest.get("oracle") is None else "UNVERIFIED"
@@ -206,6 +215,12 @@ def evaluate(root, manifest, cli, image_cli, ci):
 
 
 def self_test():
+    try:
+        checked_local_result(subprocess.CompletedProcess([], 1, b"", b"failed"), "test", "LIST")
+    except HarnessError:
+        pass
+    else:
+        raise HarnessError("local process failure was swallowed")
     assert compare(b"5\n", b" 5 \r\n", "numeric-integer") == "MATCH_SEMANTIC"
     assert compare(b"5\n", b" 5 \r\n", "exact-bytes") == "DIFF"
     assert compare(b"5\n", b"5\n", "exact-bytes") == "MATCH_EXACT"

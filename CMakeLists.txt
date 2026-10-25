@@ -161,3 +161,12 @@ if(BUILD_TESTING)
                           basic_session_runtime basic_variable_binding)
     add_test(NAME integer_assignment_runtime COMMAND test_basic_integer_assignment_runtime)
 endif()
+
+# J0.20: seventeenth suite, read-only PRINT of explicit CPC INTEGER scalars.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_variable_print
+                   tests/test_basic_integer_variable_print.c)
+    target_link_libraries(test_basic_integer_variable_print PRIVATE
+                          basic_session_runtime basic_variable_binding)
+    add_test(NAME integer_variable_print COMMAND test_basic_integer_variable_print)
+endif()

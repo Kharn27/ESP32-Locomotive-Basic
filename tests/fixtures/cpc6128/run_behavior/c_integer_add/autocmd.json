@@ -1,0 +1,15 @@
+{
+  "source_path": "tests/fixtures/cpc6128/sources/c_integer_add.bas",
+  "source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+  "commands": [
+    "10 A%=2",
+    "20 B%=A%+3",
+    "30 PRINT B%",
+    "40 END",
+    "RUN",
+    "PRINT #8,B%",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ],
+  "new_cpc_process": true,
+  "probe_is_direct_after_run": true
+}

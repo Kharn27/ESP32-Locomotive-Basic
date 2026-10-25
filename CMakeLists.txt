@@ -207,3 +207,11 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --ci)
 endif()
+
+# J0.24-C2: permanently versioned CPC evidence; no Caprice32/ROM needed.
+# The previous 21 suites remain unchanged; this is an additional integrity gate.
+if(BUILD_TESTING)
+    add_test(NAME cpc_persistent_evidence COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/cpc_evidence.py"
+        --self-test)
+endif()

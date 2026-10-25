@@ -223,3 +223,12 @@ if(BUILD_TESTING)
         ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/cpc_token_evidence.py"
         --permanent --self-test)
 endif()
+
+# J0.24-C6: twenty-fourth CTest suite, immutable CPC RUN/printer oracle.
+# The C99 core and twenty-three preceding suites are unchanged.
+if(BUILD_TESTING)
+    add_test(NAME cpc_run_behavior_permanent_evidence COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/oracles/cpc_run_evidence.py"
+        --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/run_behavior"
+        --permanent --self-test)
+endif()

@@ -122,6 +122,8 @@ def main():
         log += result.stdout + b"\n[stderr]\n" + result.stderr
         (work / "caprice.log").write_bytes(log)
         if result.returncode:
+            # Print error output in CI, not only in the archived failure log.
+            print(log[-8000:].decode("utf-8", errors="replace"), file=sys.stderr)
             raise RuntimeError(f"{name}: Caprice32 exited with {result.returncode} (inspect caprice.log)")
         screenshots = sorted(work.glob("screenshot_*.png"))
         if len(screenshots) != 1:

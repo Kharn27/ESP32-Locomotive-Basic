@@ -23,10 +23,10 @@ Le passage à J1 marque la **maturité du socle**, pas la fin du projet ni une p
 
 ## Ordre de travail J0 restant (prévision, ajustable après chaque revue)
 
-**Acquis au terme de J0.20 :** stockage scalaire borné, résolution des références explicites, affectations INTEGER constantes autonomes, puis `PRINT A%` et l'alias `?A%` avec lecture du magasin. Ces fonctionnalités sont validées en CI hôte, **pas** encore contre un oracle CPC indépendant.
+**Acquis au terme de J0.21 :** stockage scalaire borné, résolution des références explicites, affectations INTEGER constantes autonomes, puis `PRINT A%` et l'alias `?A%` avec lecture du magasin. Ces fonctionnalités sont validées en CI hôte, **pas** encore contre un oracle CPC indépendant.
 
-- **J0.21 pressenti** : tokenisation et restitution LIST de la forme entière `B%=A%+3` (opérateur `+` conforme aux tokens CPC), sans exécution d'expression.
-- **Ensuite** : premier évaluateur INTEGER borné pour addition et référence scalaire explicite, puis branchement atomique à l'affectation jusqu'à exécuter le programme témoin du critère 1 ; les priorités ROM complètes et conversions resteront explicitement non acquises.
+- **J0.21 acquis via PR #24** : tokenisation et restitution LIST de `B%=A%+3`, sans exécution ; 18/18 suites Linux et ASan/UBSan, vecteurs ROM-dérivés.
+- **J0.22 prévu** : premier évaluateur INTEGER borné pour référence scalaire explicite et addition d'une constante non signée (0..255), branchement atomique à l'affectation pour faire afficher 5 au programme témoin. Étudier les limites INT16 et le comportement CPC avant de définir les débordements ; les priorités ROM complètes et conversions restent non acquises.
 - **Clôture J0** : tests Linux et sanitizers, vérifications différentielles CPC indépendantes, diagnostics d'écarts, budget RAM/Flash et preuve anticipée de faisabilité CYD. Nombre exact de PR à fixer après revue des résultats.
 
 ## J1 — Développement de la compatibilité Locomotive BASIC 1.1

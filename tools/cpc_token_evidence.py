@@ -123,6 +123,14 @@ def validate(base, manifest):
 def validate_permanent(root, manifest):
     """Independent offline check of the promoted program-only fixtures."""
     expected_names = set(C3_SHA) if manifest.get("phase") is None else set(oracle.CASES)
+    if manifest.get("phase") == "J0.24-C4":
+        p4 = manifest.get("c4_acquisition")
+        require(isinstance(p4, dict) and p4.get("workflow") == "J0.24-C4 one-shot import" and
+                isinstance(p4.get("artifact_id"), int) and not isinstance(p4.get("artifact_id"), bool) and
+                p4["artifact_id"] > 0 and p4.get("artifact_digest", "").startswith("sha256:") and
+                len(p4["artifact_digest"]) == 71 and
+                isinstance(p4.get("run_id"), int) and p4["run_id"] > 0,
+                "C4 archival artifact provenance missing")
     require(manifest["schema_version"] == 1 and
             (manifest.get("phase") is None or manifest["phase"] == "J0.24-C4") and
             len(manifest["cases"]) == len(expected_names),
@@ -184,6 +192,9 @@ def validate_permanent(root, manifest):
                     not isinstance(origin.get("run_id"), bool) and
                     origin["run_id"] > 0 and
                     origin.get("artifact_name") == "cpc6128-c4-original-evidence" and
+                    origin.get("artifact_id") == manifest["c4_acquisition"]["artifact_id"] and
+                    origin.get("artifact_digest") == manifest["c4_acquisition"]["artifact_digest"] and
+                    origin["run_id"] == manifest["c4_acquisition"]["run_id"] and
                     origin.get("caprice32_commit") == oracle.PIN and
                     origin.get("rom_sha256") == ROM and
                     origin.get("source_sha256") == case["source_sha256"],
@@ -229,7 +240,7 @@ def validate_permanent(root, manifest):
     print(f"PASS: permanently archived {len(expected_names)} CPC program-only token images")
 
 def permanent_self_test(root, original):
-    for change in ("token", "classification", "start", "rom", "source", "proof"):
+    for change in ("token", "classification", "start", "rom", "source", "proof", "missing", "artifact"):
         altered = copy.deepcopy(original)
         if change == "token":
             altered["cases"][0]["program_sha256"] = "0"*64
@@ -244,6 +255,13 @@ def permanent_self_test(root, original):
                 altered["cases"][-1]["acquisition"]["run_id"] = 0
             else:
                 altered["provenance"]["github_actions_run_id"] = 0
+        elif change == "missing":
+            altered["cases"][0]["program_path"] = "tests/fixtures/cpc6128/token_ram/MISSING/program.bin"
+        elif change == "artifact":
+            if "phase" in altered:
+                altered["cases"][-1]["acquisition"]["artifact_digest"] = "sha256:" + "0"*64
+            else:
+                altered["provenance"]["original_acquisition_manifest_sha256"] = ""
         else:
             altered["provenance"]["system_rom_sha256"] = "0"*64
         try:

@@ -23,10 +23,11 @@ Le passage à J1 marque la **maturité du socle**, pas la fin du projet ni une p
 
 ## Ordre de travail J0 restant (prévision, ajustable après chaque revue)
 
-- **J0.15** : table de symboles/valeurs scalaires bornée et autonome, clés J0.14, stockage typé distinct, sans exécution de BASIC.
-- **Ensuite** : résolution des références typées, intégration incrémentale des affectations puis lecture PRINT, sans interpréter abusivement 0B/0C/0D.
-- **Ensuite** : évaluateur d'expressions élémentaires suivant priorités ROM, conversion et erreurs déterministes, en restant honnête sur l'absence de Maths Pack complet.
-- **Clôture J0** : CLI de bout en bout, tests de régression et différentiels CPC, preuve de faisabilité mémoire. Nombre exact de PR à fixer au fil des résultats.
+**Acquis au terme de J0.20 :** stockage scalaire borné, résolution des références explicites, affectations INTEGER constantes autonomes, puis `PRINT A%` et l'alias `?A%` avec lecture du magasin. Ces fonctionnalités sont validées en CI hôte, **pas** encore contre un oracle CPC indépendant.
+
+- **J0.21 pressenti** : tokenisation et restitution LIST de la forme entière `B%=A%+3` (opérateur `+` conforme aux tokens CPC), sans exécution d'expression.
+- **Ensuite** : premier évaluateur INTEGER borné pour addition et référence scalaire explicite, puis branchement atomique à l'affectation jusqu'à exécuter le programme témoin du critère 1 ; les priorités ROM complètes et conversions resteront explicitement non acquises.
+- **Clôture J0** : tests Linux et sanitizers, vérifications différentielles CPC indépendantes, diagnostics d'écarts, budget RAM/Flash et preuve anticipée de faisabilité CYD. Nombre exact de PR à fixer après revue des résultats.
 
 ## J1 — Développement de la compatibilité Locomotive BASIC 1.1
 

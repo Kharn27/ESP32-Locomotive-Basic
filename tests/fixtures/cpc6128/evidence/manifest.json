@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "purpose": "immutable ROM-backed evidence, not J0.24 historical acceptance",
+  "original_artifact": {
+    "run_id": 40207538056,
+    "artifact_id": 12604041942,
+    "run_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40207538056",
+    "original_manifest_sha256": "d5f1aa9b3b8129d25db5511af164db9a32a6cad6232127ae3fc30b5429ab9d55",
+    "acquired_at": "2026-10-25T15:35:23.320596+00:00"
+  },
+  "oracle": {
+    "name": "Caprice32",
+    "version": "4.6.0",
+    "commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "model": "CPC6128",
+    "ram_kb": 128,
+    "keyboard": "English",
+    "system_rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "amsdos_rom_sha256": "ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d",
+    "rom_files_committed": false
+  },
+  "historical_acceptance_gate_closed": false,
+  "token_binary_captures": 0,
+  "cases": [
+    {
+      "id": "minimal",
+      "source_upstream_path": "tests/oracles/inputs/minimal.bas",
+      "source_sha256": "5100b924968fe4e539b3cfbe871508099ce85a8b5c190b873e3c12cd2c95e9cb",
+      "commands": [
+        "10 PRINT 5",
+        "20 END",
+        "RUN",
+        "PRINT #8,5",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "comparison": {
+        "status": "MATCH_SEMANTIC",
+        "level": "strict single INTEGER value",
+        "local_channel": "C99 CLI PRINT stdout",
+        "oracle_channel": "CPC BASIC direct PRINT #8 probe after RUN",
+        "oracle_number": 5,
+        "native_number": 5,
+        "format_exactness_claimed": false
+      },
+      "printer_screen_byte_equivalence": false,
+      "screen_bytes_captured": false,
+      "files": {
+        "screenshot": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/minimal/screenshot_20261025_153526.png",
+          "size_bytes": 5222,
+          "sha256": "f1f6c19632305d30c3584b602eefa053010521d927eebc86ec86b5fdfad236d6",
+          "kind": "visual_png"
+        },
+        "printer.dat": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/minimal/printer.dat",
+          "size_bytes": 5,
+          "sha256": "427c73eb948406e2dee128c2e23ee2dfc00e26e35f6b776a7d7112a1e9996246",
+          "kind": "cpc_printer"
+        },
+        "native.stdout.bin": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/minimal/native.stdout.bin",
+          "size_bytes": 2,
+          "sha256": "f0b5c2c2211c8d67ed15e75e656c7862d086e9245420892a7de62cd9ec582a06",
+          "kind": "c99_stdout"
+        },
+        "source.bas": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/minimal/source.bas",
+          "size_bytes": 18,
+          "sha256": "5100b924968fe4e539b3cfbe871508099ce85a8b5c190b873e3c12cd2c95e9cb",
+          "kind": "basic_source"
+        },
+        "autocmd.json": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/minimal/autocmd.json",
+          "size_bytes": 276,
+          "sha256": "2ca7fe7ca97fa1885e3094d4701cf85da345f3f6f1e1cf1a2cb690e7fbfe31c9",
+          "kind": "input_trace"
+        },
+        "cap32.cfg": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/minimal/cap32.cfg",
+          "size_bytes": 1166,
+          "sha256": "9b325713d45a3c18986bc6d644d125c37aae02a981e8f56d7cc8829445f594b2",
+          "kind": "cpc_config"
+        },
+        "caprice.log": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/minimal/caprice.log",
+          "size_bytes": 379,
+          "sha256": "317c422629260c8addc8bdbcecbbc279c6efc9d3e6fdbdd33635075dc44fda2d",
+          "kind": "acquisition_log"
+        },
+        "native.stderr.log": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/minimal/native.stderr.log",
+          "size_bytes": 96,
+          "sha256": "f069308e6b3496b4705add2a92da41c4d5e587a9fefd63524164c652c2574fad",
+          "kind": "c99_stderr"
+        }
+      }
+    },
+    {
+      "id": "witness",
+      "source_upstream_path": "tests/fixtures/cpc6128/sources/c_integer_add.bas",
+      "source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+      "commands": [
+        "10 A%=2",
+        "20 B%=A%+3",
+        "30 PRINT B%",
+        "40 END",
+        "RUN",
+        "PRINT #8,B%",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "comparison": {
+        "status": "MATCH_SEMANTIC",
+        "level": "strict single INTEGER value",
+        "local_channel": "C99 CLI PRINT stdout",
+        "oracle_channel": "CPC BASIC direct PRINT #8 probe after RUN",
+        "oracle_number": 5,
+        "native_number": 5,
+        "format_exactness_claimed": false
+      },
+      "printer_screen_byte_equivalence": false,
+      "screen_bytes_captured": false,
+      "files": {
+        "screenshot": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/witness/screenshot_20261025_153527.png",
+          "size_bytes": 5569,
+          "sha256": "d0d15378eee3eb763390c1e0e592730e9260c0dcc6d7c832bcc7212d50e625b1",
+          "kind": "visual_png"
+        },
+        "printer.dat": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/witness/printer.dat",
+          "size_bytes": 5,
+          "sha256": "427c73eb948406e2dee128c2e23ee2dfc00e26e35f6b776a7d7112a1e9996246",
+          "kind": "cpc_printer"
+        },
+        "native.stdout.bin": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/witness/native.stdout.bin",
+          "size_bytes": 2,
+          "sha256": "f0b5c2c2211c8d67ed15e75e656c7862d086e9245420892a7de62cd9ec582a06",
+          "kind": "c99_stdout"
+        },
+        "source.bas": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/witness/source.bas",
+          "size_bytes": 38,
+          "sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+          "kind": "basic_source"
+        },
+        "autocmd.json": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/witness/autocmd.json",
+          "size_bytes": 327,
+          "sha256": "3bf5c3a29de1041ee6540c8a3e1b948dd6c5d97aad4ad81c305fcf8fa3cf2622",
+          "kind": "input_trace"
+        },
+        "cap32.cfg": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/witness/cap32.cfg",
+          "size_bytes": 1166,
+          "sha256": "0254d006248fa701ede71921cdd1251d9fcfc9a8e7e0ff5f51ae1785a1538d68",
+          "kind": "cpc_config"
+        },
+        "caprice.log": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/witness/caprice.log",
+          "size_bytes": 379,
+          "sha256": "ee826950917a8e3bc7532a55b874eccd0192944210a9b1be2a766c5f153bb0eb",
+          "kind": "acquisition_log"
+        },
+        "native.stderr.log": {
+          "path": "tests/fixtures/cpc6128/evidence/caprice32/witness/native.stderr.log",
+          "size_bytes": 114,
+          "sha256": "4beaadfbcbeca4cc8949d06dfa133daeb20276fd4515c5eb747b2d9ddf7977f2",
+          "kind": "c99_stderr"
+        }
+      }
+    }
+  ]
+}

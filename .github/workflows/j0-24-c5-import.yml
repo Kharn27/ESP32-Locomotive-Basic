@@ -65,7 +65,7 @@ jobs:
             --evidence "$RUNNER_TEMP/cpc-token-oracle" \
             --run-id "${{ github.run_id }}" \
             --artifact-id "${{ steps.original.outputs.artifact-id }}" \
-            --artifact-digest "${{ steps.original.outputs.artifact-digest }}"
+            --artifact-digest "sha256:${{ steps.original.outputs.artifact-digest }}"
           python3 tools/cpc_token_evidence.py --permanent --self-test
           python3 tools/cpc_diff.py \
             --manifest tests/fixtures/cpc6128/manifest.json \

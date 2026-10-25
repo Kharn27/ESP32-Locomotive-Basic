@@ -51,14 +51,20 @@ def main():
         raise RuntimeError(f"Caprice32 executable missing: {exe}")
     version = command([str(exe), "--version"], cwd=cap).stdout.decode(errors="replace").strip()
     print(f"Caprice32 commit={sha}; version={version}", flush=True)
-    romdir = args.rom.resolve().parent if args.rom else cap / "rom"
-    rom = args.rom.resolve() if args.rom else romdir / "cpc6128.rom"
+    # The emulator selects cpc6128.rom by *name* within rom_path.
+    # Do not hash an arbitrary --rom path and accidentally execute its sibling.
+    if args.rom and args.rom.name != "cpc6128.rom":
+        raise RuntimeError("--rom must name cpc6128.rom (the filename selected by Caprice32)")
+    romdir = args.rom.absolute().parent if args.rom else cap / "rom"
+    rom = args.rom.absolute() if args.rom else romdir / "cpc6128.rom"
     if not rom.is_file():
         raise RuntimeError(f"CPC 6128 ROM missing: {rom}")
     system_rom = rom.read_bytes()
     if len(system_rom) != 32768:
         raise RuntimeError(f"expected 32768-byte combined CPC6128 ROM, got {len(system_rom)}")
     romhash = sha256(system_rom)
+    amsdos = romdir / "amsdos.rom"
+    amsdos_hash = sha256(amsdos.read_bytes()) if amsdos.is_file() else None
     print(f"CPC6128 ROM sha256={romhash}, 32768 bytes; BASIC 1.1 is expected, not independently verified by hash alone", flush=True)
     config_src = cap / "cap32.cfg"
     if not config_src.is_file():
@@ -68,7 +74,7 @@ def main():
                            "commit": sha, "version_output": version,
                            "model": "CPC6128", "ram_kb": 128, "keyboard": "English",
                            "rom_path_source": "upstream-or-authorized-override",
-                           "rom_sha256": romhash,
+                           "rom_sha256": romhash, "amsdos_rom_sha256": amsdos_hash,
                            "basic_rom_version_claim": "1.1 (CPC6128; banner must be inspected)",
                            "rom_redistributed": False},
                 "captures": []}
@@ -81,7 +87,10 @@ def main():
         if not all(re.fullmatch(r"[1-9][0-9]* .+", l) for l in lines):
             raise RuntimeError(f"{name}: unexpected source line syntax")
         work = out / name
-        work.mkdir(parents=True, exist_ok=True)
+        # Never accept stale screenshot/printer evidence as a new acquisition.
+        if work.exists():
+            raise RuntimeError(f"{name}: case directory already exists; use a fresh --output root")
+        work.mkdir(parents=True, exist_ok=False)
         cfg = configparser.ConfigParser(interpolation=None)
         if not cfg.read(config_src):
             raise RuntimeError("cannot read Caprice32 config")

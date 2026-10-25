@@ -55,7 +55,7 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 
 ## Où en sommes-nous ?
 
-**Jalons J0.1 à J0.20 acceptés et fusionnés.** Le projet possède un socle Linux C99 testable, mais **ne sait pas encore exécuter un programme CPC 6128 arbitraire**. Le jalon J0 (socle exécutable cohérent) n'est **pas terminé** : il manque notamment les expressions arithmétiques, la confrontation indépendante au CPC et une estimation du budget mémoire CYD.
+**Jalons J0.1 à J0.21 acceptés et fusionnés.** Le projet possède un socle Linux C99 testable, mais **ne sait pas encore exécuter un programme CPC 6128 arbitraire**. Le jalon J0 (socle exécutable cohérent) n'est **pas terminé** : il manque notamment l'exécution des expressions arithmétiques, la confrontation indépendante au CPC et une estimation du budget mémoire CYD.
 
 | Domaine | État vérifié sur `main` |
 | --- | --- |
@@ -65,11 +65,12 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 | Types, références et magasin | Décodage CPC borné, types implicites, clés canoniques et magasin scalaire INT16 / REAL5 / STRING vide (J0.12–J0.15, J0.17) ; lecture/écriture INTEGER raccordées à `RUN` en J0.19/J0.20 |
 | Variables dans `PRINT` | Références `%`, `$`, `!` tokenisées et listables (J0.16) ; les INTEGER explicites `%` existants sont **désormais lus et affichés par `RUN`** (J0.20) ; STRING/REAL5 non exécutables et rendu numérique CPC non encore validé |
 | Affectations INTEGER | `A%=2` et `LET A%=2` : représentation CPC et `LIST` (J0.18), **exécutables dans `RUN`** (J0.19), avec création/réaffectation en magasin borné, constantes 0 à 255 et une seule affectation par ligne |
-| Évaluateur complet, nombres CPC5, autres commandes | **Non implémentés** ; ni expressions générales, ni exécution des références STRING/REAL5 dans `PRINT`, ni support intégral du dialecte |
+| Expression INTEGER simple | `B%=A%+3` et `LET B%=A%+255` : tokenisés, listables et exportables (J0.21), mais **non exécutables** ; `RUN` refuse atomiquement cette forme |
+| Évaluateur complet, nombres CPC5, autres commandes | **Non implémentés** ; ni calcul arithmétique, ni expressions générales, ni exécution des références STRING/REAL5 dans `PRINT`, ni support intégral du dialecte |
 | Écran et périphériques ESP32 CYD | **Non intégrés** : pas encore de firmware autonome, graphismes CPC, tactile ou microSD |
 | Compatibilité historique validée sur CPC indépendant | **Non acquise** : les vecteurs actuellement utilisés sont principalement des tests internes dérivés du désassemblage |
 
-Les résultats internes du dernier jalon vérifié sont **17/17 suites CTest sous Linux et 17/17 sous ASan/UBSan** ([GitHub Actions #40145869335](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40145869335)). Ils démontrent le succès des tests de ce périmètre, **pas une compatibilité CPC 6128 complète**.
+Les résultats internes du dernier jalon vérifié sont **18/18 suites CTest sous Linux et 18/18 sous ASan/UBSan** ([GitHub Actions #40177816150](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40177816150)). Ils démontrent le succès des tests de ce périmètre, **pas une compatibilité CPC 6128 complète**.
 
 Voir le [suivi des jalons et des risques](docs/PROJECT_STATUS.md), les [barrières J0 → J1](docs/ROADMAP_GATES.md) et les spécifications dans `docs/J0.*` pour la portée exacte et les preuves de chaque mission.
 

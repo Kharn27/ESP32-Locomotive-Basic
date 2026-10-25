@@ -1,5 +1,6 @@
 #include "basic_executor.h"
 #include "basic_variable_binding.h"
+#include "basic_variable_ref.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -418,6 +419,47 @@ static BEStatus execute_line(const BasicProgram *program,
                     return BE_BAD_SEQUENCE;
                 }
                 value.data.integer = (int16_t)literal;
+            } else if (literal == 0x02u) {
+                /* Validate the new form but never evaluate it in J0.21.
+                 * This pure first pass also discards prior PRINT output. */
+                BasicVariableRef rhs;
+                BVRStatus decoded = bvr_decode(body, length, pos - 1u, &rhs);
+                if (decoded == BVR_TRUNCATED) {
+                    return BE_TRUNCATED;
+                }
+                if (decoded != BVR_OK ||
+                    rhs.family != BVR_FAMILY_EXPLICIT ||
+                    rhs.explicit_type != BVR_TYPE_INTEGER) {
+                    return BE_BAD_SEQUENCE;
+                }
+                pos = rhs.reference_offset + rhs.consumed;
+                skip_spaces(body, length, &pos);
+                if (pos == length) {
+                    return BE_TRUNCATED;
+                }
+                if (body[pos++] != 0xf4u) {
+                    return BE_BAD_SEQUENCE;
+                }
+                skip_spaces(body, length, &pos);
+                if (pos == length) {
+                    return BE_TRUNCATED;
+                }
+                literal = body[pos++];
+                if (literal == 0x19u) {
+                    if (pos == length) {
+                        return BE_TRUNCATED;
+                    }
+                    if (body[pos++] < 10u) {
+                        return BE_BAD_SEQUENCE;
+                    }
+                } else if (literal < 0x0eu || literal > 0x17u) {
+                    return BE_BAD_SEQUENCE;
+                }
+                skip_spaces(body, length, &pos);
+                if (pos < length && body[pos] != 0x01u) {
+                    return BE_BAD_SEQUENCE;
+                }
+                return BE_UNSUPPORTED;
             } else {
                 return BE_BAD_SEQUENCE;
             }

@@ -339,6 +339,27 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (status == BT_OK) {
                 status = spaces(source, length, &index, out);
             }
+            /* One INTEGER reference, '+', and an unsigned byte constant.
+             * Shared BVR encoder preserves the historical CPC name format. */
+            if (status == BT_OK && index < length &&
+                ascii_letter(source[index])) {
+                status = explicit_variable(source, length, &index, out,
+                                           BVR_TYPE_INTEGER);
+                if (status == BT_OK) {
+                    status = spaces(source, length, &index, out);
+                }
+                if (status != BT_OK) {
+                    return status;
+                }
+                if (index == length || source[index] != (uint8_t)'+') {
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                }
+                status = emit(out, 0xf4u);
+                ++index;
+                if (status == BT_OK) {
+                    status = spaces(source, length, &index, out);
+                }
+            }
             if (status == BT_OK) {
                 status = decimal(source, length, &index, 255u, &number);
             }

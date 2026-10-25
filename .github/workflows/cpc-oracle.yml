@@ -11,6 +11,7 @@ on:
       - "docs/J0.24-C3-cpc-token-memory.md"
       - "docs/J0.24-C4-extended-token-oracle.md"
       - "docs/J0.24-C5-eight-case-oracle.md"
+      - "docs/J0.24-C6-run-behavior-oracle.md"
       - "tools/promote_token_ram_c5.py"
       - "tools/promote_token_ram_c4.py"
       - "docs/J0.24-C1-caprice32-oracle-automation.md"
@@ -97,6 +98,47 @@ jobs:
             --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
             --output "${RUNNER_TEMP}/cpc-oracle" \
             --case minimal --case witness
+
+      - name: Acquire independent C6 RUN + post-RUN B% numeric probes (new CPC session per case)
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/run_behavior_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+            --output "${RUNNER_TEMP}/cpc-run-behavior"
+
+      - name: Check C6 raw channels, chronology, signed integers and negative mutations
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/cpc_run_evidence.py \
+            --evidence "${RUNNER_TEMP}/cpc-run-behavior" --self-test
+          python3 tools/cpc_token_evidence.py --permanent --self-test
+
+      - name: Export selected evidence bytes for read-only provenance-preserving promotion
+        if: success()
+        run: |
+          python3 - <<'PY'
+          import base64, pathlib, os
+          base = pathlib.Path(os.environ["RUNNER_TEMP"]) / "cpc-run-behavior"
+          names = ["manifest.json"]
+          for case in ("c_integer_add", "d_self_reference"):
+              for member in ("source.bas", "autocmd.json", "cap32.cfg", "caprice.log",
+                             "printer.dat", "native.stdin.bin", "native.stdout.bin",
+                             "native.stderr.bin", "screen.png"):
+                  names.append(case + "/" + member)
+          for name in names:
+              payload = (base / name).read_bytes()
+              print("C6_EVIDENCE|" + name + "|" + base64.b64encode(payload).decode(), flush=True)
+          PY
+
+      - name: Upload C6 RUN numeric proof (printer != screen)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpc6128-c6-run-behavior
+          path: ${{ runner.temp }}/cpc-run-behavior/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Verify CPC token parser and archival helper syntax
         run: |

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "purpose": "Eight authentic ROM-backed TOKENS observations; LIST/RUN still unverified",
+  "purpose": "Eight authentic ROM-backed TOKENS observations, plus two signed post-RUN numeric probes; byte-exact CPC screen output still UNVERIFIED",
   "oracle": {
     "name": "Caprice32",
     "version": "v4.6.0-8c778bf",
@@ -14,9 +14,10 @@
   "acquisition": {
     "status": "PARTIAL",
     "date": "2026-10-25",
-    "reason": "8 original token RAM images; LIST/RUN and Xtensa not validated.",
+    "reason": "8 original token RAM images and 2 genuine ROM-backed post-RUN B% numeric probes; byte-exact LIST/RUN and Xtensa not validated.",
     "recommended_oracle": "ColinPitrat/caprice32",
-    "reference": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40238788252"
+    "reference": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40238788252",
+    "behavior_reference": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40241824206"
   },
   "cases": [
     {
@@ -84,7 +85,8 @@
       "operations": [
         "LIST",
         "RUN",
-        "TOKENS"
+        "TOKENS",
+        "RUN_NUMERIC_PROBE"
       ],
       "observations": {
         "TOKENS": {
@@ -103,6 +105,21 @@
             "header_bytes": 0,
             "memory_layout": "contiguous-cpc-ram-records"
           }
+        },
+        "RUN_NUMERIC_PROBE": {
+          "case": "c_integer_add",
+          "path": "run_behavior/c_integer_add/printer.dat",
+          "sha256": "427c73eb948406e2dee128c2e23ee2dfc00e26e35f6b776a7d7112a1e9996246",
+          "source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+          "origin": "cpc6128-rom-basic11",
+          "captured_at": "2026-10-25T22:49:01.549698+00:00",
+          "method": "Caprice32 pinned 8c778bf072a06fb7c23b9cccd179041db7f79a52; fresh 128K CPC6128 process; original 4 lines; RUN; direct PRINT #8,B% without reset; GitHub Actions run #40241824206 artifact #12615969513; screen PNG and raw CLI archived separately",
+          "media": "printer-probe",
+          "comparison": "strict-signed-integer",
+          "oracle_channel": "CPC printer: direct PRINT #8,B% after RUN",
+          "evidence_run_id": 40241824206,
+          "evidence_artifact_id": 12615969513,
+          "expected_classification": "MATCH_SEMANTIC"
         }
       }
     },
@@ -113,7 +130,8 @@
       "operations": [
         "LIST",
         "RUN",
-        "TOKENS"
+        "TOKENS",
+        "RUN_NUMERIC_PROBE"
       ],
       "observations": {
         "TOKENS": {
@@ -132,6 +150,21 @@
             "header_bytes": 0,
             "memory_layout": "contiguous-cpc-ram-records"
           }
+        },
+        "RUN_NUMERIC_PROBE": {
+          "case": "d_self_reference",
+          "path": "run_behavior/d_self_reference/printer.dat",
+          "sha256": "a6b9d0e774e8414383a7154ccc19fb4da0057614ddd554ad96789ac8d5ede99e",
+          "source_sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15",
+          "origin": "cpc6128-rom-basic11",
+          "captured_at": "2026-10-25T22:49:01.549698+00:00",
+          "method": "Caprice32 pinned 8c778bf072a06fb7c23b9cccd179041db7f79a52; fresh 128K CPC6128 process; original 4 lines; RUN; direct PRINT #8,B% without reset; GitHub Actions run #40241824206 artifact #12615969513; screen PNG and raw CLI archived separately",
+          "media": "printer-probe",
+          "comparison": "strict-signed-integer",
+          "oracle_channel": "CPC printer: direct PRINT #8,B% after RUN",
+          "evidence_run_id": 40241824206,
+          "evidence_artifact_id": 12615969513,
+          "expected_classification": "MATCH_SEMANTIC"
         }
       }
     },

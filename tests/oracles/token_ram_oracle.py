@@ -198,6 +198,7 @@ def acquire(cap, romdir, case, source, numbers, image_cli, out):
             info["files"][p.name] = {"size_bytes": p.stat().st_size,
                                      "sha256": sha(p.read_bytes())}
     print(f"{case} CPC_RAW_HEX={program.hex()} CPC_SHA256={sha(program)}", flush=True)
+    print(f"{case} C99_RAW_HEX={local.stdout.hex()} C99_SHA256={sha(local.stdout)}", flush=True)
     print(f"{case} CPC_ADDR=[{region['start_address']:04x},{region['end_exclusive']:04x}) "
           f"C99_SHA256={sha(local.stdout)} STATUS={report['classification']} "
           f"DIFF={disagreement}", flush=True)
@@ -270,6 +271,7 @@ def main():
                 "snapshots_archived": False, "rom_archived": False,
                 "captures": captures}
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    print("TOKEN_MANIFEST_JSON=" + json.dumps(manifest, separators=(",", ":")), flush=True)
     print("COMPLETE 2 CPC RAM-token acquisitions (full SNA erased); "
           "comparisons are observations, not compatibility assertions", flush=True)
 

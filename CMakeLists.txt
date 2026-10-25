@@ -170,3 +170,12 @@ if(BUILD_TESTING)
                           basic_session_runtime basic_variable_binding)
     add_test(NAME integer_variable_print COMMAND test_basic_integer_variable_print)
 endif()
+
+# J0.21: eighteenth CTest suite, token-only INTEGER source-reference addition.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_expression_tokens
+                   tests/test_basic_integer_expression_tokens.c)
+    target_link_libraries(test_basic_integer_expression_tokens PRIVATE
+                          basic_session_runtime basic_variable_binding)
+    add_test(NAME integer_expression_tokens COMMAND test_basic_integer_expression_tokens)
+endif()

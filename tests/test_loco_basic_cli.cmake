@@ -192,4 +192,12 @@ check_case("integer-variable-missing"
     "${banner}${ok}${running}${variable_missing}${stopped}${byebye}"
 )
 
-message(STATUS "host_cli: twenty-two black-box scenarios passed")
+# J0.21: stored and LISTed, but the new addition must not execute.
+set(expression_unsupported "[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_UNSUPPORTED\n")
+check_case("integer-expression-list-unsupported-run"
+    "10 A%=2\n20 B%=A%+3\n30 PRINT B%\n40 END\nLIST\nRUN\n:step\n:step\n:quit\n"
+    "10 A%=2\n20 B%=A%+3\n30 PRINT B%\n40 END\n"
+    "${banner}${ok}${ok}${ok}${ok}${listed}${running}${step1}${expression_unsupported}${byebye}"
+)
+
+message(STATUS "host_cli: twenty-three black-box scenarios passed")

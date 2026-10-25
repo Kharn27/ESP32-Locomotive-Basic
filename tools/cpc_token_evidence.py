@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify published J0.24-C3 program-only evidence; never consume a full SNA."""
+"""Verify published J0.24-C3/C4 program-only evidence; never consume a full SNA."""
 import argparse
 import copy
 import hashlib
@@ -15,6 +15,10 @@ ALLOWED = {"program.bin", "c99.bin", "cap32.cfg",
            "autocmd.json", "caprice.log", "list.png", "comparison.json"}
 FORBIDDEN_SUFFIXES = {".sna", ".rom", ".dsk", ".cpr", ".zip", ".img"}
 ROM = oracle.ROM_SHA
+C3_SHA = {
+    "b_integer_scalar": "20840377f8ec0181fe572e599f8eb63ab20a6e3edd8b448a201b14e8c23c8ee9",
+    "c_integer_add": "931531da119e6c2b794482949b757203f5ddd1b5720694e723e74a97a001d188",
+}
 
 def require(ok, msg):
     if not ok:
@@ -47,9 +51,9 @@ def validate(base, manifest):
             "unverified oracle identity")
     require(manifest["snapshots_archived"] is False and
             manifest["rom_archived"] is False, "prohibited complete image")
-    require(len(manifest["captures"]) == 2 and
+    require(len(manifest["captures"]) == len(oracle.CASES) and
             {c["case"] for c in manifest["captures"]} == set(oracle.CASES),
-            "exactly two distinct cases required")
+            "exactly the registered distinct cases required")
     present = {x.relative_to(base).as_posix() for x in base.rglob("*") if x.is_file()}
     expected = {"manifest.json"}
     for name, (source_rel, nums) in oracle.CASES.items():
@@ -113,12 +117,15 @@ def validate(base, manifest):
         print(name, "CPC", sha(cpc), report["classification"], flush=True)
     require(present == expected, "unexpected files, potentially a full SNA/ROM: "+
             str(sorted(present-expected)))
-    print("PASS: 2 delimited ROM-backed program images; no complete SNA/ROM files")
+    print(f"PASS: {len(oracle.CASES)} delimited ROM-backed program images; no complete SNA/ROM files")
 
 
 def validate_permanent(root, manifest):
-    """Independent offline check of the two promoted program-only fixtures."""
-    require(manifest["schema_version"] == 1 and len(manifest["cases"]) == 2,
+    """Independent offline check of the promoted program-only fixtures."""
+    expected_names = set(C3_SHA) if manifest.get("phase") is None else set(oracle.CASES)
+    require(manifest["schema_version"] == 1 and
+            (manifest.get("phase") is None or manifest["phase"] == "J0.24-C4") and
+            len(manifest["cases"]) == len(expected_names),
             "invalid permanent evidence manifest")
     p = manifest["provenance"]
     require(p["caprice32_commit"] == oracle.PIN and
@@ -134,8 +141,8 @@ def validate_permanent(root, manifest):
             "missing or changed acquisition provenance")
     base = root / "tests/fixtures/cpc6128/token_ram"
     expected_files = {"manifest.json"}
-    require({x["id"] for x in manifest["cases"]} == set(oracle.CASES),
-            "not the two authorized cases")
+    require({x["id"] for x in manifest["cases"]} == expected_names,
+            "missing/extra permanent case")
     for case in manifest["cases"]:
         name = case["id"]
         source, numbers = oracle.CASES[name]
@@ -164,6 +171,27 @@ def validate_permanent(root, manifest):
             require(len(binary) == case[size_key] and
                     sha(binary) == case[sha_key], "binary SHA mismatch")
             expected_files.add(file.relative_to(base).as_posix())
+        if name in C3_SHA:
+            require(case["program_sha256"] == C3_SHA[name] and
+                    case["c99_sha256"] == C3_SHA[name] and
+                    case["comparison"] == "MATCH_EXACT" and
+                    "acquisition" not in case, "immutable C3 evidence changed")
+        else:
+            origin = case.get("acquisition")
+            require(isinstance(origin, dict) and
+                    origin.get("workflow") == "J0.24-C4 one-shot import" and
+                    isinstance(origin.get("run_id"), int) and
+                    not isinstance(origin.get("run_id"), bool) and
+                    origin["run_id"] > 0 and
+                    origin.get("artifact_name") == "cpc6128-c4-original-evidence" and
+                    origin.get("caprice32_commit") == oracle.PIN and
+                    origin.get("rom_sha256") == ROM and
+                    origin.get("source_sha256") == case["source_sha256"],
+                    "missing or inconsistent C4 origin run")
+            require(isinstance(case.get("original_list_png_sha256"), str) and
+                    len(case["original_list_png_sha256"]) == 64 and
+                    "first_difference" in case,
+                    "missing C4 visual provenance or difference report")
         cpc = (root / case["program_path"]).read_bytes()
         local = (root / case["c99_path"]).read_bytes()
         found, rows = oracle.records(cpc)
@@ -185,8 +213,10 @@ def validate_permanent(root, manifest):
                 case["line_terminator_hex"] == "00" and
                 case["program_terminator_hex"] == "0000",
                 "memory boundaries/record metadata changed")
+        exact, diff = compare(cpc, local)
         require(case["comparison"] ==
-                ("MATCH_EXACT" if cpc == local else "DIFF") and
+                ("MATCH_EXACT" if exact else "DIFF") and
+                (name in C3_SHA or case["first_difference"] == diff) and
                 case["normalization"] == "none" and
                 case["raw_acquisition_preserved"] is True,
                 "fabricated or non-raw comparison")
@@ -196,10 +226,10 @@ def validate_permanent(root, manifest):
                if f.is_file()}
     require(present == expected_files,
             "unlisted/forbidden evidence files: "+repr(present-expected_files))
-    print("PASS: permanently archived two CPC program-only token images")
+    print(f"PASS: permanently archived {len(expected_names)} CPC program-only token images")
 
 def permanent_self_test(root, original):
-    for change in ("token", "classification", "start", "rom"):
+    for change in ("token", "classification", "start", "rom", "source", "proof"):
         altered = copy.deepcopy(original)
         if change == "token":
             altered["cases"][0]["program_sha256"] = "0"*64
@@ -207,6 +237,13 @@ def permanent_self_test(root, original):
             altered["cases"][0]["comparison"] = "DIFF"
         elif change == "start":
             altered["cases"][0]["program_start_cpc"] += 1
+        elif change == "source":
+            altered["cases"][0]["source_sha256"] = "0"*64
+        elif change == "proof":
+            if "phase" in altered:
+                altered["cases"][-1]["acquisition"]["run_id"] = 0
+            else:
+                altered["provenance"]["github_actions_run_id"] = 0
         else:
             altered["provenance"]["system_rom_sha256"] = "0"*64
         try:

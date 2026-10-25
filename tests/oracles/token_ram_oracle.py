@@ -130,8 +130,12 @@ def acquire(cap, romdir, case, source, numbers, image_cli, out):
             "source_sha256": sha(source), "list_requested": True}, indent=2) + "\n")
         cmd = ["xvfb-run", "-a", str(cap / "cap32"), "-c",
                str(work / "cap32.cfg")]
+        # Caprice32 pinned argparse.cpp replaceCap32Keys() omits
+        # CAP32_SNAPSHOT although keyboard.h defines it at MOD_EMU_KEY+13.
+        # StringToEvents recognizes form-feed plus the low byte 0x0d.
+        # Send that documented wire encoding; do NOT patch the emulator.
         for entry in commands:
-            cmd.extend(["-a", entry])
+            cmd.extend(["-a", entry.replace("CAP32_SNAPSHOT", "\x0c\x0d")])
         env = dict(os.environ, SDL_AUDIODRIVER="dummy", SDL_VIDEODRIVER="x11")
         result = run(cmd, cap, env=env)
         # Caprice32 stdout+stderr contain no binary snapshot or ROM.

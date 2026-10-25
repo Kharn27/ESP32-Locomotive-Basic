@@ -98,7 +98,8 @@ def main():
         cfg["rom"]["rom_mf2"] = ""
         cfg["system"]["resources_path"] = str(cap / "resources")
         with (work / "cap32.cfg").open("w", encoding="utf-8") as dest:
-            cfg.write(dest)
+            # Caprice32 does not strip spaces after '=' for config values.
+            cfg.write(dest, space_around_delimiters=False)
         calls = ["xvfb-run", "-a", str(exe), "-c", str(work / "cap32.cfg")]
         for line in lines:
             calls.extend(["-a", line])

@@ -84,6 +84,12 @@ jobs:
             --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" \
             --output "${RUNNER_TEMP}/cpc-token-oracle"
 
+      - name: Validate every exported token byte and comparison classification
+        run: |
+          set -euo pipefail
+          python3 tools/cpc_token_evidence.py \
+            --evidence "${RUNNER_TEMP}/cpc-token-oracle" --self-test
+
       - name: Upload only delimited BASIC images and their provenance
         if: always()
         uses: actions/upload-artifact@v4

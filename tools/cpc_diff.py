@@ -9,7 +9,8 @@ import subprocess
 import sys
 
 CLASSIFICATIONS = {"MATCH_EXACT", "MATCH_SEMANTIC", "DIFF", "UNSUPPORTED", "UNVERIFIED", "BLOCKED"}
-OPERATIONS = {"LIST", "RUN", "TOKENS"}
+OPERATIONS = {"LIST", "RUN", "TOKENS", "RUN_NUMERIC_PROBE"}
+PROBE_INTEGER = re.compile(rb"[ \t]*([+-]?[0-9]+)[ \t]*(?:\r\n|\r|\n)\Z")
 NUMERIC_LINE = re.compile(rb"[ \t]*([+-]?[0-9]+)[ \t]*(?:\r\n|\n|\r)?\Z")
 
 
@@ -88,6 +89,12 @@ def capture_bytes(root, capture, operation):
         data = raw[start:start + count]
         validate_image(data)
         return data
+    if operation == "RUN_NUMERIC_PROBE":
+        if capture.get("media") != "printer-probe" or \
+           capture.get("comparison") != "strict-signed-integer" or \
+           capture.get("oracle_channel") != "CPC printer: direct PRINT #8,B% after RUN":
+            raise HarnessError("numeric probe must remain a distinct CPC printer channel")
+        return raw
     if capture.get("media") != "bytes":
         raise HarnessError("console output must be exact captured bytes")
     prefix = bytes.fromhex(capture.get("protocol_prefix_hex", ""))
@@ -175,6 +182,10 @@ def read_manifest(root, path):
             if obs["expected_classification"] in ("BLOCKED", "UNVERIFIED"):
                 raise HarnessError(f"{cid}/{op}: observation must be independently verifiable")
             capture_bytes(root, obs, op)
+            if op == "RUN_NUMERIC_PROBE":
+                if cid not in ("c_integer_add", "d_self_reference") or \
+                   obs.get("expected_classification") == "MATCH_EXACT":
+                    raise HarnessError("unsupported/false exact numeric probe")
     return manifest
 
 
@@ -202,9 +213,22 @@ def evaluate(root, manifest, cli, image_cli, ci):
                     status = "UNSUPPORTED"
                 else:
                     mode = observation.get("comparison", "exact-bytes")
-                    if mode not in ("exact-bytes", "numeric-integer"):
-                        raise HarnessError("unknown comparison level")
-                    status = compare(result.stdout, expected, mode)
+                    if op == "RUN_NUMERIC_PROBE":
+                        if mode != "strict-signed-integer":
+                            raise HarnessError("bad RUN numeric comparison")
+                        left, right = PROBE_INTEGER.fullmatch(result.stdout), PROBE_INTEGER.fullmatch(expected)
+                        if not left or not right:
+                            status = "UNVERIFIED"
+                        else:
+                            a, b = int(left.group(1)), int(right.group(1))
+                            if not (-32768 <= a <= 32767 and -32768 <= b <= 32767):
+                                status = "UNVERIFIED"
+                            else:
+                                status = "MATCH_SEMANTIC" if a == b else "DIFF"
+                    else:
+                        if mode not in ("exact-bytes", "numeric-integer"):
+                            raise HarnessError("unknown comparison level")
+                        status = compare(result.stdout, expected, mode)
                 if status != observation["expected_classification"]:
                     conflicts.append(f"{case['id']}/{op}: recorded={observation['expected_classification']} observed={status}")
             counts[status] += 1
@@ -228,6 +252,7 @@ def self_test():
     assert compare(b"5\n", b" 5 \r\n", "numeric-integer") == "MATCH_SEMANTIC"
     assert compare(b"5\n", b" 5 \r\n", "exact-bytes") == "DIFF"
     assert compare(b"5\n", b"5\n", "exact-bytes") == "MATCH_EXACT"
+    assert PROBE_INTEGER.fullmatch(b" 5 \r\n") and not PROBE_INTEGER.fullmatch(b"5\n6\n")
     for image in (b"", b"\x00", b"\x00\x00\x00", b"\x05\x00\x0a\x00\x00\x00"):
         try:
             validate_image(image)

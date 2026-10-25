@@ -142,6 +142,7 @@ def main():
             raise ValueError(case + ": CPC run failed or screenshot absent")
         if not screenshots[0].read_bytes().startswith(PNG):
             raise ValueError(case + ": invalid screen PNG")
+        original_screen_name = screenshots[0].name
         screenshots[0].rename(work / "screen.png")
         if not (work / "printer.dat").is_file():
             raise ValueError(case + ": printer channel missing")
@@ -163,6 +164,7 @@ def main():
             status = "DIFF"
         capture = {
             "case": case, "source_path": source_path, "source_sha256": source_sha,
+            "original_screen_name": original_screen_name,
             "commands": commands, "hypothesis_not_oracle": hypothesis,
             "cpc_integer": cpc_number, "native_integer": native_number,
             "native_returncode": native.returncode, "cpc_returncode": cpc.returncode,

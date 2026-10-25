@@ -184,8 +184,33 @@ def read_manifest(root, path):
             capture_bytes(root, obs, op)
             if op == "RUN_NUMERIC_PROBE":
                 if cid not in ("c_integer_add", "d_self_reference") or \
-                   obs.get("expected_classification") == "MATCH_EXACT":
-                    raise HarnessError("unsupported/false exact numeric probe")
+                   obs.get("expected_classification") == "MATCH_EXACT" or \
+                   obs.get("case") != cid or \
+                   obs.get("path") != f"run_behavior/{cid}/printer.dat":
+                    raise HarnessError("unsupported/false exact/misrouted numeric probe")
+    probes = [(case["id"], case["observations"]["RUN_NUMERIC_PROBE"])
+              for case in cases if "RUN_NUMERIC_PROBE" in case["observations"]]
+    if probes:
+        # Authenticate the entire permanent acquisition, not an isolated
+        # untrusted printer file or a value invented in the differential JSON.
+        oracle_dir = root.parent.parent / "oracles"
+        sys.path.insert(0, str(oracle_dir))
+        import cpc_run_evidence as run_evidence
+        try:
+            run_evidence.verify(root / "run_behavior", permanent=True)
+        except (run_evidence.Invalid, OSError, ValueError, KeyError,
+                TypeError, json.JSONDecodeError) as exc:
+            raise HarnessError(f"C6 permanent RUN provenance failed: {exc}") from exc
+        saved = json.loads((root / "run_behavior/manifest.json").read_text())
+        archive_cases = {x["case"]: x for x in saved["captures"]}
+        for case_id, obs in probes:
+            historical = archive_cases[case_id]
+            if obs.get("sha256") != historical["files"]["printer.dat"]["sha256"] or \
+               obs.get("source_sha256") != historical["source_sha256"] or \
+               obs.get("evidence_run_id") != saved["original_artifact"]["run_id"] or \
+               obs.get("evidence_artifact_id") != saved["original_artifact"]["artifact_id"] or \
+               obs.get("expected_classification") != historical["classification"]:
+                raise HarnessError("RUN_NUMERIC_PROBE reference/provenance mismatch")
     return manifest
 
 

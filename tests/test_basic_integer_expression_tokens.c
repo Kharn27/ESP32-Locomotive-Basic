@@ -144,7 +144,7 @@ static int test_imports_and_corruption(void)
     CHECK(m == sizeof(imported) + 1u);
     CHECK(roundtrip[0] == 0xa5u && roundtrip[1] == ' ');
     CHECK(roundtrip[3] == 0u && roundtrip[4] == 0u);
-    CHECK(roundtrip[9] == 0u && roundtrip[10] == 0u);
+    CHECK(roundtrip[8] == 0u && roundtrip[9] == 0u);
     memset(list, 0x5a, sizeof(list));
     memcpy(snapshot, list, sizeof(list));
     for (i = 0u; i < sizeof(bad)/sizeof(bad[0]); ++i) {

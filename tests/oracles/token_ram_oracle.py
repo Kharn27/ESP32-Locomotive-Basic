@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""J0.24-C4: ROM-backed CPC BASIC program RAM oracle, independent of the C99 tokenizer.
+"""J0.24-C5: ROM-backed CPC BASIC program RAM oracle, independent of the C99 tokenizer.
 
 Only the delimited BASIC program is exported. Full SNA snapshots exist in a
 TemporaryDirectory outside output/ and are removed, including on error.
@@ -21,6 +21,9 @@ ROM_SHA = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
 CASES = {
     "b_integer_scalar": ("sources/b_integer_scalar.bas", [10, 20, 30]),
     "c_integer_add": ("sources/c_integer_add.bas", [10, 20, 30, 40]),
+    "d_self_reference": ("sources/d_self_reference.bas", [10, 20, 30, 40]),
+    "e_goto": ("sources/e_goto.bas", [10, 20, 30, 40]),
+    "g_uninitialized": ("sources/g_uninitialized.bas", [10, 20]),
     "a_print_constants": ("sources/a_print_constants.bas", [10, 20, 30]),
     "f_let_spacing": ("sources/f_let_spacing.bas", [10, 20, 30]),
     "f_mixed_case": ("sources/f_mixed_case.bas", [10, 20, 30]),
@@ -103,7 +106,7 @@ def acquire(cap, romdir, case, source, numbers, image_cli, out):
     work = out / case
     check(not work.exists(), "refusing to reuse output case directory")
     work.mkdir(parents=True)
-    with tempfile.TemporaryDirectory(prefix="loco-c4-sna-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="loco-c5-sna-") as temporary:
         snaps = Path(temporary)
         cfg = configparser.ConfigParser(interpolation=None)
         check(bool(cfg.read(cap / "cap32.cfg")), "Caprice32 config missing")
@@ -169,28 +172,42 @@ def acquire(cap, romdir, case, source, numbers, image_cli, out):
     capture = work / "program.bin"
     capture.write_bytes(program)
     local = run([str(image_cli)], None, timeout=15, input=source)
-    check(local.returncode == 0, "C99 image CLI failure: " +
-          local.stderr.decode("utf8", "replace"))
-    local_numbers, _ = records(local.stdout)
-    check(local_numbers == numbers, "C99 output has invalid line numbers")
-    (work / "c99.bin").write_bytes(local.stdout)
-    first = next((i for i,(a,b) in enumerate(zip(program,local.stdout)) if a!=b),
-                 min(len(program),len(local.stdout)))
-    exact = program == local.stdout
+    supported = local.returncode == 0
+    if not supported:
+        # Only the CLI's explicit, clean rejection is an unsupported export.
+        # Unexpected host crashes and other errors abort the acquisition.
+        check(local.returncode == 2 and
+              b"image-cli: input rejected:" in local.stderr and
+              not local.stdout, "unexpected C99 image CLI failure: " +
+              local.stderr.decode("utf8", "replace"))
+        (work / "c99_error.txt").write_bytes(local.stderr)
+    else:
+        local_numbers, _ = records(local.stdout)
+        check(local_numbers == numbers, "C99 output has invalid line numbers")
+        (work / "c99.bin").write_bytes(local.stdout)
     disagreement = None
-    if not exact:
-        disagreement = {
-            "first_offset": first,
-            "cpc_byte": f"{program[first]:02x}" if first < len(program) else None,
-            "c99_byte": f"{local.stdout[first]:02x}" if first < len(local.stdout) else None,
-            "cpc_context_hex": program[max(first-8,0):first+9].hex(" "),
-            "c99_context_hex": local.stdout[max(first-8,0):first+9].hex(" "),
-            "hypothesis": "unresolved; no normalization or tokenizer modification"}
-    report = {"classification": "MATCH_EXACT" if exact else "DIFF",
+    if supported:
+        first = next((i for i, (u, v) in enumerate(zip(program, local.stdout))
+                      if u != v), min(len(program), len(local.stdout)))
+        if program != local.stdout:
+            disagreement = {
+                "first_offset": first,
+                "cpc_byte": f"{program[first]:02x}" if first < len(program) else None,
+                "c99_byte": f"{local.stdout[first]:02x}" if first < len(local.stdout) else None,
+                "cpc_context_hex": program[max(first-8, 0):first+9].hex(" "),
+                "c99_context_hex": local.stdout[max(first-8, 0):first+9].hex(" "),
+                "hypothesis": "unresolved; no normalization or tokenizer modification"}
+    classification = ("UNSUPPORTED" if not supported else
+                      "MATCH_EXACT" if disagreement is None else "DIFF")
+    report = {"classification": classification,
               "basis": "raw contiguous RAM records including 0000 sentinel",
               "first_difference": disagreement,
-              "cpc_size": len(program), "c99_size": len(local.stdout),
-              "cpc_sha256": sha(program), "c99_sha256": sha(local.stdout)}
+              "cpc_size": len(program),
+              "c99_size": len(local.stdout) if supported else None,
+              "cpc_sha256": sha(program),
+              "c99_sha256": sha(local.stdout) if supported else None,
+              "c99_rejection": local.stderr.decode("utf8", "replace").strip()
+                               if not supported else None}
     (work / "comparison.json").write_text(json.dumps(report, indent=2) + "\n")
     info = {"case": case, "source_sha256": sha(source),
             "snapshot_taken_before_run": True, "list_requested": True,
@@ -201,9 +218,12 @@ def acquire(cap, romdir, case, source, numbers, image_cli, out):
             info["files"][p.name] = {"size_bytes": p.stat().st_size,
                                      "sha256": sha(p.read_bytes())}
     print(f"{case} CPC_RAW_HEX={program.hex()} CPC_SHA256={sha(program)}", flush=True)
-    print(f"{case} C99_RAW_HEX={local.stdout.hex()} C99_SHA256={sha(local.stdout)}", flush=True)
+    if supported:
+        print(f"{case} C99_RAW_HEX={local.stdout.hex()} C99_SHA256={sha(local.stdout)}", flush=True)
+    else:
+        print(f"{case} C99_EXPORT_UNSUPPORTED={report['c99_rejection']}", flush=True)
     print(f"{case} CPC_ADDR=[{region['start_address']:04x},{region['end_exclusive']:04x}) "
-          f"C99_SHA256={sha(local.stdout)} STATUS={report['classification']} "
+          f"C99_SHA256={report['c99_sha256']} STATUS={report['classification']} "
           f"DIFF={disagreement}", flush=True)
     return info
 
@@ -283,5 +303,5 @@ if __name__ == "__main__":
         main()
     except (ValueError, OSError, subprocess.SubprocessError,
             UnicodeError, KeyError) as err:
-        print("J0.24-C4 ACQUISITION FAILED:",err,file=sys.stderr)
+        print("J0.24-C5 ACQUISITION FAILED:",err,file=sys.stderr)
         sys.exit(1)

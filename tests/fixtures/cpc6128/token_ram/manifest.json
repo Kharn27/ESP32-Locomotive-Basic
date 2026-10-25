@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "purpose": "Five authentic CPC6128 ROM BASIC 1.1 token RAM images (C3 immutable, C4 measured); eight-case J0.24 gate remains open",
+  "purpose": "Eight original CPC6128 ROM BASIC 1.1 token RAM images; token-only eight-case threshold, not J0.24 acceptance",
   "acquired_at": "2026-10-25T19:01:19.685843+00:00",
   "provenance": {
     "github_actions_run_id": 40223535739,
@@ -241,9 +241,161 @@
         "artifact_id": 12614852030,
         "artifact_digest": "sha256:a19b79341ec6374a548ea535a65b207a8cdc4df2a2d53246b82bc60d15b936f8"
       }
+    },
+    {
+      "id": "d_self_reference",
+      "source_path": "tests/fixtures/cpc6128/sources/d_self_reference.bas",
+      "source_sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15",
+      "command_sequence": "numbered source; LIST; CAP32_DELAY twice; CAP32_SCRNSHOT; CAP32_SNAPSHOT; CAP32_EXIT; no RUN",
+      "program_path": "tests/fixtures/cpc6128/token_ram/d_self_reference/program.bin",
+      "program_sha256": "4175973168803538b6390f0e843abb01c566cb5d6561cb5be0c4093605f00716",
+      "program_bytes": 46,
+      "c99_path": "tests/fixtures/cpc6128/token_ram/d_self_reference/c99.bin",
+      "c99_sha256": "4175973168803538b6390f0e843abb01c566cb5d6561cb5be0c4093605f00716",
+      "c99_bytes": 46,
+      "c99_rejection": null,
+      "start_pointer_ram": 44644,
+      "end_pointer_ram": 44646,
+      "base_pointer_value": 367,
+      "program_start_cpc": 368,
+      "program_end_exclusive_cpc": 414,
+      "snapshot_header_length": 256,
+      "snapshot_program_file_offset": 624,
+      "ram_bank": 0,
+      "line_numbers": [
+        10,
+        20,
+        30,
+        40
+      ],
+      "line_record_lengths": [
+        11,
+        16,
+        11,
+        6
+      ],
+      "line_terminator_hex": "00",
+      "program_terminator_hex": "0000",
+      "original_list_png_sha256": "211fba9cdd08914e1edf07a0b373d23dc01498f23700f0b84dc179562bc12256",
+      "comparison": "MATCH_EXACT",
+      "first_difference": null,
+      "normalization": "none",
+      "raw_acquisition_preserved": true,
+      "acquisition": {
+        "workflow": "J0.24-C5 one-shot import",
+        "run_id": 40238788252,
+        "run_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40238788252",
+        "artifact_name": "cpc6128-c5-original-evidence",
+        "artifact_id": 12616100310,
+        "artifact_digest": "sha256:8243973b03ac5e89d81db8e8554e0d6b2c6cf3bc47b4e8134482b4c66a98566d",
+        "captured_at": "2026-10-25T22:09:42.202672+00:00",
+        "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+        "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+        "source_sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15"
+      }
+    },
+    {
+      "id": "e_goto",
+      "source_path": "tests/fixtures/cpc6128/sources/e_goto.bas",
+      "source_sha256": "a1c8557fb0b12d66062b7833e4128ef410515142538475cbd969a1fdc399671c",
+      "command_sequence": "numbered source; LIST; CAP32_DELAY twice; CAP32_SCRNSHOT; CAP32_SNAPSHOT; CAP32_EXIT; no RUN",
+      "program_path": "tests/fixtures/cpc6128/token_ram/e_goto/program.bin",
+      "program_sha256": "151c5f0fbc157603e54f82fbfce1a20cf3a3c1e3b4bde9c5ebc2c93632a97f62",
+      "program_bytes": 44,
+      "c99_path": "tests/fixtures/cpc6128/token_ram/e_goto/c99.bin",
+      "c99_sha256": "151c5f0fbc157603e54f82fbfce1a20cf3a3c1e3b4bde9c5ebc2c93632a97f62",
+      "c99_bytes": 44,
+      "c99_rejection": null,
+      "start_pointer_ram": 44644,
+      "end_pointer_ram": 44646,
+      "base_pointer_value": 367,
+      "program_start_cpc": 368,
+      "program_end_exclusive_cpc": 412,
+      "snapshot_header_length": 256,
+      "snapshot_program_file_offset": 624,
+      "ram_bank": 0,
+      "line_numbers": [
+        10,
+        20,
+        30,
+        40
+      ],
+      "line_record_lengths": [
+        10,
+        15,
+        11,
+        6
+      ],
+      "line_terminator_hex": "00",
+      "program_terminator_hex": "0000",
+      "original_list_png_sha256": "8f1d74f3cfcc54111cb3774bba9381276446c7f74e147c389ae70c8e44403283",
+      "comparison": "MATCH_EXACT",
+      "first_difference": null,
+      "normalization": "none",
+      "raw_acquisition_preserved": true,
+      "acquisition": {
+        "workflow": "J0.24-C5 one-shot import",
+        "run_id": 40238788252,
+        "run_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40238788252",
+        "artifact_name": "cpc6128-c5-original-evidence",
+        "artifact_id": 12616100310,
+        "artifact_digest": "sha256:8243973b03ac5e89d81db8e8554e0d6b2c6cf3bc47b4e8134482b4c66a98566d",
+        "captured_at": "2026-10-25T22:09:42.202672+00:00",
+        "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+        "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+        "source_sha256": "a1c8557fb0b12d66062b7833e4128ef410515142538475cbd969a1fdc399671c"
+      }
+    },
+    {
+      "id": "g_uninitialized",
+      "source_path": "tests/fixtures/cpc6128/sources/g_uninitialized.bas",
+      "source_sha256": "c9e530e3240bf828ec3fad99f4e8245e62772745a7eb2b2309d0f2843dba9b9f",
+      "command_sequence": "numbered source; LIST; CAP32_DELAY twice; CAP32_SCRNSHOT; CAP32_SNAPSHOT; CAP32_EXIT; no RUN",
+      "program_path": "tests/fixtures/cpc6128/token_ram/g_uninitialized/program.bin",
+      "program_sha256": "eaf8107ff5aa7e2e8130cf187f79c947f170df4023d5932e4ca0f4f2dbb3160f",
+      "program_bytes": 19,
+      "c99_path": "tests/fixtures/cpc6128/token_ram/g_uninitialized/c99.bin",
+      "c99_sha256": "eaf8107ff5aa7e2e8130cf187f79c947f170df4023d5932e4ca0f4f2dbb3160f",
+      "c99_bytes": 19,
+      "c99_rejection": null,
+      "start_pointer_ram": 44644,
+      "end_pointer_ram": 44646,
+      "base_pointer_value": 367,
+      "program_start_cpc": 368,
+      "program_end_exclusive_cpc": 387,
+      "snapshot_header_length": 256,
+      "snapshot_program_file_offset": 624,
+      "ram_bank": 0,
+      "line_numbers": [
+        10,
+        20
+      ],
+      "line_record_lengths": [
+        11,
+        6
+      ],
+      "line_terminator_hex": "00",
+      "program_terminator_hex": "0000",
+      "original_list_png_sha256": "f3fcd6ae6da2338351d70322675a2bee64b9518d5617ffc546cade1c7e89d587",
+      "comparison": "MATCH_EXACT",
+      "first_difference": null,
+      "normalization": "none",
+      "raw_acquisition_preserved": true,
+      "acquisition": {
+        "workflow": "J0.24-C5 one-shot import",
+        "run_id": 40238788252,
+        "run_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40238788252",
+        "artifact_name": "cpc6128-c5-original-evidence",
+        "artifact_id": 12616100310,
+        "artifact_digest": "sha256:8243973b03ac5e89d81db8e8554e0d6b2c6cf3bc47b4e8134482b4c66a98566d",
+        "captured_at": "2026-10-25T22:09:42.202672+00:00",
+        "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+        "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+        "source_sha256": "c9e530e3240bf828ec3fad99f4e8245e62772745a7eb2b2309d0f2843dba9b9f"
+      }
     }
   ],
-  "phase": "J0.24-C4",
+  "phase": "J0.24-C5",
   "c4_acquisition": {
     "workflow": "J0.24-C4 one-shot import",
     "run_id": 40236090690,
@@ -253,5 +405,15 @@
     "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
     "artifact_id": 12614852030,
     "artifact_digest": "sha256:a19b79341ec6374a548ea535a65b207a8cdc4df2a2d53246b82bc60d15b936f8"
+  },
+  "c5_acquisition": {
+    "workflow": "J0.24-C5 one-shot import",
+    "run_id": 40238788252,
+    "artifact_name": "cpc6128-c5-original-evidence",
+    "artifact_id": 12616100310,
+    "artifact_digest": "sha256:8243973b03ac5e89d81db8e8554e0d6b2c6cf3bc47b4e8134482b4c66a98566d",
+    "captured_at": "2026-10-25T22:09:42.202672+00:00",
+    "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
   }
 }

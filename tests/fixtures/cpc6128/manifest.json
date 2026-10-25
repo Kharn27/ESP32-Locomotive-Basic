@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "purpose": "Five authentic ROM-backed TOKENS observations; LIST/RUN and remaining cases not presumed verified",
+  "purpose": "Eight authentic ROM-backed TOKENS observations; LIST/RUN still unverified",
   "oracle": {
     "name": "Caprice32",
     "version": "v4.6.0-8c778bf",
@@ -9,14 +9,14 @@
     "basic_rom_version": "1.1",
     "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
     "input_method": "--autocmd numbered lines, LIST, snapshot before RUN",
-    "capture_method": "SNA v3 ephemeral, ROM pointers &AE64/&AE66; C3 run 40223535739 and C4 run 40236090690"
+    "capture_method": "SNA v3 ephemeral, ROM pointers &AE64/&AE66; C3 run 40223535739 and C4 run 40236090690; C5 run 40238788252"
   },
   "acquisition": {
     "status": "PARTIAL",
     "date": "2026-10-25",
-    "reason": "Five distinct authentic token RAM acquisitions; >=8 distinct cases required; LIST/RUN still unverified.",
+    "reason": "8 original token RAM images; LIST/RUN and Xtensa not validated.",
     "recommended_oracle": "ColinPitrat/caprice32",
-    "reference": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40236090690"
+    "reference": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40238788252"
   },
   "cases": [
     {
@@ -112,9 +112,28 @@
       "source_sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15",
       "operations": [
         "LIST",
-        "RUN"
+        "RUN",
+        "TOKENS"
       ],
-      "observations": {}
+      "observations": {
+        "TOKENS": {
+          "path": "token_ram/d_self_reference/program.bin",
+          "sha256": "4175973168803538b6390f0e843abb01c566cb5d6561cb5be0c4093605f00716",
+          "origin": "cpc6128-rom-basic11",
+          "captured_at": "2026-10-25T22:09:42.202672+00:00",
+          "method": "Caprice32 pinned 8c778bf; LIST then temporary SNA before RUN; pointer &AE64/&AE66; RAM &0170–&019E; GitHub Actions #40238788252; no complete snapshot retained",
+          "media": "binary",
+          "comparison": "exact-bytes",
+          "expected_classification": "MATCH_EXACT",
+          "program_region": {
+            "offset": 0,
+            "length": 46,
+            "container": "raw-ram-export",
+            "header_bytes": 0,
+            "memory_layout": "contiguous-cpc-ram-records"
+          }
+        }
+      }
     },
     {
       "id": "e_goto",
@@ -122,9 +141,28 @@
       "source_sha256": "a1c8557fb0b12d66062b7833e4128ef410515142538475cbd969a1fdc399671c",
       "operations": [
         "LIST",
-        "RUN"
+        "RUN",
+        "TOKENS"
       ],
-      "observations": {}
+      "observations": {
+        "TOKENS": {
+          "path": "token_ram/e_goto/program.bin",
+          "sha256": "151c5f0fbc157603e54f82fbfce1a20cf3a3c1e3b4bde9c5ebc2c93632a97f62",
+          "origin": "cpc6128-rom-basic11",
+          "captured_at": "2026-10-25T22:09:42.202672+00:00",
+          "method": "Caprice32 pinned 8c778bf; LIST then temporary SNA before RUN; pointer &AE64/&AE66; RAM &0170–&019C; GitHub Actions #40238788252; no complete snapshot retained",
+          "media": "binary",
+          "comparison": "exact-bytes",
+          "expected_classification": "MATCH_EXACT",
+          "program_region": {
+            "offset": 0,
+            "length": 44,
+            "container": "raw-ram-export",
+            "header_bytes": 0,
+            "memory_layout": "contiguous-cpc-ram-records"
+          }
+        }
+      }
     },
     {
       "id": "f_let_spacing",
@@ -200,9 +238,28 @@
       "source_sha256": "c9e530e3240bf828ec3fad99f4e8245e62772745a7eb2b2309d0f2843dba9b9f",
       "operations": [
         "LIST",
-        "RUN"
+        "RUN",
+        "TOKENS"
       ],
-      "observations": {}
+      "observations": {
+        "TOKENS": {
+          "path": "token_ram/g_uninitialized/program.bin",
+          "sha256": "eaf8107ff5aa7e2e8130cf187f79c947f170df4023d5932e4ca0f4f2dbb3160f",
+          "origin": "cpc6128-rom-basic11",
+          "captured_at": "2026-10-25T22:09:42.202672+00:00",
+          "method": "Caprice32 pinned 8c778bf; LIST then temporary SNA before RUN; pointer &AE64/&AE66; RAM &0170–&0183; GitHub Actions #40238788252; no complete snapshot retained",
+          "media": "binary",
+          "comparison": "exact-bytes",
+          "expected_classification": "MATCH_EXACT",
+          "program_region": {
+            "offset": 0,
+            "length": 19,
+            "container": "raw-ram-export",
+            "header_bytes": 0,
+            "memory_layout": "contiguous-cpc-ram-records"
+          }
+        }
+      }
     }
   ]
 }

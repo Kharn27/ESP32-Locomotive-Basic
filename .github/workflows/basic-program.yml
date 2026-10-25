@@ -30,3 +30,6 @@ jobs:
           echo '--- Selected C99 stack usage: GCC static estimate per function ---'
           find build -path '*/CMakeFiles/basic_*.dir/core/*.su' -type f \
             -exec grep -H -E 'bt_tokenize|one_pass|explicit_variable|bl_list_program|render|be_step|execute_line|evaluate_integer_addition|bsr_submit|bsr_step|bs_process_line|bvb_read_explicit' {} + || true
+          echo '--- Host-only CLI main stack allocation (NOT an ESP32 budget) ---'
+          find build -name 'loco_basic_cli.c.su' -type f \
+            -exec grep -H -E ':main[[:space:]]' {} + || true

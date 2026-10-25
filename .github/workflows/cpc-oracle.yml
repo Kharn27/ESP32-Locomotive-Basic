@@ -47,11 +47,26 @@ jobs:
           test -s rom/amsdos.rom
           sha256sum rom/amsdos.rom
 
+      - name: Build portable C99 comparator
+        run: |
+          set -euo pipefail
+          cmake -S . -B "${RUNNER_TEMP}/c99-build"
+          cmake --build "${RUNNER_TEMP}/c99-build" -j 2
+          ctest --test-dir "${RUNNER_TEMP}/c99-build" --output-on-failure
+
+      - name: Check existing differential manifest (without fictional CPC fixtures)
+        run: |
+          python3 tools/cpc_diff.py \
+            --manifest tests/fixtures/cpc6128/manifest.json \
+            --cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+            --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" --ci
+
       - name: Acquire CPC 6128 BASIC 1.1 evidence
         run: |
           set -euo pipefail
           python3 tests/oracles/run_caprice32.py \
             --caprice tests/oracles/caprice32 \
+            --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
             --output "${RUNNER_TEMP}/cpc-oracle" \
             --case minimal --case witness
 

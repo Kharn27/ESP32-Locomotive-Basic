@@ -35,12 +35,16 @@ def command(args, cwd=None, timeout=30):
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--caprice", type=Path, required=True, help="Caprice32 repository root")
+    cli.add_argument("--native-cli", type=Path, required=True, help="independent C99 Linux CLI executable")
     cli.add_argument("--output", type=Path, required=True)
     cli.add_argument("--rom", type=Path, help="authorized cpc6128.rom; defaults to upstream ROM directory")
     cli.add_argument("--case", choices=tuple(CASES), action="append")
     args = cli.parse_args()
     root = Path(__file__).resolve().parents[2]
     cap = args.caprice.resolve()
+    native_cli = args.native_cli.resolve()
+    if not native_cli.is_file():
+        raise RuntimeError(f"native C99 CLI missing: {native_cli}")
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
     sha = command(["git", "-C", str(cap), "rev-parse", "HEAD"]).stdout.decode().strip()
@@ -150,16 +154,39 @@ def main():
         values = [int(n) for n in re.findall(rb"(?<![0-9])[0-9]+(?![0-9])", printer_bytes)]
         if values != [numeric]:
             raise RuntimeError(f"{name}: printer probe value mismatch; found {values}, expected [{numeric}]")
+        # A separate native execution. Only compare one INTEGER value, not bytes:
+        # PRINT to the CPC screen is NOT PRINT#8 to an emulated printer.
+        native_input = source_data + b"RUN\n:step 100\n:quit\n"
+        native_result = subprocess.run([str(native_cli)], input=native_input,
+                                       capture_output=True, timeout=15, check=False)
+        (work / "native.stdout.bin").write_bytes(native_result.stdout)
+        (work / "native.stderr.log").write_bytes(native_result.stderr)
+        if native_result.returncode != 0:
+            raise RuntimeError(f"{name}: native CLI process failure {native_result.returncode}")
+        if b"[cli:error]" in native_result.stderr:
+            raise RuntimeError(f"{name}: native CLI reported BASIC error")
+        nmatch = re.fullmatch(rb"[ \t]*([+-]?[0-9]+)[ \t]*\n", native_result.stdout)
+        if not nmatch:
+            raise RuntimeError(f"{name}: native CLI did not output one integer line")
+        native_number = int(nmatch.group(1))
         capture = {"case": name, "source_path": source_rel,
                    "source_sha256": sha256(source_data), "capture_method": "Caprice32 --autocmd SDL/Xvfb",
                    "operation": "numbered entry / RUN / direct printer probe / screenshot / exit",
                    "printer_interpretation": "direct-mode PRINT #8 probe, not PRINT screen byte equivalence",
+                   "comparison": {
+                       "status": "MATCH_SEMANTIC" if native_number == numeric else "DIFF",
+                       "level": "strict single INTEGER value",
+                       "local_channel": "C99 CLI PRINT stdout",
+                       "oracle_channel": "CPC BASIC direct PRINT #8 probe after RUN",
+                       "oracle_number": numeric, "native_number": native_number,
+                       "format_exactness_claimed": False
+                   },
                    "files": {}}
-        for path in [screenshot, prn, work / "caprice.log", work / "cap32.cfg", work / "autocmd.json"]:
+        for path in [screenshot, prn, work / "caprice.log", work / "cap32.cfg", work / "autocmd.json", work / "native.stdout.bin", work / "native.stderr.log"]:
             capture["files"][str(path.relative_to(out))] = {
                 "sha256": sha256(path.read_bytes()), "size_bytes": path.stat().st_size}
         manifest["captures"].append(capture)
-        print(f"{name}: screenshot={screenshot.name} sha256={sha256(pixels)} printer_probe={values}", flush=True)
+        print(f"{name}: screenshot={screenshot.name} sha256={sha256(pixels)} printer_probe={values} native={native_number} comparison={capture['comparison']['status']}", flush=True)
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
                                         encoding="utf-8")
     print(f"COMPLETE {len(manifest['captures'])} independent ROM-backed executions; "

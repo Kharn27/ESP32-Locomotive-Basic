@@ -73,7 +73,7 @@ def extract_snapshot(snapshot, expected_lines):
     ram = memoryview(snapshot)[HEADER:]
     base = u16(ram, PROGRAM_BASE_PTR)
     end = u16(ram, PROGRAM_END_PTR)
-    check(0x0170 <= base < 0x8000 and base + 3 < end <= 0x8000,
+    check(0x016F <= base < 0x8000 and base + 3 < end <= 0x8000,
           f"ROM BASIC program pointers inconsistent: base={base:04x} end={end:04x}")
     check(ram[base] == 0, "BASIC prelude byte must be zero")
     start = base + 1

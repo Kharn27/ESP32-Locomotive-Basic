@@ -22,7 +22,7 @@
 
 #define C99_ALIGNOF(type) offsetof(struct { char lead; type member; }, member)
 #define TYPE_ROW(type) \
-    printf("  %-27s %8zu %8zu\\n", #type, sizeof(type), C99_ALIGNOF(type))
+    printf("  %-27s %8zu %8zu\n", #type, sizeof(type), C99_ALIGNOF(type))
 
 typedef struct {
     const char *name;
@@ -90,11 +90,11 @@ static int audit_scenario(const MemoryScenario *s)
         !checked_add(&occupied, s->temporary_used) ||
         !checked_add(&occupied, s->output_used) ||
         occupied > total) {
-        fprintf(stderr, "Invalid or overflowing scenario: %s\\n", s->name);
+        fprintf(stderr, "Invalid or overflowing scenario: %s\n", s->name);
         return 0;
     }
 
-    printf("  %-14s %8zu %8zu %9zu %7zu %7zu %7zu %10zu %10zu\\n",
+    printf("  %-14s %8zu %8zu %9zu %7zu %7zu %7zu %10zu %10zu\n",
            s->name, descriptors, s->program_capacity, entries_reserved,
            s->input_capacity, s->temporary_capacity, s->output_capacity,
            total, occupied);
@@ -113,15 +113,15 @@ int main(void)
         sizeof(((BasicSessionRuntime *)0)->executor) != sizeof(BasicExecutor) ||
         sizeof(BasicStringValue) < 2u * sizeof(uint32_t) ||
         sizeof(((BasicVariableValue *)0)->data.real5) != 5u) {
-        fprintf(stderr, "Unexpected core structure invariant\\n");
+        fprintf(stderr, "Unexpected core structure invariant\n");
         return EXIT_FAILURE;
     }
 
-    printf("J0.23 C99 architecture-dependent type audit\\n");
-    printf("ABI: pointer=%zu, size_t=%zu, uint32_t=%zu (bytes)\\n",
+    printf("J0.23 C99 architecture-dependent type audit\n");
+    printf("ABI: pointer=%zu, size_t=%zu, uint32_t=%zu (bytes)\n",
            sizeof(void *), sizeof(size_t), sizeof(uint32_t));
-    printf("Core structures (bytes; C99 alignment via offsetof):\\n");
-    printf("  %-27s %8s %8s\\n", "Type", "sizeof", "align");
+    printf("Core structures (bytes; C99 alignment via offsetof):\n");
+    printf("  %-27s %8s %8s\n", "Type", "sizeof", "align");
     TYPE_ROW(BasicProgram);
     TYPE_ROW(BasicProgramLine);
     TYPE_ROW(BasicExecutor);
@@ -137,8 +137,8 @@ int main(void)
     TYPE_ROW(BSResult);
     TYPE_ROW(BSRResult);
 
-    printf("\\nCaller-owned scenarios (bytes, no heap overhead, no task stacks):\\n");
-    printf("  %-14s %8s %8s %9s %7s %7s %7s %10s %10s\\n",
+    printf("\nCaller-owned scenarios (bytes, no heap overhead, no task stacks):\n");
+    printf("  %-14s %8s %8s %9s %7s %7s %7s %10s %10s\n",
            "Scenario", "fixed", "program", "entries", "input", "temp",
            "output", "reserved", "occupied*");
     for (i = 0u; i < sizeof(scenarios) / sizeof(scenarios[0]); ++i) {

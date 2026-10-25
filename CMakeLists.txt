@@ -179,3 +179,12 @@ if(BUILD_TESTING)
                           basic_session_runtime basic_variable_binding)
     add_test(NAME integer_expression_tokens COMMAND test_basic_integer_expression_tokens)
 endif()
+
+# J0.22: nineteenth CTest suite, bounded native INTEGER addition.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_expression_runtime
+                   tests/test_basic_integer_expression_runtime.c)
+    target_link_libraries(test_basic_integer_expression_runtime PRIVATE
+                          basic_session_runtime basic_variable_binding)
+    add_test(NAME integer_expression_runtime COMMAND test_basic_integer_expression_runtime)
+endif()

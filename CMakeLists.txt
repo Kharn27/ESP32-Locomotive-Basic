@@ -188,3 +188,10 @@ if(BUILD_TESTING)
                           basic_session_runtime basic_variable_binding)
     add_test(NAME integer_expression_runtime COMMAND test_basic_integer_expression_runtime)
 endif()
+
+# J0.23: architecture-native ABI inventory; no ESP32 HAL or core mutation.
+add_executable(basic_memory_budget tools/basic_memory_budget.c)
+target_include_directories(basic_memory_budget PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
+if(BUILD_TESTING)
+    add_test(NAME memory_budget COMMAND basic_memory_budget)
+endif()

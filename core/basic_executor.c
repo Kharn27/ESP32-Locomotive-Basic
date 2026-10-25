@@ -135,6 +135,65 @@ static BEStatus binding_error(BVBStatus status)
     }
 }
 
+/* Evaluate precisely one explicit INTEGER reference + unsigned byte literal.
+ * One decoder serves both executor passes; only caller-local values change.
+ * The reference cache is opaque and bvb_read_explicit never edits it. */
+static BEStatus evaluate_integer_addition(const uint8_t *body, size_t length,
+                                          size_t source_start,
+                                          const BasicVariableStore *variables,
+                                          size_t *next_pos, int16_t *number)
+{
+    BasicVariableKey source;
+    BasicVariableValue value;
+    size_t consumed = 0u;
+    size_t pos;
+    uint8_t token, addend;
+    int32_t sum;
+    BVBStatus resolved = bvb_read_explicit(body, length, source_start,
+                                           variables, &source, &consumed, &value);
+    if (resolved != BVB_OK) {
+        return binding_error(resolved);
+    }
+    if (source.type != (uint8_t)BVT_INTEGER ||
+        value.type != (uint8_t)BVT_INTEGER) {
+        return BE_INVALID_TYPE;
+    }
+    pos = source_start + consumed;
+    skip_spaces(body, length, &pos);
+    if (pos == length) {
+        return BE_TRUNCATED;
+    }
+    if (body[pos++] != 0xf4u) {
+        return BE_BAD_SEQUENCE;
+    }
+    skip_spaces(body, length, &pos);
+    if (pos == length) {
+        return BE_TRUNCATED;
+    }
+    token = body[pos++];
+    if (token >= 0x0eu && token <= 0x17u) {
+        addend = (uint8_t)(token - 0x0eu);
+    } else if (token == 0x19u) {
+        if (pos == length) {
+            return BE_TRUNCATED;
+        }
+        addend = body[pos++];
+        if (addend < 10u) {
+            return BE_BAD_SEQUENCE;
+        }
+    } else {
+        return BE_BAD_SEQUENCE;
+    }
+    /* Widen before arithmetic; never rely on signed overflow or wrapping. */
+    sum = (int32_t)value.data.integer + (int32_t)addend;
+    if (sum < INT16_MIN || sum > INT16_MAX) {
+        return BE_INTEGER_OVERFLOW;
+    }
+    *number = (int16_t)sum;
+    *next_pos = pos;
+    return BE_OK;
+}
+
 /* A branch or END may skip a suffix. In J0.19, no numbered line
  * containing an actual subsequent assignment is executable. Locate only
  * statement starts, never CPC cache bytes or quoted payloads. */
@@ -420,46 +479,14 @@ static BEStatus execute_line(const BasicProgram *program,
                 }
                 value.data.integer = (int16_t)literal;
             } else if (literal == 0x02u) {
-                /* Validate the new form but never evaluate it in J0.21.
-                 * This pure first pass also discards prior PRINT output. */
-                BasicVariableRef rhs;
-                BVRStatus decoded = bvr_decode(body, length, pos - 1u, &rhs);
-                if (decoded == BVR_TRUNCATED) {
-                    return BE_TRUNCATED;
+                /* The very same bounded decoder/evaluator is called by both
+                 * be_step passes; neither pass mutates the store. */
+                status = evaluate_integer_addition(body, length, pos - 1u,
+                                                    variables, &pos,
+                                                    &value.data.integer);
+                if (status != BE_OK) {
+                    return status;
                 }
-                if (decoded != BVR_OK ||
-                    rhs.family != BVR_FAMILY_EXPLICIT ||
-                    rhs.explicit_type != BVR_TYPE_INTEGER) {
-                    return BE_BAD_SEQUENCE;
-                }
-                pos = rhs.reference_offset + rhs.consumed;
-                skip_spaces(body, length, &pos);
-                if (pos == length) {
-                    return BE_TRUNCATED;
-                }
-                if (body[pos++] != 0xf4u) {
-                    return BE_BAD_SEQUENCE;
-                }
-                skip_spaces(body, length, &pos);
-                if (pos == length) {
-                    return BE_TRUNCATED;
-                }
-                literal = body[pos++];
-                if (literal == 0x19u) {
-                    if (pos == length) {
-                        return BE_TRUNCATED;
-                    }
-                    if (body[pos++] < 10u) {
-                        return BE_BAD_SEQUENCE;
-                    }
-                } else if (literal < 0x0eu || literal > 0x17u) {
-                    return BE_BAD_SEQUENCE;
-                }
-                skip_spaces(body, length, &pos);
-                if (pos < length && body[pos] != 0x01u) {
-                    return BE_BAD_SEQUENCE;
-                }
-                return BE_UNSUPPORTED;
             } else {
                 return BE_BAD_SEQUENCE;
             }

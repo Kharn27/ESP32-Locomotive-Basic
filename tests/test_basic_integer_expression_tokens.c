@@ -171,7 +171,7 @@ static int test_atomic_execution(void)
     BasicExecutor e;
     BasicVariableStore store;
     BasicVariableEntry entries[4], entry_copy[4];
-    BasicVariableKey a;
+    BasicVariableKey a, b;
     BasicVariableValue v;
     uint8_t storage[512], before[512], tokens[160], out[100], out_copy[100];
     size_t n, written, cursor;
@@ -201,15 +201,21 @@ static int test_atomic_execution(void)
     memcpy(out_copy, out, sizeof(out));
     cursor = e.cursor;
     written = 876u;
-    CHECK(be_step(&e, out, sizeof(out), &written) == BE_UNSUPPORTED);
-    CHECK(written == 876u && e.cursor == cursor);
+    CHECK(be_step(&e, out, sizeof(out), &written) == BE_OK);
+    CHECK(written == 0u && e.cursor != cursor);
     CHECK(memcmp(before, storage, sizeof(before)) == 0);
-    CHECK(memcmp(entry_copy, entries, sizeof(entries)) == 0);
     CHECK(memcmp(out_copy, out, sizeof(out)) == 0);
-    CHECK(store.count == 1u);
+    CHECK(store.count == 2u);
     CHECK(bvs_get(&store, &a, &v) == BVS_OK && v.data.integer == 2);
-    CHECK(be_step(&e, out, 0u, &written) == BE_UNSUPPORTED);
-    CHECK(written == 876u && e.cursor == cursor);
+    b = a;
+    b.name[0] = (uint8_t)'B';
+    CHECK(bvs_get(&store, &b, &v) == BVS_OK && v.data.integer == 5);
+    memcpy(entry_copy, entries, sizeof(entries));
+    CHECK(be_step(&e, out, sizeof(out), &written) == BE_OK);
+    CHECK(written == 2u && memcmp(out, "5\n", 2u) == 0);
+    CHECK(memcmp(entry_copy, entries, sizeof(entries)) == 0);
+    CHECK(be_step(&e, out, sizeof(out), &written) == BE_OK);
+    CHECK(be_step(&e, out, sizeof(out), &written) == BE_END);
     CHECK(bp_init(&p, storage, sizeof(storage)) == BP_OK);
     CHECK(bt_tokenize((const uint8_t *)"PRINT \"X\":B%=A%+3",
                       strlen("PRINT \"X\":B%=A%+3"),
@@ -218,6 +224,9 @@ static int test_atomic_execution(void)
     CHECK(be_init_with_store(&e, &p, &store) == BE_OK);
     memcpy(before, storage, sizeof(before));
     memcpy(entry_copy, entries, sizeof(entries));
+    memset(out, 0x77, sizeof(out));
+    memcpy(out_copy, out, sizeof(out));
+    written = 876u;
     CHECK(be_step(&e, out, sizeof(out), &written) == BE_UNSUPPORTED);
     CHECK(written == 876u && e.cursor == 0u);
     CHECK(memcmp(before, storage, sizeof(before)) == 0);

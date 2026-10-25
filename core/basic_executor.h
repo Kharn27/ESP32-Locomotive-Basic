@@ -23,7 +23,8 @@ typedef enum {
     BE_INVALID_STORE,
     BE_INVALID_KEY,
     BE_INVALID_TYPE,
-    BE_VARIABLE_NOT_FOUND /* Internal diagnostic, not a CPC error code. */
+    BE_VARIABLE_NOT_FOUND, /* Internal diagnostic, not a CPC error code. */
+    BE_INTEGER_OVERFLOW /* Internal range error; CPC semantics unverified. */
 } BEStatus;
 
 typedef struct {
@@ -42,7 +43,12 @@ BEStatus be_init(BasicExecutor *executor, const BasicProgram *program);
 BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program,
                             BasicVariableStore *variables);
 
-/* With a store, PRINT reads existing explicit INTEGER (%) scalars only.
+/* With a store, standalone INTEGER assignments accept a literal or exactly
+ * one explicit INTEGER reference plus one unsigned byte literal (0..255).
+ * A non-representable sum returns BE_INTEGER_OVERFLOW without wrapping.
+ * This is a provisional internal diagnostic, NOT a historic CPC error.
+ *
+ * With a store, PRINT reads existing explicit INTEGER (%) scalars only.
  * Missing variables return BE_VARIABLE_NOT_FOUND; without a store the
  * legacy API still returns BE_UNSUPPORTED. Numeric output is prototype
  * signed decimal + LF, not CPC PRINT formatting.

@@ -55,7 +55,7 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 
 ## Où en sommes-nous ?
 
-**Jalons J0.1 à J0.19 acceptés et fusionnés.** Le projet possède un socle Linux C99 testable, mais **ne sait pas encore exécuter un programme CPC 6128 arbitraire**. Le jalon J0 (socle exécutable cohérent) n'est **pas terminé** : il manque notamment la lecture de variables par `PRINT`, les expressions, la confrontation indépendante au CPC et une estimation du budget mémoire CYD.
+**Jalons J0.1 à J0.20 acceptés et fusionnés.** Le projet possède un socle Linux C99 testable, mais **ne sait pas encore exécuter un programme CPC 6128 arbitraire**. Le jalon J0 (socle exécutable cohérent) n'est **pas terminé** : il manque notamment les expressions arithmétiques, la confrontation indépendante au CPC et une estimation du budget mémoire CYD.
 
 | Domaine | État vérifié sur `main` |
 | --- | --- |
@@ -63,13 +63,78 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 | Exécution BASIC native | `PRINT` littéral ou constante simple, `GOTO`, `END`, `REM`, apostrophe ; `RUN` piloté pas à pas et arrêt externe (J0.7–J0.11) |
 | Environnement de test | Console Linux `loco_basic_cli` avec `:help`, `:step`, `:stop`, `:quit`, exclusivement pour le développement (J0.9) |
 | Types, références et magasin | Spécification de la représentation CPC, décodage borné des références, types implicites et clés canoniques, magasin scalaire INT16 / REAL5 / STRING vide, résolution et lecture **hors exécution BASIC** (J0.12–J0.15, J0.17) |
-| Variables dans `PRINT` | Références suffixées `%`, `$`, `!` tokenisées et listables ; **la valeur n'est pas encore évaluée ni imprimée par `RUN`** (J0.16) |
+| Variables dans `PRINT` | Références `%`, `# LOCO-CYD — Locomotive BASIC 1.1 pour ESP32 CYD
+
+> **Objectif : recréer fidèlement, à terme avec une compatibilité complète, le véritable Locomotive BASIC 1.1 de l’Amstrad CPC 6128 sur ESP32 — en C natif, sans émulation Z80.**
+>
+> **Ce projet n’est pas un interpréteur BASIC générique.** Il vise précisément le dialecte, les tokens, la syntaxe, les règles d’exécution et les comportements historiques du **Locomotive BASIC 1.1 livré avec l’Amstrad CPC 6128**.
+>
+> **Project goal (English):** a native-C, ultimately fully compatible reimplementation of the **Amstrad CPC 6128 Locomotive BASIC 1.1** — not a generic BASIC interpreter and not a Z80 emulator.
+
+**État : développement en cours — compatibilité CPC complète NON encore atteinte.** La fidélité au CPC 6128 est l’**objectif de référence**, pas une certification de la version actuelle. Voir le [suivi des jalons](docs/PROJECT_STATUS.md).
+
+## Le BASIC que nous voulons retrouver
+
+Le modèle est **l’Amstrad CPC 6128 et son Locomotive BASIC 1.1**, pas un BASIC simplifié, ni une adaptation libre partageant quelques mots-clés.
+
+Notre définition de la compatibilité cible notamment :
+
+- **Syntaxe et tokenisation CPC** : mots-clés, abréviations et formes lexicales acceptées/refusées, lignes numérotées, chaînes, constantes, variables, références de lignes et représentation interne.
+- **Comportement de l’interpréteur** : ordre d’exécution, instructions et fonctions d’origine, expressions, précédence, conversions, tableaux, boucles, sous-programmes et commandes directes.
+- **Sémantique et diagnostics historiques** : résultats, formatage, arrondis et nombres CPC (dont le format réel sur 5 octets), limites et erreurs observables du BASIC 1.1.
+- **Graphismes et environnement CPC** : `MODE`, `INK`, `PEN`, `PAPER`, `PLOT`, `DRAW`, `LOCATE`, `WINDOW`, etc., avec adaptation de l’affichage à l’écran CYD **sans changer la sémantique BASIC**.
+- **Programmes d’époque** : saisie, listing, chargement, sauvegarde et, à terme, exécution de programmes historiques CPC 6128 aussi fidèlement que possible, y compris leur représentation tokenisée.
+
+**Objectif final :** un programme écrit pour **Locomotive BASIC 1.1 sur CPC 6128** doit pouvoir s’exécuter ici **sans réécriture**, dans les limites des périphériques effectivement pris en charge. Toute différence connue avec le CPC doit être **documentée, testée et traitée comme un écart à résorber**, et non devenir un nouveau dialecte BASIC.
+
+Nous distinguons donc toujours trois niveaux : **implémenté**, **validé par les tests internes**, et **confirmé compatible avec un CPC 6128 de référence**. Une suite de tests Linux verte ne démontre pas, à elle seule, une compatibilité historique totale.
+
+## Pourquoi une réimplémentation native ?
+
+Nous **ne lançons ni ROM Locomotive BASIC d’origine ni machine Z80 émulée**. Le firmware réimplémente en **C99** les mécanismes du langage après étude des sources de référence (désassemblage et documentation), tout en restant indépendant des pilotes matériels.
+
+Cela permet de :
+
+- faire fonctionner le cœur sur Linux pour le tester de façon reproductible ;
+- le porter ensuite sur l’ESP32 CYD, avec un budget mémoire contraint ;
+- isoler le moteur BASIC du rendu écran, du tactile et du stockage ;
+- avancer vers une fidélité mesurable, instruction par instruction.
+
+Le code Z80 sert de **spécification comportementale historique**, pas de code à exécuter sur ESP32.
+
+**Référence technique principale :** [désassemblage Locomotive BASIC 1.1 (`basic.asm`)](http://cpctech.cpc-live.com/docs/basic.asm). Les observations issues du désassemblage doivent être distinguées des hypothèses et confirmées, lorsque c’est nécessaire, par des programmes ou dumps CPC indépendants.
+
+## Matériel cible
+
+| Élément | Cible |
+| --- | --- |
+| Carte | **ESP32-2432S028R (CYD / Cheap Yellow Display)** |
+| Microcontrôleur | ESP32 dual-core |
+| Mémoire | Flash 4 Mo, **sans PSRAM** |
+| Écran | ILI9341 TFT, 320 × 240 |
+| Tactile | XPT2046 |
+| Stockage externe | microSD |
+| Moteur BASIC | C99 natif, indépendant de la HAL |
+
+L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les modes et coordonnées CPC devront être **reproduits logiquement**, puis adaptés au matériel. La même séparation s’applique au clavier, aux fichiers, au son et aux autres périphériques.
+
+## Où en sommes-nous ?
+
+**Jalons J0.1 à J0.20 acceptés et fusionnés.** Le projet possède un socle Linux C99 testable, mais **ne sait pas encore exécuter un programme CPC 6128 arbitraire**. Le jalon J0 (socle exécutable cohérent) n'est **pas terminé** : il manque notamment les expressions arithmétiques, la confrontation indépendante au CPC et une estimation du budget mémoire CYD.
+
+| Domaine | État vérifié sur `main` |
+| --- | --- |
+| Programme et représentation CPC | Stockage, édition de lignes numérotées, import/export tokenisé, tokeniseur, détokéniseur, `LIST` et `NEW` pour un **sous-ensemble** (J0.1–J0.6) |
+| Exécution BASIC native | `PRINT` littéral ou constante simple, `GOTO`, `END`, `REM`, apostrophe ; `RUN` piloté pas à pas et arrêt externe (J0.7–J0.11) |
+| Environnement de test | Console Linux `loco_basic_cli` avec `:help`, `:step`, `:stop`, `:quit`, exclusivement pour le développement (J0.9) |
+| Types, références et magasin | Spécification de la représentation CPC, décodage borné des références, types implicites et clés canoniques, magasin scalaire INT16 / REAL5 / STRING vide, résolution et lecture **hors exécution BASIC** (J0.12–J0.15, J0.17) |
+, `!` tokenisées et listables (J0.16) ; les INTEGER explicites `%` existants sont **désormais lus et affichés par `RUN`** (J0.20) ; STRING/REAL5 non exécutables et rendu numérique CPC non encore validé |
 | Affectations INTEGER | `A%=2` et `LET A%=2` : représentation CPC et `LIST` (J0.18), **exécutables dans `RUN`** (J0.19), avec création/réaffectation en magasin borné, constantes 0 à 255 et une seule affectation par ligne |
-| Évaluateur complet, nombres CPC5, autres commandes | **Non implémentés** ; ni expressions générales, ni lecture des valeurs dans `PRINT`, ni support intégral du dialecte |
+| Évaluateur complet, nombres CPC5, autres commandes | **Non implémentés** ; ni expressions générales, ni exécution des références STRING/REAL5 dans `PRINT`, ni support intégral du dialecte |
 | Écran et périphériques ESP32 CYD | **Non intégrés** : pas encore de firmware autonome, graphismes CPC, tactile ou microSD |
 | Compatibilité historique validée sur CPC indépendant | **Non acquise** : les vecteurs actuellement utilisés sont principalement des tests internes dérivés du désassemblage |
 
-Les résultats internes du dernier jalon vérifié sont **16/16 suites CTest sous Linux et 16/16 sous ASan/UBSan** ([GitHub Actions #40144865756](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40144865756)). Ils démontrent le succès des tests de ce périmètre, **pas une compatibilité CPC 6128 complète**.
+Les résultats internes du dernier jalon vérifié sont **17/17 suites CTest sous Linux et 17/17 sous ASan/UBSan** ([GitHub Actions #40145869335](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40145869335)). Ils démontrent le succès des tests de ce périmètre, **pas une compatibilité CPC 6128 complète**.
 
 Voir le [suivi des jalons et des risques](docs/PROJECT_STATUS.md), les [barrières J0 → J1](docs/ROADMAP_GATES.md) et les spécifications dans `docs/J0.*` pour la portée exacte et les preuves de chaque mission.
 
@@ -111,9 +176,9 @@ ctest --test-dir build-asan --output-on-failure
 ./build/loco_basic_cli
 ```
 
-Ce prototype accepte les lignes numérotées, `LIST`, `NEW`, `RUN`, `PRINT` sur littéral ou constante simple, `GOTO`, `END`, `REM` et l'apostrophe (`'`). Les références de variables explicites dans `PRINT` sont tokenisées et listables **mais ne sont pas encore évaluées par `RUN`**. Les affectations `INTEGER` avec/sans `LET` sont désormais exécutables pour les seules constantes 0..255, à raison d'une affectation autonome par ligne (J0.19). Les méta-commandes Linux (`:help`, `:step`, `:stop`, `:quit`) ne font **pas** partie du Locomotive BASIC historique ; `RUN` est piloté explicitement par `:step`.
+Ce prototype accepte les lignes numérotées, `LIST`, `NEW`, `RUN`, `PRINT` sur littéral ou constante simple, `GOTO`, `END`, `REM` et l'apostrophe (`'`). Les références de variables explicites dans `PRINT` sont tokenisées et listables ; celles de type INTEGER `%` peuvent désormais être **lues et affichées pendant `RUN`**, si la variable existe (J0.20). Les affectations `INTEGER` avec/sans `LET` sont exécutables pour les constantes 0..255 seulement, à raison d'une affectation autonome par ligne (J0.19). Le format numérique actuel est provisoire et les variables absentes déclenchent un diagnostic interne. Les méta-commandes Linux (`:help`, `:step`, `:stop`, `:quit`) ne font **pas** partie du Locomotive BASIC historique ; `RUN` est piloté explicitement par `:step`.
 
-Pour J0.19, la CI a validé **16/16 suites** dans chaque configuration ([GitHub Actions #40144865756](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40144865756)). Ces tests n'établissent pas, à eux seuls, la fidélité binaire à un CPC 6128 de référence.
+Pour J0.20, la CI a validé **17/17 suites** dans chaque configuration ([GitHub Actions #40145869335](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40145869335)). Ces tests n'établissent pas, à eux seuls, la fidélité binaire à un CPC 6128 de référence.
 
 ## Ligne directrice du projet
 

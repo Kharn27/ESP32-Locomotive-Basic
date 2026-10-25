@@ -23,12 +23,13 @@ Le passage à J1 marque la **maturité du socle**, pas la fin du projet ni une p
 
 ## Ordre de travail J0 restant (prévision, ajustable après chaque revue)
 
-**Acquis au terme de J0.22 :** stockage scalaire borné, résolution des références explicites, affectations INTEGER constantes autonomes, puis `PRINT A%` et l'alias `?A%` avec lecture du magasin. Ces fonctionnalités sont validées en CI hôte, **pas** encore contre un oracle CPC indépendant.
+**Acquis au terme de J0.23 :** stockage scalaire borné, résolution des références explicites, affectations INTEGER constantes autonomes, puis `PRINT A%` et l'alias `?A%` avec lecture du magasin. Ces fonctionnalités sont validées en CI hôte, **pas** encore contre un oracle CPC indépendant.
 
 - **J0.21 acquis via PR #24** : tokenisation et restitution LIST de `B%=A%+3`, sans exécution ; 18/18 suites Linux et ASan/UBSan, vecteurs ROM-dérivés.
 - **J0.22 acquis via PR #26** : premier évaluateur INTEGER borné ; le programme témoin affiche `5`, atteint `END` et dispose de tests sur débordement/atomicité (19/19 Linux et ASan/UBSan). Les sémantiques CPC exactes restent à confronter à un oracle indépendant.
-- **J0.23 prévu** : audit reproductible des budgets RAM/Flash et de l'empreinte d'objets C99 pour l'ESP32-2432S028R (4 Mo Flash, sans PSRAM) ; étude/prototype de faisabilité cible lorsqu'outillage disponible, sans HAL ni fonctions BASIC supplémentaires.
-- **J0.24 pressenti** : premier banc différentiel indépendant sur CPC 6128 ou émulateur précisément identifié ; comparer tokens/LIST/exécution du sous-ensemble J0 et classifier les écarts. Toute divergence bloquant la tranche verticale doit être corrigée avant clôture J0.
+- **J0.23 acquis via PR #28** : audit C99 ABI Linux, quatre scénarios de réservation, relevés ELF et pile GCC ; risque CLI hôte `main()` 170 256 octets, non transposable directement à FreeRTOS. **Compilation et mesures matérielles CYD toujours non vérifiées**. Budget plausible, mais pas une preuve de faisabilité cible.
+- **J0.24 proposé** : premier banc différentiel indépendant sur CPC 6128 ou émulateur précisément identifié ; comparer tokens/LIST/exécution du sous-ensemble J0 et classifier les écarts, en distinguant captures réelles et valeurs synthétiques. Ne déclarer aucune validation indépendante sans véritable oracle.
+- **Avant clôture J0** : preuve de compilation ESP-IDF/Xtensa et de marge RAM/Flash/pile de la CYD reste nécessaire ; si l'outillage est indisponible, la phase ne peut pas être clôturée.
 - **Clôture J0** : tests Linux et sanitizers, vérifications différentielles CPC indépendantes, diagnostics d'écarts, budget RAM/Flash et preuve anticipée de faisabilité CYD. Nombre exact de PR à fixer après revue des résultats.
 
 ## J1 — Développement de la compatibilité Locomotive BASIC 1.1

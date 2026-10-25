@@ -62,7 +62,7 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 | Programme et représentation CPC | Stockage, édition de lignes numérotées, import/export tokenisé, tokeniseur, détokéniseur, `LIST` et `NEW` pour un **sous-ensemble** (J0.1–J0.6) |
 | Exécution BASIC native | `PRINT` littéral ou constante simple, `GOTO`, `END`, `REM`, apostrophe ; `RUN` piloté pas à pas et arrêt externe (J0.7–J0.11) |
 | Environnement de test | Console Linux `loco_basic_cli` avec `:help`, `:step`, `:stop`, `:quit`, exclusivement pour le développement (J0.9) |
-| Types, références et magasin | Spécification de la représentation CPC, décodage borné des références, types implicites et clés canoniques, magasin scalaire INT16 / REAL5 / STRING vide, résolution et lecture **hors exécution BASIC** (J0.12–J0.15, J0.17) |
+| Types, références et magasin | Décodage CPC borné, types implicites, clés canoniques et magasin scalaire INT16 / REAL5 / STRING vide (J0.12–J0.15, J0.17) ; lecture/écriture INTEGER raccordées à `RUN` en J0.19/J0.20 |
 | Variables dans `PRINT` | Références `%`, `$`, `!` tokenisées et listables (J0.16) ; les INTEGER explicites `%` existants sont **désormais lus et affichés par `RUN`** (J0.20) ; STRING/REAL5 non exécutables et rendu numérique CPC non encore validé |
 | Affectations INTEGER | `A%=2` et `LET A%=2` : représentation CPC et `LIST` (J0.18), **exécutables dans `RUN`** (J0.19), avec création/réaffectation en magasin borné, constantes 0 à 255 et une seule affectation par ligne |
 | Évaluateur complet, nombres CPC5, autres commandes | **Non implémentés** ; ni expressions générales, ni exécution des références STRING/REAL5 dans `PRINT`, ni support intégral du dialecte |

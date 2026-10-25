@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "purpose": "proposed CPC6128 BASIC 1.1 experiments; none is independent evidence until captured",
+  "oracle": null,
+  "acquisition": {
+    "status": "BLOCKED",
+    "date": "2026-10-25",
+    "reason": "No runnable CPC6128 or Caprice32 and no verified ROM image available in the execution environment. Network access from the local build container unavailable.",
+    "recommended_oracle": "ColinPitrat/caprice32",
+    "reference": "https://github.com/ColinPitrat/caprice32/blob/master/doc/man.html"
+  },
+  "cases": [
+    {
+      "id": "a_print_constants",
+      "source": "sources/a_print_constants.bas",
+      "source_sha256": "7e7ae5a03b179326eef2f4b5eab4315d9d86432baa672a964666fb3af36bdfa3",
+      "operations": [
+        "LIST",
+        "RUN"
+      ],
+      "observations": {}
+    },
+    {
+      "id": "b_integer_scalar",
+      "source": "sources/b_integer_scalar.bas",
+      "source_sha256": "7b000be0cd026bd73e309b24d2f57ab17f2dc6e650278e7e32776ab07a9039f1",
+      "operations": [
+        "LIST",
+        "RUN",
+        "TOKENS"
+      ],
+      "observations": {}
+    },
+    {
+      "id": "c_integer_add",
+      "source": "sources/c_integer_add.bas",
+      "source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+      "operations": [
+        "LIST",
+        "RUN",
+        "TOKENS"
+      ],
+      "observations": {}
+    },
+    {
+      "id": "d_self_reference",
+      "source": "sources/d_self_reference.bas",
+      "source_sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15",
+      "operations": [
+        "LIST",
+        "RUN"
+      ],
+      "observations": {}
+    },
+    {
+      "id": "e_goto",
+      "source": "sources/e_goto.bas",
+      "source_sha256": "a1c8557fb0b12d66062b7833e4128ef410515142538475cbd969a1fdc399671c",
+      "operations": [
+        "LIST",
+        "RUN"
+      ],
+      "observations": {}
+    },
+    {
+      "id": "f_let_spacing",
+      "source": "sources/f_let_spacing.bas",
+      "source_sha256": "1070c2ad379dc254bec45e48e35d2da7a57228d1f73c867f34d200485a0a0506",
+      "operations": [
+        "LIST",
+        "RUN",
+        "TOKENS"
+      ],
+      "observations": {}
+    },
+    {
+      "id": "f_constant_boundary",
+      "source": "sources/f_constant_boundary.bas",
+      "source_sha256": "cea81d48987634e8e2168375ff288aa4dbea56bd83ba87ba7424fafc02e16051",
+      "operations": [
+        "LIST",
+        "RUN"
+      ],
+      "observations": {}
+    },
+    {
+      "id": "f_mixed_case",
+      "source": "sources/f_mixed_case.bas",
+      "source_sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6",
+      "operations": [
+        "LIST",
+        "RUN"
+      ],
+      "observations": {}
+    },
+    {
+      "id": "g_uninitialized",
+      "source": "sources/g_uninitialized.bas",
+      "source_sha256": "c9e530e3240bf828ec3fad99f4e8245e62772745a7eb2b2309d0f2843dba9b9f",
+      "operations": [
+        "LIST",
+        "RUN"
+      ],
+      "observations": {}
+    }
+  ]
+}

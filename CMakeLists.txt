@@ -195,3 +195,15 @@ target_include_directories(basic_memory_budget PRIVATE ${CMAKE_CURRENT_SOURCE_DI
 if(BUILD_TESTING)
     add_test(NAME memory_budget COMMAND basic_memory_budget)
 endif()
+
+# J0.24: independent historical fixtures when present; no emulator or ROM in CI.
+add_executable(basic_program_image_cli tools/basic_program_image_cli.c)
+target_link_libraries(basic_program_image_cli PRIVATE basic_session)
+if(BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME cpc_differential_infrastructure COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/cpc_diff.py"
+        --manifest "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/manifest.json"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --ci)
+endif()

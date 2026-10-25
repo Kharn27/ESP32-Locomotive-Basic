@@ -119,6 +119,10 @@ def local_observation(source, operation, cli, image_cli):
 def checked_local_result(result, case_id, operation):
     # Process-level failure is an infrastructure error even without an oracle.
     # Valid BASIC rejections are CLI protocol diagnostics with exit code zero.
+    if operation == "TOKENS" and result.returncode == 2 and \
+            b"image-cli: input rejected:" in result.stderr and not result.stdout:
+        # Rejected C99 export, NOT a reason to discard authentic CPC evidence.
+        return
     if result.returncode != 0:
         details = result.stderr[:180].decode("utf-8", errors="replace")
         raise HarnessError(f"{case_id}/{operation}: local process exited {result.returncode}: {details}")

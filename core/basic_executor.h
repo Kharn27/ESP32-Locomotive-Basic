@@ -22,7 +22,8 @@ typedef enum {
     BE_STORE_FULL,
     BE_INVALID_STORE,
     BE_INVALID_KEY,
-    BE_INVALID_TYPE
+    BE_INVALID_TYPE,
+    BE_VARIABLE_NOT_FOUND /* Internal diagnostic, not a CPC error code. */
 } BEStatus;
 
 typedef struct {
@@ -41,7 +42,12 @@ BEStatus be_init(BasicExecutor *executor, const BasicProgram *program);
 BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program,
                             BasicVariableStore *variables);
 
-/* Execute at most ONE numbered line. END commits the reached prefix's output
+/* With a store, PRINT reads existing explicit INTEGER (%) scalars only.
+ * Missing variables return BE_VARIABLE_NOT_FOUND; without a store the
+ * legacy API still returns BE_UNSUPPORTED. Numeric output is prototype
+ * signed decimal + LF, not CPC PRINT formatting.
+ *
+ * Execute at most ONE numbered line. END commits the reached prefix's output
  * and moves the cursor to the program sentinel; the NEXT be_step returns
  * BE_END. This is the host step protocol, not CPC console timing.
  * BE_OK commits its output and cursor.

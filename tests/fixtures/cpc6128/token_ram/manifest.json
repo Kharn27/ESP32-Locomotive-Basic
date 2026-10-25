@@ -139,7 +139,9 @@
         "captured_at": "2026-10-25T21:35:41.507316+00:00",
         "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
         "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
-        "source_sha256": "7e7ae5a03b179326eef2f4b5eab4315d9d86432baa672a964666fb3af36bdfa3"
+        "source_sha256": "7e7ae5a03b179326eef2f4b5eab4315d9d86432baa672a964666fb3af36bdfa3",
+        "artifact_id": 12614852030,
+        "artifact_digest": "sha256:a19b79341ec6374a548ea535a65b207a8cdc4df2a2d53246b82bc60d15b936f8"
       }
     },
     {
@@ -186,7 +188,9 @@
         "captured_at": "2026-10-25T21:35:41.507316+00:00",
         "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
         "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
-        "source_sha256": "1070c2ad379dc254bec45e48e35d2da7a57228d1f73c867f34d200485a0a0506"
+        "source_sha256": "1070c2ad379dc254bec45e48e35d2da7a57228d1f73c867f34d200485a0a0506",
+        "artifact_id": 12614852030,
+        "artifact_digest": "sha256:a19b79341ec6374a548ea535a65b207a8cdc4df2a2d53246b82bc60d15b936f8"
       }
     },
     {
@@ -233,7 +237,9 @@
         "captured_at": "2026-10-25T21:35:41.507316+00:00",
         "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
         "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
-        "source_sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6"
+        "source_sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6",
+        "artifact_id": 12614852030,
+        "artifact_digest": "sha256:a19b79341ec6374a548ea535a65b207a8cdc4df2a2d53246b82bc60d15b936f8"
       }
     }
   ],
@@ -244,6 +250,8 @@
     "artifact_name": "cpc6128-c4-original-evidence",
     "captured_at": "2026-10-25T21:35:41.507316+00:00",
     "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
-    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
+    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "artifact_id": 12614852030,
+    "artifact_digest": "sha256:a19b79341ec6374a548ea535a65b207a8cdc4df2a2d53246b82bc60d15b936f8"
   }
 }

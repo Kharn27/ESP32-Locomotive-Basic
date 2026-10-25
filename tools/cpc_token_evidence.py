@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify published J0.24-C3/C4 program-only evidence; never consume a full SNA."""
+"""Verify published J0.24-C3/C4/C5 program-only evidence; never consume a full SNA."""
 import argparse
 import copy
 import hashlib
@@ -13,12 +13,17 @@ sys.path.insert(0, str(ROOT / "tests/oracles"))
 import token_ram_oracle as oracle
 
 ALLOWED = {"program.bin", "c99.bin", "cap32.cfg",
-           "autocmd.json", "caprice.log", "list.png", "comparison.json"}
+           "autocmd.json", "caprice.log", "list.png", "comparison.json", "c99_error.txt"}
 FORBIDDEN_SUFFIXES = {".sna", ".rom", ".dsk", ".cpr", ".zip", ".img"}
 ROM = oracle.ROM_SHA
 C3_SOURCE_SHA = {
     "b_integer_scalar": "7b000be0cd026bd73e309b24d2f57ab17f2dc6e650278e7e32776ab07a9039f1",
     "c_integer_add": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+}
+C4_SHA = {
+    "a_print_constants": "0e4458cc0974f4cf4974917bbf52df4596bbb22341fd4db85dc7fffdf18abd05",
+    "f_let_spacing": "cb6833e1f87945ebf164bcd017dcf9c7f761c552b37c51e7088526cfe32b28fe",
+    "f_mixed_case": "984ad8367a45274de4aee19ffdf1eb0ef10fddea91aa975b68f2cc0851730056",
 }
 C3_SHA = {
     "b_integer_scalar": "20840377f8ec0181fe572e599f8eb63ab20a6e3edd8b448a201b14e8c23c8ee9",
@@ -64,7 +69,10 @@ def validate(base, manifest):
     for name, (source_rel, nums) in oracle.CASES.items():
         cap = next(c for c in manifest["captures"] if c["case"] == name)
         files = cap["files"]
-        require(set(files) == ALLOWED, "unexpected case file inventory")
+        expected_keys = ALLOWED - {"c99_error.txt"}
+        unsupported_keys = (ALLOWED - {"c99.bin"})
+        require(set(files) in (expected_keys, unsupported_keys),
+                "unexpected case file inventory")
         require(cap["snapshot_taken_before_run"] is True and
                 cap["list_requested"] is True, "LIST / before RUN not documented")
         src = (ROOT / "tests/fixtures/cpc6128" / source_rel).read_bytes()
@@ -95,9 +103,9 @@ def validate(base, manifest):
         require((base/name/"list.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n"),
                 "LIST visual evidence invalid")
         cpc = (base/name/"program.bin").read_bytes()
-        local = (base/name/"c99.bin").read_bytes()
+        local = (base/name/"c99.bin").read_bytes() if "c99.bin" in files else None
         cpc_lines, cpc_records = oracle.records(cpc)
-        local_lines, _ = oracle.records(local)
+        local_lines = oracle.records(local)[0] if local is not None else nums
         require(cpc_lines == nums and local_lines == nums, "wrong stored line numbers")
         region = cap["region"]
         require(region["start_address"] == region["base_pointer_value"]+1 and
@@ -112,13 +120,25 @@ def validate(base, manifest):
                 region["terminator_hex"] == "0000", "region bounds inconsistent")
         report = json.loads((base/name/"comparison.json").read_text())
         require(report == cap["comparison"], "comparison report differs from manifest")
-        same, diff = compare(cpc,local)
-        require(report["classification"] == ("MATCH_EXACT" if same else "DIFF") and
-                report["first_difference"] == diff and
-                report["cpc_sha256"] == sha(cpc) and
-                report["c99_sha256"] == sha(local) and
-                report["cpc_size"] == len(cpc) and
-                report["c99_size"] == len(local), "comparison is not reproducible")
+        if local is None:
+            rejection = (base/name/"c99_error.txt").read_text().strip()
+            require(rejection.startswith("image-cli: input rejected:") and
+                    report["classification"] == "UNSUPPORTED" and
+                    report["first_difference"] is None and
+                    report["c99_sha256"] is None and
+                    report["c99_size"] is None and
+                    report["c99_rejection"] == rejection,
+                    "native rejection evidence inconsistent")
+        else:
+            same, diff = compare(cpc,local)
+            require(report["classification"] == ("MATCH_EXACT" if same else "DIFF") and
+                    report["first_difference"] == diff and
+                    report["c99_sha256"] == sha(local) and
+                    report["c99_size"] == len(local) and
+                    report["c99_rejection"] is None,
+                    "comparison is not reproducible")
+        require(report["cpc_sha256"] == sha(cpc) and
+                report["cpc_size"] == len(cpc), "CPC comparison hash invalid")
         print(name, "CPC", sha(cpc), report["classification"], flush=True)
     require(present == expected, "unexpected files, potentially a full SNA/ROM: "+
             str(sorted(present-expected)))
@@ -127,7 +147,10 @@ def validate(base, manifest):
 
 def validate_permanent(root, manifest):
     """Independent offline check of the promoted program-only fixtures."""
-    expected_names = set(C3_SHA) if manifest.get("phase") is None else set(oracle.CASES)
+    phase = manifest.get("phase")
+    expected_names = (set(C3_SHA) if phase is None else
+                      set(C3_SHA) | set(C4_SHA) if phase == "J0.24-C4" else
+                      set(oracle.CASES) if phase == "J0.24-C5" else set())
     if manifest.get("phase") == "J0.24-C4":
         p4 = manifest.get("c4_acquisition")
         require(isinstance(p4, dict) and p4.get("workflow") == "J0.24-C4 one-shot import" and
@@ -136,8 +159,16 @@ def validate_permanent(root, manifest):
                 re.fullmatch(r"sha256:[0-9a-f]{64}", p4["artifact_digest"]) and
                 isinstance(p4.get("run_id"), int) and p4["run_id"] > 0,
                 "C4 archival artifact provenance missing")
+    if phase == "J0.24-C5":
+        p5 = manifest.get("c5_acquisition")
+        require(isinstance(p5, dict) and
+                p5.get("workflow") == "J0.24-C5 one-shot import" and
+                isinstance(p5.get("run_id"), int) and not isinstance(p5.get("run_id"), bool) and p5["run_id"] > 0 and
+                isinstance(p5.get("artifact_id"), int) and not isinstance(p5.get("artifact_id"), bool) and p5["artifact_id"] > 0 and
+                re.fullmatch(r"sha256:[0-9a-f]{64}", p5.get("artifact_digest", "")),
+                "C5 acquisition provenance missing")
     require(manifest["schema_version"] == 1 and
-            (manifest.get("phase") is None or manifest["phase"] == "J0.24-C4") and
+            phase in (None, "J0.24-C4", "J0.24-C5") and
             len(manifest["cases"]) == len(expected_names),
             "invalid permanent evidence manifest")
     p = manifest["provenance"]
@@ -168,14 +199,19 @@ def validate_permanent(root, manifest):
                 "LIST" in case["command_sequence"] and
                 "CAP32_SNAPSHOT" in case["command_sequence"],
                 "invalid acquisition method")
+        native_supported = case.get("comparison") != "UNSUPPORTED"
         require(case["program_path"] ==
                 f"tests/fixtures/cpc6128/token_ram/{name}/program.bin" and
-                case["c99_path"] ==
-                f"tests/fixtures/cpc6128/token_ram/{name}/c99.bin",
+                (case.get("c99_path") ==
+                 f"tests/fixtures/cpc6128/token_ram/{name}/c99.bin"
+                 if native_supported else
+                 (phase == "J0.24-C5" and name not in C3_SHA and
+                  name not in C4_SHA and case.get("c99_path") is None and
+                  case.get("c99_sha256") is None and case.get("c99_bytes") is None)),
                 "unexpected binary path")
         for key, sha_key, size_key in (
-                ("program_path", "program_sha256", "program_bytes"),
-                ("c99_path", "c99_sha256", "c99_bytes")):
+                [("program_path", "program_sha256", "program_bytes")] +
+                ([("c99_path", "c99_sha256", "c99_bytes")] if native_supported else [])):
             file = root / case[key]
             require(file.is_file() and not file.is_symlink() and
                     file.resolve().is_relative_to(base.resolve()),
@@ -190,7 +226,11 @@ def validate_permanent(root, manifest):
                     case["c99_sha256"] == C3_SHA[name] and
                     case["comparison"] == "MATCH_EXACT" and
                     "acquisition" not in case, "immutable C3 evidence changed")
-        else:
+        elif name in C4_SHA:
+            require(case["program_sha256"] == C4_SHA[name] and
+                    case["c99_sha256"] == C4_SHA[name] and
+                    case["comparison"] == "MATCH_EXACT",
+                    "immutable C4 evidence changed")
             origin = case.get("acquisition")
             require(isinstance(origin, dict) and
                     origin.get("workflow") == "J0.24-C4 one-shot import" and
@@ -209,10 +249,29 @@ def validate_permanent(root, manifest):
                     len(case["original_list_png_sha256"]) == 64 and
                     "first_difference" in case,
                     "missing C4 visual provenance or difference report")
+        else:
+            require(phase == "J0.24-C5", "unpromoted case")
+            origin = case.get("acquisition")
+            p5 = manifest["c5_acquisition"]
+            require(isinstance(origin, dict) and
+                    origin.get("workflow") == p5["workflow"] and
+                    origin.get("run_id") == p5["run_id"] and
+                    origin.get("run_url") ==
+                      "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/" + str(p5["run_id"]) and
+                    origin.get("artifact_name") == p5["artifact_name"] and
+                    origin.get("artifact_id") == p5["artifact_id"] and
+                    origin.get("artifact_digest") == p5["artifact_digest"] and
+                    origin.get("source_sha256") == case["source_sha256"] and
+                    origin.get("rom_sha256") == ROM and
+                    origin.get("caprice32_commit") == oracle.PIN and
+                    isinstance(case.get("original_list_png_sha256"), str) and
+                    re.fullmatch(r"[0-9a-f]{64}", case["original_list_png_sha256"]),
+                    "C5 evidence provenance missing/inconsistent")
         cpc = (root / case["program_path"]).read_bytes()
-        local = (root / case["c99_path"]).read_bytes()
+        local = ((root / case["c99_path"]).read_bytes()
+                 if native_supported else None)
         found, rows = oracle.records(cpc)
-        local_numbers, _ = oracle.records(local)
+        local_numbers = oracle.records(local)[0] if local is not None else numbers
         require(found == numbers and local_numbers == numbers,
                 "stored line numbers invalid")
         require([r["length"] for r in rows] == case["line_record_lengths"],
@@ -230,13 +289,17 @@ def validate_permanent(root, manifest):
                 case["line_terminator_hex"] == "00" and
                 case["program_terminator_hex"] == "0000",
                 "memory boundaries/record metadata changed")
-        exact, diff = compare(cpc, local)
-        require(case["comparison"] ==
-                ("MATCH_EXACT" if exact else "DIFF") and
+        exact, diff = compare(cpc, local) if local is not None else (False, None)
+        effective = ("UNSUPPORTED" if local is None else "MATCH_EXACT" if exact else "DIFF")
+        require(case["comparison"] == effective and
                 (name in C3_SHA or case["first_difference"] == diff) and
                 case["normalization"] == "none" and
                 case["raw_acquisition_preserved"] is True,
                 "fabricated or non-raw comparison")
+        if local is None:
+            require(isinstance(case.get("c99_rejection"), str) and
+                    case["c99_rejection"].startswith("image-cli: input rejected:"),
+                    "missing native rejection diagnostic")
         print("PERMANENT", name, case["comparison"],
               case["program_sha256"],flush=True)
     present = {f.relative_to(base).as_posix() for f in base.rglob("*")
@@ -246,7 +309,7 @@ def validate_permanent(root, manifest):
     print(f"PASS: permanently archived {len(expected_names)} CPC program-only token images")
 
 def permanent_self_test(root, original):
-    for change in ("token", "classification", "start", "rom", "source", "proof", "missing", "artifact"):
+    for change in ("token", "classification", "start", "rom", "source", "proof", "missing", "artifact", "c4_immutable", "c5_origin"):
         altered = copy.deepcopy(original)
         if change == "token":
             altered["cases"][0]["program_sha256"] = "0"*64
@@ -268,6 +331,16 @@ def permanent_self_test(root, original):
                 altered["cases"][-1]["acquisition"]["artifact_digest"] = "sha256:" + "0"*64
             else:
                 altered["provenance"]["original_acquisition_manifest_sha256"] = ""
+        elif change == "c4_immutable":
+            if altered.get("phase") == "J0.24-C5":
+                next(c for c in altered["cases"] if c["id"] in C4_SHA)["program_sha256"] = "0"*64
+            else:
+                continue
+        elif change == "c5_origin":
+            if altered.get("phase") == "J0.24-C5":
+                altered["c5_acquisition"]["artifact_id"] = 0
+            else:
+                continue
         else:
             altered["provenance"]["system_rom_sha256"] = "0"*64
         try:

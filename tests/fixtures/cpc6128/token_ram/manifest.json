@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "purpose": "J0.24-C3 original CPC6128 ROM BASIC 1.1 RAM token images; not a declaration of 8-case J0.24 acceptance",
+  "purpose": "Five authentic CPC6128 ROM BASIC 1.1 token RAM images (C3 immutable, C4 measured); eight-case J0.24 gate remains open",
   "acquired_at": "2026-10-25T19:01:19.685843+00:00",
   "provenance": {
     "github_actions_run_id": 40223535739,
@@ -94,6 +94,156 @@
       "comparison": "MATCH_EXACT",
       "normalization": "none",
       "raw_acquisition_preserved": true
+    },
+    {
+      "id": "a_print_constants",
+      "source_path": "tests/fixtures/cpc6128/sources/a_print_constants.bas",
+      "source_sha256": "7e7ae5a03b179326eef2f4b5eab4315d9d86432baa672a964666fb3af36bdfa3",
+      "command_sequence": "numbered source; LIST; CAP32_DELAY twice; CAP32_SCRNSHOT; CAP32_SNAPSHOT; CAP32_EXIT; no RUN",
+      "program_path": "tests/fixtures/cpc6128/token_ram/a_print_constants/program.bin",
+      "program_sha256": "0e4458cc0974f4cf4974917bbf52df4596bbb22341fd4db85dc7fffdf18abd05",
+      "program_bytes": 25,
+      "c99_path": "tests/fixtures/cpc6128/token_ram/a_print_constants/c99.bin",
+      "c99_sha256": "0e4458cc0974f4cf4974917bbf52df4596bbb22341fd4db85dc7fffdf18abd05",
+      "c99_bytes": 25,
+      "start_pointer_ram": 44644,
+      "end_pointer_ram": 44646,
+      "base_pointer_value": 367,
+      "program_start_cpc": 368,
+      "program_end_exclusive_cpc": 393,
+      "snapshot_header_length": 256,
+      "snapshot_program_file_offset": 624,
+      "ram_bank": 0,
+      "line_numbers": [
+        10,
+        20,
+        30
+      ],
+      "line_record_lengths": [
+        8,
+        9,
+        6
+      ],
+      "line_terminator_hex": "00",
+      "program_terminator_hex": "0000",
+      "original_list_png_sha256": "8418c6b282770615997baa0f13253d90804fb2af91aca29034aca022e0d34d77",
+      "comparison": "MATCH_EXACT",
+      "first_difference": null,
+      "normalization": "none",
+      "raw_acquisition_preserved": true,
+      "acquisition": {
+        "workflow": "J0.24-C4 one-shot import",
+        "run_id": 40236090690,
+        "run_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40236090690",
+        "artifact_name": "cpc6128-c4-original-evidence",
+        "captured_at": "2026-10-25T21:35:41.507316+00:00",
+        "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+        "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+        "source_sha256": "7e7ae5a03b179326eef2f4b5eab4315d9d86432baa672a964666fb3af36bdfa3"
+      }
+    },
+    {
+      "id": "f_let_spacing",
+      "source_path": "tests/fixtures/cpc6128/sources/f_let_spacing.bas",
+      "source_sha256": "1070c2ad379dc254bec45e48e35d2da7a57228d1f73c867f34d200485a0a0506",
+      "command_sequence": "numbered source; LIST; CAP32_DELAY twice; CAP32_SCRNSHOT; CAP32_SNAPSHOT; CAP32_EXIT; no RUN",
+      "program_path": "tests/fixtures/cpc6128/token_ram/f_let_spacing/program.bin",
+      "program_sha256": "cb6833e1f87945ebf164bcd017dcf9c7f761c552b37c51e7088526cfe32b28fe",
+      "program_bytes": 32,
+      "c99_path": "tests/fixtures/cpc6128/token_ram/f_let_spacing/c99.bin",
+      "c99_sha256": "cb6833e1f87945ebf164bcd017dcf9c7f761c552b37c51e7088526cfe32b28fe",
+      "c99_bytes": 32,
+      "start_pointer_ram": 44644,
+      "end_pointer_ram": 44646,
+      "base_pointer_value": 367,
+      "program_start_cpc": 368,
+      "program_end_exclusive_cpc": 400,
+      "snapshot_header_length": 256,
+      "snapshot_program_file_offset": 624,
+      "ram_bank": 0,
+      "line_numbers": [
+        10,
+        20,
+        30
+      ],
+      "line_record_lengths": [
+        13,
+        11,
+        6
+      ],
+      "line_terminator_hex": "00",
+      "program_terminator_hex": "0000",
+      "original_list_png_sha256": "12fd68baaff7dd41806860e866e84b8cc8b6712c2d376bef3c974de565f7f54d",
+      "comparison": "MATCH_EXACT",
+      "first_difference": null,
+      "normalization": "none",
+      "raw_acquisition_preserved": true,
+      "acquisition": {
+        "workflow": "J0.24-C4 one-shot import",
+        "run_id": 40236090690,
+        "run_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40236090690",
+        "artifact_name": "cpc6128-c4-original-evidence",
+        "captured_at": "2026-10-25T21:35:41.507316+00:00",
+        "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+        "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+        "source_sha256": "1070c2ad379dc254bec45e48e35d2da7a57228d1f73c867f34d200485a0a0506"
+      }
+    },
+    {
+      "id": "f_mixed_case",
+      "source_path": "tests/fixtures/cpc6128/sources/f_mixed_case.bas",
+      "source_sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6",
+      "command_sequence": "numbered source; LIST; CAP32_DELAY twice; CAP32_SCRNSHOT; CAP32_SNAPSHOT; CAP32_EXIT; no RUN",
+      "program_path": "tests/fixtures/cpc6128/token_ram/f_mixed_case/program.bin",
+      "program_sha256": "984ad8367a45274de4aee19ffdf1eb0ef10fddea91aa975b68f2cc0851730056",
+      "program_bytes": 44,
+      "c99_path": "tests/fixtures/cpc6128/token_ram/f_mixed_case/c99.bin",
+      "c99_sha256": "984ad8367a45274de4aee19ffdf1eb0ef10fddea91aa975b68f2cc0851730056",
+      "c99_bytes": 44,
+      "start_pointer_ram": 44644,
+      "end_pointer_ram": 44646,
+      "base_pointer_value": 367,
+      "program_start_cpc": 368,
+      "program_end_exclusive_cpc": 412,
+      "snapshot_header_length": 256,
+      "snapshot_program_file_offset": 624,
+      "ram_bank": 0,
+      "line_numbers": [
+        10,
+        20,
+        30
+      ],
+      "line_record_lengths": [
+        19,
+        17,
+        6
+      ],
+      "line_terminator_hex": "00",
+      "program_terminator_hex": "0000",
+      "original_list_png_sha256": "a03b373de33f8dc2b4904f4f785c952e57e90e5542da0c78f2bb9a8a4f963ff0",
+      "comparison": "MATCH_EXACT",
+      "first_difference": null,
+      "normalization": "none",
+      "raw_acquisition_preserved": true,
+      "acquisition": {
+        "workflow": "J0.24-C4 one-shot import",
+        "run_id": 40236090690,
+        "run_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40236090690",
+        "artifact_name": "cpc6128-c4-original-evidence",
+        "captured_at": "2026-10-25T21:35:41.507316+00:00",
+        "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+        "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+        "source_sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6"
+      }
     }
-  ]
+  ],
+  "phase": "J0.24-C4",
+  "c4_acquisition": {
+    "workflow": "J0.24-C4 one-shot import",
+    "run_id": 40236090690,
+    "artifact_name": "cpc6128-c4-original-evidence",
+    "captured_at": "2026-10-25T21:35:41.507316+00:00",
+    "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
+  }
 }

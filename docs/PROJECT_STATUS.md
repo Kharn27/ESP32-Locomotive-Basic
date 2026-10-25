@@ -86,3 +86,5 @@
 - **Développeur :** investigation et implémentation sur branche dédiée, commits et PR vers `main`, sans fusion autonome.
 - **Pilotage :** revue technique des critères, demandes de corrections, acceptation/fusion selon autorisation et rédaction du prochain prompt.
 - **Garde-fou :** ne pas enchaîner automatiquement sur le jalon suivant.
+
+**J0.24-C4 — LIVRÉ POUR REVUE PILOTAGE :** Trois captures RAM CPC 6128 ROM BASIC 1.1 supplémentaires, pour cinq cas indépendants. Captures conservées avec SHA, adresses mesurées et comparaisons exactes ou divergentes ; C3 inchangé. [Acquisition C4](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40236090690) ; [Rapport C4](J0.24-C4-extended-token-oracle.md). **J0.24 reste ouvert (5/8) ; J0.25 et J1 non engagés.**

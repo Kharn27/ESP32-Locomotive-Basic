@@ -57,12 +57,16 @@ jobs:
           cmake --build "${RUNNER_TEMP}/c99-build" -j 2
           ctest --test-dir "${RUNNER_TEMP}/c99-build" --output-on-failure
 
-      - name: Check existing differential manifest (without fictional CPC fixtures)
+      - name: Check historical differential manifest (two verified token observations)
+        # Only genuine C3 program RAM records are promoted; no invented LIST or RUN oracles.
         run: |
           python3 tools/cpc_diff.py \
             --manifest tests/fixtures/cpc6128/manifest.json \
             --cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
             --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" --ci
+
+      - name: Verify permanent CPC token fixtures against original SHA provenance
+        run: python3 tools/cpc_token_evidence.py --permanent --self-test
 
       - name: Acquire CPC 6128 BASIC 1.1 evidence
         run: |

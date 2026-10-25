@@ -67,6 +67,35 @@ static BEStatus emit_decimal(BEEmitter *out, uint8_t value)
     return BE_OK;
 }
 
+/* Prototype INTEGER rendering: widen before negation (including -32768). */
+static BEStatus emit_integer(BEEmitter *out, int16_t value)
+{
+    uint8_t digits[5];
+    size_t count = 0u;
+    int32_t magnitude = (int32_t)value;
+    unsigned int n;
+    BEStatus status;
+    if (magnitude < 0) {
+        status = emit(out, (uint8_t)'-');
+        if (status != BE_OK) {
+            return status;
+        }
+        magnitude = -magnitude;
+    }
+    n = (unsigned int)magnitude;
+    do {
+        digits[count++] = (uint8_t)((unsigned int)'0' + n % 10u);
+        n /= 10u;
+    } while (n != 0u);
+    while (count != 0u) {
+        status = emit(out, digits[--count]);
+        if (status != BE_OK) {
+            return status;
+        }
+    }
+    return BE_OK;
+}
+
 static void skip_spaces(const uint8_t *body, size_t length, size_t *pos)
 {
     while (*pos < length && body[*pos] == (uint8_t)' ') {
@@ -98,6 +127,8 @@ static BEStatus binding_error(BVBStatus status)
 {
     switch (status) {
         case BVB_TRUNCATED: return BE_TRUNCATED;
+        case BVB_NOT_FOUND: return BE_VARIABLE_NOT_FOUND;
+        case BVB_INVALID_STORE: return BE_INVALID_STORE;
         case BVB_OVERLAPPING_MEMORY: return BE_OVERLAP;
         default: return BE_BAD_SEQUENCE;
     }
@@ -242,10 +273,33 @@ static BEStatus execute_line(const BasicProgram *program,
                     if (status != BE_OK) {
                         return status;
                     }
-                } else if (token >= 0x02u && token <= 0x04u) {
-                    /* Valid explicit scalar syntax is stored/listed only.
-                     * Never resolve caches or read the variable store here. */
-                    return BE_UNSUPPORTED;
+                } else if (token == 0x02u) {
+                    BasicVariableKey key;
+                    BasicVariableValue value;
+                    size_t consumed = 0u;
+                    size_t start = pos - 1u;
+                    BVBStatus resolved;
+                    /* The binding layer handles opaque CPC cache bytes,
+                     * canonical names and exact typed lookup, without mutation. */
+                    if (variables == NULL) {
+                        return BE_UNSUPPORTED;
+                    }
+                    resolved = bvb_read_explicit(body, length, start, variables,
+                                                 &key, &consumed, &value);
+                    if (resolved != BVB_OK) {
+                        return binding_error(resolved);
+                    }
+                    if (key.type != (uint8_t)BVT_INTEGER ||
+                        value.type != (uint8_t)BVT_INTEGER) {
+                        return BE_INVALID_TYPE;
+                    }
+                    pos = start + consumed;
+                    status = emit_integer(out, value.data.integer);
+                    if (status != BE_OK) {
+                        return status;
+                    }
+                } else if (token == 0x03u || token == 0x04u) {
+                    return BE_UNSUPPORTED; /* STRING and REAL5 postponed. */
                 } else {
                     return unexpected(token);
                 }

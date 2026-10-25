@@ -43,6 +43,7 @@ set(eof "[cli] EOF\n")
 set(session_unsupported "[cli:error] BSR_SESSION_ERROR BS_UNSUPPORTED_DIRECT BT_OK BP_OK BL_OK BE_OK\n")
 set(session_multiple "[cli:error] BSR_SESSION_ERROR BS_MULTIPLE_DIRECT BT_OK BP_OK BL_OK BE_OK\n")
 set(executor_missing "[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_MISSING_TARGET\n")
+set(variable_missing "[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_VARIABLE_NOT_FOUND\n")
 
 check_case("run-list-end"
     "20 PRINT 42\n10 PRINT \"HELLO\"\nLIST\nRUN\n:step\n:step\n:step\n:quit\n"
@@ -138,7 +139,7 @@ check_case("end-comments-and-direct-rejection"
 check_case("explicit-variable-list-unsupported-run"
     "10 PRINT A%\n20 PRINT B!\n30 PRINT S$\n40 END\nLIST\nRUN\n:step\n:quit\n"
     "10 PRINT A%\n20 PRINT B!\n30 PRINT S$\n40 END\n"
-    "${banner}${ok}${ok}${ok}${ok}${listed}${running}[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_UNSUPPORTED\n${byebye}"
+    "${banner}${ok}${ok}${ok}${ok}${listed}${running}${variable_missing}${byebye}"
 )
 
 
@@ -147,7 +148,7 @@ check_case("explicit-variable-list-unsupported-run"
 check_case("c1-alias-print-suffix-and-number"
     "10 ?A%\n20 ?B!\n30 ?S$\n40 PRINT A%\n50 ?A%:END\n60 ?5\n70 ?42\n80 ?\"Q\"\n90 END\nLIST\nRUN\n:step\n:quit\n"
     "10 PRINT A%\n20 PRINT B!\n30 PRINT S$\n40 PRINT A%\n50 PRINT A%:END\n60 PRINT 5\n70 PRINT 42\n80 PRINT\"Q\"\n90 END\n"
-    "${banner}${ok}${ok}${ok}${ok}${ok}${ok}${ok}${ok}${ok}${listed}${running}[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_UNSUPPORTED\n${byebye}"
+    "${banner}${ok}${ok}${ok}${ok}${ok}${ok}${ok}${ok}${ok}${listed}${running}${variable_missing}${byebye}"
 )
 
 check_case("c1-printa-is-not-a-keyword"
@@ -172,4 +173,23 @@ check_case("integer-assignment-step"
     "${banner}${ok}${ok}${ok}${running}${step1}${step1}${step1}${ended}${byebye}"
 )
 
-message(STATUS "host_cli: nineteen black-box scenarios passed")
+# J0.20: real CLI process, BASIC stdout and host diagnostics separated.
+check_case("integer-variable-print"
+    "10 A%=2\n20 PRINT A%\n30 END\nRUN\n:step\n:step\n:step\n:step\n:quit\n"
+    "2\n"
+    "${banner}${ok}${ok}${ok}${running}${step1}${step1}${step1}${ended}${byebye}"
+)
+
+check_case("integer-variable-alias"
+    "10 A%=9\n20 ?A%\n30 END\nRUN\n:step 3\n:step\n:quit\n"
+    "9\n"
+    "${banner}${ok}${ok}${ok}${running}[cli] STEPPED 3\n${ended}${byebye}"
+)
+
+check_case("integer-variable-missing"
+    "10 PRINT A%\nRUN\n:step\n:stop\n:quit\n"
+    ""
+    "${banner}${ok}${running}${variable_missing}${stopped}${byebye}"
+)
+
+message(STATUS "host_cli: twenty-two black-box scenarios passed")

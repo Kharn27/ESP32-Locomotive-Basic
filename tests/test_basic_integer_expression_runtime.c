@@ -194,6 +194,20 @@ static int test_limits(void)
         }
         CHECK(equals(&h, "A", cases[i].initial) == 0);
     }
+    /* An overflowing assignment to a NEW destination must not create it. */
+    {
+        Harness h;
+        BasicVariableKey missing = key_of("B");
+        BasicVariableValue value;
+        CHECK(setup(&h, 2u) == 0);
+        CHECK(inject(&h, "A", INT16_MAX) == 0);
+        CHECK(put(&h, 10u, "B%=A%+1") == 0);
+        CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+        CHECK(failure(&h, BE_INTEGER_OVERFLOW) == 0);
+        CHECK(h.store.count == 1u);
+        CHECK(bvs_get(&h.store, &missing, &value) == BVS_NOT_FOUND);
+        CHECK(equals(&h, "A", INT16_MAX) == 0);
+    }
     return 0;
 }
 

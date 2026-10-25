@@ -1,0 +1,3 @@
+[submodule "tests/oracles/caprice32"]
+	path = tests/oracles/caprice32
+	url = https://github.com/ColinPitrat/caprice32.git

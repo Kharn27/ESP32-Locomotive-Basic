@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "purpose": "J0.24-C3 original CPC6128 ROM BASIC 1.1 RAM token images; not a declaration of 8-case J0.24 acceptance",
+  "acquired_at": "2026-10-25T19:01:19.685843+00:00",
+  "provenance": {
+    "github_actions_run_id": 40223535739,
+    "github_actions_artifact_id": 12609729713,
+    "artifact_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40223535739/artifacts/12609729713",
+    "artifact_zip_sha256": "122c92dd7cee61a2d97630bf5a5d4aa9d046ae0c9f55e6d302bd4444575b8a3e",
+    "original_acquisition_manifest_sha256": "44fa405bd6bcf1ab08cd2df603d0cb2ebec8fca04bb9ee435ab527feaff686bc",
+    "caprice32_version": "4.6.0",
+    "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "cpc_model": "CPC6128",
+    "ram_kb": 128,
+    "basic_rom_banner": "BASIC 1.1",
+    "system_rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "amsdos_rom_sha256": "ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d",
+    "snapshot_format": "MV - SNA v3, 256-byte header, 128KiB physical RAM; temporary snapshot removed",
+    "actual_autocmd_snapshot_wire_encoding": "0c 0d following literal formfeed (CAP32_SNAPSHOT absent from pinned argparse keywords)",
+    "screenshot_proof": "LIST banner and exact numbered lines visually inspected from original artifact; PNG not promoted",
+    "snapshot_or_rom_published": false
+  },
+  "cases": [
+    {
+      "id": "b_integer_scalar",
+      "source_path": "tests/fixtures/cpc6128/sources/b_integer_scalar.bas",
+      "source_sha256": "7b000be0cd026bd73e309b24d2f57ab17f2dc6e650278e7e32776ab07a9039f1",
+      "command_sequence": "numbered source; LIST; CAP32_DELAY twice; CAP32_SCRNSHOT; CAP32_SNAPSHOT; CAP32_EXIT; no RUN",
+      "program_path": "tests/fixtures/cpc6128/token_ram/b_integer_scalar/program.bin",
+      "program_sha256": "20840377f8ec0181fe572e599f8eb63ab20a6e3edd8b448a201b14e8c23c8ee9",
+      "program_bytes": 30,
+      "c99_path": "tests/fixtures/cpc6128/token_ram/b_integer_scalar/c99.bin",
+      "c99_sha256": "20840377f8ec0181fe572e599f8eb63ab20a6e3edd8b448a201b14e8c23c8ee9",
+      "c99_bytes": 30,
+      "start_pointer_ram": 44644,
+      "end_pointer_ram": 44646,
+      "base_pointer_value": 367,
+      "program_start_cpc": 368,
+      "program_end_exclusive_cpc": 398,
+      "snapshot_header_length": 256,
+      "snapshot_program_file_offset": 624,
+      "ram_bank": 0,
+      "line_numbers": [
+        10,
+        20,
+        30
+      ],
+      "line_record_lengths": [
+        11,
+        11,
+        6
+      ],
+      "line_terminator_hex": "00",
+      "program_terminator_hex": "0000",
+      "original_list_png_sha256": "8bd7d5c955c87f4c84362ec4ab7312b5efd572ef58e0c82d7018810ed48d1316",
+      "comparison": "MATCH_EXACT",
+      "normalization": "none",
+      "raw_acquisition_preserved": true
+    },
+    {
+      "id": "c_integer_add",
+      "source_path": "tests/fixtures/cpc6128/sources/c_integer_add.bas",
+      "source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+      "command_sequence": "numbered source; LIST; CAP32_DELAY twice; CAP32_SCRNSHOT; CAP32_SNAPSHOT; CAP32_EXIT; no RUN",
+      "program_path": "tests/fixtures/cpc6128/token_ram/c_integer_add/program.bin",
+      "program_sha256": "931531da119e6c2b794482949b757203f5ddd1b5720694e723e74a97a001d188",
+      "program_bytes": 46,
+      "c99_path": "tests/fixtures/cpc6128/token_ram/c_integer_add/c99.bin",
+      "c99_sha256": "931531da119e6c2b794482949b757203f5ddd1b5720694e723e74a97a001d188",
+      "c99_bytes": 46,
+      "start_pointer_ram": 44644,
+      "end_pointer_ram": 44646,
+      "base_pointer_value": 367,
+      "program_start_cpc": 368,
+      "program_end_exclusive_cpc": 414,
+      "snapshot_header_length": 256,
+      "snapshot_program_file_offset": 624,
+      "ram_bank": 0,
+      "line_numbers": [
+        10,
+        20,
+        30,
+        40
+      ],
+      "line_record_lengths": [
+        11,
+        16,
+        11,
+        6
+      ],
+      "line_terminator_hex": "00",
+      "program_terminator_hex": "0000",
+      "original_list_png_sha256": "3a8b91b69672f870e38e8e4d24b95359ae5ccd708029622831bd8ff741377f0f",
+      "comparison": "MATCH_EXACT",
+      "normalization": "none",
+      "raw_acquisition_preserved": true
+    }
+  ]
+}

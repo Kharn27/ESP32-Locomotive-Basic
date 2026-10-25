@@ -215,3 +215,11 @@ if(BUILD_TESTING)
         ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/cpc_evidence.py"
         --self-test)
 endif()
+
+# J0.24-C3: verify genuine CPC program-only fixtures and SHA provenance.
+# All 22 previous portable C99 test suites remain unchanged.
+if(BUILD_TESTING)
+    add_test(NAME cpc_token_permanent_evidence COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/cpc_token_evidence.py"
+        --permanent --self-test)
+endif()

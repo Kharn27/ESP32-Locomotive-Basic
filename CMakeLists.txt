@@ -290,3 +290,12 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+# J1.1: historical CPC RAM oracle for signed INTEGER assignments, independent
+# of the host tokenizer; each binary fixture is pinned by explicit SHA-256.
+if(BUILD_TESTING)
+    add_test(NAME j1_signed_assignment_differential COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_signed_assignment_audit.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

@@ -65,7 +65,8 @@ def c6_direct(case):
     return raw
 
 
-def verify(base, permanent=False):
+def verify(base, permanent=False, native_c1=False):
+    require(not (permanent and native_c1), "fresh C99 comparator cannot override permanent archive")
     require(base.is_dir(), "missing evidence directory")
     require((base / "manifest.json").is_file(), "mandatory manifest missing")
     m = load(base / "manifest.json")
@@ -214,7 +215,13 @@ def verify(base, permanent=False):
         if mode == "screen":
             require(raw["native.stdin.bin"] == historical + b"RUN\n:step 100\n:quit\n",
                     id_ + ": native original/RUN chronology altered")
-            require(signed(raw["native.stdout.bin"], SIGNED_NATIVE) == integer and
+            # J0.27-A permanent acquisition is pinned to the ORIGINAL
+            # pre-C1 native format. Only explicitly selected fresh runs
+            # validate C1: blank + digits + blank + LF, never CRLF.
+            expected_c1 = (" " + str(integer) + " \n").encode("ascii")
+            native_ok = (raw["native.stdout.bin"] == expected_c1 if native_c1 else
+                         signed(raw["native.stdout.bin"], SIGNED_NATIVE) == integer)
+            require(native_ok and
                     b"[cli:error]" not in raw["native.stderr.bin"],
                     id_ + ": native value/output unsupported or changed")
             observations[case + "_native"] = raw["native.stdout.bin"]
@@ -247,7 +254,7 @@ def verify(base, permanent=False):
     return observations
 
 
-def self_test(base, permanent):
+def self_test(base, permanent, native_c1=False):
     # Every mutation starts from a pristine copy which has passed the FULL
     # validator; an unrelated initial error cannot yield a false positive.
     cases = [
@@ -264,6 +271,9 @@ def self_test(base, permanent):
          "d_self_reference: CPC printer programmed/direct DIFF "
          "expected=20 32 20 0D 0A observed=20 32 20 0A"),
     ]
+    if native_c1:
+        cases.append(("native_format",
+                      "c_integer_add_screen: native value/output unsupported or changed"))
     with tempfile.TemporaryDirectory() as td:
         for name, reason in cases:
             dest = Path(td) / name
@@ -275,7 +285,7 @@ def self_test(base, permanent):
                 original = (dest / "acquisition.json").read_bytes()
                 (dest / "manifest.json").write_bytes(original)
                 (dest / "acquisition.json").unlink()
-            verify(dest, permanent=False)
+            verify(dest, permanent=False, native_c1=native_c1)
             manifest = load(dest / "manifest.json")
             entries = {c["id"]: c for c in manifest["captures"]}
             screen = entries["c_integer_add_screen"]
@@ -293,6 +303,13 @@ def self_test(base, permanent):
                 (dest / "d_self_reference_screen/screen.png").unlink()
             elif name == "channel_conflation":
                 manifest["printer_screen_equivalent"] = True
+            elif name == "native_format":
+                # Recompute metadata; only the native-layout gate may reject.
+                changed = b"5\n"
+                p = dest / "c_integer_add_screen/native.stdout.bin"
+                p.write_bytes(changed)
+                screen["files"]["native.stdout.bin"] = {
+                    "sha256": digest(changed), "size_bytes": len(changed)}
             elif name == "source_forgery":
                 p = dest / "c_integer_add_screen/source.bas"
                 changed = p.read_bytes().replace(b"30 PRINT B%", b"30 PRINT A%")
@@ -318,7 +335,7 @@ def self_test(base, permanent):
                     "sha256": digest(changed), "size_bytes": len(changed)}
             (dest / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
             try:
-                verify(dest, permanent=False)
+                verify(dest, permanent=False, native_c1=native_c1)
             except Invalid as e:
                 require(str(e) == reason,
                         name + ": WRONG REJECTION CAUSE " + str(e) + " != " + reason)
@@ -366,11 +383,13 @@ def main():
     p.add_argument("--evidence", type=Path, required=True)
     p.add_argument("--permanent", action="store_true")
     p.add_argument("--self-test", action="store_true")
+    p.add_argument("--native-c1", action="store_true",
+                   help="Require J0.27-C1 formatting for freshly acquired C99 stdout only")
     args = p.parse_args()
-    verify(args.evidence.resolve(), args.permanent)
+    verify(args.evidence.resolve(), args.permanent, args.native_c1)
     print("PASS POSITIVE INTACT EVIDENCE")
     if args.self_test:
-        self_test(args.evidence.resolve(), args.permanent)
+        self_test(args.evidence.resolve(), args.permanent, args.native_c1)
         if args.permanent:
             archival_self_test(args.evidence.resolve())
 

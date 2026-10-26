@@ -176,13 +176,13 @@ check_case("integer-assignment-step"
 # J0.20: real CLI process, BASIC stdout and host diagnostics separated.
 check_case("integer-variable-print"
     "10 A%=2\n20 PRINT A%\n30 END\nRUN\n:step\n:step\n:step\n:step\n:quit\n"
-    "2\n"
+    " 2 \n"
     "${banner}${ok}${ok}${ok}${running}${step1}${step1}${step1}${ended}${byebye}"
 )
 
 check_case("integer-variable-alias"
     "10 A%=9\n20 ?A%\n30 END\nRUN\n:step 3\n:step\n:quit\n"
-    "9\n"
+    " 9 \n"
     "${banner}${ok}${ok}${ok}${running}[cli] STEPPED 3\n${ended}${byebye}"
 )
 
@@ -195,8 +195,17 @@ check_case("integer-variable-missing"
 # J0.22: the formerly unsupported program runs and terminates.
 check_case("integer-expression-runtime"
     "10 A%=2\n20 B%=A%+3\n30 PRINT B%\n40 END\nLIST\nRUN\n:step 4\n:step\n:quit\n"
-    "10 A%=2\n20 B%=A%+3\n30 PRINT B%\n40 END\n5\n"
+    "10 A%=2\n20 B%=A%+3\n30 PRINT B%\n40 END\n 5 \n"
     "${banner}${ok}${ok}${ok}${ok}${listed}${running}[cli] STEPPED 4\n${ended}${byebye}"
 )
 
-message(STATUS "host_cli: twenty-three black-box scenarios passed")
+# J0.27-C1: actual executable INTEGER assignments; stdout retains LF.
+foreach(value IN ITEMS 0 5 2)
+    check_case("integer-b-${value}"
+        "10 B%=${value}\n20 PRINT B%\n30 END\nRUN\n:step 3\n:step\n:quit\n"
+        " ${value} \n"
+        "${banner}${ok}${ok}${ok}${running}[cli] STEPPED 3\n${ended}${byebye}"
+    )
+endforeach()
+
+message(STATUS "host_cli: twenty-six black-box scenarios passed")

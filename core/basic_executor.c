@@ -68,7 +68,9 @@ static BEStatus emit_decimal(BEEmitter *out, uint8_t value)
     return BE_OK;
 }
 
-/* Prototype INTEGER rendering: widen before negation (including -32768). */
+/* CPC INTEGER variable PRINT: sign/alignment and trailing blank.
+ * Transport newline belongs to execute_line(), never to this formatter.
+ * Widen before negation so INT16_MIN is representable. */
 static BEStatus emit_integer(BEEmitter *out, int16_t value)
 {
     uint8_t digits[5];
@@ -76,7 +78,12 @@ static BEStatus emit_integer(BEEmitter *out, int16_t value)
     int32_t magnitude = (int32_t)value;
     unsigned int n;
     BEStatus status;
-    if (magnitude < 0) {
+    if (magnitude >= 0) {
+        status = emit(out, (uint8_t)' ');
+        if (status != BE_OK) {
+            return status;
+        }
+    } else {
         status = emit(out, (uint8_t)'-');
         if (status != BE_OK) {
             return status;
@@ -94,7 +101,7 @@ static BEStatus emit_integer(BEEmitter *out, int16_t value)
             return status;
         }
     }
-    return BE_OK;
+    return emit(out, (uint8_t)' ');
 }
 
 static void skip_spaces(const uint8_t *body, size_t length, size_t *pos)

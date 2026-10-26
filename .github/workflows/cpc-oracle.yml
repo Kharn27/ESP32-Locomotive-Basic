@@ -117,6 +117,27 @@ jobs:
             --evidence "${RUNNER_TEMP}/cpc-run-behavior" --self-test
           python3 tools/cpc_token_evidence.py --permanent --self-test
 
+      - name: Require C6 fresh behavioral acceptance (CPC/C99 C=5 D=2 MATCH_SEMANTIC)
+        # Intentionally separate from structural validation: DIFF and other
+        # outcomes must remain archived for diagnosis, but fail the job.
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/cpc_run_evidence.py \
+            --evidence "${RUNNER_TEMP}/cpc-run-behavior" \
+            --require-accepted-behavior
+
+      - name: Reproduce C6 locally without GitHub Actions identity
+        run: |
+          set -euo pipefail
+          env -u GITHUB_RUN_ID -u GITHUB_SHA \
+            python3 tests/oracles/run_behavior_oracle.py \
+              --caprice tests/oracles/caprice32 \
+              --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+              --output "${RUNNER_TEMP}/cpc-run-behavior-local"
+          python3 tests/oracles/cpc_run_evidence.py \
+            --evidence "${RUNNER_TEMP}/cpc-run-behavior-local" \
+            --self-test --require-accepted-behavior
+
       - name: Upload C6 RUN numeric proof (printer != screen)
         if: always()
         uses: actions/upload-artifact@v4

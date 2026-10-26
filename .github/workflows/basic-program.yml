@@ -19,6 +19,10 @@ jobs:
         run: cmake --build build --parallel
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      # CTest hides stdout of passing tests. Publish the intact-copy proof
+      # and all 10+4 cause-specific rejection diagnostics on both CI variants.
+      - name: J0.26-C2 audit self-test (visible positive and negative controls)
+        run: python3 tools/j0_exit_audit.py --self-test
       - name: J0.23 memory audit (Linux host only)
         run: |
           cc --version | head -n 1

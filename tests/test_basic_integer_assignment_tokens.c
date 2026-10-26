@@ -292,9 +292,51 @@ static int test_run_no_partial_print(void)
     return 0;
 }
 
+
+/* J1.1: CPC unary token and literal must remain a single bounded construct. */
+static int test_signed_literal_capacity(void)
+{
+    static const char source[] = "B%=-12";
+    static const uint8_t expected[] = {2u,0u,0u,0xc2u,0xefu,0xf5u,0x19u,12u};
+    static const uint8_t truncated[] = {2u,0u,0u,0xc2u,0xefu,0xf5u};
+    static const uint8_t bad_operand[] = {2u,0u,0u,0xc2u,0xefu,0xf5u,0x02u};
+    uint8_t encoded[8], output[24];
+    size_t written = 77u;
+    memset(encoded, 0xa9, sizeof(encoded));
+    CHECK(bt_tokenize((const uint8_t *)source, strlen(source), encoded,
+                      sizeof(encoded) - 1u, &written) == BT_NO_SPACE);
+    CHECK(written == 77u);
+    for (size_t i = 0u; i < sizeof(encoded); ++i) {
+        CHECK(encoded[i] == 0xa9u);
+    }
+    CHECK(bt_tokenize((const uint8_t *)source, strlen(source), encoded,
+                      sizeof(encoded), &written) == BT_OK);
+    CHECK(written == sizeof(expected) &&
+          memcmp(encoded, expected, sizeof(expected)) == 0);
+    memset(output, 0xb7, sizeof(output));
+    written = 77u;
+    CHECK(bl_detokenize(encoded, sizeof(encoded), output, strlen(source) - 1u,
+                        &written) == BL_NO_SPACE);
+    CHECK(written == 77u);
+    for (size_t i = 0u; i < sizeof(output); ++i) {
+        CHECK(output[i] == 0xb7u);
+    }
+    CHECK(bl_detokenize(encoded, sizeof(encoded), output, strlen(source),
+                        &written) == BL_OK);
+    CHECK(written == strlen(source) &&
+          memcmp(output, source, written) == 0);
+    written = 77u;
+    CHECK(bl_detokenize(truncated, sizeof(truncated), output, sizeof(output),
+                        &written) == BL_TRUNCATED);
+    CHECK(bl_detokenize(bad_operand, sizeof(bad_operand), output, sizeof(output),
+                        &written) == BL_BAD_SEQUENCE);
+    return 0;
+}
+
 int main(void)
 {
     CHECK(test_vectors() == 0);
+    CHECK(test_signed_literal_capacity() == 0);
     CHECK(test_naming() == 0);
     CHECK(test_rejections() == 0);
     CHECK(test_imported_and_bad_listing() == 0);

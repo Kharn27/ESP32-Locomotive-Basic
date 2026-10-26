@@ -251,3 +251,11 @@ if(BUILD_TESTING)
         --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/list_screen"
         --permanent --self-test)
 endif()
+
+# J0.26: exit evidence audit is NOT an automatic phase transition.
+# Check real archived bytes, approved validators and deliberate negative mutations.
+if(BUILD_TESTING)
+    add_test(NAME j0_exit_evidence_audit COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j0_exit_audit.py"
+        --self-test)
+endif()

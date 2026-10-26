@@ -93,7 +93,8 @@ fusionnée et le jalon J0 reste ouvert.**
 
 ```text
 core/                 # Bibliothèques du cœur BASIC, indépendantes du matériel
-host/                 # Console Linux native (outil de développement J0.9)\nfirmware/esp32_probe/ # Sonde ESP-IDF Xtensa autonome (PR #44 non fusionnée)
+host/                 # Console Linux native (outil de développement J0.9)
+firmware/esp32_probe/ # Sonde ESP-IDF Xtensa autonome (PR #44 non fusionnée)
 tests/                # Tests unitaires et d'intégration CTest
 docs/                 # Spécifications, validations, décisions et suivi
 CMakeLists.txt        # Construction C99 et CTest sur Linux

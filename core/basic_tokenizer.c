@@ -370,7 +370,6 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                     !ascii_digit(source[index + 1u])) {
                     return BT_UNSUPPORTED_CONSTRUCT;
                 }
-                negative = 1;
                 ++index;
                 status = emit(out, 0xf5u);
             }

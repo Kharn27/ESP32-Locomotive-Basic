@@ -76,9 +76,9 @@ jobs:
       - name: J0.28 post-C1 vertical slice, sealed history and negative falsifications
         run: |
           set -euo pipefail
-          python3 tools/j0_post_c1_audit.py \\
-            --cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \\
-            --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" \\
+          python3 tools/j0_post_c1_audit.py \
+            --cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+            --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" \
             --self-test
 
       - name: Check historical differential manifest (only actually promoted token observations)

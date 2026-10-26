@@ -271,3 +271,13 @@ if(BUILD_TESTING)
             --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/numeric_print"
             --permanent --self-test)
 endif()
+
+# J0.27-B2: approved historical six-case printer bytes sealed in Git.
+# Portable on Linux with/without sanitizers; no ROM/emulator required.
+if(BUILD_TESTING)
+    add_test(NAME cpc_signed_print_permanent_evidence COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/oracles/signed_print_evidence.py"
+        --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/signed_print"
+        --permanent --self-test)
+endif()

@@ -96,3 +96,8 @@ espaces/CRLF. Acquisition originale Actions #40341786914, artefact
 #12659112768 ; permanence vérifiée par manifeste et approbation SHA
 indépendante. CI finales au HEAD C1 : [Linux OFF/ON](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40352258686), [Xtensa](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40352258814), [oracle CPC](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40352258713), toutes SUCCESS.
 **J0.27-B1 autorisé** : acquisitions ROM-backed indépendantes des formats numériques pour zéro, nombres négatifs et bornes INTEGER, sans modification du moteur. Toute correction C99 reste soumise à cette preuve et à la revue Pilotage. Le cœur, les archives C3–C8 et les critères de sortie J0 restent inchangés ; **J0.24/J0 OUVERTS, J1 NON AUTORISÉ**.
+
+
+### J0.27-B1 — six nouvelles observations CPC INTEGER, sans correction native
+
+PR [#50](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/50) en revue, non fusionnée : acquisition de 12 processus Caprice32 BASIC 1.1 pour 0, 5, -1, -12, 32767, -32768, séparant écran PNG/flux imprimante brut. [Run #40360049336](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40360049336) et artefact #12668440819. Observations : positifs et zéro avec un blanc avant/après, négatifs avec moins sans blanc initial, blanc final, CRLF imprimante sur les six valeurs. Les six programmes CPC s'exécutent, y compris -32768 ; observation écran VISUAL_OBSERVATION. C99 OBSERVED 0/5, autres UNSUPPORTED. Pas d'extrapolation ni de promotion de règle générale avant revue contradictoire. Aucune modification core/, firmware/ ou archives acceptées. **J0.24/J0 ouverts ; J1 interdit ; J0.27-B correction native non engagée.**

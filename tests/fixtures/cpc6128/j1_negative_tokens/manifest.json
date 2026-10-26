@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "phase": "J1.1-CPC6128-ROM-BASIC-1.1",
+  "acquisition_run_id": 40405671305,
+  "acquisition_workflow": "CPC 6128 independent oracle",
+  "acquisition_commit": "55c559c365cad6ff9a7d0fbc6a06aba2bf6540dc",
+  "artifact_id": 12690008430,
+  "artifact_digest": "sha256:4682bc14f04f6541af54d23246ccda4fd0594fb93d4a659df903e673b93ee35b",
+  "original_acquisition_manifest_sha256": "ce6ad0959d3c9a5dc6ea518dc77a75f1045e2c278b4776859e1f59d88b931961",
+  "machine": "CPC6128",
+  "basic": "1.1",
+  "ram_kb": 128,
+  "caprice32_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+  "rom_cpc6128_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+  "acquisition_method": "separate fresh CPC sessions; LIST, snapshot pre-RUN; ROM-backed records only",
+  "no_rom_or_snapshot_export": true,
+  "cases": {
+    "minus_one": {
+      "source": "tests/oracles/inputs/j027_b1/minus_one.bas",
+      "source_sha256": "ae7f11f667659dc5b06ccd5fe3dfa418306bdbec70fdb3131e29a50a0809e3b9",
+      "program_path": "minus_one/program.bin",
+      "program_sha256": "2cb0acf88f9eab748a1c10247379993e6979a894e1784f201939e80710a3904c",
+      "size_bytes": 31,
+      "assignment_operand_hex": "F5 0F",
+      "native_at_acquisition": "UNSUPPORTED"
+    },
+    "minus_twelve": {
+      "source": "tests/oracles/inputs/j027_b1/minus_twelve.bas",
+      "source_sha256": "c96aa8c415fa3972378009fb2a6c5fad1245ef112dd2bb4eea2b333f37932cfd",
+      "program_path": "minus_twelve/program.bin",
+      "program_sha256": "6c72b0bf1fe2a77514a456985a9a3c275581966b31e823e8ef6f3cd9bfc468a5",
+      "size_bytes": 32,
+      "assignment_operand_hex": "F5 19 0C",
+      "native_at_acquisition": "UNSUPPORTED"
+    }
+  },
+  "historical_archives_modified": false,
+  "historical_list_run_promoted": false
+}

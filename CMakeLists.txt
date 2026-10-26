@@ -232,3 +232,12 @@ if(BUILD_TESTING)
         --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/run_behavior"
         --permanent --self-test)
 endif()
+
+# J0.24-C7: twenty-fifth portable CTest suite, immutable CPC LIST printer
+# evidence and coordinated-tamper negative probes. No emulator needed locally.
+if(BUILD_TESTING)
+    add_test(NAME cpc_list_printer_permanent_evidence COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/oracles/cpc_list_evidence.py"
+        --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/list_printer"
+        --permanent --self-test)
+endif()

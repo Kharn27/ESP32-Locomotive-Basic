@@ -1,0 +1,14 @@
+{
+  "source_path": "tests/fixtures/cpc6128/sources/f_mixed_case.bas",
+  "source_sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6",
+  "commands": [
+    "10 let LongVar%=9",
+    "20 print LongVar%",
+    "30 end",
+    "LIST 10-30,#8",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ],
+  "new_cpc_process": true,
+  "direct_list_to_printer": true,
+  "run_executed": false
+}

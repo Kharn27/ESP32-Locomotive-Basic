@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "phase": "J0.24-C7",
+  "generated_at": "2026-10-26T07:11:37.188699+00:00",
+  "github_run_id": "40284150801",
+  "github_sha": "b974a66aad981ec4ef386232ba23c17df006fccf",
+  "oracle": {
+    "name": "Caprice32",
+    "commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "version_output": "Caprice32 v4.6.0-8c778bf072a06fb7c23b9cccd179041db7f79a52\nAPP_PATH: /home/runner/work/ESP32-Locomotive-Basic/ESP32-Locomotive-Basic/tests/oracles/caprice32\nCompiled with:\nNumber of video plugins available: 11",
+    "model": "CPC6128",
+    "ram_kb": 128,
+    "basic": "1.1",
+    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "amsdos_sha256": "ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d",
+    "rom_archived": false,
+    "snapshot_archived": false
+  },
+  "screen_bytes_captured": false,
+  "printer_screen_byte_equivalence": false,
+  "captures": [
+    {
+      "case": "c_integer_add",
+      "source_path": "tests/fixtures/cpc6128/sources/c_integer_add.bas",
+      "source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+      "commands": [
+        "10 A%=2",
+        "20 B%=A%+3",
+        "30 PRINT B%",
+        "40 END",
+        "LIST 10-40,#8",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screen_name": "screenshot_20261026_071137.png",
+      "operation": "LIST_PRINTER_PROBE",
+      "list_command_cpc": "LIST 10-40,#8",
+      "list_command_native": "LIST",
+      "selection_scope": "all stored historical lines, identical numbered range",
+      "comparison": "exact-bytes",
+      "classification": "DIFF",
+      "first_difference": {
+        "offset": 7,
+        "cpc_size": 42,
+        "native_size": 38,
+        "cpc_context_hex": "31302041253d320d0a32302042253d41252b330d0a3330",
+        "native_context_hex": "31302041253d320a32302042253d41252b330a33302050"
+      },
+      "cpc_returncode": 0,
+      "native_returncode": 0,
+      "cpc_channel": "printer.dat: CPC direct LIST <range>,#8 (no RUN)",
+      "native_channel": "native.stdout.bin: C99 CLI LIST (no RUN)",
+      "screen_channel": "screen.png: visual only, NOT byte-exact text",
+      "files": {
+        "source.bas": {
+          "sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+          "size_bytes": 38
+        },
+        "autocmd.json": {
+          "sha256": "81a3859a0682e8cca0ec24dc59ace86ed7301ae4cf2d1d5719266b12096eccbf",
+          "size_bytes": 409
+        },
+        "cap32.cfg": {
+          "sha256": "e65f7736464af762e4c32a0949df478c97a1a242bb7848cbbecbb7c04d6565c0",
+          "size_bytes": 1190
+        },
+        "caprice.log": {
+          "sha256": "5de0a8db396a472e3b7c08863c6fd7744ec2b1ee44e155d90fb4e19d05a3a651",
+          "size_bytes": 416
+        },
+        "printer.dat": {
+          "sha256": "c3db3e6b2880996f91a7d0ead4b0dadcda679d6ad0aae0d57292ae5060f21f27",
+          "size_bytes": 42
+        },
+        "native.stdin.bin": {
+          "sha256": "947a651a62d82afc5d4ebd0d2eaba6ba1b6826f78de150a0da84347d6fb4c512",
+          "size_bytes": 49
+        },
+        "native.stdout.bin": {
+          "sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+          "size_bytes": 38
+        },
+        "native.stderr.bin": {
+          "sha256": "f33394cec2f2a70ac2fbbbe27c3e9463f13df89e05ff933606dfa5b77bc9700e",
+          "size_bytes": 85
+        },
+        "screen.png": {
+          "sha256": "328942415628cacd300906e9a11b84b4a699dcbf0c8bb8436b8c78456fc57e78",
+          "size_bytes": 5348
+        }
+      }
+    },
+    {
+      "case": "f_mixed_case",
+      "source_path": "tests/fixtures/cpc6128/sources/f_mixed_case.bas",
+      "source_sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6",
+      "commands": [
+        "10 let LongVar%=9",
+        "20 print LongVar%",
+        "30 end",
+        "LIST 10-30,#8",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screen_name": "screenshot_20261026_071138.png",
+      "operation": "LIST_PRINTER_PROBE",
+      "list_command_cpc": "LIST 10-30,#8",
+      "list_command_native": "LIST",
+      "selection_scope": "all stored historical lines, identical numbered range",
+      "comparison": "exact-bytes",
+      "classification": "DIFF",
+      "first_difference": {
+        "offset": 17,
+        "cpc_size": 46,
+        "native_size": 43,
+        "cpc_context_hex": "54204c6f6e67566172253d390d0a3230205052494e54204c6f6e6756",
+        "native_context_hex": "54204c6f6e67566172253d390a3230205052494e54204c6f6e675661"
+      },
+      "cpc_returncode": 0,
+      "native_returncode": 0,
+      "cpc_channel": "printer.dat: CPC direct LIST <range>,#8 (no RUN)",
+      "native_channel": "native.stdout.bin: C99 CLI LIST (no RUN)",
+      "screen_channel": "screen.png: visual only, NOT byte-exact text",
+      "files": {
+        "source.bas": {
+          "sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6",
+          "size_bytes": 43
+        },
+        "autocmd.json": {
+          "sha256": "53ba8eeb71f6c4bd615ad511ce0ea1d88da5df96df4f2639c71e82d48f77b462",
+          "size_bytes": 406
+        },
+        "cap32.cfg": {
+          "sha256": "ec70b5bbcec4f58f0dbdba294daee110a686882ac743b43a33f126bf0c461095",
+          "size_bytes": 1188
+        },
+        "caprice.log": {
+          "sha256": "e25d3073b837bd016a5d849b6b45ed703b06910bbf020760342c5f82cadea8e7",
+          "size_bytes": 414
+        },
+        "printer.dat": {
+          "sha256": "b4cbaf999398b71c6bcddb7b82343db35691c044a292c2f13f01a23be73305ad",
+          "size_bytes": 46
+        },
+        "native.stdin.bin": {
+          "sha256": "74c82824f613f35efad40ccc829c37b1160f1866eba52938e95833662d2198c3",
+          "size_bytes": 54
+        },
+        "native.stdout.bin": {
+          "sha256": "653f1f2490a1b25475309e40c9829776ea49e6270629fc95542ea16d45cb6b3c",
+          "size_bytes": 43
+        },
+        "native.stderr.bin": {
+          "sha256": "36d2530230e4791f072a59541efcb4044a666fa5dd2fbe963cbaab0f0a865875",
+          "size_bytes": 76
+        },
+        "screen.png": {
+          "sha256": "021d04467c99797bd552016d9d5aad80cc46631210df2141a6fa7c773a663500",
+          "size_bytes": 5306
+        }
+      }
+    }
+  ],
+  "original_artifact": {
+    "run_id": 40284150801,
+    "artifact_id": 12633570767,
+    "run_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40284150801",
+    "acquisition_sha256": "932f9cdc72ddb529d2f3bfb4f28457f8217c18d561ad95947d38c5c73d27750e"
+  }
+}

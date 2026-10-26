@@ -12,6 +12,7 @@ on:
       - "docs/J0.24-C4-extended-token-oracle.md"
       - "docs/J0.24-C5-eight-case-oracle.md"
       - "docs/J0.24-C6-run-behavior-oracle.md"
+      - "docs/J0.24-C7-list-oracle.md"
       - "tools/promote_token_ram_c5.py"
       - "tools/promote_token_ram_c4.py"
       - "docs/J0.24-C1-caprice32-oracle-automation.md"
@@ -75,6 +76,12 @@ jobs:
 
       - name: Verify permanent C6 independent RUN/probe evidence and source provenance
         run: python3 tests/oracles/cpc_run_evidence.py --evidence tests/fixtures/cpc6128/run_behavior --permanent --self-test
+
+      - name: Verify C7 permanent authentic CPC LIST printer captures and forgery guards
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/cpc_list_evidence.py \
+            --evidence tests/fixtures/cpc6128/list_printer --permanent --self-test
 
       - name: Check eight-case quantitative threshold (not J0.24 acceptance)
         run: |
@@ -146,6 +153,40 @@ jobs:
           path: ${{ runner.temp }}/cpc-run-behavior/
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Acquire two C7 CPC LIST printer probes (fresh CPC per case, no RUN)
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/list_printer_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+            --output "${RUNNER_TEMP}/cpc-list-printer"
+          python3 tests/oracles/cpc_list_evidence.py \
+            --evidence "${RUNNER_TEMP}/cpc-list-printer" --self-test
+
+      - name: Log exact original C7 acquisition bytes for verified permanent promotion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, os
+          root = Path(os.environ["RUNNER_TEMP"]) / "cpc-list-printer"
+          for p in sorted(root.rglob("*")):
+              if p.is_file():
+                  print("C7_B64_BEGIN " + p.relative_to(root).as_posix(), flush=True)
+                  b64 = base64.b64encode(p.read_bytes()).decode("ascii")
+                  for offset in range(0, len(b64), 120):
+                      print(b64[offset:offset + 120])
+                  print("C7_B64_END", flush=True)
+          PY
+
+      - name: Upload C7 genuine CPC LIST printer and independent native stdout
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpc6128-c7-list-printer
+          path: ${{ runner.temp }}/cpc-list-printer/
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Verify CPC token parser and archival helper syntax
         run: |

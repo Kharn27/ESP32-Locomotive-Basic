@@ -1,0 +1,3 @@
+10 let LongVar%=9
+20 print LongVar%
+30 end

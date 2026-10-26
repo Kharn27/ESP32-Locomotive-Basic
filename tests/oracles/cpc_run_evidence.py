@@ -293,6 +293,97 @@ def self_test(base, permanent):
     should_reject(base, broken_source, "source SHA altered", permanent)
     print("PASS: strict integer grammar and 13 negative integrity/chronology/channel tests")
 
+    # Reproduction from a developer machine has no GitHub Actions variables.
+    # Use authentic historical bytes, but drop the permanent provenance wrapper
+    # to model the output produced by run_behavior_oracle.py on that machine.
+    def local_copy(destination):
+        shutil.copytree(base, destination)
+        j = read_json(destination / "manifest.json")
+        j.pop("original_artifact", None)
+        (destination / "acquisition.json").unlink(missing_ok=True)
+        j["github_run_id"] = None
+        j["github_sha"] = None
+        (destination / "manifest.json").write_text(json.dumps(j, indent=2) + "\n")
+        return j
+
+    with tempfile.TemporaryDirectory(prefix="c6-local-proof-") as tmp:
+        local = Path(tmp) / "evidence"
+        local_copy(local)
+        observed = verify(local, permanent=False)
+        require_accepted_behavior(observed)
+        cmd = [sys.executable, str(Path(__file__).resolve()), "--evidence",
+               str(local), "--require-accepted-behavior"]
+        positive = subprocess.run(cmd, capture_output=True, timeout=20, check=False)
+        require(positive.returncode == 0, "valid no-Actions local acquisition rejected")
+        print("PASS: valid local acquisition without GITHUB_RUN_ID/GITHUB_SHA")
+
+    # Every mutation below retains internal integrity (all relevant file
+    # hashes and the semantic classification are recomputed). A regression
+    # must remain structurally archivable yet fail the *actual CLI* CI gate.
+    regressions = {
+        "DIFF": (b" 6 \r\n", b"5\n", b"", "DIFF"),
+        "UNVERIFIED": (b"?\r\n", b"5\n", b"", "UNVERIFIED"),
+        "UNSUPPORTED": (b" 5 \r\n", b"5\n", b"[cli:error] deliberate test\n", "UNSUPPORTED"),
+        "WRONG_MATCH": (b" 6 \r\n", b"6\n", b"", "MATCH_SEMANTIC"),
+    }
+    for label, (printer, stdout, stderr, result_status) in regressions.items():
+        with tempfile.TemporaryDirectory(prefix="c6-gate-negative-") as tmp:
+            local = Path(tmp) / "evidence"
+            j = local_copy(local)
+            c = next(item for item in j["captures"] if item["case"] == first)
+            for name, data in (("printer.dat", printer), ("native.stdout.bin", stdout),
+                               ("native.stderr.bin", stderr)):
+                target = local / first / name
+                target.write_bytes(data)
+                c["files"][name] = {"size_bytes": len(data), "sha256": digest(data)}
+            c["classification"], c["cpc_integer"], c["native_integer"] = classification(
+                printer, stdout, c["native_returncode"], stderr)
+            require(c["classification"] == result_status,
+                    "negative test classified incorrectly: " + label)
+            (local / "manifest.json").write_text(json.dumps(j, indent=2) + "\n")
+            observed = verify(local, permanent=False)  # real, structurally valid diagnostic
+            require(observed[first]["status"] == result_status,
+                    "regression fixture not structurally accepted: " + label)
+            test = subprocess.run([sys.executable, str(Path(__file__).resolve()),
+                                   "--evidence", str(local), "--require-accepted-behavior"],
+                                  capture_output=True, timeout=20, check=False)
+            require(test.returncode != 0 and
+                    b"C6 behavior gate:" in test.stderr,
+                    "CI gate did not reject " + label)
+            print("PASS: CI behavioral gate rejects", label, "with nonzero exit")
+
+    if permanent:
+        with tempfile.TemporaryDirectory(prefix="c6-coordinated-forgery-") as tmp:
+            forged = Path(tmp) / "evidence"
+            shutil.copytree(base, forged)
+            j = read_json(forged / "manifest.json")
+            c = next(item for item in j["captures"] if item["case"] == first)
+            forged_printer = b"+5\n"  # same numeric value, different CPC raw bytes
+            (forged / first / "printer.dat").write_bytes(forged_printer)
+            c["files"]["printer.dat"] = {
+                "sha256": digest(forged_printer), "size_bytes": len(forged_printer)}
+            original = copy.deepcopy(j)
+            original.pop("original_artifact")
+            acquisition = (json.dumps(original, indent=2, ensure_ascii=False) + "\n").encode()
+            (forged / "acquisition.json").write_bytes(acquisition)
+            j["original_artifact"]["acquisition_sha256"] = digest(acquisition)
+            (forged / "manifest.json").write_text(
+                json.dumps(j, indent=2, ensure_ascii=False) + "\n")
+            require(digest(acquisition) != APPROVED_ACQUISITION_SHA256 and
+                    read_json(forged / "acquisition.json") == original and
+                    j["original_artifact"]["acquisition_sha256"] == digest(acquisition),
+                    "coordinated forgery test was not fully rehashed")
+            try:
+                verify(forged, permanent=True)
+            except Invalid as exc:
+                require("approved acquisition SHA-256 anchor mismatch" in str(exc),
+                        "forgery rejected for unrelated reason: " + str(exc))
+            else:
+                raise Invalid("coordinated historical forgery accepted!")
+            print("PASS: coordinated raw printer+both manifests+all SHA-256 "
+                  "rejected by immutable approved acquisition anchor")
+
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

@@ -55,6 +55,12 @@ Le passage à J1 marque la **maturité du socle**, pas la fin du projet ni une p
 
 **Avis corrigé : `ADDITIONAL_WORK_REQUIRED`.** Suite technique proposée, **non lancée** : **J0.27 — Fidélité du formatage numérique PRINT** : décrire les règles d'espaces, signes et fins de lignes BASIC CPC ; acquérir des observations comparables par canal écran/imprimante avec provenance ; confronter les sorties numériques de RUN versus impression directe ; faire corriger par une PR dédiée le code C natif minimal après vérification, avec tests Linux/sanitizers et différentiel CPC. Pas de clôture avant revue explicite des correctifs et des critères de sortie par Pilotage.
 
+### J0.26-C2 — fiabilisation de la falsification (26 octobre 2026)
+
+La PR #47 conserve sa conclusion `ADDITIONAL_WORK_REQUIRED` et la matrice **1 PARTIAL ; 2 SATISFIED ; 3 SATISFIED ; 4 PARTIAL ; 5 SATISFIED**. Suite à une revue Pilotage, la procédure de falsification J0.26 a été corrigée : sur la copie temporaire, les chemins sources tokenisés sont désormais résolus **par rapport à la copie elle-même**, avec empreintes vérifiées ; une **copie intacte doit réussir** avant tout test négatif. Chacune des **dix mutations** ne passe qu'en présence d'un `AuditError` de **motif exact**, et les **quatre tests directs C6** restent obligatoires. La CI Linux/ASan-UBSan publie une trace positive et 14 rejets attendus avec leurs causes, en plus des 27 suites CTest. [Rapport de preuve C2](J0.26-j0-exit-audit.md) ; premier [run positif #40337154525](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40337154525), à revalider sur le HEAD final de la PR.
+
+Cette réparation ne supprime **pas** la divergence de formatage numérique CPC/C99, ne change **aucun oracle ni aucune classe historique**, et **ne lance pas J0.27**. **J0.24 et J0 demeurent ouverts ; J1 n'est pas autorisé ; la PR #47 est non fusionnée.**
+
 ## J1 — Développement de la compatibilité Locomotive BASIC 1.1
 
 Élargissement systématique des instructions et fonctions : DEFINT/DEFREAL/DEFSTR selon sémantique historique, chaînes, contrôle de flux (IF, FOR/NEXT, GOSUB/RETURN), expressions complètes, données et erreurs CPC, nombres REAL5 et opérations Maths Pack, puis autres familles du langage. Pour chaque famille, matrice ROM → implémentation → tests CPC indépendants. Les fonctions graphiques dépendantes du matériel disposent d'une interface abstraite et pourront être implémentées conjointement avec J2.

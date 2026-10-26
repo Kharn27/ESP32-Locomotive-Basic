@@ -26,17 +26,17 @@ jobs:
               cd firmware/esp32_probe
               idf.py --version | tee reports/idf-version.txt
               idf.py --version | grep -Fx "ESP-IDF v5.5.6"
-              xtensa-esp32-elf-gcc --version | head -n 1 | tee reports/compiler-version.txt
-              xtensa-esp32-elf-gcc -dumpmachine | tee reports/compiler-target.txt
-              grep -Fx "xtensa-esp32-elf" reports/compiler-target.txt
+              xtensa-esp-elf-gcc --version | head -n 1 | tee reports/compiler-version.txt
+              xtensa-esp-elf-gcc -dumpmachine | tee reports/compiler-target.txt
+              grep -Fx "xtensa-esp-elf" reports/compiler-target.txt
               idf.py set-target esp32 2>&1 | tee reports/set-target.log
               idf.py build 2>&1 | tee reports/build.log
               idf.py size 2>&1 | tee reports/size.txt
               idf.py size-components 2>&1 | tee reports/size-components.txt
               idf.py size-files 2>&1 | tee reports/size-files.txt
-              xtensa-esp32-elf-readelf -h build/loco_esp32_probe.elf | tee reports/elf-header.txt
+              xtensa-esp-elf-readelf -h build/loco_esp32_probe.elf | tee reports/elf-header.txt
               grep -q "Tensilica Xtensa" reports/elf-header.txt
-              xtensa-esp32-elf-readelf -S -W build/loco_esp32_probe.elf > reports/elf-sections.txt
+              xtensa-esp-elf-readelf -S -W build/loco_esp32_probe.elf > reports/elf-sections.txt
               ls -l build/loco_esp32_probe.bin build/loco_esp32_probe.elf | tee reports/binary-sizes.txt
               python scripts/check_build.py sdkconfig partitions.csv build/loco_esp32_probe.bin \
                 | tee reports/partition-check.txt

@@ -165,17 +165,26 @@ static int test_invalid_images(void)
     static const uint8_t bad7[] = {0xa5u,3u,0u,0u,0xc1u,0xefu,0x10u};
     static const uint8_t bad8[] = {2u,0u,0u,0xc1u,0xefu,0x1au};
     static const uint8_t bad9[] = {2u,0u,0u,0xc1u,0xefu,0x10u,0x01u,0x98u};
+    static const uint8_t bad10[] = {2u,0u,0u,0xc1u,0xefu,0xf5u};
+    static const uint8_t bad11[] = {2u,0u,0u,0xc1u,0xefu,0xf5u,0xf5u,0x0fu};
+    static const uint8_t bad12[] = {2u,0u,0u,0xc1u,0xefu,0xf5u,0x19u,9u};
+    static const uint8_t bad13[] = {2u,0u,0u,0xc1u,0xefu,0xf5u,0x02u,0,0,0xc1u};
+    static const uint8_t bad14[] = {2u,0u,0u,0xc1u,0xefu,0xf5u,0x0fu,0x01u,0x98u};
     static const uint8_t *const data[] = {
-        bad1,bad2,bad3,bad4,bad5,bad6,bad7,bad8,bad9
+        bad1,bad2,bad3,bad4,bad5,bad6,bad7,bad8,bad9,
+        bad10,bad11,bad12,bad13,bad14
     };
     static const size_t len[] = {
         sizeof(bad1),sizeof(bad2),sizeof(bad3),sizeof(bad4),sizeof(bad5),
-        sizeof(bad6),sizeof(bad7),sizeof(bad8),sizeof(bad9)
+        sizeof(bad6),sizeof(bad7),sizeof(bad8),sizeof(bad9),
+        sizeof(bad10),sizeof(bad11),sizeof(bad12),sizeof(bad13),
+        sizeof(bad14)
     };
     static const BEStatus errors[] = {
         BE_TRUNCATED,BE_TRUNCATED,BE_TRUNCATED,BE_BAD_SEQUENCE,
         BE_TRUNCATED,BE_BAD_SEQUENCE,BE_BAD_SEQUENCE,BE_BAD_SEQUENCE,
-        BE_UNSUPPORTED
+        BE_UNSUPPORTED,BE_TRUNCATED,BE_BAD_SEQUENCE,BE_BAD_SEQUENCE,
+        BE_BAD_SEQUENCE,BE_UNSUPPORTED
     };
     Harness h;
     CHECK(setup(&h, 2u) == 0);

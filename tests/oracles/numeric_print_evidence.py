@@ -197,7 +197,7 @@ def verify(base, permanent=False):
                 cfg.get("file", "sdump_dir").endswith("/" + id_),
                 id_ + ": CPC config/channel invalid")
         argv = load(work / "command_argv.json")
-        require(isinstance(argv, list) and len(argv) == 6 + 2 * len(expected_commands) and
+        require(isinstance(argv, list) and len(argv) == 5 + 2 * len(expected_commands) and
                 argv[0:2] == ["xvfb-run", "-a"] and
                 argv[3] == "-c" and
                 argv[4].endswith("/" + id_ + "/cap32.cfg") and

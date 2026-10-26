@@ -1,0 +1,85 @@
+name: ESP32 Xtensa J0.25
+
+on:
+  push:
+    branches:
+      - feat/j0-25-esp32-xtensa-feasibility
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  esp32-cross-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real ESP-IDF v5.5.6 Xtensa build and measurements
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Official versioned Espressif toolchain, not a Linux-host fake build.
+          docker run --rm -v "$PWD:/project" -w /project \
+            -e IDF_GIT_SAFE_DIR=/project \
+            espressif/idf:v5.5.6 bash -lc '
+              set -euo pipefail
+              mkdir -p firmware/esp32_probe/reports
+              cd firmware/esp32_probe
+              idf.py --version | tee reports/idf-version.txt
+              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
+              xtensa-esp-elf-gcc --version | head -n 1 | tee reports/compiler-version.txt
+              xtensa-esp-elf-gcc -dumpmachine | tee reports/compiler-target.txt
+              grep -Fx "xtensa-esp-elf" reports/compiler-target.txt
+              idf.py set-target esp32 2>&1 | tee reports/set-target.log
+              idf.py build 2>&1 | tee reports/build.log
+              idf.py size 2>&1 | tee reports/size.txt
+              idf.py size-components 2>&1 | tee reports/size-components.txt
+              idf.py size-files 2>&1 | tee reports/size-files.txt
+              xtensa-esp-elf-readelf -h build/loco_esp32_probe.elf | tee reports/elf-header.txt
+              grep -q "Tensilica Xtensa" reports/elf-header.txt
+              xtensa-esp-elf-readelf -S -W build/loco_esp32_probe.elf > reports/elf-sections.txt
+              ls -l build/loco_esp32_probe.bin build/loco_esp32_probe.elf | tee reports/binary-sizes.txt
+              python scripts/check_build.py sdkconfig partitions.csv build/loco_esp32_probe.bin \
+                | tee reports/partition-check.txt
+              python scripts/report_abi.py build/loco_esp32_probe.elf \
+                | tee reports/xtensa-abi.txt
+              cp sdkconfig reports/sdkconfig.effective
+              printf "TARGET_BUILD_VERIFIED; ON_DEVICE_UNVERIFIED\n" | tee reports/status.txt
+            '
+      - name: Retain evidence, including partial diagnostics on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: j025-esp32-xtensa-evidence
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            firmware/esp32_probe/reports/
+            firmware/esp32_probe/build/loco_esp32_probe.bin
+            firmware/esp32_probe/build/loco_esp32_probe.elf
+            firmware/esp32_probe/build/loco_esp32_probe.map
+            firmware/esp32_probe/build/partition_table/partition-table.bin
+            firmware/esp32_probe/sdkconfig
+
+  linux-regression:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizers: ["OFF", "ON"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native C99 and run all existing suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-check -DBP_SANITIZERS=${{ matrix.sanitizers }}
+          cmake --build build-check -j 2
+          ctest --test-dir build-check --output-on-failure 2>&1 | tee ctest-${{ matrix.sanitizers }}.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: j025-linux-${{ matrix.sanitizers }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: ctest-${{ matrix.sanitizers }}.txt

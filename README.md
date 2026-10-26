@@ -76,11 +76,26 @@ Au dernier HEAD C7 validé puis fusionné par [PR #43](https://github.com/Kharn2
 
 Voir le [suivi des jalons et des risques](docs/PROJECT_STATUS.md), les [barrières J0 → J1](docs/ROADMAP_GATES.md) et les spécifications dans `docs/J0.*` pour la portée exacte et les preuves de chaque mission.
 
+## Sonde ESP-IDF J0.25 (branche en revue)
+
+La [PR #44](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/44)
+propose un projet distinct `firmware/esp32_probe/` pour la **première
+compilation croisée Xtensa du cœur C99 réel** sur ESP32 classique,
+Flash 4 Mo, sans PSRAM et sans périphériques. Le scénario
+`A%=2; B%=A%+3; PRINT B%; END` utilise les API du cœur, et non une
+sortie simulée. **`TARGET_BUILD_VERIFIED`** : la [CI réelle Xtensa #40303281598](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40303281598)
+a réussi (ESP-IDF v5.5.6, ELF Xtensa et binaire de 153 360 octets,
+IRAM 51 807, DRAM 30 396). **`ON_DEVICE_UNVERIFIED`** :
+aucun journal d'exécution sur CYD physique, aucune mesure de heap/pile.
+Voir [J0.25](docs/J0.25-esp32-xtensa-feasibility.md). **La PR n'est pas
+fusionnée et le jalon J0 reste ouvert.**
+
 ## Architecture du dépôt
 
 ```text
 core/                 # Bibliothèques du cœur BASIC, indépendantes du matériel
 host/                 # Console Linux native (outil de développement J0.9)
+firmware/esp32_probe/ # Sonde ESP-IDF Xtensa autonome (PR #44 non fusionnée)
 tests/                # Tests unitaires et d'intégration CTest
 docs/                 # Spécifications, validations, décisions et suivi
 CMakeLists.txt        # Construction C99 et CTest sur Linux

@@ -318,6 +318,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             }
         } else if (statement == ST_ASSIGN) {
             unsigned int number;
+            int reference_rhs = 0;
             /* Limited solely to standalone signed numeric literals. */
             /* E03A-E0A4: explicit INTEGER variable 02, cache 00 00,
              * high-bit terminated name. E736: '=' is operator EF. */
@@ -344,6 +345,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
              * Shared BVR encoder preserves the historical CPC name format. */
             if (status == BT_OK && index < length &&
                 ascii_letter(source[index])) {
+                reference_rhs = 1;
                 status = explicit_variable(source, length, &index, out,
                                            BVR_TYPE_INTEGER);
                 if (status == BT_OK) {
@@ -366,7 +368,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
              * host-only signed literal or accept binary subtraction. */
             if (status == BT_OK && index < length &&
                 source[index] == (uint8_t)'-') {
-                if (index + 1u >= length ||
+                if (reference_rhs || index + 1u >= length ||
                     !ascii_digit(source[index + 1u])) {
                     return BT_UNSUPPORTED_CONSTRUCT;
                 }

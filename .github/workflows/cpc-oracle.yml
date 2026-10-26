@@ -26,6 +26,8 @@ on:
       - "tools/j0_post_c1_audit.py"
       - "tests/oracles/j1_signed_token_oracle.py"
       - "docs/J1.1-signed-integer-assignment.md"
+      - "tools/j1_signed_assignment_audit.py"
+      - "tests/oracles/j1_native_capabilities.json"
       - "tools/j0_exit_audit.py"
       - "docs/ROADMAP_GATES.md"
   workflow_dispatch:
@@ -126,6 +128,13 @@ jobs:
             test "$result" -ne 0
             grep -q 'VERIFIED_CASES=5 TOKEN_BINARIES=5' "$RUNNER_TEMP/gate.log"
           fi
+
+      - name: J1.1 verify archived original CPC negative INTEGER images and live native RUN
+        run: |
+          python3 tools/j1_signed_assignment_audit.py \
+            --cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+            --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" \
+            --self-test
 
       - name: Acquire CPC 6128 BASIC 1.1 evidence
         run: |

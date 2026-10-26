@@ -76,26 +76,25 @@ Au dernier HEAD C7 validé puis fusionné par [PR #43](https://github.com/Kharn2
 
 Voir le [suivi des jalons et des risques](docs/PROJECT_STATUS.md), les [barrières J0 → J1](docs/ROADMAP_GATES.md) et les spécifications dans `docs/J0.*` pour la portée exacte et les preuves de chaque mission.
 
-## Sonde ESP-IDF J0.25 (branche en revue)
+## Sonde ESP-IDF J0.25 (acceptée, test matériel à réaliser)
 
 La [PR #44](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/44)
-propose un projet distinct `firmware/esp32_probe/` pour la **première
+a été **acceptée et fusionnée** (squash `865a4cd1`). Elle introduit un projet distinct `firmware/esp32_probe/` pour la **première
 compilation croisée Xtensa du cœur C99 réel** sur ESP32 classique,
 Flash 4 Mo, sans PSRAM et sans périphériques. Le scénario
 `A%=2; B%=A%+3; PRINT B%; END` utilise les API du cœur, et non une
-sortie simulée. **`TARGET_BUILD_VERIFIED`** : la [CI réelle Xtensa #40303281598](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40303281598)
+sortie simulée. **`TARGET_BUILD_VERIFIED`** : la [CI réelle Xtensa finale #40303901028](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40303901028)
 a réussi (ESP-IDF v5.5.6, ELF Xtensa et binaire de 153 360 octets,
 IRAM 51 807, DRAM 30 396). **`ON_DEVICE_UNVERIFIED`** :
 aucun journal d'exécution sur CYD physique, aucune mesure de heap/pile.
-Voir [J0.25](docs/J0.25-esp32-xtensa-feasibility.md). **La PR n'est pas
-fusionnée et le jalon J0 reste ouvert.**
+Voir [J0.25](docs/J0.25-esp32-xtensa-feasibility.md). **Le test série réel sur CYD est maintenant la prochaine validation ; J0 reste ouvert.**
 
 ## Architecture du dépôt
 
 ```text
 core/                 # Bibliothèques du cœur BASIC, indépendantes du matériel
 host/                 # Console Linux native (outil de développement J0.9)
-firmware/esp32_probe/ # Sonde ESP-IDF Xtensa autonome (PR #44 non fusionnée)
+firmware/esp32_probe/ # Sonde ESP-IDF Xtensa native (J0.25 acceptée)
 tests/                # Tests unitaires et d'intégration CTest
 docs/                 # Spécifications, validations, décisions et suivi
 CMakeLists.txt        # Construction C99 et CTest sur Linux
@@ -131,7 +130,7 @@ ctest --test-dir build-asan --output-on-failure
 
 Ce prototype accepte les lignes numérotées, `LIST`, `NEW`, `RUN`, `PRINT` sur littéral ou constante simple, `GOTO`, `END`, `REM` et l'apostrophe (`'`). Les références de variables explicites dans `PRINT` sont tokenisées et listables ; celles de type INTEGER `%` peuvent désormais être **lues et affichées pendant `RUN`**, si la variable existe (J0.20). Les affectations `INTEGER` avec/sans `LET` sont exécutables pour les constantes 0..255 (J0.19) **ou** une référence `%` existante additionnée d'une constante 0..255 (J0.22), à raison d'une affectation autonome par ligne. Le format numérique actuel est provisoire et les variables absentes déclenchent un diagnostic interne. Les méta-commandes Linux (`:help`, `:step`, `:stop`, `:quit`) ne font **pas** partie du Locomotive BASIC historique ; `RUN` est piloté explicitement par `:step`.
 
-Après J0.24-C7 (PR #43), les **25 suites CTest** sont réussies sous Linux et ASan/UBSan. Les [images CPC tokenisées](tests/fixtures/cpc6128/token_ram/) couvrent huit cas exacts indépendants ; les [sondes comportementales C/D](tests/fixtures/cpc6128/run_behavior/) disposent d'un SHA d'acquisition historique épinglé et d'une barrière de non-régression. La capture imprimante n'est **pas** une capture byte-à-byte de l'écran CPC. Les [preuves de listing CPC imprimante](tests/fixtures/cpc6128/list_printer/) révèlent deux différences exactes de fin de ligne avec stdout Linux, sans modification du cœur C99. La prochaine étape est la compilation de faisabilité ESP-IDF/Xtensa ; les sorties écran CPC restent à homologuer.
+Après J0.24-C7 (PR #43), les **25 suites CTest** sont réussies sous Linux et ASan/UBSan. Les [images CPC tokenisées](tests/fixtures/cpc6128/token_ram/) couvrent huit cas exacts indépendants ; les [sondes comportementales C/D](tests/fixtures/cpc6128/run_behavior/) disposent d'un SHA d'acquisition historique épinglé et d'une barrière de non-régression. La capture imprimante n'est **pas** une capture byte-à-byte de l'écran CPC. Les [preuves de listing CPC imprimante](tests/fixtures/cpc6128/list_printer/) révèlent deux différences exactes de fin de ligne avec stdout Linux, sans modification du cœur C99. La compilation ESP-IDF/Xtensa est désormais démontrée par J0.25 ; le prochain contrôle est son exécution sur la CYD physique, avec mesure heap/pile. Les sorties écran CPC restent à homologuer.
 
 ## Ligne directrice du projet
 

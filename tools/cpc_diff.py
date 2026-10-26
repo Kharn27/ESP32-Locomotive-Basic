@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 CLASSIFICATIONS = {"MATCH_EXACT", "MATCH_SEMANTIC", "DIFF", "UNSUPPORTED", "UNVERIFIED", "BLOCKED"}
-OPERATIONS = {"LIST", "RUN", "TOKENS", "RUN_NUMERIC_PROBE"}
+OPERATIONS = {"LIST", "RUN", "TOKENS", "RUN_NUMERIC_PROBE", "LIST_PRINTER_PROBE"}
 PROBE_INTEGER = re.compile(rb"[ \t]*([+-]?[0-9]+)[ \t]*(?:\r\n|\r|\n)\Z")
 NUMERIC_LINE = re.compile(rb"[ \t]*([+-]?[0-9]+)[ \t]*(?:\r\n|\n|\r)?\Z")
 
@@ -89,6 +89,12 @@ def capture_bytes(root, capture, operation):
         data = raw[start:start + count]
         validate_image(data)
         return data
+    if operation == "LIST_PRINTER_PROBE":
+        if capture.get("media") != "printer-list" or \
+           capture.get("comparison") != "exact-bytes" or \
+           capture.get("oracle_channel") != "CPC printer: direct LIST <range>,#8 (no RUN)":
+            raise HarnessError("LIST printer observation must use raw CPC printer bytes")
+        return raw
     if operation == "RUN_NUMERIC_PROBE":
         if capture.get("media") != "printer-probe" or \
            capture.get("comparison") != "strict-signed-integer" or \
@@ -118,7 +124,9 @@ def local_observation(source, operation, cli, image_cli):
         if result.returncode == 0:
             validate_image(result.stdout)
         return result
-    if operation == "LIST":
+    if operation in ("LIST", "LIST_PRINTER_PROBE"):
+        # C99 only supports bare LIST. Both archived programs contain exactly
+        # the lines selected by the original CPC LIST range, so scope matches.
         return run_command(cli, source + b"LIST\n:quit\n")
     return run_command(cli, source + b"RUN\n:step 100\n:quit\n")
 
@@ -182,6 +190,13 @@ def read_manifest(root, path):
             if obs["expected_classification"] in ("BLOCKED", "UNVERIFIED"):
                 raise HarnessError(f"{cid}/{op}: observation must be independently verifiable")
             capture_bytes(root, obs, op)
+            if op == "LIST_PRINTER_PROBE":
+                if cid not in ("c_integer_add", "f_mixed_case") or \
+                   obs.get("case") != cid or \
+                   obs.get("path") != f"list_printer/{cid}/printer.dat" or \
+                   obs.get("comparison") != "exact-bytes" or \
+                   obs.get("expected_classification") == "MATCH_SEMANTIC":
+                    raise HarnessError("unsupported/misrouted LIST printer probe")
             if op == "RUN_NUMERIC_PROBE":
                 if cid not in ("c_integer_add", "d_self_reference") or \
                    obs.get("expected_classification") == "MATCH_EXACT" or \
@@ -211,6 +226,29 @@ def read_manifest(root, path):
                obs.get("evidence_artifact_id") != saved["original_artifact"]["artifact_id"] or \
                obs.get("expected_classification") != historical["classification"]:
                 raise HarnessError("RUN_NUMERIC_PROBE reference/provenance mismatch")
+
+    listings = [(case["id"], case["observations"]["LIST_PRINTER_PROBE"])
+                for case in cases if "LIST_PRINTER_PROBE" in case["observations"]]
+    if listings:
+        sys.path.insert(0, str(root.parent.parent / "oracles"))
+        import cpc_list_evidence as list_evidence
+        try:
+            checked = list_evidence.verify(root / "list_printer", permanent=True)
+        except (list_evidence.Invalid, OSError, ValueError, KeyError,
+                TypeError, json.JSONDecodeError) as exc:
+            raise HarnessError(f"C7 permanent LIST provenance failed: {exc}") from exc
+        archive = json.loads((root / "list_printer/manifest.json").read_text())
+        archived_cases = {item["case"]: item for item in archive["captures"]}
+        if {name for name, _ in listings} != set(archived_cases):
+            raise HarnessError("C7 requires BOTH archived LIST observations")
+        for case_id, obs in listings:
+            historical = archived_cases[case_id]
+            if obs.get("sha256") != historical["files"]["printer.dat"]["sha256"] or \
+               obs.get("source_sha256") != historical["source_sha256"] or \
+               obs.get("evidence_run_id") != archive["original_artifact"]["run_id"] or \
+               obs.get("evidence_artifact_id") != archive["original_artifact"]["artifact_id"] or \
+               obs.get("expected_classification") != checked[case_id]["status"]:
+                raise HarnessError("C7 LIST observation/provenance mismatch")
     return manifest
 
 

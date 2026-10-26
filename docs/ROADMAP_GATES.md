@@ -84,7 +84,7 @@ Pilotage déclare chaque passage de phase uniquement après examen des livrables
 
 ### J0.27-A — reprise de la preuve PRINT numérique, sans J1 automatique
 
-**En revue Pilotage**, PR [#49](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/49).
+**Accepté et fusionné** via PR [#49](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/49), squash [`560e8c33`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/560e8c33049ea4cd50fbbe1faa1390c64bdb068c). C1 a rendu bloquantes les égalités exactes CPC/CPC pour les seuls positifs C=5 et D=2, avec deux mutations de présentation rejetées à cause précise.
 Quatre nouveaux démarrages CPC6128 authentiques :
 PRINT B% écran pendant RUN pour C=5/D=2 (preuve PNG visuelle),
 PRINT #8,B% imprimante **pendant** RUN dans des variantes distinctes
@@ -94,6 +94,5 @@ C=20 35 20 0D 0A, D=20 32 20 0D 0A.
 Par rapport à stdout C99 : **MATCH_SEMANTIC** entier et **DIFF**
 espaces/CRLF. Acquisition originale Actions #40341786914, artefact
 #12659112768 ; permanence vérifiée par manifeste et approbation SHA
-indépendante. J0.27-B, correction du formatage, **non engagée**.
-Le cœur, les archives C3–C8 et les critères de sortie J0
-restent inchangés ; **J0.24/J0 OUVERTS, J1 NON AUTORISÉ**.
+indépendante. CI finales au HEAD C1 : [Linux OFF/ON](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40352258686), [Xtensa](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40352258814), [oracle CPC](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40352258713), toutes SUCCESS.
+**J0.27-B1 autorisé** : acquisitions ROM-backed indépendantes des formats numériques pour zéro, nombres négatifs et bornes INTEGER, sans modification du moteur. Toute correction C99 reste soumise à cette preuve et à la revue Pilotage. Le cœur, les archives C3–C8 et les critères de sortie J0 restent inchangés ; **J0.24/J0 OUVERTS, J1 NON AUTORISÉ**.

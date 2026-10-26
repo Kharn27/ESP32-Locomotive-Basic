@@ -83,9 +83,10 @@ propose un projet distinct `firmware/esp32_probe/` pour la **première
 compilation croisée Xtensa du cœur C99 réel** sur ESP32 classique,
 Flash 4 Mo, sans PSRAM et sans périphériques. Le scénario
 `A%=2; B%=A%+3; PRINT B%; END` utilise les API du cœur, et non une
-sortie simulée. La preuve `TARGET_BUILD_VERIFIED` dépend de la réussite
-de la [CI dédiée](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/workflows/esp32-xtensa-j025.yml),
-et `ON_DEVICE_VERIFIED` exige toujours un journal d'exécution matérielle.
+sortie simulée. **`TARGET_BUILD_VERIFIED`** : la [CI réelle Xtensa #40303281598](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40303281598)
+a réussi (ESP-IDF v5.5.6, ELF Xtensa et binaire de 153 360 octets,
+IRAM 51 807, DRAM 30 396). **`ON_DEVICE_UNVERIFIED`** :
+aucun journal d'exécution sur CYD physique, aucune mesure de heap/pile.
 Voir [J0.25](docs/J0.25-esp32-xtensa-feasibility.md). **La PR n'est pas
 fusionnée et le jalon J0 reste ouvert.**
 

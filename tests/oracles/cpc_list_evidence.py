@@ -19,11 +19,11 @@ import tempfile
 from list_printer_oracle import (CASES, PIN, ROM_SHA, AMSDOS_SHA, ROOT,
                                  EXPECTED_FILES, PNG, digest, difference, classify)
 
-# Filled only after the FIRST original acquisition is archived and approved,
-# never recomputed from data being verified. "None" forbids permanent promotion.
-APPROVED_ACQUISITION_SHA256 = None
-APPROVED_GITHUB_RUN_ID = None
-APPROVED_ARTIFACT_ID = None
+# Independently approved original acquisition identity. NEVER derived from the
+# manifest or payload being verified (including coordinated SHA forgeries).
+APPROVED_ACQUISITION_SHA256 = "932f9cdc72ddb529d2f3bfb4f28457f8217c18d561ad95947d38c5c73d27750e"
+APPROVED_GITHUB_RUN_ID = 40284150801
+APPROVED_ARTIFACT_ID = 12633570767
 ALLOWED = {"MATCH_EXACT", "DIFF", "UNVERIFIED", "UNSUPPORTED"}
 
 

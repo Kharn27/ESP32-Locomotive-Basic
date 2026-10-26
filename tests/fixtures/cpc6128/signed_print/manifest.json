@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "phase": "J0.27-B2",
+  "acquisition_phase": "J0.27-B1",
+  "oracle_scope": "SIX_APPROVED_INTEGER_PRINTER_STREAMS_ONLY",
+  "screen_status": "VISUAL_OBSERVATION",
+  "screen_text_bytes_extracted": false,
+  "printer_screen_equivalent": false,
+  "origin": {
+    "repository": "Kharn27/ESP32-Locomotive-Basic",
+    "merged_pr": 50,
+    "merge_commit": "5699bb1a1476d26e78334983cf778554a01b8528",
+    "run_id": 40360049336,
+    "artifact_id": 12668440819,
+    "artifact_name": "cpc6128-j027-b1-signed-print",
+    "github_sha": "a39d6083ef70fa5faac69d8105c0c1c9a3fcab44",
+    "acquisition_manifest_sha256": "069da38e3b000091e5cfb5d97b79edefb34eb26b5f097c60b500765a86e8c67d",
+    "acquisition_manifest_size_bytes": 31222
+  }
+}

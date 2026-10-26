@@ -279,10 +279,18 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--evidence", required=True, type=Path)
     p.add_argument("--self-test", action="store_true")
+    p.add_argument("--permanent", action="store_true",
+                   help="validate Pilotage-approved J0.27-B2 sealed archive")
     p.add_argument("--require-six-prints", action="store_true",
                    help="fail closed if any of the six CPC values lacks raw printer proof")
     args = p.parse_args()
     base = args.evidence.resolve()
+    if args.permanent:
+        from signed_print_permanent import verify_permanent, self_test_permanent
+        verify_permanent(base)
+        if args.self_test:
+            self_test_permanent(base)
+        return
     verify(base, require_six_prints=args.require_six_prints)
     print("PASS POSITIVE INTACT B1 EVIDENCE", flush=True)
     if args.self_test:

@@ -72,6 +72,13 @@ jobs:
             --cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
             --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" --ci
 
+      - name: Verify sealed J0.27-B2 original twelve-session PRINT archive and negative tests
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/signed_print_evidence.py \
+            --evidence tests/fixtures/cpc6128/signed_print \
+            --permanent --self-test
+
       - name: Verify permanent C3/C4/C5 fixtures against original SHA provenance
         run: python3 tools/cpc_token_evidence.py --permanent --self-test
 

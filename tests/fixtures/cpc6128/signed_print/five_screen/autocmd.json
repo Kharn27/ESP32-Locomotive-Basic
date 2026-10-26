@@ -1,0 +1,17 @@
+{
+  "id": "five_screen",
+  "case": "five",
+  "mode": "screen",
+  "fresh_process": true,
+  "run_executed": true,
+  "direct_post_run_probe": false,
+  "original_sha256": "1c114b7824adefed60bfd65fcae593050b6dbe5c4224b5e4b846214ec103f0af",
+  "source_sha256": "1c114b7824adefed60bfd65fcae593050b6dbe5c4224b5e4b846214ec103f0af",
+  "commands": [
+    "10 B%=5",
+    "20 PRINT B%",
+    "30 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ]
+}

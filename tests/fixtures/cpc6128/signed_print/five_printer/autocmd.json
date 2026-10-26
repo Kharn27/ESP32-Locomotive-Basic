@@ -1,0 +1,17 @@
+{
+  "id": "five_printer",
+  "case": "five",
+  "mode": "printer",
+  "fresh_process": true,
+  "run_executed": true,
+  "direct_post_run_probe": false,
+  "original_sha256": "1c114b7824adefed60bfd65fcae593050b6dbe5c4224b5e4b846214ec103f0af",
+  "source_sha256": "17fc7505caab0dfb466388b10e7143676b25e3f5c0021123a5b9796c64013d7f",
+  "commands": [
+    "10 B%=5",
+    "20 PRINT #8,B%",
+    "30 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ]
+}

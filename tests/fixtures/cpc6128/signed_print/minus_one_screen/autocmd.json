@@ -1,0 +1,17 @@
+{
+  "id": "minus_one_screen",
+  "case": "minus_one",
+  "mode": "screen",
+  "fresh_process": true,
+  "run_executed": true,
+  "direct_post_run_probe": false,
+  "original_sha256": "ae7f11f667659dc5b06ccd5fe3dfa418306bdbec70fdb3131e29a50a0809e3b9",
+  "source_sha256": "ae7f11f667659dc5b06ccd5fe3dfa418306bdbec70fdb3131e29a50a0809e3b9",
+  "commands": [
+    "10 B%=-1",
+    "20 PRINT B%",
+    "30 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ]
+}

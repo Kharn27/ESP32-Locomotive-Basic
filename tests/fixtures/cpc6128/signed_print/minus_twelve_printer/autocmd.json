@@ -1,0 +1,17 @@
+{
+  "id": "minus_twelve_printer",
+  "case": "minus_twelve",
+  "mode": "printer",
+  "fresh_process": true,
+  "run_executed": true,
+  "direct_post_run_probe": false,
+  "original_sha256": "c96aa8c415fa3972378009fb2a6c5fad1245ef112dd2bb4eea2b333f37932cfd",
+  "source_sha256": "f374627612b4a069f95eabd1d34ebfbf74a0a574d22445a7b5498cd1a7ff8f16",
+  "commands": [
+    "10 B%=-12",
+    "20 PRINT #8,B%",
+    "30 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ]
+}

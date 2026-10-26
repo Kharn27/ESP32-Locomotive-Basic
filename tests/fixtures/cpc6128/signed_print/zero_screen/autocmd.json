@@ -1,0 +1,17 @@
+{
+  "id": "zero_screen",
+  "case": "zero",
+  "mode": "screen",
+  "fresh_process": true,
+  "run_executed": true,
+  "direct_post_run_probe": false,
+  "original_sha256": "a1937b1dc43ae952a61b6d1d1cc41ed9f50fb1e712d4c99139c0701b78f135a5",
+  "source_sha256": "a1937b1dc43ae952a61b6d1d1cc41ed9f50fb1e712d4c99139c0701b78f135a5",
+  "commands": [
+    "10 B%=0",
+    "20 PRINT B%",
+    "30 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ]
+}

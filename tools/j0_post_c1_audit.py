@@ -142,6 +142,29 @@ def run_case(name, spec, cpc_root, cli, image_cli, printer):
           "TRANSPORT=CPC_CRLF_VS_C99_LF", flush=True)
 
 
+
+def refuse_non_executable_b1(cli):
+    """Exercise the four historical B1 programs; DO NOT promote them."""
+    for case in B1_UNSUPPORTED:
+        value = {"minus_one": -1, "minus_twelve": -12,
+                 "max_int16": 32767, "min_int16": -32768}[case]
+        source = (ROOT / "tests/oracles/inputs/j027_b1" /
+                  (case + ".bas")).read_bytes()
+        require(source ==
+                (f"10 B%={value}\\n20 PRINT B%\\n30 END\\n").encode("ascii"),
+                case + ": UNSUPPORTED_B1_SOURCE_CHANGED")
+        try:
+            result = subprocess.run([str(cli)],
+                                    input=source + b"RUN\\n:step 100\\n:quit\\n",
+                                    capture_output=True, timeout=20, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise AuditError(case + ": UNSUPPORTED_CLI_PROCESS_FAILED") from exc
+        require(result.returncode == 0 and
+                b"[cli:error]" in result.stderr and not result.stdout,
+                case + ": UNSUPPORTED_B1_WAS_EXECUTED_OR_MISCLASSIFIED")
+        print("PASS J0.28 B1_REMAINS_UNSUPPORTED", case, flush=True)
+
+
 def integrity(cpc_root, independent=True):
     # C6/C7/C8 classification freezes, original C6 pre-C1 gap, 18 UNVERIFIED.
     print(inspect(cpc_root).splitlines()[0], flush=True)
@@ -254,6 +277,7 @@ def main():
                 require(cpc == APPROVED_PRINTER_BYTES[name],
                         name + ": B2_APPROVED_PRINTER_BYTES_CHANGED")
             run_case(name, spec, root, cli, image_cli, cpc)
+        refuse_non_executable_b1(cli)
         if args.self_test:
             negative_tests(root)
         print("PASS J0.28 FOUR EXECUTABLE CASES; 4 B1 UNSUPPORTED; "

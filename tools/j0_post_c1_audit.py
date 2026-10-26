@@ -306,8 +306,9 @@ def main():
         refuse_non_executable_b1(cli)
         if args.self_test:
             negative_tests(root)
-        print("PASS J0.28 FOUR EXECUTABLE CASES; 4 B1 UNSUPPORTED; "
-              "18 HISTORICAL UNVERIFIED; NOT AN AUTOMATIC J0 GATE", flush=True)
+        print("PASS J0.28 4 HISTORICAL EXECUTABLE CASES; "
+              "4 ARCHIVED B1 UNSUPPORTED; 2 CURRENT B1 UNSUPPORTED; "
+              "18 HISTORICAL UNVERIFIED; NOT AN AUTOMATIC J1 GATE", flush=True)
     except (AuditError, SignedInvalid, OSError, ValueError, KeyError,
             TypeError, subprocess.TimeoutExpired) as exc:
         print("J0.28 AUDIT FAILED:", exc, file=sys.stderr)

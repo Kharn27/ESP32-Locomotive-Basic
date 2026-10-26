@@ -1,0 +1,18 @@
+{
+  "case": "c_integer_add",
+  "channel": "screen",
+  "new_cpc_process": true,
+  "programmed_print": true,
+  "run_executed": true,
+  "direct_probe_after_run": false,
+  "commands": [
+    "10 A%=2",
+    "20 B%=A%+3",
+    "30 PRINT B%",
+    "40 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ],
+  "source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+  "original_source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec"
+}

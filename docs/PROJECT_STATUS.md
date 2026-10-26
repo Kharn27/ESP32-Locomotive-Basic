@@ -153,3 +153,25 @@ pas de J1 automatique.**
 **J0.26-C2 — CORRECTION DES FAUX POSITIFS DES TESTS NÉGATIFS (26 octobre 2026), PR [#47](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/47) en nouvelle revue, non fusionnée :** l'audit des sources tokenisées emploie désormais le répertoire d'acquisition **fourni** (copie d'archives ou original), et vérifie la provenance et les empreintes SHA des sources. Le self-test impose le passage d'une **copie temporaire intacte** avant les mutations, puis une validation fraîche avant chacune des **10 mutations**, suivie d'une erreur `AuditError` de **cause exacte attendue** (aucun succès via exception incidente). Les **quatre tests négatifs directs C6** sont maintenus. Un nouveau pas du workflow C99 imprime explicitement `PASS POSITIVE INTACT_TEMP_COPY`, les dix `PASS EXPECTED_REJECTION ... cause=` et les quatre `PASS EXPECTED_C6_REJECTION ... cause=`, sous Linux et ASan/UBSan ; premier run C2 [#40337154525](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40337154525), **27/27 + 27/27**, motifs détaillés visibles. La CI du SHA **final** C2 est à vérifier séparément sur la PR. La matrice **1 PARTIAL / 2 SATISFIED / 3 SATISFIED / 4 PARTIAL / 5 SATISFIED** et l'avis **`ADDITIONAL_WORK_REQUIRED`** restent inchangés. Les 18 `LIST/RUN UNVERIFIED`, les 8 `TOKENS MATCH_EXACT`, les 2 C6 `MATCH_SEMANTIC`, les 2 C7 `DIFF` et les 2 C8 `VISUAL_OBSERVATION` demeurent inchangés. **J0.24 OUVERT ; J0 OUVERT ; J1 NON AUTORISÉ ; J0.27 NON LANCÉE.** Aucun changement à `core/`, firmware ou preuves originales.
 
 **J0.26 / C1 / C2 — ACCEPTÉES ET FUSIONNÉES par Pilotage via [PR #47](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/47), squash [`b51a35ad`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/b51a35ad3006233548c5761de4fc54c86271308f) (26 octobre 2026) : revue du HEAD `9e2ed9647962fa4fdb6fa6466451906f1bbfc00f`, 27/27 CTest Linux et 27/27 ASan/UBSan ([C99 #40337540156](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40337540156)), et 3 jobs verts dont ESP-IDF Xtensa ([ESP32 #40337540670](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40337540670)). Le test des faux positifs est fiabilisé : corpus temporaire intact PASS, dix rejets spécifiques d'archives avec motif exact, quatre rejets directs C6 ; les quinze marqueurs apparaissent dans chacun des deux journaux CI. Aucun `core/` ni archive historique ni firmware modifié. Matrice de sortie **1 PARTIAL, 2 SATISFIED, 3 SATISFIED, 4 PARTIAL, 5 SATISFIED** ; `ADDITIONAL_WORK_REQUIRED` car la présentation numérique `PRINT` CPC imprimante post-RUN (`20 35/32 20 0D 0A`) et stdout natif pendant RUN (`35/32 0A`) diffèrent au-delà des fins de ligne, avec canaux non équivalents. 18 LIST/RUN `UNVERIFIED` et classements C3–C8 préservés. **J0.24 et J0 OUVERTS ; J1 NON AUTORISÉ. Prochain jalon décidé : J0.27, caractérisation indépendante par canaux et correction native minimale justifiée du formatage numérique `PRINT`.**
+
+
+## J0.27-A — Oracle indépendant de PRINT numérique (26 octobre 2026, en revue)
+
+PR [#49](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/49)
+ouverte, non fusionnée. Quatre acquisitions indépendantes sur Caprice32
+CPC6128/BASIC 1.1, basées sur les sources originales C/D, dont deux
+variantes instrumentées par PRINT #8,B% pendant RUN.
+[Artefact authentique #12659112768](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40341786914/artifacts/12659112768)
+du [run #40341786914](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40341786914) :
+C imprimante programmée 20 35 20 0D 0A et D imprimante programmée
+20 32 20 0D 0A, **MATCH_EXACT** contre les références imprimante
+directes C6 inchangées ; C99 35 0A et 32 0A, uniquement
+**MATCH_SEMANTIC** par valeur, avec **DIFF** sur espaces et fin de ligne.
+PNG écran C/D inspectés comme VISUAL_OBSERVATION, pas des octets écran.
+Original conservé dans numeric_print/acquisition.json, empreinte
+SHA-256 approuvée indépendamment
+f4e48600515a83d736fd5a61a94c5f53b8e6fb6537280d1a8e2332b561a7521d.
+Tests de falsification à raison précise ; CI permanente à confirmer
+au HEAD final. **core/ et firmware inchangés**.
+Les 18 anciennes comparaisons LIST/RUN sont toujours UNVERIFIED ;
+J0.24 et J0 restent OUVERTS, J1 NON AUTORISÉ.

@@ -80,3 +80,20 @@ Campagne systématique de programmes historiques et tests différentiels, traite
 ## Gouvernance des barrières
 
 Pilotage déclare chaque passage de phase uniquement après examen des livrables réels, des PR fusionnées, de la CI, des écarts CPC et de la mémoire cible. Si une condition manque, la phase reste ouverte avec risque/documentation, même si les autres activités avancent.
+
+
+### J0.27-A — reprise de la preuve PRINT numérique, sans J1 automatique
+
+**En revue Pilotage**, PR [#49](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/49).
+Quatre nouveaux démarrages CPC6128 authentiques :
+PRINT B% écran pendant RUN pour C=5/D=2 (preuve PNG visuelle),
+PRINT #8,B% imprimante **pendant** RUN dans des variantes distinctes
+(preuve brute), comparés avec C6 PRINT #8 direct après RUN et stdout C99.
+Deux concordances **MATCH_EXACT uniquement sur le canal imprimante CPC** :
+C=20 35 20 0D 0A, D=20 32 20 0D 0A.
+Par rapport à stdout C99 : **MATCH_SEMANTIC** entier et **DIFF**
+espaces/CRLF. Acquisition originale Actions #40341786914, artefact
+#12659112768 ; permanence vérifiée par manifeste et approbation SHA
+indépendante. J0.27-B, correction du formatage, **non engagée**.
+Le cœur, les archives C3–C8 et les critères de sortie J0
+restent inchangés ; **J0.24/J0 OUVERTS, J1 NON AUTORISÉ**.

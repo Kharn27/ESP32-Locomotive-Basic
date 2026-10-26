@@ -1,0 +1,18 @@
+{
+  "case": "d_self_reference",
+  "channel": "screen",
+  "new_cpc_process": true,
+  "programmed_print": true,
+  "run_executed": true,
+  "direct_probe_after_run": false,
+  "commands": [
+    "10 B%=1",
+    "20 B%=B%+1",
+    "30 PRINT B%",
+    "40 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ],
+  "source_sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15",
+  "original_source_sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15"
+}

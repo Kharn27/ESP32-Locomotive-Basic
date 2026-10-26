@@ -17,6 +17,11 @@ on:
       - "tools/promote_token_ram_c5.py"
       - "tools/promote_token_ram_c4.py"
       - "docs/J0.24-C1-caprice32-oracle-automation.md"
+      - "core/basic_executor.c"
+      - "tests/test_basic_integer_variable_print.c"
+      - "tests/test_basic_integer_expression_runtime.c"
+      - "tests/test_loco_basic_cli.cmake"
+      - "docs/J0.27-C1-integer-print-format.md"
   workflow_dispatch:
 
 permissions:

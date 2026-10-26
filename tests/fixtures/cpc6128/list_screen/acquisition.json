@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "phase": "J0.24-C8",
+  "generated_at": "2026-10-26T11:53:21.357639+00:00",
+  "github_run_id": "40318152573",
+  "github_sha": "803357c673a00c3e7bfd29f37d1d72f44c49dd0a",
+  "oracle": {
+    "name": "Caprice32",
+    "commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "version_output": "Caprice32 v4.6.0-8c778bf072a06fb7c23b9cccd179041db7f79a52\nAPP_PATH: /home/runner/work/ESP32-Locomotive-Basic/ESP32-Locomotive-Basic/tests/oracles/caprice32\nCompiled with:\nNumber of video plugins available: 11",
+    "model": "CPC6128",
+    "ram_kb": 128,
+    "basic": "1.1",
+    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "amsdos_sha256": "ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d",
+    "rom_archived": false,
+    "snapshot_archived": false
+  },
+  "screen_text_bytes_extracted": false,
+  "screen_printer_equivalence": false,
+  "captures": [
+    {
+      "case": "c_integer_add",
+      "source_path": "tests/fixtures/cpc6128/sources/c_integer_add.bas",
+      "source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+      "commands": [
+        "10 A%=2",
+        "20 B%=A%+3",
+        "30 PRINT B%",
+        "40 END",
+        "CLS",
+        "LIST 10-40",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screen_name": "screenshot_20261026_115322.png",
+      "operation": "LIST_SCREEN_VISUAL",
+      "list_command_cpc": "LIST 10-40",
+      "list_command_native": "LIST",
+      "selection_scope": "all historical lines match requested CPC range",
+      "classification": "VISUAL_OBSERVATION",
+      "visual_review_status": "PENDING_MANUAL_INSPECTION",
+      "visual_review": null,
+      "byte_exactness_claimed": false,
+      "cpc_returncode": 0,
+      "native_returncode": 0,
+      "cpc_channel": "screen.png: original CPC DISPLAY PIXELS (no RUN, no printer)",
+      "printer_channel": "not acquired (disabled, no LIST #8)",
+      "native_channel": "native.stdout.bin: original C99 CLI LIST bytes",
+      "files": {
+        "source.bas": {
+          "sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+          "size_bytes": 38
+        },
+        "autocmd.json": {
+          "sha256": "a022fc917cd4b2ee6b2d94e9fcf38ed44e91d693538340ef87cd45537399ed72",
+          "size_bytes": 488
+        },
+        "cap32.cfg": {
+          "sha256": "b52ca80bd621c375ffe5d10dab7df74902f648fa7fcbe02009970fdb20c0b92d",
+          "size_bytes": 1199
+        },
+        "caprice.log": {
+          "sha256": "c78ae16b35ac365d9eada368b7a41e37b17c187b1961a275157faab0330e1f40",
+          "size_bytes": 416
+        },
+        "native.stdin.bin": {
+          "sha256": "947a651a62d82afc5d4ebd0d2eaba6ba1b6826f78de150a0da84347d6fb4c512",
+          "size_bytes": 49
+        },
+        "native.stdout.bin": {
+          "sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+          "size_bytes": 38
+        },
+        "native.stderr.bin": {
+          "sha256": "f33394cec2f2a70ac2fbbbe27c3e9463f13df89e05ff933606dfa5b77bc9700e",
+          "size_bytes": 85
+        },
+        "screen.png": {
+          "sha256": "937701c673d3490aae7f170e555902062364497696b10140a0abec9356d0d6e2",
+          "size_bytes": 3863
+        }
+      }
+    },
+    {
+      "case": "f_mixed_case",
+      "source_path": "tests/fixtures/cpc6128/sources/f_mixed_case.bas",
+      "source_sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6",
+      "commands": [
+        "10 let LongVar%=9",
+        "20 print LongVar%",
+        "30 end",
+        "CLS",
+        "LIST 10-30",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screen_name": "screenshot_20261026_115323.png",
+      "operation": "LIST_SCREEN_VISUAL",
+      "list_command_cpc": "LIST 10-30",
+      "list_command_native": "LIST",
+      "selection_scope": "all historical lines match requested CPC range",
+      "classification": "VISUAL_OBSERVATION",
+      "visual_review_status": "PENDING_MANUAL_INSPECTION",
+      "visual_review": null,
+      "byte_exactness_claimed": false,
+      "cpc_returncode": 0,
+      "native_returncode": 0,
+      "cpc_channel": "screen.png: original CPC DISPLAY PIXELS (no RUN, no printer)",
+      "printer_channel": "not acquired (disabled, no LIST #8)",
+      "native_channel": "native.stdout.bin: original C99 CLI LIST bytes",
+      "files": {
+        "source.bas": {
+          "sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6",
+          "size_bytes": 43
+        },
+        "autocmd.json": {
+          "sha256": "6d030714236325ce24e2ee658b486497f7f88fe2086945a4f0b49f2be8dd95e2",
+          "size_bytes": 485
+        },
+        "cap32.cfg": {
+          "sha256": "83ff816195bc951bb0cd36ec1435b0d9b9d995c93f12f1a22e9f424e25d23967",
+          "size_bytes": 1197
+        },
+        "caprice.log": {
+          "sha256": "9e5dbed18cd03151bc71765445e63cb75a96857acb8ee945eb319b884ee8b512",
+          "size_bytes": 414
+        },
+        "native.stdin.bin": {
+          "sha256": "74c82824f613f35efad40ccc829c37b1160f1866eba52938e95833662d2198c3",
+          "size_bytes": 54
+        },
+        "native.stdout.bin": {
+          "sha256": "653f1f2490a1b25475309e40c9829776ea49e6270629fc95542ea16d45cb6b3c",
+          "size_bytes": 43
+        },
+        "native.stderr.bin": {
+          "sha256": "36d2530230e4791f072a59541efcb4044a666fa5dd2fbe963cbaab0f0a865875",
+          "size_bytes": 76
+        },
+        "screen.png": {
+          "sha256": "522c6bf6bc83fd686cca9650da847d0b0c14434bc0ab85b7c8cba4835d729404",
+          "size_bytes": 3858
+        }
+      }
+    }
+  ]
+}

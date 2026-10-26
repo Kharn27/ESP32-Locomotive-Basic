@@ -1,0 +1,3 @@
+10 LET LongVar%=9
+20 PRINT LongVar%
+30 END

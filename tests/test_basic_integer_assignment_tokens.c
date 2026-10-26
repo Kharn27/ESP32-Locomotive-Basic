@@ -36,6 +36,9 @@ static int test_vectors(void)
     static const uint8_t a9[]   = {2,0,0,0xc1,0xef,0x17};
     static const uint8_t a10[]  = {2,0,0,0xc1,0xef,0x19,10};
     static const uint8_t a255[] = {2,0,0,0xc1,0xef,0x19,255};
+    /* Synthetic vector pending independent CPC RAM image verification. */
+    static const uint8_t bneg1[] = {2,0,0,0xc2,0xef,0xf5,0x0f};
+    static const uint8_t bneg12[] = {2,0,0,0xc2,0xef,0xf5,0x19,12};
     static const uint8_t let[]  = {0xa5,' ',2,0,0,0xc1,0xef,0x10};
     static const uint8_t multi[] = {2,0,0,0xc1,0xef,0x10,1,0x98};
     static const uint8_t spaced[] = {' ',0xa5,' ',2,0,0,0xc1,' ',0xef,' ',0x10,' '};
@@ -45,6 +48,8 @@ static int test_vectors(void)
     CHECK(vector("A%=9", a9, sizeof(a9)) == 0);
     CHECK(vector("A%=10", a10, sizeof(a10)) == 0);
     CHECK(vector("A%=255", a255, sizeof(a255)) == 0);
+    CHECK(vector("B%=-1", bneg1, sizeof(bneg1)) == 0);
+    CHECK(vector("B%=-12", bneg12, sizeof(bneg12)) == 0);
     CHECK(vector("LET A%=2", let, sizeof(let)) == 0);
     CHECK(vector("A%=2:END", multi, sizeof(multi)) == 0);
     CHECK(vector(" LET A% = 2 ", spaced, sizeof(spaced)) == 0);

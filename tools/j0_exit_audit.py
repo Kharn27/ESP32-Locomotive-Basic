@@ -77,6 +77,31 @@ def archive_case_map(base, dirname, expected, classification, op):
     return manifest, {c["case"]: c for c in captures}
 
 
+def c6_format_gap(cpc_bytes, native_bytes, value, case_id):
+    """Assert C6 *archived* cross-channel numeric formatting divergence.
+
+    This compares CPC post-RUN PRINT #8,B% with the C99 RUN stdout,
+    NOT identical historical commands or CPC screen text bytes.
+    The historical observation stays MATCH_SEMANTIC regardless.
+    """
+    number = str(value).encode("ascii")
+    require(cpc_bytes == b" " + number + b" \r\n",
+            f"{case_id}: CPC C6 post-RUN printer numeric format changed")
+    require(native_bytes == number + b"\n",
+            f"{case_id}: C99 C6 RUN stdout numeric format changed")
+    # Normalize line endings only; CPC spaces still survive and must be reported.
+    newline_only = cpc_bytes.replace(b"\r\n", b"\n")
+    require(newline_only != native_bytes and
+            newline_only.strip() == native_bytes.strip(),
+            f"{case_id}: expected leading/trailing numeric spaces gap disappeared")
+    return ("C6_FORMAT_GAP_OBSERVED "
+            f"case={case_id} CPC_PRINTER_POST_RUN={cpc_bytes.hex(' ')} "
+            f"C99_STDOUT_DURING_RUN={native_bytes.hex(' ')} "
+            "CRLF_TO_LF_INSUFFICIENT=YES NUMERIC_SPACES=LEADING_AND_TRAILING "
+            "HISTORICAL_CLASSIFICATION=MATCH_SEMANTIC "
+            "SCREEN_TEXT_BYTES=NOT_AUTOMATICALLY_VERIFIABLE")
+
+
 def inspect(base):
     """Verify actual manifests and payloads, not an audit-specific copied claim."""
     master = load(base / "manifest.json")
@@ -144,6 +169,7 @@ def inspect(base):
                 f"token archive case {c.get('id')} incomplete")
     run, run_captures = archive_case_map(
         base, "run_behavior", RUN_CASES, "MATCH_SEMANTIC", "RUN_NUMERIC_PROBE")
+    format_gaps = []
     require(run.get("screen_bytes_captured") is False and
             run.get("printer_screen_byte_equivalence") is False,
             "RUN screen/printer equivalence invented")
@@ -152,6 +178,10 @@ def inspect(base):
         require(c.get("cpc_integer") == c.get("native_integer") == expected and
                 c.get("comparison") == "strict-signed-integer",
                 f"{cid}: post-RUN semantic probe drift")
+        format_gaps.append(c6_format_gap(
+            (base / "run_behavior" / cid / "printer.dat").read_bytes(),
+            (base / "run_behavior" / cid / "native.stdout.bin").read_bytes(),
+            expected, cid))
     printer, listings = archive_case_map(
         base, "list_printer", LIST_CASES, "DIFF", "LIST_PRINTER_PROBE")
     require(printer.get("screen_bytes_captured") is False and
@@ -177,7 +207,8 @@ def inspect(base):
                 f"{cid}: visual-only classification changed")
     return ("PASS 9 cases / 18 historical LIST+RUN UNVERIFIED / "
             "8 TOKENS MATCH_EXACT / 2 RUN_NUMERIC_PROBE MATCH_SEMANTIC / "
-            "2 LIST_PRINTER_PROBE DIFF / 2 LIST_SCREEN_VISUAL VISUAL_OBSERVATION")
+            "2 LIST_PRINTER_PROBE DIFF / 2 LIST_SCREEN_VISUAL VISUAL_OBSERVATION"
+            + "\n" + "\n".join(format_gaps))
 
 
 def external_validators():
@@ -228,6 +259,10 @@ def negative_tests(base):
                 lambda m: m.update({"screen_text_bytes_extracted": True}))),
             ("printer-byte-swap", lambda: (copied / "list_printer/c_integer_add/printer.dat").write_bytes(
                 (copied / "list_printer/c_integer_add/native.stdout.bin").read_bytes())),
+            ("c6-cpc-numeric-spaces-removed", lambda: (
+                copied / "run_behavior/c_integer_add/printer.dat").write_bytes(b"5\r\n")),
+            ("c6-native-numeric-spaces-added", lambda: (
+                copied / "run_behavior/d_self_reference/native.stdout.bin").write_bytes(b" 2 \n")),
         ]
         for name, mutation in scenarios:
             # Recopy originals before each independent negative mutation.
@@ -240,6 +275,21 @@ def negative_tests(base):
                 print("PASS NEGATIVE", name)
             else:
                 raise AuditError("negative test did not reject " + name)
+    # Direct regression tests for the formatting diagnostic itself, independent
+    # of the archive's SHA checks (which also reject mutated fixture bytes).
+    bad_signatures = [
+        ("missing-both-spaces", b"5\r\n", b"5\n", 5),
+        ("missing-trailing-space", b" 5\r\n", b"5\n", 5),
+        ("native-space-added", b" 5 \r\n", b" 5 \n", 5),
+        ("wrong-value", b" 2 \r\n", b"2\n", 5),
+    ]
+    for name, cpc_bytes, native_bytes, value in bad_signatures:
+        try:
+            c6_format_gap(cpc_bytes, native_bytes, value, name)
+        except AuditError:
+            print("PASS NEGATIVE C6 FORMAT", name)
+        else:
+            raise AuditError("C6 numeric formatting negative test missed " + name)
 
 
 def main():

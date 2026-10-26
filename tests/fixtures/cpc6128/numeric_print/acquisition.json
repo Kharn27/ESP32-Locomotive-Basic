@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "phase": "J0.27-A",
+  "generated_at": "2026-10-26T14:42:14.002746+00:00",
+  "github_run_id": "40341786914",
+  "github_sha": "0ff5351cc8e9d71fedc23bc231b10cd7f9ad666c",
+  "oracle": {
+    "name": "Caprice32",
+    "commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "version_output": "Caprice32 v4.6.0-8c778bf072a06fb7c23b9cccd179041db7f79a52\nAPP_PATH: /home/runner/work/ESP32-Locomotive-Basic/ESP32-Locomotive-Basic/tests/oracles/caprice32\nCompiled with:\nNumber of video plugins available: 11",
+    "model": "CPC6128",
+    "ram_kb": 128,
+    "basic": "1.1",
+    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "amsdos_sha256": "ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d",
+    "rom_archived": false,
+    "snapshot_archived": false
+  },
+  "screen_bytes_extracted": false,
+  "printer_screen_equivalent": false,
+  "captures": [
+    {
+      "id": "c_integer_add_screen",
+      "case": "c_integer_add",
+      "mode": "screen",
+      "source_path": "tests/fixtures/cpc6128/sources/c_integer_add.bas",
+      "original_source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+      "source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+      "numeric_hypothesis": 5,
+      "commands": [
+        "10 A%=2",
+        "20 B%=A%+3",
+        "30 PRINT B%",
+        "40 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screen_name": "screenshot_20261026_144214.png",
+      "cpc_returncode": 0,
+      "native_returncode": 0,
+      "screen_classification": "VISUAL_OBSERVATION",
+      "screen_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "printer_channel": "disabled; no printer output",
+      "native_channel": "C99 stdout during RUN",
+      "files": {
+        "source.bas": {
+          "sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+          "size_bytes": 38
+        },
+        "autocmd.json": {
+          "sha256": "004f1b25290e6e69b3ba1c4baeae3aaed77bc06d044e2904392cf92c321ea5cc",
+          "size_bytes": 504
+        },
+        "cap32.cfg": {
+          "sha256": "7507c7b70aa6b4fd13a05717276beb2ab74dc02a1eabb94357cbe121cad887f0",
+          "size_bytes": 1219
+        },
+        "command_argv.json": {
+          "sha256": "c86e91a11ccf51ce711b05544777a6d6897537efb871cbf62899d80fe4e690ad",
+          "size_bytes": 381
+        },
+        "caprice.log": {
+          "sha256": "3d156760da11fe7838b90a3d8a2e96514e3fc82fec9059791fb45de3177dfe4e",
+          "size_bytes": 636
+        },
+        "screen.png": {
+          "sha256": "70814948be7f97810d9aa140649c6f58851bf39e0e6c53b32e9408be7ac47bd6",
+          "size_bytes": 5271
+        },
+        "native.stdin.bin": {
+          "sha256": "fe683f30f610f62b362854ceb8155a34bbd517930df5da2dad341bd6431d03df",
+          "size_bytes": 58
+        },
+        "native.stdout.bin": {
+          "sha256": "f0b5c2c2211c8d67ed15e75e656c7862d086e9245420892a7de62cd9ec582a06",
+          "size_bytes": 2
+        },
+        "native.stderr.bin": {
+          "sha256": "4beaadfbcbeca4cc8949d06dfa133daeb20276fd4515c5eb747b2d9ddf7977f2",
+          "size_bytes": 114
+        }
+      }
+    },
+    {
+      "id": "c_integer_add_printer",
+      "case": "c_integer_add",
+      "mode": "printer",
+      "source_path": "tests/fixtures/cpc6128/sources/c_integer_add.bas",
+      "original_source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+      "source_sha256": "ed7a6db97e931fe19a1e549a90f5cc740eb88e8dc2092649ff835945a037373b",
+      "numeric_hypothesis": 5,
+      "commands": [
+        "10 A%=2",
+        "20 B%=A%+3",
+        "30 PRINT #8,B%",
+        "40 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screen_name": "screenshot_20261026_144215.png",
+      "cpc_returncode": 0,
+      "native_returncode": null,
+      "screen_classification": "VISUAL_OBSERVATION",
+      "screen_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "printer_channel": "programmed PRINT #8 during RUN",
+      "native_channel": "not executed in printer session",
+      "files": {
+        "source.bas": {
+          "sha256": "ed7a6db97e931fe19a1e549a90f5cc740eb88e8dc2092649ff835945a037373b",
+          "size_bytes": 41
+        },
+        "autocmd.json": {
+          "sha256": "cc979911c38c4142882d5f14963c22a1c30b8f237d3207482d89fb0a753c67d1",
+          "size_bytes": 508
+        },
+        "cap32.cfg": {
+          "sha256": "daa4f39501608d11af788c1f587a57a819b055f1c25b0f353560d99299086679",
+          "size_bytes": 1210
+        },
+        "command_argv.json": {
+          "sha256": "b674360d379486f754cf7135b559f6b9820921983c230f80c4b0411c1a8b9f54",
+          "size_bytes": 385
+        },
+        "caprice.log": {
+          "sha256": "65361858f865120ca3770b88dcf92c9bca5a085cd9ccdc3c97d828ef2434b80f",
+          "size_bytes": 642
+        },
+        "screen.png": {
+          "sha256": "36f01bcf69aae3fcd3d01064cfc889a199af3cd5835a8cfea31b343bfe3cbb43",
+          "size_bytes": 5273
+        },
+        "printer.dat": {
+          "sha256": "427c73eb948406e2dee128c2e23ee2dfc00e26e35f6b776a7d7112a1e9996246",
+          "size_bytes": 5
+        }
+      }
+    },
+    {
+      "id": "d_self_reference_screen",
+      "case": "d_self_reference",
+      "mode": "screen",
+      "source_path": "tests/fixtures/cpc6128/sources/d_self_reference.bas",
+      "original_source_sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15",
+      "source_sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15",
+      "numeric_hypothesis": 2,
+      "commands": [
+        "10 B%=1",
+        "20 B%=B%+1",
+        "30 PRINT B%",
+        "40 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screen_name": "screenshot_20261026_144216.png",
+      "cpc_returncode": 0,
+      "native_returncode": 0,
+      "screen_classification": "VISUAL_OBSERVATION",
+      "screen_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "printer_channel": "disabled; no printer output",
+      "native_channel": "C99 stdout during RUN",
+      "files": {
+        "source.bas": {
+          "sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15",
+          "size_bytes": 38
+        },
+        "autocmd.json": {
+          "sha256": "92ab00cbe96ff8339ba5ec11319170cb40859c5d774ee96ece6fdeb9f54e3d25",
+          "size_bytes": 507
+        },
+        "cap32.cfg": {
+          "sha256": "2802cb35ea1ad5c0fe637f383f99ecae30d9aed424901c537fd5a93a770fd95b",
+          "size_bytes": 1225
+        },
+        "command_argv.json": {
+          "sha256": "3e58342d4c073763337e4186fe9b6dcd302688307af391c3487f55b2e2f89593",
+          "size_bytes": 384
+        },
+        "caprice.log": {
+          "sha256": "2aba3e9df351e0d6e2eab4efa29fcd1208f5f4a86c1f6ee13e09026a3ebbb88c",
+          "size_bytes": 645
+        },
+        "screen.png": {
+          "sha256": "001140c1f8b48d5abe7357cdd7bf137dcd16dcfab3d7b24d013cdaa3db820daf",
+          "size_bytes": 5220
+        },
+        "native.stdin.bin": {
+          "sha256": "81799536aa7f18708d28b96b3549553c8f892265e062a593480b5f1aaba755a9",
+          "size_bytes": 58
+        },
+        "native.stdout.bin": {
+          "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "size_bytes": 2
+        },
+        "native.stderr.bin": {
+          "sha256": "4beaadfbcbeca4cc8949d06dfa133daeb20276fd4515c5eb747b2d9ddf7977f2",
+          "size_bytes": 114
+        }
+      }
+    },
+    {
+      "id": "d_self_reference_printer",
+      "case": "d_self_reference",
+      "mode": "printer",
+      "source_path": "tests/fixtures/cpc6128/sources/d_self_reference.bas",
+      "original_source_sha256": "618271a360f538c5a68bc3dae662dbce3d875fe01cacd2375e1e2bf3dc8d2e15",
+      "source_sha256": "fd99e30211591e0037670510272760c87b5aa09da383154cb90a180038a624c0",
+      "numeric_hypothesis": 2,
+      "commands": [
+        "10 B%=1",
+        "20 B%=B%+1",
+        "30 PRINT #8,B%",
+        "40 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screen_name": "screenshot_20261026_144217.png",
+      "cpc_returncode": 0,
+      "native_returncode": null,
+      "screen_classification": "VISUAL_OBSERVATION",
+      "screen_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "printer_channel": "programmed PRINT #8 during RUN",
+      "native_channel": "not executed in printer session",
+      "files": {
+        "source.bas": {
+          "sha256": "fd99e30211591e0037670510272760c87b5aa09da383154cb90a180038a624c0",
+          "size_bytes": 41
+        },
+        "autocmd.json": {
+          "sha256": "34c212f7f22f98d720d16a4e1f113110f098e343ea2e1b18cba49f53f256d1e8",
+          "size_bytes": 511
+        },
+        "cap32.cfg": {
+          "sha256": "32aed8369e9d1887a076cee0c5dbb861fccf3a0427cdebd880ecb41b3f57af10",
+          "size_bytes": 1216
+        },
+        "command_argv.json": {
+          "sha256": "2b80fe814da0d78f0ae1d937e6e80a651698097b98eb51e84ac1f60864c8d021",
+          "size_bytes": 388
+        },
+        "caprice.log": {
+          "sha256": "62d666fa2c65e3e4d0776d6da9cd440fe94069abc7b6fa76030f7468480937bf",
+          "size_bytes": 651
+        },
+        "screen.png": {
+          "sha256": "b742ed06e3a44bb3d605e6652fd38d2eaa1d3385f117463eaedf8399e0bea733",
+          "size_bytes": 5226
+        },
+        "printer.dat": {
+          "sha256": "a6b9d0e774e8414383a7154ccc19fb4da0057614ddd554ad96789ac8d5ede99e",
+          "size_bytes": 5
+        }
+      }
+    }
+  ]
+}

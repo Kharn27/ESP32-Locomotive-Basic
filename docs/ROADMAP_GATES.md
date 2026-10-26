@@ -43,6 +43,24 @@ Le passage à J1 marque la **maturité du socle**, pas la fin du projet ni une p
 - **Avant clôture J0** : les premières preuves de compilation ESP-IDF/Xtensa et d'exécution physique sur CYD sont acquises en J0.25/HW1 pour la sonde minimale, avec mesures RAM/Flash/pile et limites explicites ; l'audit final doit vérifier leur adéquation au critère 5, la provenance des mesures et les réserves liées aux périphériques non encore intégrés. Elles ne prouvent pas le futur firmware complet.
 - **Clôture J0** : tests Linux et sanitizers, vérifications différentielles CPC indépendantes, diagnostics d'écarts, budget RAM/Flash et preuve anticipée de faisabilité CYD. Nombre exact de PR à fixer après revue des résultats.
 
+### J0.26-C1 — correction de l'audit après revue Pilotage (26 octobre 2026)
+
+**J0.26-C1 livrée pour revue dans la PR #47, NON FUSIONNÉE. J0.24 et J0 restent OUVERTS ; J1 NON AUTORISÉ.** [Rapport corrigé](J0.26-j0-exit-audit.md) et 27e CTest étendu au diagnostic d'espaces C6, sans modification de `core/`, des archives historiques ou du firmware.
+
+**Matrice de clôture corrigée** : critère **1 PARTIAL** (l'exécution du témoin 5 est démontrée, **pas** son formatage numérique CPC) ; **2 SATISFIED** (architecture bornée et types distincts) ; **3 SATISFIED** (robustesse Linux/ASan-UBSan, 27/27 chacune sur le précédent HEAD, à confirmer sur HEAD C1) ; **4 PARTIAL** (écart de présentation du témoin effectivement constaté entre deux canaux C6, non traité) ; **5 SATISFIED** (faisabilité préliminaire Xtensa et HW1 sur transcription PO, sans garantie pour écran/SD/tactile).
+
+**Blocage identifié dans C6 authentique** : CPC imprimante `PRINT #8,B%` post-RUN (C=5 : `20 35 20 0D 0A` ; D=2 : `20 32 20 0D 0A`) versus stdout CLI C99 pendant RUN (`35 0A` ; `32 0A`). Le diagnostic **ne se limite pas à CRLF/LF** : `20` initial et `20` final restent différents après normalisation des fins de lignes. Les captures écran CPC C6 suggèrent visuellement un retrait numérique, **sans extraction d'octets écran**. Les imprimantes C7 LIST restent des `DIFF` de CRLF/LF seulement, et les images écran C8 restent `VISUAL_OBSERVATION`.
+
+**Aucune promotion d'oracle historique** : 8 TOKENS `MATCH_EXACT`, 2 RUN_NUMERIC_PROBE `MATCH_SEMANTIC`, 2 LIST_PRINTER_PROBE `DIFF`, 2 LIST_SCREEN_VISUAL `VISUAL_OBSERVATION` et **18 LIST/RUN historiques `UNVERIFIED`**, inchangés. La correspondance des valeurs C6 n'efface pas le décalage de présentation.
+
+**Avis corrigé : `ADDITIONAL_WORK_REQUIRED`.** Suite technique proposée, **non lancée** : **J0.27 — Fidélité du formatage numérique PRINT** : décrire les règles d'espaces, signes et fins de lignes BASIC CPC ; acquérir des observations comparables par canal écran/imprimante avec provenance ; confronter les sorties numériques de RUN versus impression directe ; faire corriger par une PR dédiée le code C natif minimal après vérification, avec tests Linux/sanitizers et différentiel CPC. Pas de clôture avant revue explicite des correctifs et des critères de sortie par Pilotage.
+
+### J0.26-C2 — fiabilisation de la falsification (26 octobre 2026)
+
+La PR #47 conserve sa conclusion `ADDITIONAL_WORK_REQUIRED` et la matrice **1 PARTIAL ; 2 SATISFIED ; 3 SATISFIED ; 4 PARTIAL ; 5 SATISFIED**. Suite à une revue Pilotage, la procédure de falsification J0.26 a été corrigée : sur la copie temporaire, les chemins sources tokenisés sont désormais résolus **par rapport à la copie elle-même**, avec empreintes vérifiées ; une **copie intacte doit réussir** avant tout test négatif. Chacune des **dix mutations** ne passe qu'en présence d'un `AuditError` de **motif exact**, et les **quatre tests directs C6** restent obligatoires. La CI Linux/ASan-UBSan publie une trace positive et 14 rejets attendus avec leurs causes, en plus des 27 suites CTest. [Rapport de preuve C2](J0.26-j0-exit-audit.md) ; premier [run positif #40337154525](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40337154525), à revalider sur le HEAD final de la PR.
+
+Cette réparation ne supprime **pas** la divergence de formatage numérique CPC/C99, ne change **aucun oracle ni aucune classe historique**, et **ne lance pas J0.27**. **J0.24 et J0 demeurent ouverts ; J1 n'est pas autorisé ; la PR #47 est non fusionnée.**
+
 ## J1 — Développement de la compatibilité Locomotive BASIC 1.1
 
 Élargissement systématique des instructions et fonctions : DEFINT/DEFREAL/DEFSTR selon sémantique historique, chaînes, contrôle de flux (IF, FOR/NEXT, GOSUB/RETURN), expressions complètes, données et erreurs CPC, nombres REAL5 et opérations Maths Pack, puis autres familles du langage. Pour chaque famille, matrice ROM → implémentation → tests CPC indépendants. Les fonctions graphiques dépendantes du matériel disposent d'une interface abstraite et pourront être implémentées conjointement avec J2.

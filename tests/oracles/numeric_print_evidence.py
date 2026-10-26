@@ -255,7 +255,14 @@ def self_test(base, permanent):
         for name, reason in cases:
             dest = Path(td) / name
             shutil.copytree(base, dest)
-            verify(dest, permanent=permanent)
+            # The original archive passed permanent validation. In the COPY
+            # remove only the external approval wrapper so each mutation
+            # reaches its precise evidence check instead of the outer anchor.
+            if permanent:
+                original = (dest / "acquisition.json").read_bytes()
+                (dest / "manifest.json").write_bytes(original)
+                (dest / "acquisition.json").unlink()
+            verify(dest, permanent=False)
             manifest = load(dest / "manifest.json")
             entries = {c["id"]: c for c in manifest["captures"]}
             screen = entries["c_integer_add_screen"]
@@ -281,7 +288,7 @@ def self_test(base, permanent):
                     "sha256": digest(changed), "size_bytes": len(changed)}
             (dest / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
             try:
-                verify(dest, permanent=permanent)
+                verify(dest, permanent=False)
             except Invalid as e:
                 require(str(e) == reason,
                         name + ": WRONG REJECTION CAUSE " + str(e) + " != " + reason)

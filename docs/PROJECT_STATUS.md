@@ -124,3 +124,21 @@ vrai build ESP-IDF, de l'ELF Xtensa, de la configuration effective et
 de la taille Flash/DRAM/IRAM. **`ON_DEVICE_UNVERIFIED`** tant qu'aucun
 log d'un ESP32 réel n'est fourni. J0.24 et J0 restent ouverts ;
 aucun passage automatique à J1.
+
+**J0.25 — preuves cible sur PR #44 (sans acceptation ni fusion) :**
+le [workflow Xtensa #40303281598](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40303281598)
+a conclu **SUCCESS pour la compilation croisée et les deux jobs
+de tests Linux** (25/25 classiques + 25/25 ASan/UBSan). Compilateur
+officiel ESP-IDF v5.5.6 `xtensa-esp-elf-gcc` GCC 14.2.0,
+ELF32 `Tensilica Xtensa Processor`, .bin **153 360 octets**,
+ELF **2 541 784 octets**. Partition applicative **3 145 728
+octets**, marge **2 992 368 octets** ; IRAM statique utilisée
+**51 807**, DRAM statique utilisée **30 396** ; inventaire ABI extrait
+du symbole réel : pointeurs 4 octets, entrées variables 56 octets,
+application statique **18 484 octets**. Configuration `esp32`,
+Flash 4 Mio, aucune PSRAM, graphe CMake sans Wi-Fi/Bluetooth.
+**`TARGET_BUILD_VERIFIED` ; `ON_DEVICE_UNVERIFIED`** : aucune preuve
+d'exécution du programme ni de heap/pile sur la CYD physique. Le
+[rapport détaillé](J0.25-esp32-xtensa-feasibility.md) conserve
+séparation stricte des mesures. **J0.24 et J0 restent ouverts,
+pas de J1 automatique.**

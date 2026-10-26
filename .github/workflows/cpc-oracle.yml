@@ -275,7 +275,7 @@ jobs:
             --native-cli "$RUNNER_TEMP/c99-build/loco_basic_cli" \
             --output "$RUNNER_TEMP/j027-numeric-print"
           python3 tests/oracles/numeric_print_evidence.py \
-            --evidence "$RUNNER_TEMP/j027-numeric-print" --self-test
+            --evidence "$RUNNER_TEMP/j027-numeric-print" --self-test --native-c1
 
       - name: Export unmodified J0.27-A acquisitions for independently reviewed archival
         run: |

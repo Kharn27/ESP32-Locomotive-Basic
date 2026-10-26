@@ -146,7 +146,27 @@ def inspect(base):
                     observation.get("media") == expected_media,
                     f"{cid}/{op}: forged classification or media")
             filename = base / observation["path"]
-            require(filename.is_file() and raw_sha(filename) == observation["sha256"],
+            require(filename.is_file(), f"{cid}/{op}: missing/modified archived evidence")
+            # Check the targeted C6/C7 byte signatures *before* the generic SHA:
+            # mutated format or newline fixtures must fail for their specific
+            # audited behavior, not merely because a protected blob was changed.
+            if op == "RUN_NUMERIC_PROBE":
+                native_path = base / "run_behavior" / cid / "native.stdout.bin"
+                require(native_path.is_file(),
+                        f"{cid}: C6 native stdout file missing")
+                c6_format_gap(filename.read_bytes(), native_path.read_bytes(),
+                              RUN_CASES[cid], cid)
+            elif op == "LIST_PRINTER_PROBE":
+                native_path = base / "list_printer" / cid / "native.stdout.bin"
+                require(native_path.is_file(),
+                        f"{cid}: C7 native stdout file missing")
+                cpc = filename.read_bytes()
+                native = native_path.read_bytes()
+                require((len(cpc), len(native)) == LIST_CASES[cid] and
+                        b"\r\n" in cpc and b"\r" not in native and
+                        cpc.replace(b"\r\n", b"\n") == native and cpc != native,
+                        f"{cid}: C7 DIFF is no longer solely CRLF/LF")
+            require(raw_sha(filename) == observation["sha256"],
                     f"{cid}/{op}: missing/modified archived evidence")
             seen.add(cid)
             if op == "TOKENS":

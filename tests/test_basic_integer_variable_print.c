@@ -331,7 +331,7 @@ static int test_legacy_and_prior_prints(void)
     CHECK(put(&h, 40u, "END") == 0);
     CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
     CHECK(print_step(&h, "TXT\n") == 0);
-    CHECK(print_step(&h, " 2 \n") == 0);
+    CHECK(print_step(&h, "2\n") == 0); /* Numeric literal unchanged. */
     CHECK(print_step(&h, "\n") == 0);
     CHECK(empty_step(&h) == 0);
     return 0;

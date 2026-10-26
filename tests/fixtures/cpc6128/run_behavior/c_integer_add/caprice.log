@@ -1,0 +1,8 @@
+$ cap32 -c <case-config> -a <numbered lines> -a RUN -a PRINT#8 -a <screenshot+exit>
+exit code: 0
+Using configuration file: /home/runner/work/_temp/cpc-run-behavior/c_integer_add/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /home/runner/work/_temp/cpc-run-behavior/c_integer_add/screenshot_20261025_224902.png
+
+[stderr]

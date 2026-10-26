@@ -11,6 +11,7 @@ on:
       - "docs/J0.24-C3-cpc-token-memory.md"
       - "docs/J0.24-C4-extended-token-oracle.md"
       - "docs/J0.24-C5-eight-case-oracle.md"
+      - "docs/J0.24-C6-run-behavior-oracle.md"
       - "tools/promote_token_ram_c5.py"
       - "tools/promote_token_ram_c4.py"
       - "docs/J0.24-C1-caprice32-oracle-automation.md"
@@ -72,6 +73,9 @@ jobs:
       - name: Verify permanent C3/C4/C5 fixtures against original SHA provenance
         run: python3 tools/cpc_token_evidence.py --permanent --self-test
 
+      - name: Verify permanent C6 independent RUN/probe evidence and source provenance
+        run: python3 tests/oracles/cpc_run_evidence.py --evidence tests/fixtures/cpc6128/run_behavior --permanent --self-test
+
       - name: Check eight-case quantitative threshold (not J0.24 acceptance)
         run: |
           set -euo pipefail
@@ -97,6 +101,51 @@ jobs:
             --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
             --output "${RUNNER_TEMP}/cpc-oracle" \
             --case minimal --case witness
+
+      - name: Acquire independent C6 RUN + post-RUN B% numeric probes (new CPC session per case)
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/run_behavior_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+            --output "${RUNNER_TEMP}/cpc-run-behavior"
+
+      - name: Check C6 raw channels, chronology, signed integers and negative mutations
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/cpc_run_evidence.py \
+            --evidence "${RUNNER_TEMP}/cpc-run-behavior" --self-test
+          python3 tools/cpc_token_evidence.py --permanent --self-test
+
+      - name: Require C6 fresh behavioral acceptance (CPC/C99 C=5 D=2 MATCH_SEMANTIC)
+        # Intentionally separate from structural validation: DIFF and other
+        # outcomes must remain archived for diagnosis, but fail the job.
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/cpc_run_evidence.py \
+            --evidence "${RUNNER_TEMP}/cpc-run-behavior" \
+            --require-accepted-behavior
+
+      - name: Reproduce C6 locally without GitHub Actions identity
+        run: |
+          set -euo pipefail
+          env -u GITHUB_RUN_ID -u GITHUB_SHA \
+            python3 tests/oracles/run_behavior_oracle.py \
+              --caprice tests/oracles/caprice32 \
+              --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+              --output "${RUNNER_TEMP}/cpc-run-behavior-local"
+          python3 tests/oracles/cpc_run_evidence.py \
+            --evidence "${RUNNER_TEMP}/cpc-run-behavior-local" \
+            --self-test --require-accepted-behavior
+
+      - name: Upload C6 RUN numeric proof (printer != screen)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpc6128-c6-run-behavior
+          path: ${{ runner.temp }}/cpc-run-behavior/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Verify CPC token parser and archival helper syntax
         run: |

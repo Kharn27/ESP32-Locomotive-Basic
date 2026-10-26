@@ -14,12 +14,18 @@ from pathlib import Path
 import re
 import shutil
 import struct
+import subprocess
 import sys
 import tempfile
 
 from run_behavior_oracle import CASES, EXPECTED_FILES, PIN, ROM_SHA, ROOT, digest, integer
 
 ALLOWED = {"MATCH_SEMANTIC", "DIFF", "UNSUPPORTED", "UNVERIFIED"}
+# Pilotage-approved anchors: NEVER derive them from acquisition.json or
+# manifest.json, which are themselves inputs to this verifier.
+APPROVED_ACQUISITION_SHA256 = "2e39584df89089120f422a0c7cd3541ac5e0b9a4f24788007b31c9d3cc34b895"
+APPROVED_GITHUB_RUN_ID = 40241824206
+APPROVED_ARTIFACT_ID = 12615969513
 PNG = b"\x89PNG\r\n\x1a\n"
 KINDS = {
     "source.bas": "basic_source",
@@ -79,23 +85,38 @@ def verify(base, permanent=False):
             re.fullmatch("[0-9a-f]{64}", oracle["amsdos_sha256"]) and
             "4.6.0" in oracle.get("version_output", ""),
             "unverified emulator/ROM provenance")
-    require(isinstance(manifest.get("github_run_id"), str) and
-            re.fullmatch("[0-9]+", manifest["github_run_id"]) and
-            re.fullmatch("[0-9a-f]{40}", str(manifest.get("github_sha", ""))),
-            "missing acquisition workflow identity")
+    # Temporary acquisitions can originate from a machine without Actions.
+    # Either both workflow fields are absent, or both must be well-formed.
+    run_id, github_sha = manifest.get("github_run_id"), manifest.get("github_sha")
+    if permanent:
+        require(isinstance(run_id, str) and
+                run_id == str(APPROVED_GITHUB_RUN_ID) and
+                isinstance(github_sha, str) and
+                re.fullmatch("[0-9a-f]{40}", github_sha) is not None,
+                "permanent acquisition GitHub identity unapproved/missing")
+    else:
+        require((run_id is None and github_sha is None) or
+                (isinstance(run_id, str) and
+                 re.fullmatch("[0-9]+", run_id) is not None and
+                 isinstance(github_sha, str) and
+                 re.fullmatch("[0-9a-f]{40}", github_sha) is not None),
+                "partial or malformed optional local GitHub identity")
     if permanent:
         original = manifest.get("original_artifact", {})
         require(type(original.get("run_id")) is int and
-                original["run_id"] == int(manifest["github_run_id"]) and
-                type(original.get("artifact_id")) is int and original["artifact_id"] > 0 and
+                original["run_id"] == APPROVED_GITHUB_RUN_ID and
+                type(original.get("artifact_id")) is int and
+                original["artifact_id"] == APPROVED_ARTIFACT_ID and
                 original.get("run_url") ==
                 "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/" +
-                str(original["run_id"]) and
-                re.fullmatch("[0-9a-f]{64}", str(original.get("acquisition_sha256", ""))),
-                "missing/incoherent permanent artifact provenance")
+                str(APPROVED_GITHUB_RUN_ID),
+                "unapproved permanent acquisition run/artifact identity")
+        # This digest is a hard-coded historical acceptance anchor. Checking
+        # ONLY manifest.original_artifact.acquisition_sha256 is forgeable.
         acquisition = (base / "acquisition.json").read_bytes()
-        require(digest(acquisition) == original["acquisition_sha256"],
-                "original acquisition manifest SHA-256 mismatch")
+        require(digest(acquisition) == APPROVED_ACQUISITION_SHA256 and
+                original.get("acquisition_sha256") == APPROVED_ACQUISITION_SHA256,
+                "approved acquisition SHA-256 anchor mismatch")
         before = json.loads(acquisition)
         expected = copy.deepcopy(manifest)
         expected.pop("original_artifact")
@@ -189,6 +210,21 @@ def verify(base, permanent=False):
     return results
 
 
+def require_accepted_behavior(results):
+    """Acceptance policy, intentionally separate from structural verification.
+
+    DIFF/UNVERIFIED/UNSUPPORTED are legitimate *observations* which should
+    remain archivable, but are not successes of the reproducibility gate.
+    """
+    require(set(results) == set(CASES), "C6 behavior gate: missing/extra case")
+    for case, (_, _, approved) in CASES.items():
+        result = results[case]
+        require(result["status"] == "MATCH_SEMANTIC" and
+                result["cpc"] == approved and result["native"] == approved,
+                f"C6 behavior gate: {case} expected CPC/C99={approved} "
+                f"MATCH_SEMANTIC, got {result}")
+
+
 def should_reject(base, mutate, label, permanent):
     with tempfile.TemporaryDirectory(prefix="c6-negative-") as tmp:
         copied = Path(tmp) / "evidence"
@@ -263,10 +299,15 @@ def main():
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--permanent", action="store_true")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--require-accepted-behavior", action="store_true",
+                        help="nonzero exit unless both fresh C/D probes are CPC/C99=5/2 MATCH_SEMANTIC")
     args = parser.parse_args()
     try:
         base = args.evidence.resolve()
-        verify(base, args.permanent)
+        results = verify(base, args.permanent)
+        if args.require_accepted_behavior:
+            require_accepted_behavior(results)
+            print("PASS: C6 behavioral acceptance gate C=5 D=2 MATCH_SEMANTIC")
         if args.self_test:
             self_test(base, args.permanent)
     except (Invalid, OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:

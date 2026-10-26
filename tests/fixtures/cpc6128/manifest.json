@@ -86,7 +86,8 @@
         "LIST",
         "RUN",
         "TOKENS",
-        "RUN_NUMERIC_PROBE"
+        "RUN_NUMERIC_PROBE",
+        "LIST_PRINTER_PROBE"
       ],
       "observations": {
         "TOKENS": {
@@ -120,6 +121,21 @@
           "evidence_run_id": 40241824206,
           "evidence_artifact_id": 12615969513,
           "expected_classification": "MATCH_SEMANTIC"
+        },
+        "LIST_PRINTER_PROBE": {
+          "case": "c_integer_add",
+          "path": "list_printer/c_integer_add/printer.dat",
+          "sha256": "c3db3e6b2880996f91a7d0ead4b0dadcda679d6ad0aae0d57292ae5060f21f27",
+          "source_sha256": "36afdbf24629f79f7753d1def84279374d54ee55eca7b03c2e0508da1ce396ec",
+          "origin": "cpc6128-rom-basic11",
+          "captured_at": "2026-10-26T07:11:37.188699+00:00",
+          "method": "Caprice32 pinned 8c778bf072a06fb7c23b9cccd179041db7f79a52 CPC6128 BASIC 1.1; fresh process; unchanged numbered source; direct LIST range,#8 without RUN; GitHub Actions #40284150801 artifact #12633570767; raw printer/CLI/screenshot/log/commands archived separately",
+          "media": "printer-list",
+          "comparison": "exact-bytes",
+          "oracle_channel": "CPC printer: direct LIST <range>,#8 (no RUN)",
+          "evidence_run_id": 40284150801,
+          "evidence_artifact_id": 12633570767,
+          "expected_classification": "DIFF"
         }
       }
     },
@@ -243,7 +259,8 @@
       "operations": [
         "LIST",
         "RUN",
-        "TOKENS"
+        "TOKENS",
+        "LIST_PRINTER_PROBE"
       ],
       "observations": {
         "TOKENS": {
@@ -262,6 +279,21 @@
             "header_bytes": 0,
             "memory_layout": "contiguous-cpc-ram-records"
           }
+        },
+        "LIST_PRINTER_PROBE": {
+          "case": "f_mixed_case",
+          "path": "list_printer/f_mixed_case/printer.dat",
+          "sha256": "b4cbaf999398b71c6bcddb7b82343db35691c044a292c2f13f01a23be73305ad",
+          "source_sha256": "8b1c146b127009fec277794afa9ad8ee586ceeb8f0bac75c652ded59b73c34d6",
+          "origin": "cpc6128-rom-basic11",
+          "captured_at": "2026-10-26T07:11:37.188699+00:00",
+          "method": "Caprice32 pinned 8c778bf072a06fb7c23b9cccd179041db7f79a52 CPC6128 BASIC 1.1; fresh process; unchanged numbered source; direct LIST range,#8 without RUN; GitHub Actions #40284150801 artifact #12633570767; raw printer/CLI/screenshot/log/commands archived separately",
+          "media": "printer-list",
+          "comparison": "exact-bytes",
+          "oracle_channel": "CPC printer: direct LIST <range>,#8 (no RUN)",
+          "evidence_run_id": 40284150801,
+          "evidence_artifact_id": 12633570767,
+          "expected_classification": "DIFF"
         }
       }
     },

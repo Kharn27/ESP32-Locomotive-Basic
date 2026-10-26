@@ -43,8 +43,10 @@ static LocoProbeStorage probe;
  * CI extracts them from this symbol's ELF section, rather than using host ABI.
  * The first item is a layout revision; values are uint32_t in target endian.
  */
+/* Volatile forces an actual referenced load: linker garbage collection must
+ * not discard this record even under ESP-IDF's optimized release build. */
 __attribute__((used))
-const uint32_t loco_probe_abi_sizes[] = {
+const volatile uint32_t loco_probe_abi_sizes[] = {
     1u,
     (uint32_t)sizeof(void *),
     (uint32_t)sizeof(size_t),

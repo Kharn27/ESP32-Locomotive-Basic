@@ -289,6 +289,45 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Acquire six B1 signed INTEGER programs on CPC (12 fresh sessions)
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/signed_print_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --native-cli "$RUNNER_TEMP/c99-build/loco_basic_cli" \
+            --output "$RUNNER_TEMP/j027-b1-signed-print"
+          python3 tests/oracles/signed_print_evidence.py \
+            --evidence "$RUNNER_TEMP/j027-b1-signed-print" \
+            --self-test --require-six-prints
+
+      - name: Log all authentic B1 output bytes and SHA-256 for archival review
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, hashlib, os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"]) / "j027-b1-signed-print"
+          for file in sorted(root.rglob("*")):
+              if file.is_file():
+                  path = file.relative_to(root).as_posix()
+                  data = file.read_bytes()
+                  print(f"B1_FILE {path} SIZE={len(data)} SHA256={hashlib.sha256(data).hexdigest()}", flush=True)
+                  print("B1_B64_BEGIN " + path, flush=True)
+                  encoded = base64.b64encode(data).decode("ascii")
+                  for i in range(0, len(encoded), 120):
+                      print(encoded[i:i + 120], flush=True)
+                  print("B1_B64_END", flush=True)
+          PY
+
+      - name: Upload authentic B1 CPC screenshots, printer streams and native logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpc6128-j027-b1-signed-print
+          path: ${{ runner.temp }}/j027-b1-signed-print/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Acquire CPC BASIC token RAM images before RUN
         run: |
           set -euo pipefail

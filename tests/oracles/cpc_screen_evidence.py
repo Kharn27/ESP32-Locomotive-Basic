@@ -22,9 +22,9 @@ from list_screen_oracle import (CASES, PIN, ROM_SHA, AMSDOS_SHA, ROOT,
 
 # Set these ONLY after a genuine independently reviewed GitHub Actions
 # acquisition has been promoted, NOT from the manifest under verification.
-APPROVED_ACQUISITION_SHA256 = None
-APPROVED_GITHUB_RUN_ID = None
-APPROVED_ARTIFACT_ID = None
+APPROVED_ACQUISITION_SHA256 = "8e45113b53719bdd374fc6d2f8d067a7d5819d234bb9f982ca8e502037bcc0d2"
+APPROVED_GITHUB_RUN_ID = 40318152573
+APPROVED_ARTIFACT_ID = 12647711931
 
 
 class Invalid(Exception):
@@ -275,9 +275,15 @@ def self_test(base, permanent):
         def coordinated(root, m):
             f = root / name / "screen.png"
             raw = f.read_bytes()
-            # Valid CRC-preserving alteration of screenshot pixels/metadata:
-            # a forged original can adjust all hashes and both manifests.
-            altered = raw + b"X"
+            # Insert a valid ancillary PNG chunk (with correct CRC) before
+            # IEND. Structural PNG checks must PASS; only the independent
+            # approved acquisition digest may reject the coordinated forgery.
+            payload = b"J0.24-C8\x00forged"
+            kind = b"tEXt"
+            new_chunk = (struct.pack(">I", len(payload)) + kind + payload +
+                         struct.pack(">I", zlib.crc32(kind + payload) & 0xffffffff))
+            altered = raw[:-12] + new_chunk + raw[-12:]
+            check_png(altered)
             f.write_bytes(altered)
             c = next(c for c in m["captures"] if c["case"] == name)
             c["files"]["screen.png"] = {

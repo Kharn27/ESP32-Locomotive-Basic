@@ -212,7 +212,7 @@ static int test_atomic_execution(void)
     CHECK(bvs_get(&store, &b, &v) == BVS_OK && v.data.integer == 5);
     memcpy(entry_copy, entries, sizeof(entries));
     CHECK(be_step(&e, out, sizeof(out), &written) == BE_OK);
-    CHECK(written == 2u && memcmp(out, "5\n", 2u) == 0);
+    CHECK(written == 4u && memcmp(out, " 5 \n", 4u) == 0);
     CHECK(memcmp(entry_copy, entries, sizeof(entries)) == 0);
     CHECK(be_step(&e, out, sizeof(out), &written) == BE_OK);
     CHECK(be_step(&e, out, sizeof(out), &written) == BE_END);

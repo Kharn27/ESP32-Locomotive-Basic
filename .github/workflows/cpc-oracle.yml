@@ -22,6 +22,10 @@ on:
       - "tests/test_basic_integer_expression_runtime.c"
       - "tests/test_loco_basic_cli.cmake"
       - "docs/J0.27-C1-integer-print-format.md"
+      - "docs/J0.28-post-c1-gate-audit.md"
+      - "tools/j0_post_c1_audit.py"
+      - "tools/j0_exit_audit.py"
+      - "docs/ROADMAP_GATES.md"
   workflow_dispatch:
 
 permissions:
@@ -68,6 +72,14 @@ jobs:
           cmake -S . -B "${RUNNER_TEMP}/c99-build"
           cmake --build "${RUNNER_TEMP}/c99-build" -j 2
           ctest --test-dir "${RUNNER_TEMP}/c99-build" --output-on-failure
+
+      - name: J0.28 post-C1 vertical slice, sealed history and negative falsifications
+        run: |
+          set -euo pipefail
+          python3 tools/j0_post_c1_audit.py \
+            --cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+            --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" \
+            --self-test
 
       - name: Check historical differential manifest (only actually promoted token observations)
         # Only original ROM-backed RAM records are promoted; never fabricate LIST or RUN oracles.

@@ -297,7 +297,8 @@ jobs:
             --native-cli "$RUNNER_TEMP/c99-build/loco_basic_cli" \
             --output "$RUNNER_TEMP/j027-b1-signed-print"
           python3 tests/oracles/signed_print_evidence.py \
-            --evidence "$RUNNER_TEMP/j027-b1-signed-print" --self-test
+            --evidence "$RUNNER_TEMP/j027-b1-signed-print" \
+            --self-test --require-six-prints
 
       - name: Log all authentic B1 output bytes and SHA-256 for archival review
         run: |

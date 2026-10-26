@@ -32,7 +32,30 @@ EXECUTABLE = {
     "zero": ("../oracles/inputs/j027_b1/zero.bas", 0, 3),
     "five": ("../oracles/inputs/j027_b1/five.bas", 5, 3),
 }
+# This immutable J0 classification describes ARCHIVED observations, not the
+# supported program inputs of later native engines.
 B1_UNSUPPORTED = ("minus_one", "minus_twelve", "max_int16", "min_int16")
+# J1.1 adds executable negatives; old archives MUST still say UNSUPPORTED.
+CURRENT_B1_UNSUPPORTED = ("max_int16", "min_int16")
+
+
+def current_capabilities():
+    filename = ROOT / "tests/oracles/j1_native_capabilities.json"
+    data = json.loads(filename.read_bytes())
+    require(data.get("schema_version") == 1 and data.get("phase") == "J1.1",
+            "CURRENT_CAPABILITY_SCHEMA_CHANGED")
+    require(data.get("archived_B1_native_status") ==
+            {name: "UNSUPPORTED" for name in B1_UNSUPPORTED},
+            "ARCHIVED_B1_STATUS_REWRITTEN")
+    require(data.get("current_native_B1") ==
+            {"minus_one": "EXECUTABLE", "minus_twelve": "EXECUTABLE",
+             "max_int16": "UNSUPPORTED", "min_int16": "UNSUPPORTED"},
+            "CURRENT_B1_CAPABILITY_PROMOTION_FORBIDDEN")
+    require(data.get("historical_LIST_RUN") == "UNVERIFIED" and
+            data.get("presentation_comparison") == "MATCH_PRESENTATION" and
+            data.get("screen_transport") == "VISUAL_OBSERVATION",
+            "HISTORICAL_CHANNEL_PROMOTION_FORBIDDEN")
+    return data
 HISTORICAL_CASES = (
     "a_print_constants", "b_integer_scalar", "c_integer_add",
     "d_self_reference", "e_goto", "f_let_spacing",
@@ -145,7 +168,8 @@ def run_case(name, spec, cpc_root, cli, image_cli, printer):
 
 def refuse_non_executable_b1(cli):
     """Exercise the four historical B1 programs; DO NOT promote them."""
-    for case in B1_UNSUPPORTED:
+    current_capabilities()
+    for case in CURRENT_B1_UNSUPPORTED:
         value = {"minus_one": -1, "minus_twelve": -12,
                  "max_int16": 32767, "min_int16": -32768}[case]
         source = (ROOT / "tests/oracles/inputs/j027_b1" /
@@ -206,6 +230,7 @@ def negative_tests(cpc_root):
         # A full untouched archive copy MUST pass before any mutation.
         integrity(dest, independent=False)
         reject_if_invalid_policy(copy.deepcopy(POLICY))
+        current_capabilities()
         print("PASS POSITIVE INTACT_TEMP_COPY", flush=True)
 
         for name, case, cpc, native, expected, reason in (
@@ -265,6 +290,7 @@ def main():
                 "both real C99 executables required; build with CMake first")
         root = ROOT / "tests/fixtures/cpc6128"
         reject_if_invalid_policy(POLICY)
+        current_capabilities()
         integrity(root)
         for name, spec in EXECUTABLE.items():
             cpc = ((root / "run_behavior" / name / "printer.dat").read_bytes()

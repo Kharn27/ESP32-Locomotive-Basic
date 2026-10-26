@@ -28,6 +28,11 @@ jobs:
           python3 tools/j0_post_c1_audit.py \
             --cli build/loco_basic_cli \
             --image-cli build/basic_program_image_cli --self-test
+      - name: J1.1 signed INTEGER native/CPC independent differential audit
+        run: |
+          python3 tools/j1_signed_assignment_audit.py \
+            --cli build/loco_basic_cli \
+            --image-cli build/basic_program_image_cli --self-test
       - name: J0.23 memory audit (Linux host only)
         run: |
           cc --version | head -n 1

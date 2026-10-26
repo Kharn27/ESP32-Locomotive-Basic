@@ -165,17 +165,26 @@ static int test_invalid_images(void)
     static const uint8_t bad7[] = {0xa5u,3u,0u,0u,0xc1u,0xefu,0x10u};
     static const uint8_t bad8[] = {2u,0u,0u,0xc1u,0xefu,0x1au};
     static const uint8_t bad9[] = {2u,0u,0u,0xc1u,0xefu,0x10u,0x01u,0x98u};
+    static const uint8_t bad10[] = {2u,0u,0u,0xc1u,0xefu,0xf5u};
+    static const uint8_t bad11[] = {2u,0u,0u,0xc1u,0xefu,0xf5u,0xf5u,0x0fu};
+    static const uint8_t bad12[] = {2u,0u,0u,0xc1u,0xefu,0xf5u,0x19u,9u};
+    static const uint8_t bad13[] = {2u,0u,0u,0xc1u,0xefu,0xf5u,0x02u,0,0,0xc1u};
+    static const uint8_t bad14[] = {2u,0u,0u,0xc1u,0xefu,0xf5u,0x0fu,0x01u,0x98u};
     static const uint8_t *const data[] = {
-        bad1,bad2,bad3,bad4,bad5,bad6,bad7,bad8,bad9
+        bad1,bad2,bad3,bad4,bad5,bad6,bad7,bad8,bad9,
+        bad10,bad11,bad12,bad13,bad14
     };
     static const size_t len[] = {
         sizeof(bad1),sizeof(bad2),sizeof(bad3),sizeof(bad4),sizeof(bad5),
-        sizeof(bad6),sizeof(bad7),sizeof(bad8),sizeof(bad9)
+        sizeof(bad6),sizeof(bad7),sizeof(bad8),sizeof(bad9),
+        sizeof(bad10),sizeof(bad11),sizeof(bad12),sizeof(bad13),
+        sizeof(bad14)
     };
     static const BEStatus errors[] = {
         BE_TRUNCATED,BE_TRUNCATED,BE_TRUNCATED,BE_BAD_SEQUENCE,
         BE_TRUNCATED,BE_BAD_SEQUENCE,BE_BAD_SEQUENCE,BE_BAD_SEQUENCE,
-        BE_UNSUPPORTED
+        BE_UNSUPPORTED,BE_TRUNCATED,BE_BAD_SEQUENCE,BE_BAD_SEQUENCE,
+        BE_BAD_SEQUENCE,BE_UNSUPPORTED
     };
     Harness h;
     CHECK(setup(&h, 2u) == 0);
@@ -354,6 +363,43 @@ static int test_run_new_and_regressions(void)
     return 0;
 }
 
+
+/* A negative assignment is atomic; PRINT needs its exact output capacity. */
+static int test_signed_print_capacity_and_atomicity(void)
+{
+    Harness h;
+    size_t cursor_before;
+    BasicVariableEntry entries_before[8];
+    uint8_t program_before[sizeof(h.storage)];
+    CHECK(setup(&h, 1u) == 0);
+    CHECK(put(&h, 10u, "B%=-12") == 0);
+    CHECK(put(&h, 20u, "PRINT B%") == 0);
+    CHECK(put(&h, 30u, "END") == 0);
+    CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+    memset(h.output, 0xcc, sizeof(h.output));
+    h.written = 88u;
+    CHECK(be_step(&h.executor, h.output, 0u, &h.written) == BE_OK);
+    CHECK(h.store.count == 1u && has(&h, "B", -12) == 0);
+    CHECK(h.written == 0u && h.output[0] == 0xccu);
+    cursor_before = h.executor.cursor;
+    memcpy(entries_before, h.entries, sizeof(entries_before));
+    memcpy(program_before, h.storage, sizeof(program_before));
+    h.written = 88u;
+    CHECK(be_step(&h.executor, h.output, 4u, &h.written) == BE_NO_SPACE);
+    CHECK(h.written == 88u && h.executor.cursor == cursor_before);
+    CHECK(memcmp(entries_before, h.entries, sizeof(entries_before)) == 0);
+    CHECK(memcmp(program_before, h.storage, sizeof(program_before)) == 0);
+    for (size_t i = 0u; i < sizeof(h.output); ++i) {
+        CHECK(h.output[i] == 0xccu);
+    }
+    CHECK(be_step(&h.executor, h.output, 5u, &h.written) == BE_OK);
+    CHECK(h.written == 5u && memcmp(h.output, "-12 \n", 5u) == 0);
+    CHECK(has(&h, "B", -12) == 0);
+    CHECK(be_step(&h.executor, h.output, sizeof(h.output), &h.written) == BE_OK);
+    CHECK(be_step(&h.executor, h.output, sizeof(h.output), &h.written) == BE_END);
+    return 0;
+}
+
 int main(void)
 {
     CHECK(test_literals_and_names() == 0);
@@ -362,6 +408,7 @@ int main(void)
     CHECK(test_full_and_atomic() == 0);
     CHECK(test_overlap_and_legacy() == 0);
     CHECK(test_output_capacity() == 0);
+    CHECK(test_signed_print_capacity_and_atomicity() == 0);
     CHECK(test_run_new_and_regressions() == 0);
     puts("integer_assignment_runtime: OK (synthetic CPC-derived fixtures)");
     return 0;

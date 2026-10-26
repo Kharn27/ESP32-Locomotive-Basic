@@ -24,6 +24,10 @@ on:
       - "docs/J0.27-C1-integer-print-format.md"
       - "docs/J0.28-post-c1-gate-audit.md"
       - "tools/j0_post_c1_audit.py"
+      - "tests/oracles/j1_signed_token_oracle.py"
+      - "docs/J1.1-signed-integer-assignment.md"
+      - "tools/j1_signed_assignment_audit.py"
+      - "tests/oracles/j1_native_capabilities.json"
       - "tools/j0_exit_audit.py"
       - "docs/ROADMAP_GATES.md"
   workflow_dispatch:
@@ -124,6 +128,13 @@ jobs:
             test "$result" -ne 0
             grep -q 'VERIFIED_CASES=5 TOKEN_BINARIES=5' "$RUNNER_TEMP/gate.log"
           fi
+
+      - name: J1.1 verify archived original CPC negative INTEGER images and live native RUN
+        run: |
+          python3 tools/j1_signed_assignment_audit.py \
+            --cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+            --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" \
+            --self-test
 
       - name: Acquire CPC 6128 BASIC 1.1 evidence
         run: |
@@ -383,3 +394,37 @@ jobs:
           path: ${{ runner.temp }}/cpc-oracle/
           if-no-files-found: warn
           retention-days: 14
+
+      - name: J1.1 acquire new independent negative INTEGER token images (pre-RUN)
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/j1_signed_token_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --image-cli "${RUNNER_TEMP}/c99-build/basic_program_image_cli" \
+            --output "${RUNNER_TEMP}/j1-signed-tokens"
+
+      - name: J1.1 publish original delimited CPC bytes and SHA-256 (no SNA/ROM)
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          base = Path(os.environ["RUNNER_TEMP"]) / "j1-signed-tokens"
+          if base.exists():
+              for path in sorted(base.rglob("*")):
+                  if path.is_file():
+                      data = path.read_bytes()
+                      print("J1_ORIGINAL", path.relative_to(base),
+                            "SIZE", len(data), "SHA256", hashlib.sha256(data).hexdigest(), flush=True)
+                      if path.name == "program.bin":
+                          print("J1_ORIGINAL_CPC_PROGRAM_HEX", path.parent.name, data.hex(), flush=True)
+          PY
+
+      - name: Upload independent J1.1 CPC program images and provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpc6128-j1-signed-negative-program-ram
+          path: ${{ runner.temp }}/j1-signed-tokens/
+          if-no-files-found: warn
+          retention-days: 30

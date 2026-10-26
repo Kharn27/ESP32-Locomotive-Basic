@@ -432,6 +432,7 @@ static BEStatus execute_line(const BasicProgram *program,
             BasicVariableValue value = {0};
             size_t consumed, start;
             uint8_t literal;
+            int negative = 0;
             BVBStatus resolved;
             /* Multi-statement lines must not commit a PRINT prefix or
              * an assignment on the same line. The probe stays pure. */
@@ -474,6 +475,15 @@ static BEStatus execute_line(const BasicProgram *program,
                 return BE_TRUNCATED;
             }
             literal = body[pos++];
+            if (literal == 0xf5u) {
+                /* Tokenized CPC unary minus, not a signed-byte encoding.
+                 * The RHS must still be one immediate positive literal. */
+                negative = 1;
+                if (pos == length) {
+                    return BE_TRUNCATED;
+                }
+                literal = body[pos++];
+            }
             if (literal >= 0x0eu && literal <= 0x17u) {
                 value.data.integer = (int16_t)(literal - 0x0eu);
             } else if (literal == 0x19u) {
@@ -485,7 +495,7 @@ static BEStatus execute_line(const BasicProgram *program,
                     return BE_BAD_SEQUENCE;
                 }
                 value.data.integer = (int16_t)literal;
-            } else if (literal == 0x02u) {
+            } else if (literal == 0x02u && !negative) {
                 /* The very same bounded decoder/evaluator is called by both
                  * be_step passes; neither pass mutates the store. */
                 status = evaluate_integer_addition(body, length, pos - 1u,
@@ -496,6 +506,10 @@ static BEStatus execute_line(const BasicProgram *program,
                 }
             } else {
                 return BE_BAD_SEQUENCE;
+            }
+            if (negative) {
+                /* Magnitude is bounded to 0..255 by existing token grammar. */
+                value.data.integer = (int16_t)(-(int32_t)value.data.integer);
             }
             skip_spaces(body, length, &pos);
             /* Multi-statement lines with an assignment are not in J0.19.

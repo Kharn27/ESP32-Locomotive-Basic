@@ -365,13 +365,17 @@ static int test_runtime_run_new_stop(void)
     return 0;
 }
 
-/* End-to-end: B%=0/5/2 assignments are executable natively. */
+/* End-to-end: J0 0/5/2 plus J1.1 CPC unary-minus assignments. */
 static int test_executable_b_assignments(void)
 {
-    static const char *const input[] = {"B%=0", "B%=5", "B%=2"};
-    static const char *const expected[] = {" 0 \n", " 5 \n", " 2 \n"};
+    static const char *const input[] = {"B%=0", "B%=5", "B%=2",
+                                          "B%=-1", "B%=-12"};
+    static const char *const expected[] = {" 0 \n", " 5 \n", " 2 \n",
+                                             "-1 \n", "-12 \n"};
     size_t i;
-    for (i = 0u; i < 3u; ++i) {
+    CHECK(sizeof(input) / sizeof(input[0]) ==
+          sizeof(expected) / sizeof(expected[0]));
+    for (i = 0u; i < sizeof(input) / sizeof(input[0]); ++i) {
         Harness h;
         BasicSessionRuntime runtime;
         BSRResult r;

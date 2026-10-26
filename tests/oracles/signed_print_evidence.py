@@ -38,7 +38,7 @@ def load(path):
     return json.loads(path.read_bytes())
 
 
-def verify(base):
+def verify(base, require_six_prints=False):
     require(base.is_dir(), "missing J0.27-B1 directory")
     require((base / "manifest.json").is_file(), "missing manifest.json")
     m = load(base / "manifest.json")
@@ -200,6 +200,13 @@ def verify(base):
     require(present == inventory, "unexpected/missing evidence file inventory")
     for case, value in VALUES.items():
         printer, screen = outcomes[case + "_printer"], outcomes[case + "_screen"]
+        if require_six_prints:
+            # Structural validation deliberately allows an error screenshot.
+            # The acceptance gate cannot silently pass an unreviewed CPC
+            # error or missing printer stream as a successful observation.
+            require(printer["status"] == "PRINT_NUMERIC",
+                    case + ": missing numeric CPC proof; historical "
+                    "screenshot diagnosis requires independent review")
         print(case, "hypothesis=", value,
               "printer=", printer["raw_hex"], "status=", printer["status"],
               "C99=", screen["native_status"], "screen=VISUAL_OBSERVATION",
@@ -272,9 +279,11 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--evidence", required=True, type=Path)
     p.add_argument("--self-test", action="store_true")
+    p.add_argument("--require-six-prints", action="store_true",
+                   help="fail closed if any of the six CPC values lacks raw printer proof")
     args = p.parse_args()
     base = args.evidence.resolve()
-    verify(base)
+    verify(base, require_six_prints=args.require_six_prints)
     print("PASS POSITIVE INTACT B1 EVIDENCE", flush=True)
     if args.self_test:
         self_test(base)

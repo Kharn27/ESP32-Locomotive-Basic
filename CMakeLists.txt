@@ -241,3 +241,13 @@ if(BUILD_TESTING)
         --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/list_printer"
         --permanent --self-test)
 endif()
+
+# J0.24-C8: twenty-sixth portable CTest suite. Genuine CPC screen PNGs
+# are visual evidence only; this test verifies SHA/provenance, not text bytes.
+# The 25 previous CTest suites are preserved unchanged.
+if(BUILD_TESTING)
+    add_test(NAME cpc_list_screen_permanent_evidence COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/oracles/cpc_screen_evidence.py"
+        --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/list_screen"
+        --permanent --self-test)
+endif()

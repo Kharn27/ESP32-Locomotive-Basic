@@ -297,6 +297,40 @@ def self_test(base, permanent):
                 raise Invalid(name + ": FORGERY NOT REJECTED")
 
 
+
+def archival_self_test(base):
+    """Independently pinned permanent approval must reject forged wrappers."""
+    cases = (
+        ("artifact_id", "unapproved artifact/manifest anchor"),
+        ("acquisition_sha", "approved acquisition SHA-256 mismatch"),
+        ("missing_acquisition", "approved acquisition missing"),
+    )
+    with tempfile.TemporaryDirectory() as td:
+        for name, reason in cases:
+            dest = Path(td) / name
+            shutil.copytree(base, dest)
+            verify(dest, permanent=True)  # Mandatory clean positive check.
+            manifest = dest / "manifest.json"
+            acquisition = dest / "acquisition.json"
+            if name == "artifact_id":
+                data = load(manifest)
+                data["original_artifact"]["artifact_id"] += 1
+                manifest.write_text(json.dumps(data, indent=2) + "\n")
+            elif name == "acquisition_sha":
+                acquisition.write_bytes(acquisition.read_bytes().replace(
+                    b'"phase": "J0.27-A"', b'"phase": "J0.27-X"'))
+            else:
+                acquisition.unlink()
+            try:
+                verify(dest, permanent=True)
+            except Invalid as err:
+                require(str(err) == reason,
+                        name + ": WRONG REJECTION CAUSE " + str(err))
+                print("PASS EXPECTED_ARCHIVAL_REJECTION", name,
+                      "cause=", str(err), flush=True)
+            else:
+                raise Invalid(name + ": FORGED PERMANENT ARCHIVE ACCEPTED")
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--evidence", type=Path, required=True)
@@ -307,6 +341,8 @@ def main():
     print("PASS POSITIVE INTACT EVIDENCE")
     if args.self_test:
         self_test(args.evidence.resolve(), args.permanent)
+        if args.permanent:
+            archival_self_test(args.evidence.resolve())
 
 
 if __name__ == "__main__":

@@ -77,6 +77,12 @@ jobs:
       - name: Verify permanent C6 independent RUN/probe evidence and source provenance
         run: python3 tests/oracles/cpc_run_evidence.py --evidence tests/fixtures/cpc6128/run_behavior --permanent --self-test
 
+      - name: Verify C7 permanent authentic CPC LIST printer captures and forgery guards
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/cpc_list_evidence.py \
+            --evidence tests/fixtures/cpc6128/list_printer --permanent --self-test
+
       - name: Check eight-case quantitative threshold (not J0.24 acceptance)
         run: |
           set -euo pipefail

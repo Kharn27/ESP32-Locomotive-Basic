@@ -281,3 +281,12 @@ if(BUILD_TESTING)
         --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/signed_print"
         --permanent --self-test)
 endif()
+
+# J0.28: live CLI token/LIST/RUN and post-C1 INTEGER presentation audit.
+# Does not change historical classifications or authorize J0/J1 transition.
+if(BUILD_TESTING)
+    add_test(NAME j0_post_c1_gate_audit COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j0_post_c1_audit.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

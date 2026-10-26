@@ -159,14 +159,25 @@ def inspect(base):
             and printer_seen == set(LIST_CASES),
             "insufficient 8 TOKENS / 2 RUN probes / 2 LIST printer captures")
     token_archive = load(base / "token_ram" / "manifest.json")
+    master_by_id = {case["id"]: case for case in cases}
     require(token_archive.get("phase") == "J0.24-C5" and
             {c.get("id") for c in token_archive.get("cases", [])} == TOKEN_CASES and
             len(token_archive["cases"]) == 8,
             "C3/C4/C5 eight-case manifest changed")
     for c in token_archive["cases"]:
-        require(c.get("comparison") is not None and
-                (base.parent.parent.parent / c["source_path"]).is_file(),
-                f"token archive case {c.get('id')} incomplete")
+        cid = c["id"]
+        # source_path is repository-relative provenance, not relative to ROOT
+        # or to the parent directories of a potentially temporary corpus copy.
+        # Resolve it through the corresponding source of THIS corpus instance.
+        source_record = master_by_id[cid]
+        require(c.get("source_path") ==
+                "tests/fixtures/cpc6128/" + source_record["source"] and
+                c.get("source_sha256") == source_record["source_sha256"],
+                f"token archive case {cid}: source provenance drift")
+        source = base / source_record["source"]
+        require(c.get("comparison") == "MATCH_EXACT" and source.is_file()
+                and raw_sha(source) == c["source_sha256"],
+                f"token archive case {cid} incomplete")
     run, run_captures = archive_case_map(
         base, "run_behavior", RUN_CASES, "MATCH_SEMANTIC", "RUN_NUMERIC_PROBE")
     format_gaps = []
@@ -232,64 +243,99 @@ def external_validators():
 
 
 def negative_tests(base):
+    """Falsify only a corpus that already passes, and require exact failure causes."""
     with tempfile.TemporaryDirectory(prefix="j026-audit-") as temp:
         copied = Path(temp) / "cpc6128"
         shutil.copytree(base, copied)
+
+        # Mandatory positive control: an UNMODIFIED temporary copy must pass the
+        # same inspect() used by the negative tests, or no mutation can count.
+        print("PASS POSITIVE INTACT_TEMP_COPY", inspect(copied).splitlines()[0])
+
         def mutate_json(path, change):
             p = copied / path
             doc = load(p)
             change(doc)
             p.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+
         scenarios = [
-            ("lost-token", lambda: (copied / "token_ram/b_integer_scalar/program.bin").unlink()),
+            ("lost-token", lambda: (
+                copied / "token_ram/b_integer_scalar/program.bin").unlink(),
+             "b_integer_scalar/TOKENS: missing/modified archived evidence"),
             ("promoted-LIST", lambda: mutate_json("manifest.json",
                 lambda m: m["cases"][0]["observations"].update(
-                    {"LIST": {"expected_classification": "MATCH_EXACT"}}))),
+                    {"LIST": {"expected_classification": "MATCH_EXACT"}})),
+             "a_print_constants: UNVERIFIED operation promoted or observation lost"),
             ("lost-RUN", lambda: mutate_json("manifest.json",
-                lambda m: m["cases"][0]["operations"].remove("RUN"))),
+                lambda m: m["cases"][0]["operations"].remove("RUN")),
+             "a_print_constants: one of 18 historical LIST/RUN operations removed/changed"),
             ("forged-TOKENS", lambda: mutate_json("manifest.json",
                 lambda m: m["cases"][0]["observations"]["TOKENS"].update(
-                    {"expected_classification": "MATCH_SEMANTIC"}))),
+                    {"expected_classification": "MATCH_SEMANTIC"})),
+             "a_print_constants/TOKENS: forged classification or media"),
             ("printer-classification", lambda: mutate_json("list_printer/manifest.json",
-                lambda m: m["captures"][0].update({"classification": "MATCH_EXACT"}))),
+                lambda m: m["captures"][0].update({"classification": "MATCH_EXACT"})),
+             "list_printer/c_integer_add: classification or operation drift"),
             ("screen-channel", lambda: mutate_json("list_screen/manifest.json",
                 lambda m: m["captures"][0].update(
-                    {"cpc_channel": "native.stdout.bin: invented text"}))),
+                    {"cpc_channel": "native.stdout.bin: invented text"})),
+             "list_screen/c_integer_add: CPC/native channel confusion"),
             ("screen-promotion", lambda: mutate_json("list_screen/manifest.json",
-                lambda m: m.update({"screen_text_bytes_extracted": True}))),
-            ("printer-byte-swap", lambda: (copied / "list_printer/c_integer_add/printer.dat").write_bytes(
-                (copied / "list_printer/c_integer_add/native.stdout.bin").read_bytes())),
+                lambda m: m.update({"screen_text_bytes_extracted": True})),
+             "screen pixels promoted to textual byte oracle"),
+            ("printer-byte-swap", lambda: (
+                copied / "list_printer/c_integer_add/printer.dat").write_bytes(
+                    (copied / "list_printer/c_integer_add/native.stdout.bin").read_bytes()),
+             "c_integer_add: C7 DIFF is no longer solely CRLF/LF"),
             ("c6-cpc-numeric-spaces-removed", lambda: (
-                copied / "run_behavior/c_integer_add/printer.dat").write_bytes(b"5\r\n")),
+                copied / "run_behavior/c_integer_add/printer.dat").write_bytes(b"5\r\n"),
+             "c_integer_add: CPC C6 post-RUN printer numeric format changed"),
             ("c6-native-numeric-spaces-added", lambda: (
-                copied / "run_behavior/d_self_reference/native.stdout.bin").write_bytes(b" 2 \n")),
+                copied / "run_behavior/d_self_reference/native.stdout.bin").write_bytes(b" 2 \n"),
+             "d_self_reference: C99 C6 RUN stdout numeric format changed"),
         ]
-        for name, mutation in scenarios:
-            # Recopy originals before each independent negative mutation.
+        for name, mutation, expected_reason in scenarios:
+            # Each mutation starts from a fresh, proven-good temporary copy.
             shutil.rmtree(copied)
             shutil.copytree(base, copied)
+            try:
+                inspect(copied)
+            except Exception as error:
+                raise AuditError(
+                    f"{name}: unmodified recopy failed before mutation: {error}"
+                ) from error
             mutation()
             try:
                 inspect(copied)
-            except (AuditError, OSError, KeyError, ValueError):
-                print("PASS NEGATIVE", name)
+            except AuditError as error:
+                require(str(error) == expected_reason,
+                        f"{name}: WRONG_REJECTION_CAUSE: "
+                        f"expected {expected_reason!r}, got {str(error)!r}")
+                print(f"PASS EXPECTED_REJECTION {name} cause={error}")
             else:
-                raise AuditError("negative test did not reject " + name)
-    # Direct regression tests for the formatting diagnostic itself, independent
-    # of the archive's SHA checks (which also reject mutated fixture bytes).
+                raise AuditError(f"{name}: mutation did not cause rejection")
+            # OSError/KeyError/etc. are NOT accepted as expected rejections.
+
+    # Direct signature tests: archive SHA checks cannot satisfy these.
     bad_signatures = [
-        ("missing-both-spaces", b"5\r\n", b"5\n", 5),
-        ("missing-trailing-space", b" 5\r\n", b"5\n", 5),
-        ("native-space-added", b" 5 \r\n", b" 5 \n", 5),
-        ("wrong-value", b" 2 \r\n", b"2\n", 5),
+        ("missing-both-spaces", b"5\r\n", b"5\n", 5,
+         "CPC C6 post-RUN printer numeric format changed"),
+        ("missing-trailing-space", b" 5\r\n", b"5\n", 5,
+         "CPC C6 post-RUN printer numeric format changed"),
+        ("native-space-added", b" 5 \r\n", b" 5 \n", 5,
+         "C99 C6 RUN stdout numeric format changed"),
+        ("wrong-value", b" 2 \r\n", b"2\n", 5,
+         "CPC C6 post-RUN printer numeric format changed"),
     ]
-    for name, cpc_bytes, native_bytes, value in bad_signatures:
+    for name, cpc_bytes, native_bytes, value, expected_suffix in bad_signatures:
         try:
             c6_format_gap(cpc_bytes, native_bytes, value, name)
-        except AuditError:
-            print("PASS NEGATIVE C6 FORMAT", name)
+        except AuditError as error:
+            require(str(error) == f"{name}: {expected_suffix}",
+                    f"{name}: WRONG_C6_REJECTION_CAUSE: {error}")
+            print(f"PASS EXPECTED_C6_REJECTION {name} cause={error}")
         else:
-            raise AuditError("C6 numeric formatting negative test missed " + name)
+            raise AuditError(f"{name}: C6 numeric format mutation was accepted")
 
 
 def main():

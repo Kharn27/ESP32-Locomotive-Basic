@@ -248,6 +248,40 @@ jobs:
           python3 -m py_compile tools/promote_token_ram_c4.py tools/promote_token_ram_c5.py
           python3 tests/oracles/token_ram_oracle.py --self-test
 
+      - name: Acquire four independent J0.27-A CPC PRINT channels during RUN
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/numeric_print_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --native-cli "$RUNNER_TEMP/c99-build/loco_basic_cli" \
+            --output "$RUNNER_TEMP/j027-numeric-print"
+          python3 tests/oracles/numeric_print_evidence.py \
+            --evidence "$RUNNER_TEMP/j027-numeric-print" --self-test
+
+      - name: Export unmodified J0.27-A acquisitions for independently reviewed archival
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, os
+          root = Path(os.environ["RUNNER_TEMP"]) / "j027-numeric-print"
+          for p in sorted(root.rglob("*")):
+              if p.is_file():
+                  print("J027_B64_BEGIN " + p.relative_to(root).as_posix(), flush=True)
+                  data = base64.b64encode(p.read_bytes()).decode("ascii")
+                  for i in range(0, len(data), 120):
+                      print(data[i:i+120], flush=True)
+                  print("J027_B64_END", flush=True)
+          PY
+
+      - name: Upload authentic J0.27-A CPC screen/printer/C99 captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpc6128-j027-numeric-print
+          path: ${{ runner.temp }}/j027-numeric-print/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Acquire CPC BASIC token RAM images before RUN
         run: |
           set -euo pipefail

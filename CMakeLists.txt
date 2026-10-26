@@ -259,3 +259,15 @@ if(BUILD_TESTING)
         ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j0_exit_audit.py"
         --self-test)
 endif()
+
+
+# J0.27-A: the oracle evidence is permanent, independently approved, and
+# required. CTest fails closed if a source/PNG/printer byte/manifest is absent.
+if(BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME numeric_print_provenance
+        COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/oracles/numeric_print_evidence.py"
+            --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/numeric_print"
+            --permanent --self-test)
+endif()

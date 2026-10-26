@@ -151,11 +151,11 @@ def refuse_non_executable_b1(cli):
         source = (ROOT / "tests/oracles/inputs/j027_b1" /
                   (case + ".bas")).read_bytes()
         require(source ==
-                (f"10 B%={value}\\n20 PRINT B%\\n30 END\\n").encode("ascii"),
+                (f"10 B%={value}\n20 PRINT B%\n30 END\n").encode("ascii"),
                 case + ": UNSUPPORTED_B1_SOURCE_CHANGED")
         try:
             result = subprocess.run([str(cli)],
-                                    input=source + b"RUN\\n:step 100\\n:quit\\n",
+                                    input=source + b"RUN\n:step 100\n:quit\n",
                                     capture_output=True, timeout=20, check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise AuditError(case + ": UNSUPPORTED_CLI_PROCESS_FAILED") from exc

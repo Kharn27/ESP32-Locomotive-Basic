@@ -297,7 +297,12 @@ def self_test(base, permanent):
     # Use authentic historical bytes, but drop the permanent provenance wrapper
     # to model the output produced by run_behavior_oracle.py on that machine.
     def local_copy(destination):
-        shutil.copytree(base, destination)
+        # Always use the permanently approved baseline, NOT the just-acquired
+        # data under validation. The self-test must pass even if a fresh RUN
+        # legitimately reports DIFF/UNVERIFIED/UNSUPPORTED (diagnostic mode).
+        trusted_baseline = ROOT / "tests/fixtures/cpc6128/run_behavior"
+        require(trusted_baseline.is_dir(), "missing trusted baseline for C6 negative tests")
+        shutil.copytree(trusted_baseline, destination)
         j = read_json(destination / "manifest.json")
         j.pop("original_artifact", None)
         (destination / "acquisition.json").unlink(missing_ok=True)

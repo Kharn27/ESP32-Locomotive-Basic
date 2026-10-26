@@ -5,7 +5,6 @@ CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_PARTITION_TABLE_OFFSET=0x8000
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
-# Explicitly disable the default-on Wi-Fi component in effective sdkconfig.
-# CONFIG_ESP_WIFI_ENABLED is not set
+# main-only component graph omits esp_wifi / bt and their Kconfig.
 # CONFIG_BT_ENABLED is not set
 # No SPIRAM/PSRAM; this CYD has none.

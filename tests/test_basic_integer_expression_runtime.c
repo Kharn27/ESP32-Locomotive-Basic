@@ -127,7 +127,7 @@ static int test_program(void)
     CHECK(h.store.count == 2u);
     h.written = 500u;
     CHECK(be_step(&h.executor, h.output, sizeof(h.output), &h.written) == BE_OK);
-    CHECK(h.written == 2u && memcmp(h.output, "5\n", 2u) == 0);
+    CHECK(h.written == 4u && memcmp(h.output, " 5 \n", 4u) == 0);
     CHECK(step(&h) == 0);
     h.written = 123u;
     CHECK(be_step(&h.executor, h.output, sizeof(h.output), &h.written) == BE_END);

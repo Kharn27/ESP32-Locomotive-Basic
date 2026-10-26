@@ -96,6 +96,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tests/fixtures/cpc6128/signed_print
           git rm -f .github/workflows/j027-b2-import.yml
-          git diff --cached --check
+          # Authentic historical files intentionally contain trailing spaces and blank EOFs.
+          # They must remain byte-for-byte unchanged: do NOT run whitespace lint on them.
           git commit -m "J0.27-B2: archive approved B1 bytes and retire one-shot importer"
           git push origin HEAD:feat/j0-27-b2-permanent-signed-evidence

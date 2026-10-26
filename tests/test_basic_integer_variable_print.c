@@ -373,7 +373,9 @@ static int test_executable_b_assignments(void)
     static const char *const expected[] = {" 0 \n", " 5 \n", " 2 \n",
                                              "-1 \n", "-12 \n"};
     size_t i;
-    for (i = 0u; i < 3u; ++i) {
+    CHECK(sizeof(input) / sizeof(input[0]) ==
+          sizeof(expected) / sizeof(expected[0]));
+    for (i = 0u; i < sizeof(input) / sizeof(input[0]); ++i) {
         Harness h;
         BasicSessionRuntime runtime;
         BSRResult r;

@@ -1,0 +1,17 @@
+[
+  "xvfb-run",
+  "-a",
+  "/home/runner/work/ESP32-Locomotive-Basic/ESP32-Locomotive-Basic/tests/oracles/caprice32/cap32",
+  "-c",
+  "/home/runner/work/_temp/j027-b1-signed-print/min_int16_printer/cap32.cfg",
+  "-a",
+  "10 B%=-32768",
+  "-a",
+  "20 PRINT #8,B%",
+  "-a",
+  "30 END",
+  "-a",
+  "RUN",
+  "-a",
+  "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+]

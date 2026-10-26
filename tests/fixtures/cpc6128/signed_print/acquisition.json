@@ -1,0 +1,867 @@
+{
+  "schema_version": 1,
+  "phase": "J0.27-B1",
+  "generated_at": "2026-10-26T16:34:16.366834+00:00",
+  "github_run_id": "40360049336",
+  "github_sha": "a39d6083ef70fa5faac69d8105c0c1c9a3fcab44",
+  "oracle": {
+    "name": "Caprice32",
+    "commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "version_output": "Caprice32 v4.6.0-8c778bf072a06fb7c23b9cccd179041db7f79a52\nAPP_PATH: /home/runner/work/ESP32-Locomotive-Basic/ESP32-Locomotive-Basic/tests/oracles/caprice32\nCompiled with:\nNumber of video plugins available: 11",
+    "model": "CPC6128",
+    "ram_kb": 128,
+    "basic": "1.1",
+    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "amsdos_sha256": "ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d",
+    "rom_archived": false,
+    "snapshot_archived": false
+  },
+  "screen_bytes_extracted": false,
+  "printer_screen_equivalent": false,
+  "captures": [
+    {
+      "id": "zero_screen",
+      "case": "zero",
+      "mode": "screen",
+      "hypothesis_integer": 0,
+      "source_path": "tests/oracles/inputs/j027_b1/zero.bas",
+      "original_sha256": "a1937b1dc43ae952a61b6d1d1cc41ed9f50fb1e712d4c99139c0701b78f135a5",
+      "source_sha256": "a1937b1dc43ae952a61b6d1d1cc41ed9f50fb1e712d4c99139c0701b78f135a5",
+      "commands": [
+        "10 B%=0",
+        "20 PRINT B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163417.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "VISUAL_OBSERVATION",
+      "printer_observation": null,
+      "printer_raw_hex": null,
+      "native_status": "OBSERVED",
+      "native_observation": {
+        "numeric_value": 0,
+        "leading_spaces": 0,
+        "trailing_spaces": 0,
+        "sign": "",
+        "digits": "0",
+        "digit_count": 1,
+        "terminator_hex": "0A"
+      },
+      "native_returncode": 0,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "a1937b1dc43ae952a61b6d1d1cc41ed9f50fb1e712d4c99139c0701b78f135a5",
+          "size_bytes": 27
+        },
+        "source.bas": {
+          "sha256": "a1937b1dc43ae952a61b6d1d1cc41ed9f50fb1e712d4c99139c0701b78f135a5",
+          "size_bytes": 27
+        },
+        "autocmd.json": {
+          "sha256": "27590da92c07dbbfbf8992ac06bec9ec1a5934469acec8cf95a5d362f126380c",
+          "size_bytes": 459
+        },
+        "cap32.cfg": {
+          "sha256": "99658cc6c7dd1e7644f57c045152d7ade67de59bbe1393704650fd3764db5597",
+          "size_bytes": 1205
+        },
+        "command_argv.json": {
+          "sha256": "a540697b9f768cb2dfad8bd3cd5bdf85ab9785e99d7cad9bf98788b7ee25731c",
+          "size_bytes": 350
+        },
+        "caprice.log": {
+          "sha256": "fabd62fc237a43347a94ac9b13b8d1c03afe125bca5ba7c328ff0227624d0791",
+          "size_bytes": 599
+        },
+        "screen.png": {
+          "sha256": "5a885ae8865d7e4663974e8e2365f6f3091ecb635a1f9994403afba2167fc72d",
+          "size_bytes": 5068
+        },
+        "native.stdin.bin": {
+          "sha256": "253541062bcda74333b3c061d56b1d17561de50f517aedc8eb903d7081167276",
+          "size_bytes": 47
+        },
+        "native.stdout.bin": {
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "size_bytes": 2
+        },
+        "native.stderr.bin": {
+          "sha256": "362395e4c0e9d17a1e15b4f698beacba71616679744b1469e754d278ce4f243f",
+          "size_bytes": 105
+        }
+      }
+    },
+    {
+      "id": "zero_printer",
+      "case": "zero",
+      "mode": "printer",
+      "hypothesis_integer": 0,
+      "source_path": "tests/oracles/inputs/j027_b1/zero.bas",
+      "original_sha256": "a1937b1dc43ae952a61b6d1d1cc41ed9f50fb1e712d4c99139c0701b78f135a5",
+      "source_sha256": "4646face250b8096a06452bf10de64db3676119928374f6759b1be740d31473c",
+      "commands": [
+        "10 B%=0",
+        "20 PRINT #8,B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163418.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "PRINT_NUMERIC",
+      "printer_observation": {
+        "numeric_value": 0,
+        "leading_spaces": 1,
+        "trailing_spaces": 1,
+        "sign": "",
+        "digits": "0",
+        "digit_count": 1,
+        "terminator_hex": "0D 0A"
+      },
+      "printer_raw_hex": "20 30 20 0D 0A",
+      "native_status": null,
+      "native_observation": null,
+      "native_returncode": null,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "a1937b1dc43ae952a61b6d1d1cc41ed9f50fb1e712d4c99139c0701b78f135a5",
+          "size_bytes": 27
+        },
+        "source.bas": {
+          "sha256": "4646face250b8096a06452bf10de64db3676119928374f6759b1be740d31473c",
+          "size_bytes": 30
+        },
+        "autocmd.json": {
+          "sha256": "4d37bbed933776c498c51e313ccfc06a4c407c88444d9c11f367573ca1df7903",
+          "size_bytes": 464
+        },
+        "cap32.cfg": {
+          "sha256": "b1d9c2dc4f06b614d6d66ee22e67bdff434235a992ace5a7f835b0579a1c167e",
+          "size_bytes": 1196
+        },
+        "command_argv.json": {
+          "sha256": "d126e671feee73293e968e7549a113463e09b9d660e6e35477ecca87ac8604d0",
+          "size_bytes": 354
+        },
+        "caprice.log": {
+          "sha256": "b40a67099087994ed1ffec70ddec8c5545b04103bb7cf8c0091130dffce91ccc",
+          "size_bytes": 605
+        },
+        "screen.png": {
+          "sha256": "e915d4ccb279b97b5cdce9e9c942a5b487930d548af1ef5d16fad8ce0c755f4f",
+          "size_bytes": 5069
+        },
+        "printer.dat": {
+          "sha256": "e71b465bb0f150349f095a844d0db28d674a96911e65a08271608ba28ca4261c",
+          "size_bytes": 5
+        }
+      }
+    },
+    {
+      "id": "five_screen",
+      "case": "five",
+      "mode": "screen",
+      "hypothesis_integer": 5,
+      "source_path": "tests/oracles/inputs/j027_b1/five.bas",
+      "original_sha256": "1c114b7824adefed60bfd65fcae593050b6dbe5c4224b5e4b846214ec103f0af",
+      "source_sha256": "1c114b7824adefed60bfd65fcae593050b6dbe5c4224b5e4b846214ec103f0af",
+      "commands": [
+        "10 B%=5",
+        "20 PRINT B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163418.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "VISUAL_OBSERVATION",
+      "printer_observation": null,
+      "printer_raw_hex": null,
+      "native_status": "OBSERVED",
+      "native_observation": {
+        "numeric_value": 5,
+        "leading_spaces": 0,
+        "trailing_spaces": 0,
+        "sign": "",
+        "digits": "5",
+        "digit_count": 1,
+        "terminator_hex": "0A"
+      },
+      "native_returncode": 0,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "1c114b7824adefed60bfd65fcae593050b6dbe5c4224b5e4b846214ec103f0af",
+          "size_bytes": 27
+        },
+        "source.bas": {
+          "sha256": "1c114b7824adefed60bfd65fcae593050b6dbe5c4224b5e4b846214ec103f0af",
+          "size_bytes": 27
+        },
+        "autocmd.json": {
+          "sha256": "4e1bbec5b9c022f8bebdbf4377cf0ea10b98bb8d61eeef6ac6a47b0490ce71ac",
+          "size_bytes": 459
+        },
+        "cap32.cfg": {
+          "sha256": "5ed245599d01ca07e31b5f8db13a2ba4e7947414a3cc55ee0c74bf6d6acdda30",
+          "size_bytes": 1205
+        },
+        "command_argv.json": {
+          "sha256": "0e5dec9ebc5d48c0c00f5df0adf8eb5aaf2e1003c335000e2f4405d32fe84c70",
+          "size_bytes": 350
+        },
+        "caprice.log": {
+          "sha256": "5deb822e7c2228e3bf799290ae36ea33b78b5e77e81fcda04b7c6d51e21bca49",
+          "size_bytes": 599
+        },
+        "screen.png": {
+          "sha256": "d2a1982c46de64330dfae74bf37c585027a5b8910ca78e9d26f5fca405aeba72",
+          "size_bytes": 5066
+        },
+        "native.stdin.bin": {
+          "sha256": "9fd9be22a7a834fdf43506d74e39b7bcba3a6591de1f78c29950ff975bee598f",
+          "size_bytes": 47
+        },
+        "native.stdout.bin": {
+          "sha256": "f0b5c2c2211c8d67ed15e75e656c7862d086e9245420892a7de62cd9ec582a06",
+          "size_bytes": 2
+        },
+        "native.stderr.bin": {
+          "sha256": "362395e4c0e9d17a1e15b4f698beacba71616679744b1469e754d278ce4f243f",
+          "size_bytes": 105
+        }
+      }
+    },
+    {
+      "id": "five_printer",
+      "case": "five",
+      "mode": "printer",
+      "hypothesis_integer": 5,
+      "source_path": "tests/oracles/inputs/j027_b1/five.bas",
+      "original_sha256": "1c114b7824adefed60bfd65fcae593050b6dbe5c4224b5e4b846214ec103f0af",
+      "source_sha256": "17fc7505caab0dfb466388b10e7143676b25e3f5c0021123a5b9796c64013d7f",
+      "commands": [
+        "10 B%=5",
+        "20 PRINT #8,B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163419.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "PRINT_NUMERIC",
+      "printer_observation": {
+        "numeric_value": 5,
+        "leading_spaces": 1,
+        "trailing_spaces": 1,
+        "sign": "",
+        "digits": "5",
+        "digit_count": 1,
+        "terminator_hex": "0D 0A"
+      },
+      "printer_raw_hex": "20 35 20 0D 0A",
+      "native_status": null,
+      "native_observation": null,
+      "native_returncode": null,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "1c114b7824adefed60bfd65fcae593050b6dbe5c4224b5e4b846214ec103f0af",
+          "size_bytes": 27
+        },
+        "source.bas": {
+          "sha256": "17fc7505caab0dfb466388b10e7143676b25e3f5c0021123a5b9796c64013d7f",
+          "size_bytes": 30
+        },
+        "autocmd.json": {
+          "sha256": "80d520fff3b8f520c5c4a61e49636d17fa4d7f0f5234f115fbee8825f4fb7c18",
+          "size_bytes": 464
+        },
+        "cap32.cfg": {
+          "sha256": "6d9051ce41430396fc7427f6471383d749cd12d9d5a4f58c83d2569ecc7a8492",
+          "size_bytes": 1196
+        },
+        "command_argv.json": {
+          "sha256": "2f1567524297fb7f338ea91c9d42347db9c2437ef6f4678fac279c07e7134287",
+          "size_bytes": 354
+        },
+        "caprice.log": {
+          "sha256": "ec2d4455fcc568148253f378b26b71a5102902f94d7a01409a4fd7423f26a132",
+          "size_bytes": 605
+        },
+        "screen.png": {
+          "sha256": "f7585f1cd040713ffb50cd86b8da6e2478b3874112262b41b7a212a227c69d65",
+          "size_bytes": 5069
+        },
+        "printer.dat": {
+          "sha256": "427c73eb948406e2dee128c2e23ee2dfc00e26e35f6b776a7d7112a1e9996246",
+          "size_bytes": 5
+        }
+      }
+    },
+    {
+      "id": "minus_one_screen",
+      "case": "minus_one",
+      "mode": "screen",
+      "hypothesis_integer": -1,
+      "source_path": "tests/oracles/inputs/j027_b1/minus_one.bas",
+      "original_sha256": "ae7f11f667659dc5b06ccd5fe3dfa418306bdbec70fdb3131e29a50a0809e3b9",
+      "source_sha256": "ae7f11f667659dc5b06ccd5fe3dfa418306bdbec70fdb3131e29a50a0809e3b9",
+      "commands": [
+        "10 B%=-1",
+        "20 PRINT B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163420.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "VISUAL_OBSERVATION",
+      "printer_observation": null,
+      "printer_raw_hex": null,
+      "native_status": "UNSUPPORTED",
+      "native_observation": null,
+      "native_returncode": 0,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "ae7f11f667659dc5b06ccd5fe3dfa418306bdbec70fdb3131e29a50a0809e3b9",
+          "size_bytes": 28
+        },
+        "source.bas": {
+          "sha256": "ae7f11f667659dc5b06ccd5fe3dfa418306bdbec70fdb3131e29a50a0809e3b9",
+          "size_bytes": 28
+        },
+        "autocmd.json": {
+          "sha256": "d8255535ba2fcc957af3e29dbbf7f06b72f9ae17a6b2abdcfba3199518e0e700",
+          "size_bytes": 470
+        },
+        "cap32.cfg": {
+          "sha256": "4da6f809148b79d529de5c0a124b6a28635b25c380b400d0e2a2d2673e7b19fc",
+          "size_bytes": 1215
+        },
+        "command_argv.json": {
+          "sha256": "be7f71c5fcbfddc1fb31f32b84e618acac4b38bbacc03f6c316b5543b6597f67",
+          "size_bytes": 356
+        },
+        "caprice.log": {
+          "sha256": "dde2d10a232f5780c42ec7c6cee73bf8642416568a70771bc0cb6a1f8ea29535",
+          "size_bytes": 615
+        },
+        "screen.png": {
+          "sha256": "61034778120dcd5e541b81313713643930ba40509731ae5d09d031159d003239",
+          "size_bytes": 5054
+        },
+        "native.stdin.bin": {
+          "sha256": "9465280e5804ca1ea203c271a0cf802c9a32af1a0d7b4c0380b227ec592bd232",
+          "size_bytes": 48
+        },
+        "native.stdout.bin": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size_bytes": 0
+        },
+        "native.stderr.bin": {
+          "sha256": "787ff48097212a977514e709187261b1752c017d1d90c79aada377ed2a1c46fb",
+          "size_bytes": 233
+        }
+      }
+    },
+    {
+      "id": "minus_one_printer",
+      "case": "minus_one",
+      "mode": "printer",
+      "hypothesis_integer": -1,
+      "source_path": "tests/oracles/inputs/j027_b1/minus_one.bas",
+      "original_sha256": "ae7f11f667659dc5b06ccd5fe3dfa418306bdbec70fdb3131e29a50a0809e3b9",
+      "source_sha256": "e6304cff24d11fcaf3ba478eed31d2db9e0dbb0b4e82c5c63d5ef565d068c9e8",
+      "commands": [
+        "10 B%=-1",
+        "20 PRINT #8,B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163421.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "PRINT_NUMERIC",
+      "printer_observation": {
+        "numeric_value": -1,
+        "leading_spaces": 0,
+        "trailing_spaces": 1,
+        "sign": "-",
+        "digits": "1",
+        "digit_count": 1,
+        "terminator_hex": "0D 0A"
+      },
+      "printer_raw_hex": "2D 31 20 0D 0A",
+      "native_status": null,
+      "native_observation": null,
+      "native_returncode": null,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "ae7f11f667659dc5b06ccd5fe3dfa418306bdbec70fdb3131e29a50a0809e3b9",
+          "size_bytes": 28
+        },
+        "source.bas": {
+          "sha256": "e6304cff24d11fcaf3ba478eed31d2db9e0dbb0b4e82c5c63d5ef565d068c9e8",
+          "size_bytes": 31
+        },
+        "autocmd.json": {
+          "sha256": "eb9132aca27b8f4aba72138230021d8dfa026012a992d78c76b92043b510d0c0",
+          "size_bytes": 475
+        },
+        "cap32.cfg": {
+          "sha256": "b13d4c545145d1673807b1f6417fb6e1fb7aa7992afa2e0cf2244b13cd42f465",
+          "size_bytes": 1206
+        },
+        "command_argv.json": {
+          "sha256": "cd4227d4efb322fcace7ea7de951971ad00b5448b48812babd5ed8398822f843",
+          "size_bytes": 360
+        },
+        "caprice.log": {
+          "sha256": "aa56fed94b1624bc399b83398ec6880fe78dda6125b87070b86eab84b8e5f78b",
+          "size_bytes": 621
+        },
+        "screen.png": {
+          "sha256": "8b4a1710749a23a00024f8e28e0c572b0752d383a1960e1638094d39da4b3376",
+          "size_bytes": 5070
+        },
+        "printer.dat": {
+          "sha256": "b6626dde5feadbb3302a67528088e8f7cf8536de683f152639d3727ac4b24b3a",
+          "size_bytes": 5
+        }
+      }
+    },
+    {
+      "id": "minus_twelve_screen",
+      "case": "minus_twelve",
+      "mode": "screen",
+      "hypothesis_integer": -12,
+      "source_path": "tests/oracles/inputs/j027_b1/minus_twelve.bas",
+      "original_sha256": "c96aa8c415fa3972378009fb2a6c5fad1245ef112dd2bb4eea2b333f37932cfd",
+      "source_sha256": "c96aa8c415fa3972378009fb2a6c5fad1245ef112dd2bb4eea2b333f37932cfd",
+      "commands": [
+        "10 B%=-12",
+        "20 PRINT B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163422.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "VISUAL_OBSERVATION",
+      "printer_observation": null,
+      "printer_raw_hex": null,
+      "native_status": "UNSUPPORTED",
+      "native_observation": null,
+      "native_returncode": 0,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "c96aa8c415fa3972378009fb2a6c5fad1245ef112dd2bb4eea2b333f37932cfd",
+          "size_bytes": 29
+        },
+        "source.bas": {
+          "sha256": "c96aa8c415fa3972378009fb2a6c5fad1245ef112dd2bb4eea2b333f37932cfd",
+          "size_bytes": 29
+        },
+        "autocmd.json": {
+          "sha256": "6f46fc792aa511142abe7583513e7ea66a13a87650881f1fecdd4deb10c39366",
+          "size_bytes": 477
+        },
+        "cap32.cfg": {
+          "sha256": "79e7f1edbe6486872edac4b8d774c75437cf1e5caf7678b8f7a3fe6aeeba3a83",
+          "size_bytes": 1221
+        },
+        "command_argv.json": {
+          "sha256": "5bb8753dcf1867543cffa4b08ce678740486c771fe36f514b4c4d78fd0b64be1",
+          "size_bytes": 360
+        },
+        "caprice.log": {
+          "sha256": "8e92f69cb122b5d41b10533ea65009b9d71f4577b10b88750039f33d1ff6bca8",
+          "size_bytes": 625
+        },
+        "screen.png": {
+          "sha256": "7b2487bee9da16c2ee96b9c38dd2a3ea4f23a39a300114070c04b73c7bfb16fe",
+          "size_bytes": 5097
+        },
+        "native.stdin.bin": {
+          "sha256": "4beb15f5b4bae2f75e62572be6230b3855bfdce5e8473494fb8212b386c605a8",
+          "size_bytes": 49
+        },
+        "native.stdout.bin": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size_bytes": 0
+        },
+        "native.stderr.bin": {
+          "sha256": "787ff48097212a977514e709187261b1752c017d1d90c79aada377ed2a1c46fb",
+          "size_bytes": 233
+        }
+      }
+    },
+    {
+      "id": "minus_twelve_printer",
+      "case": "minus_twelve",
+      "mode": "printer",
+      "hypothesis_integer": -12,
+      "source_path": "tests/oracles/inputs/j027_b1/minus_twelve.bas",
+      "original_sha256": "c96aa8c415fa3972378009fb2a6c5fad1245ef112dd2bb4eea2b333f37932cfd",
+      "source_sha256": "f374627612b4a069f95eabd1d34ebfbf74a0a574d22445a7b5498cd1a7ff8f16",
+      "commands": [
+        "10 B%=-12",
+        "20 PRINT #8,B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163423.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "PRINT_NUMERIC",
+      "printer_observation": {
+        "numeric_value": -12,
+        "leading_spaces": 0,
+        "trailing_spaces": 1,
+        "sign": "-",
+        "digits": "12",
+        "digit_count": 2,
+        "terminator_hex": "0D 0A"
+      },
+      "printer_raw_hex": "2D 31 32 20 0D 0A",
+      "native_status": null,
+      "native_observation": null,
+      "native_returncode": null,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "c96aa8c415fa3972378009fb2a6c5fad1245ef112dd2bb4eea2b333f37932cfd",
+          "size_bytes": 29
+        },
+        "source.bas": {
+          "sha256": "f374627612b4a069f95eabd1d34ebfbf74a0a574d22445a7b5498cd1a7ff8f16",
+          "size_bytes": 32
+        },
+        "autocmd.json": {
+          "sha256": "7f3e1efdd97bff59b9e04eceec22ba070cf8523a53dc6e6061d2144356822b93",
+          "size_bytes": 482
+        },
+        "cap32.cfg": {
+          "sha256": "80d2fdfcb8690105f2b0a00ce80e1bc1670567afa40eb746819bedf64f88e14e",
+          "size_bytes": 1212
+        },
+        "command_argv.json": {
+          "sha256": "0b5803c24986a022332b99f0a82165bb48a81a9b576711dda5419c66f56d60bb",
+          "size_bytes": 364
+        },
+        "caprice.log": {
+          "sha256": "6ab32c746987d95953070be0afe19fc531a8d071b8ec3e1d143239b00f17ea0d",
+          "size_bytes": 631
+        },
+        "screen.png": {
+          "sha256": "ccffda838e9fe716bb91827179f0a666517ef0998e85614271de2fd26540c919",
+          "size_bytes": 5078
+        },
+        "printer.dat": {
+          "sha256": "56bdce0803be1f5c4da86a74837ad3857d36b62ba66848c0491ba619320b6e42",
+          "size_bytes": 6
+        }
+      }
+    },
+    {
+      "id": "max_int16_screen",
+      "case": "max_int16",
+      "mode": "screen",
+      "hypothesis_integer": 32767,
+      "source_path": "tests/oracles/inputs/j027_b1/max_int16.bas",
+      "original_sha256": "2e16a17c48ea26e4b7a9abccb0baaddaa598ef75a65215849b94ad589049d32a",
+      "source_sha256": "2e16a17c48ea26e4b7a9abccb0baaddaa598ef75a65215849b94ad589049d32a",
+      "commands": [
+        "10 B%=32767",
+        "20 PRINT B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163424.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "VISUAL_OBSERVATION",
+      "printer_observation": null,
+      "printer_raw_hex": null,
+      "native_status": "UNSUPPORTED",
+      "native_observation": null,
+      "native_returncode": 0,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "2e16a17c48ea26e4b7a9abccb0baaddaa598ef75a65215849b94ad589049d32a",
+          "size_bytes": 31
+        },
+        "source.bas": {
+          "sha256": "2e16a17c48ea26e4b7a9abccb0baaddaa598ef75a65215849b94ad589049d32a",
+          "size_bytes": 31
+        },
+        "autocmd.json": {
+          "sha256": "e72ca9ad128fb171122bde156add57daf7c987d850dfab1536e2d0526c8a9bd7",
+          "size_bytes": 473
+        },
+        "cap32.cfg": {
+          "sha256": "66b4377835d15937b47f977a811ce5b3fbbd1571ceb8bfec9a45db6e15f4bffc",
+          "size_bytes": 1215
+        },
+        "command_argv.json": {
+          "sha256": "fc6929d41543a6f68a8d437c90e3bcc38c1cccba57ea3597e24194219667038f",
+          "size_bytes": 359
+        },
+        "caprice.log": {
+          "sha256": "5809cd8b67fc4e8644f0d160e312fa7a81810e575e0a59de83f7d2be1cf80c8d",
+          "size_bytes": 618
+        },
+        "screen.png": {
+          "sha256": "998449d6bdd1637df8c86e9e47cc151c42d70ab9b877d8f0c79a90b7518f8cad",
+          "size_bytes": 5159
+        },
+        "native.stdin.bin": {
+          "sha256": "384059772e146fe2f774c059ee53c132c87d6808e639297f548cba20d111c7b0",
+          "size_bytes": 51
+        },
+        "native.stdout.bin": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size_bytes": 0
+        },
+        "native.stderr.bin": {
+          "sha256": "ed4d077c0067d52c236e7f6fd7da5c8abd815cc1962c2d00efe58307542345cd",
+          "size_bytes": 237
+        }
+      }
+    },
+    {
+      "id": "max_int16_printer",
+      "case": "max_int16",
+      "mode": "printer",
+      "hypothesis_integer": 32767,
+      "source_path": "tests/oracles/inputs/j027_b1/max_int16.bas",
+      "original_sha256": "2e16a17c48ea26e4b7a9abccb0baaddaa598ef75a65215849b94ad589049d32a",
+      "source_sha256": "751b179e43b9f927709f4c2e888a582c2c7a8b8391a99793aba09679a936a9cb",
+      "commands": [
+        "10 B%=32767",
+        "20 PRINT #8,B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163425.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "PRINT_NUMERIC",
+      "printer_observation": {
+        "numeric_value": 32767,
+        "leading_spaces": 1,
+        "trailing_spaces": 1,
+        "sign": "",
+        "digits": "32767",
+        "digit_count": 5,
+        "terminator_hex": "0D 0A"
+      },
+      "printer_raw_hex": "20 33 32 37 36 37 20 0D 0A",
+      "native_status": null,
+      "native_observation": null,
+      "native_returncode": null,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "2e16a17c48ea26e4b7a9abccb0baaddaa598ef75a65215849b94ad589049d32a",
+          "size_bytes": 31
+        },
+        "source.bas": {
+          "sha256": "751b179e43b9f927709f4c2e888a582c2c7a8b8391a99793aba09679a936a9cb",
+          "size_bytes": 34
+        },
+        "autocmd.json": {
+          "sha256": "012455aba8452e1368d047092c6d899583d39be53a81e637cbd5e59041473ffe",
+          "size_bytes": 478
+        },
+        "cap32.cfg": {
+          "sha256": "89740a9fc0e297174f430c2b54720d33329f2da65c0119985a9ed33050280689",
+          "size_bytes": 1206
+        },
+        "command_argv.json": {
+          "sha256": "2e7a6369100655af0ec4fa512c2814090e1a21c52a6e591faa36816caead9313",
+          "size_bytes": 363
+        },
+        "caprice.log": {
+          "sha256": "c3d6e4667488bbda12a3988b7fdc00e37952e2ba0d4a98271e48c40ed9cc3e52",
+          "size_bytes": 624
+        },
+        "screen.png": {
+          "sha256": "90593d89dff229a2d577b574241a92f4233de0f8bdb20b144ce506e2171aad81",
+          "size_bytes": 5105
+        },
+        "printer.dat": {
+          "sha256": "b0ea93de3a0d78ef7021f6385a1836a5653bfa869f40957f463e89fffd6a984c",
+          "size_bytes": 9
+        }
+      }
+    },
+    {
+      "id": "min_int16_screen",
+      "case": "min_int16",
+      "mode": "screen",
+      "hypothesis_integer": -32768,
+      "source_path": "tests/oracles/inputs/j027_b1/min_int16.bas",
+      "original_sha256": "22ab97864beb006b05b3cd395626b9aadeeadfe2aa882386673e48bd5efa35b6",
+      "source_sha256": "22ab97864beb006b05b3cd395626b9aadeeadfe2aa882386673e48bd5efa35b6",
+      "commands": [
+        "10 B%=-32768",
+        "20 PRINT B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163426.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "VISUAL_OBSERVATION",
+      "printer_observation": null,
+      "printer_raw_hex": null,
+      "native_status": "UNSUPPORTED",
+      "native_observation": null,
+      "native_returncode": 0,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "22ab97864beb006b05b3cd395626b9aadeeadfe2aa882386673e48bd5efa35b6",
+          "size_bytes": 32
+        },
+        "source.bas": {
+          "sha256": "22ab97864beb006b05b3cd395626b9aadeeadfe2aa882386673e48bd5efa35b6",
+          "size_bytes": 32
+        },
+        "autocmd.json": {
+          "sha256": "18e829edf1c3c31e828d6cef8f5b7680454035277eab47a1cd05af3a357fd65a",
+          "size_bytes": 474
+        },
+        "cap32.cfg": {
+          "sha256": "13104fba2cba2649a95d744bbbecce213c10c088a6edf0e74caa3ac5452af27e",
+          "size_bytes": 1215
+        },
+        "command_argv.json": {
+          "sha256": "6e944601122046091bfd8f71e90a4013f684216d63a5ded11469bd5a0de73d7c",
+          "size_bytes": 360
+        },
+        "caprice.log": {
+          "sha256": "5a766a70fc7eb3a52bbab4828149f6a21ae87aed3b9a81470d2e5d25239deed1",
+          "size_bytes": 619
+        },
+        "screen.png": {
+          "sha256": "7f383c2c196b2bba850dcb6e79c26433d105caa716b20c4d9ffa10a0ead4dac8",
+          "size_bytes": 5153
+        },
+        "native.stdin.bin": {
+          "sha256": "b06b4662520bc179e045d23011fee8b4f8109c3e8ca1db0c99d0296a5926ff90",
+          "size_bytes": 52
+        },
+        "native.stdout.bin": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size_bytes": 0
+        },
+        "native.stderr.bin": {
+          "sha256": "787ff48097212a977514e709187261b1752c017d1d90c79aada377ed2a1c46fb",
+          "size_bytes": 233
+        }
+      }
+    },
+    {
+      "id": "min_int16_printer",
+      "case": "min_int16",
+      "mode": "printer",
+      "hypothesis_integer": -32768,
+      "source_path": "tests/oracles/inputs/j027_b1/min_int16.bas",
+      "original_sha256": "22ab97864beb006b05b3cd395626b9aadeeadfe2aa882386673e48bd5efa35b6",
+      "source_sha256": "53151e02b52b23acbc4629cec9b05f23e77ff562d9a7f2e90742b46df71225e7",
+      "commands": [
+        "10 B%=-32768",
+        "20 PRINT #8,B%",
+        "30 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "original_screenshot_name": "screenshot_20261026_163427.png",
+      "cpc_returncode": 0,
+      "cpc_printer_status": "PRINT_NUMERIC",
+      "printer_observation": {
+        "numeric_value": -32768,
+        "leading_spaces": 0,
+        "trailing_spaces": 1,
+        "sign": "-",
+        "digits": "32768",
+        "digit_count": 5,
+        "terminator_hex": "0D 0A"
+      },
+      "printer_raw_hex": "2D 33 32 37 36 38 20 0D 0A",
+      "native_status": null,
+      "native_observation": null,
+      "native_returncode": null,
+      "screen_status": "VISUAL_OBSERVATION",
+      "screen_text_bytes_extracted": false,
+      "printer_screen_equivalent": false,
+      "files": {
+        "original.bas": {
+          "sha256": "22ab97864beb006b05b3cd395626b9aadeeadfe2aa882386673e48bd5efa35b6",
+          "size_bytes": 32
+        },
+        "source.bas": {
+          "sha256": "53151e02b52b23acbc4629cec9b05f23e77ff562d9a7f2e90742b46df71225e7",
+          "size_bytes": 35
+        },
+        "autocmd.json": {
+          "sha256": "767896125c5a2999594faf6ec08b88a7df229e03f9e3756ab57f038456079f36",
+          "size_bytes": 479
+        },
+        "cap32.cfg": {
+          "sha256": "e1492ee0a43fccc3d9013933022d8df4894419def3c2da4806452804dbbb1074",
+          "size_bytes": 1206
+        },
+        "command_argv.json": {
+          "sha256": "caefb2e6561352be2f1187760dea06cf3b47d1fbb21f3202f5e02feb60b6ee27",
+          "size_bytes": 364
+        },
+        "caprice.log": {
+          "sha256": "ce3864914384196a4b68ce1b535cc29cb79d0c5e8bd96b65eb87db16acda8db4",
+          "size_bytes": 625
+        },
+        "screen.png": {
+          "sha256": "33234bac423f81dedbb1a3c08a22581a1916a4240ffd7f59e7a1e1262e33faae",
+          "size_bytes": 5118
+        },
+        "printer.dat": {
+          "sha256": "aa95e812953eb4bfedea2c83391bba05a53293d89cfd2623a0a7a4cd9b801d98",
+          "size_bytes": 9
+        }
+      }
+    }
+  ]
+}

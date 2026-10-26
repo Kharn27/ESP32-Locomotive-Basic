@@ -1,0 +1,8 @@
+$ xvfb-run -a /home/runner/work/ESP32-Locomotive-Basic/ESP32-Locomotive-Basic/tests/oracles/caprice32/cap32 -c /home/runner/work/_temp/j027-b1-signed-print/max_int16_printer/cap32.cfg -a '10 B%=32767' -a '20 PRINT #8,B%' -a '30 END' -a RUN -a 'CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT'
+exit code: 0
+Using configuration file: /home/runner/work/_temp/j027-b1-signed-print/max_int16_printer/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /home/runner/work/_temp/j027-b1-signed-print/max_int16_printer/screenshot_20261026_163425.png
+
+[stderr]

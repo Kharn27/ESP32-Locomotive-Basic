@@ -1,0 +1,17 @@
+{
+  "id": "zero_printer",
+  "case": "zero",
+  "mode": "printer",
+  "fresh_process": true,
+  "run_executed": true,
+  "direct_post_run_probe": false,
+  "original_sha256": "a1937b1dc43ae952a61b6d1d1cc41ed9f50fb1e712d4c99139c0701b78f135a5",
+  "source_sha256": "4646face250b8096a06452bf10de64db3676119928374f6759b1be740d31473c",
+  "commands": [
+    "10 B%=0",
+    "20 PRINT #8,B%",
+    "30 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ]
+}

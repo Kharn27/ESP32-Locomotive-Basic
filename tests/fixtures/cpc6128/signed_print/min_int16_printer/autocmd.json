@@ -1,0 +1,17 @@
+{
+  "id": "min_int16_printer",
+  "case": "min_int16",
+  "mode": "printer",
+  "fresh_process": true,
+  "run_executed": true,
+  "direct_post_run_probe": false,
+  "original_sha256": "22ab97864beb006b05b3cd395626b9aadeeadfe2aa882386673e48bd5efa35b6",
+  "source_sha256": "53151e02b52b23acbc4629cec9b05f23e77ff562d9a7f2e90742b46df71225e7",
+  "commands": [
+    "10 B%=-32768",
+    "20 PRINT #8,B%",
+    "30 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ]
+}

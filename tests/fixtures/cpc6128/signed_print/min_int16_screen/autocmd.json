@@ -1,0 +1,17 @@
+{
+  "id": "min_int16_screen",
+  "case": "min_int16",
+  "mode": "screen",
+  "fresh_process": true,
+  "run_executed": true,
+  "direct_post_run_probe": false,
+  "original_sha256": "22ab97864beb006b05b3cd395626b9aadeeadfe2aa882386673e48bd5efa35b6",
+  "source_sha256": "22ab97864beb006b05b3cd395626b9aadeeadfe2aa882386673e48bd5efa35b6",
+  "commands": [
+    "10 B%=-32768",
+    "20 PRINT B%",
+    "30 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+  ]
+}

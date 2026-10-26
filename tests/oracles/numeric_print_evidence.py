@@ -271,6 +271,9 @@ def self_test(base, permanent, native_c1=False):
          "d_self_reference: CPC printer programmed/direct DIFF "
          "expected=20 32 20 0D 0A observed=20 32 20 0A"),
     ]
+    if native_c1:
+        cases.append(("native_format",
+                      "c_integer_add_screen: native value/output unsupported or changed"))
     with tempfile.TemporaryDirectory() as td:
         for name, reason in cases:
             dest = Path(td) / name
@@ -300,6 +303,13 @@ def self_test(base, permanent, native_c1=False):
                 (dest / "d_self_reference_screen/screen.png").unlink()
             elif name == "channel_conflation":
                 manifest["printer_screen_equivalent"] = True
+            elif name == "native_format":
+                # Recompute metadata; only the native-layout gate may reject.
+                changed = b"5\n"
+                p = dest / "c_integer_add_screen/native.stdout.bin"
+                p.write_bytes(changed)
+                screen["files"]["native.stdout.bin"] = {
+                    "sha256": digest(changed), "size_bytes": len(changed)}
             elif name == "source_forgery":
                 p = dest / "c_integer_add_screen/source.bas"
                 changed = p.read_bytes().replace(b"30 PRINT B%", b"30 PRINT A%")

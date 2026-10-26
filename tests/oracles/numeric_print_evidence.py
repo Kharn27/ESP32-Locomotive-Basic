@@ -22,9 +22,9 @@ from cpc_screen_evidence import check_png
 
 # Approved values are independent of the archived manifest and MUST be filled
 # only following independent review of the acquired GitHub Actions artifact.
-APPROVED_ACQUISITION_SHA256 = None
-APPROVED_GITHUB_RUN_ID = None
-APPROVED_ARTIFACT_ID = None
+APPROVED_ACQUISITION_SHA256 = "f4e48600515a83d736fd5a61a94c5f53b8e6fb6537280d1a8e2332b561a7521d"
+APPROVED_GITHUB_RUN_ID = 40341786914
+APPROVED_ARTIFACT_ID = 12659112768
 
 C6_PRINTER_SHA = {
     "c_integer_add": "427c73eb948406e2dee128c2e23ee2dfc00e26e35f6b776a7d7112a1e9996246",

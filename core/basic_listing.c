@@ -237,6 +237,21 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 return BL_TRUNCATED;
             }
             t = body[pos++];
+            if (t == 0xf5u) {
+                /* CPC unary minus is an operator before the magnitude;
+                 * only a literal operand is in the native J1.1 subset. */
+                status = append_byte(out, (uint8_t)'-');
+                if (status != BL_OK) {
+                    return status;
+                }
+                if (pos >= length) {
+                    return BL_TRUNCATED;
+                }
+                t = body[pos++];
+                if (t == 0x02u) {
+                    return BL_BAD_SEQUENCE;
+                }
+            }
             if (t == 0x02u) {
                 /* RHS CPC cache bytes remain opaque (20, EF, F4 included). */
                 BasicVariableRef rhs;

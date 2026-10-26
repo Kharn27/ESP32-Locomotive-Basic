@@ -155,10 +155,9 @@ pas de J1 automatique.**
 **J0.26 / C1 / C2 — ACCEPTÉES ET FUSIONNÉES par Pilotage via [PR #47](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/47), squash [`b51a35ad`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/b51a35ad3006233548c5761de4fc54c86271308f) (26 octobre 2026) : revue du HEAD `9e2ed9647962fa4fdb6fa6466451906f1bbfc00f`, 27/27 CTest Linux et 27/27 ASan/UBSan ([C99 #40337540156](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40337540156)), et 3 jobs verts dont ESP-IDF Xtensa ([ESP32 #40337540670](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40337540670)). Le test des faux positifs est fiabilisé : corpus temporaire intact PASS, dix rejets spécifiques d'archives avec motif exact, quatre rejets directs C6 ; les quinze marqueurs apparaissent dans chacun des deux journaux CI. Aucun `core/` ni archive historique ni firmware modifié. Matrice de sortie **1 PARTIAL, 2 SATISFIED, 3 SATISFIED, 4 PARTIAL, 5 SATISFIED** ; `ADDITIONAL_WORK_REQUIRED` car la présentation numérique `PRINT` CPC imprimante post-RUN (`20 35/32 20 0D 0A`) et stdout natif pendant RUN (`35/32 0A`) diffèrent au-delà des fins de ligne, avec canaux non équivalents. 18 LIST/RUN `UNVERIFIED` et classements C3–C8 préservés. **J0.24 et J0 OUVERTS ; J1 NON AUTORISÉ. Prochain jalon décidé : J0.27, caractérisation indépendante par canaux et correction native minimale justifiée du formatage numérique `PRINT`.**
 
 
-## J0.27-A — Oracle indépendant de PRINT numérique (26 octobre 2026, en revue)
+## J0.27-A — Oracle indépendant de PRINT numérique (26 octobre 2026, ACCEPTÉ et FUSIONNÉ)
 
-PR [#49](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/49)
-ouverte, non fusionnée. Quatre acquisitions indépendantes sur Caprice32
+PR [#49](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/49) **acceptée par Pilotage et fusionnée** (squash [`560e8c33`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/560e8c33049ea4cd50fbbe1faa1390c64bdb068c), HEAD C1 revu `0e25e158`). Quatre acquisitions indépendantes sur Caprice32
 CPC6128/BASIC 1.1, basées sur les sources originales C/D, dont deux
 variantes instrumentées par PRINT #8,B% pendant RUN.
 [Artefact authentique #12659112768](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40341786914/artifacts/12659112768)
@@ -171,7 +170,5 @@ PNG écran C/D inspectés comme VISUAL_OBSERVATION, pas des octets écran.
 Original conservé dans numeric_print/acquisition.json, empreinte
 SHA-256 approuvée indépendamment
 f4e48600515a83d736fd5a61a94c5f53b8e6fb6537280d1a8e2332b561a7521d.
-Tests de falsification à raison précise ; CI permanente à confirmer
-au HEAD final. **core/ et firmware inchangés**.
-Les 18 anciennes comparaisons LIST/RUN sont toujours UNVERIFIED ;
-J0.24 et J0 restent OUVERTS, J1 NON AUTORISÉ.
+C1 clôturée : comparaison CPC/CPC `MATCH_EXACT` désormais obligatoire et bloquante, y compris pour les acquisitions fraîches. Huit falsifications sur les acquisitions (+ deux mutations de présentation avec empreintes recalculées) et trois contrôles du scellement passent. CI au HEAD accepté : [Linux C99 OFF/ON 28/28](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40352258686), [ESP32 Xtensa 3/3](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40352258814), [oracle CPC](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40352258713), toutes SUCCESS. **core/ et firmware/ inchangés**.
+**Suite autorisée : J0.27-B1**, acquisition indépendante CPC sur zéro, signe et bornes INTEGER ; aucune correction native générale autorisée avant revue de ces nouvelles preuves. Les 18 anciennes comparaisons LIST/RUN restent `UNVERIFIED`. **J0.24 et J0 OUVERTS, J1 NON AUTORISÉ.**

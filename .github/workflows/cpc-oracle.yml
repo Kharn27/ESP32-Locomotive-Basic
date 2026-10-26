@@ -13,6 +13,7 @@ on:
       - "docs/J0.24-C5-eight-case-oracle.md"
       - "docs/J0.24-C6-run-behavior-oracle.md"
       - "docs/J0.24-C7-list-oracle.md"
+      - "docs/J0.24-C8-list-screen-evidence.md"
       - "tools/promote_token_ram_c5.py"
       - "tools/promote_token_ram_c4.py"
       - "docs/J0.24-C1-caprice32-oracle-automation.md"
@@ -187,6 +188,60 @@ jobs:
           path: ${{ runner.temp }}/cpc-list-printer/
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Acquire C8 CPC 6128 LIST SCREEN without printer or RUN
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/list_screen_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+            --output "${RUNNER_TEMP}/cpc-list-screen"
+          python3 tests/oracles/cpc_screen_evidence.py \
+            --evidence "${RUNNER_TEMP}/cpc-list-screen" --self-test
+
+      - name: Export original C8 acquisition files unmodified for independent promotion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, os
+          root = Path(os.environ["RUNNER_TEMP"]) / "cpc-list-screen"
+          for p in sorted(root.rglob("*")):
+              if p.is_file():
+                  print("C8_B64_BEGIN " + p.relative_to(root).as_posix(), flush=True)
+                  b64 = base64.b64encode(p.read_bytes()).decode("ascii")
+                  for i in range(0, len(b64), 120):
+                      print(b64[i:i+120], flush=True)
+                  print("C8_B64_END", flush=True)
+          PY
+
+      - name: Reproduce C8 locally without Actions identity
+        run: |
+          set -euo pipefail
+          env -u GITHUB_RUN_ID -u GITHUB_SHA \
+            python3 tests/oracles/list_screen_oracle.py \
+              --caprice tests/oracles/caprice32 \
+              --native-cli "${RUNNER_TEMP}/c99-build/loco_basic_cli" \
+              --output "${RUNNER_TEMP}/cpc-list-screen-local"
+          python3 tests/oracles/cpc_screen_evidence.py \
+            --evidence "${RUNNER_TEMP}/cpc-list-screen-local" --self-test
+
+      - name: Upload C8 authentic CPC LIST screen pixels and separate C99 stdout
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpc6128-c8-list-screen
+          path: ${{ runner.temp }}/cpc-list-screen/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Verify promoted C8 screen evidence when present
+        run: |
+          if test -f tests/fixtures/cpc6128/list_screen/manifest.json; then
+            python3 tests/oracles/cpc_screen_evidence.py \
+              --evidence tests/fixtures/cpc6128/list_screen --permanent --self-test
+          else
+            echo "C8 ORIGINAL SCREEN ACQUISITION PENDING PERMANENT PROMOTION"
+          fi
 
       - name: Verify CPC token parser and archival helper syntax
         run: |

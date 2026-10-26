@@ -248,6 +248,13 @@ jobs:
           python3 -m py_compile tools/promote_token_ram_c4.py tools/promote_token_ram_c5.py
           python3 tests/oracles/token_ram_oracle.py --self-test
 
+      - name: Verify permanent J0.27-A provenance and negative forgery tests
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/numeric_print_evidence.py \
+            --evidence tests/fixtures/cpc6128/numeric_print \
+            --permanent --self-test
+
       - name: Acquire four independent J0.27-A CPC PRINT channels during RUN
         run: |
           set -euo pipefail

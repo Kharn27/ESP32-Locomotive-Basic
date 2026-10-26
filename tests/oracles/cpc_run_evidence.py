@@ -350,15 +350,16 @@ def self_test(base, permanent):
             require(observed[first]["status"] == result_status,
                     "regression fixture not structurally accepted: " + label)
             if label == "DIFF":
-                # The structural + negative-test command must itself succeed
-                # on diagnostic evidence; ONLY the acceptance gate fails.
+                # The structural CLI must accept diagnostic evidence;
+                # only the separately invoked behavioral acceptance gate fails.
+                # Do not recursively invoke --self-test from self_test().
                 structural = subprocess.run(
                     [sys.executable, str(Path(__file__).resolve()),
-                     "--evidence", str(local), "--self-test"],
-                    capture_output=True, timeout=30, check=False)
+                     "--evidence", str(local)],
+                    capture_output=True, timeout=20, check=False)
                 require(structural.returncode == 0,
-                        "structural self-tests wrongly reject a verified DIFF")
-                print("PASS: structurally valid DIFF + self-tests remains archivable")
+                        "structural CLI wrongly rejected a verified DIFF")
+                print("PASS: structurally valid DIFF remains archivable")
             test = subprocess.run([sys.executable, str(Path(__file__).resolve()),
                                    "--evidence", str(local), "--require-accepted-behavior"],
                                   capture_output=True, timeout=20, check=False)

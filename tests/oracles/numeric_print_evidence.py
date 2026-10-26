@@ -307,10 +307,9 @@ def self_test(base, permanent):
                           else "d_self_reference_printer")
                 expected = C6_PRINTER_RAW["c_integer_add" if name == "printer_leading_space"
                                           else "d_self_reference"]
-                changed = (b"35 20 0D 0A" if name == "printer_leading_space"
-                           else b"20 32 20 0A")
-                # Hex literals above are bytes, not their ASCII spellings.
-                changed = bytes.fromhex(changed.decode("ascii"))
+                changed = bytes.fromhex(
+                    "35 20 0D 0A" if name == "printer_leading_space"
+                    else "20 32 20 0A")
                 require(changed != expected, name + ": no presentation mutation")
                 p = dest / target / "printer.dat"
                 require(p.read_bytes() == expected, name + ": pristine byte mismatch")

@@ -208,4 +208,13 @@ foreach(value IN ITEMS 0 5 2)
     )
 endforeach()
 
-message(STATUS "host_cli: twenty-six black-box scenarios passed")
+# J1.1: true negative BASIC assignment, LIST and three steps through END.
+foreach(value IN ITEMS -1 -12)
+    check_case("j1-negative-integer-${value}"
+        "10 B%=${value}\n20 PRINT B%\n30 END\nLIST\nRUN\n:step 3\n:step\n:quit\n"
+        "10 B%=${value}\n20 PRINT B%\n30 END\n${value} \n"
+        "${banner}${ok}${ok}${ok}${listed}${running}[cli] STEPPED 3\n${ended}${byebye}"
+    )
+endforeach()
+
+message(STATUS "host_cli: twenty-eight black-box scenarios passed")

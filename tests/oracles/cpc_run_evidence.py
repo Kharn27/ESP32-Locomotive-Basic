@@ -352,6 +352,22 @@ def self_test(base, permanent):
                     "CI gate did not reject " + label)
             print("PASS: CI behavioral gate rejects", label, "with nonzero exit")
 
+    # Missing C or D must fail the process-level gate, not merely omit output.
+    with tempfile.TemporaryDirectory(prefix="c6-missing-case-") as tmp:
+        local = Path(tmp) / "evidence"
+        j = local_copy(local)
+        j["captures"] = [c for c in j["captures"] if c["case"] != first]
+        shutil.rmtree(local / first)
+        (local / "manifest.json").write_text(json.dumps(j, indent=2) + "\n")
+        missing_result = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), "--evidence",
+             str(local), "--require-accepted-behavior"],
+            capture_output=True, timeout=20, check=False)
+        require(missing_result.returncode != 0 and
+                b"two independent numbered programs required" in missing_result.stderr,
+                "CI gate accepted acquisition with missing case")
+        print("PASS: CI behavioral gate rejects missing C case with nonzero exit")
+
     if permanent:
         with tempfile.TemporaryDirectory(prefix="c6-coordinated-forgery-") as tmp:
             forged = Path(tmp) / "evidence"

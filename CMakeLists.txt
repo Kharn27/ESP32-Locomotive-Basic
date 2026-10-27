@@ -481,3 +481,13 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+
+# J1.10-A: independent CPC6128 IF/THEN oracle only. No native flow code.
+# Fail closed on any changed original RAM, printer, source, manifest, or SHA.
+if(BUILD_TESTING)
+    add_test(NAME j1_10_a_if_then_cpc_permanent COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_10_if_then_verify.py"
+        --permanent --self-test)
+endif()

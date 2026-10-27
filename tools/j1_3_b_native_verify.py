@@ -115,7 +115,7 @@ def test_negative(cli, image_cli):
     # Intentionally ONLY forms forbidden by the strict J1.3-B grammar.
     bad = [
         "B%=A%-256", "B%=A%--1", "B%=A%- -1", "B%=A%-+1",
-        "B%=A%-1-2", "B%=A%-1+2", "B%=A%-C%", "B%=A!-1",
+        "B%=A%-1-2", "B%=A%-1+2", "B%=A%-C%-D%", "B%=A!-1",
         "B%=A%-32768", "B%=A%-1.2", "B%=A%-1:PRINT 2:",
     ]
     for item in bad:

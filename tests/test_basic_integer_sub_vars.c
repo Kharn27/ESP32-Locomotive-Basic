@@ -172,7 +172,7 @@ static int corpus(void)
         (void)snprintf(a, sizeof(a), "A%%=%d", (int)cases[i].a);
         (void)snprintf(b, sizeof(b), "B%%=%d", (int)cases[i].b);
         (void)snprintf(full, sizeof(full),
-                       "10 %s\n20 %s\n30 C%%=A%%+B%%\n40 PRINT C%%\n50 END\n", a, b);
+                       "10 %s\n20 %s\n30 C%%=A%%-B%%\n40 PRINT C%%\n50 END\n", a, b);
         CHECK(put(&h, 10u, a) == 0);
         CHECK(put(&h, 20u, b) == 0);
         CHECK(put(&h, 30u, "C%=A%-B%") == 0);

@@ -88,6 +88,31 @@ L'index vaut `(swap_xy ? 1 : 0) + (mirror_x ? 2 : 0) + (mirror_y ? 4 : 0)`.
 
 **Statut de correction tant que le nouveau test n'est pas reçu :** `HW3-C1 PUSHED — TARGET_BUILD_PENDING — ON_DEVICE_RETEST_PENDING — PR #66 OPEN / NON MERGED`.
 
+
+## HW3-C2 — Photos C1 non conformes et voies alternatives (27 octobre 2026)
+
+**Échec visuel de HW3-C1 sur le CYD réel :** les commandes UART fonctionnent, mais les photos montrent des caractères illisibles, des traits de mire repliés ou tronqués et un cadrage incorrect. Aucun des huit cas MADCTL ne peut être considéré validé sur la base de ces observations. La cause exacte doit être mesurée : décalage de repères entre GRAM, fenêtre SPI et orientation LCD ; une mauvaise fonte ne suffit pas à expliquer les bordures.
+
+**Deux nouvelles hypothèses, indépendantes de la matrice C1 :**
+- **Cas 8..11 :** adresser directement **320×240** avec **MV=0** (pas de permutation matérielle) et quatre combinaisons des miroirs. Cette variante est documentée sur au moins une CYD dans [Overhead — orientation landscape-native](https://github.com/JamesDavid/Overhead/blob/main/CYD-ESP32-2432S028R.md#display-orientation--the-fix-overhead-lovyangfx), sans garantie que la révision du PO soit identique.
+- **Cas 12/13 :** **rotation logicielle** depuis les pixels BASIC 320×240 vers la GRAM native 240×320, toujours **MV=0** et miroirs désactivés. Cas 12 : `u=239-y, v=x` ; cas 13 : `u=y, v=319-x`. L'écran est redessiné par 40 bandes **240×8** ; le curseur 8×8 est converti vers les mêmes coordonnées. Aucun framebuffer plein écran, aucun changement RGB/BGR.
+
+**Commandes UART0 à 115200 (nouveau firmware de la même PR #66) :**
+
+| Entrée | Effet |
+|---|---|
+| `n` | boucle six mires **8 à 13** (2,5 s chacune) |
+| `8` / `9` / `a` / `c` | maintient la mire native-large du cas **8 / 9 / 10 / 11** |
+| `d` | mire de rotation logicielle **cas 12** (horaire) |
+| `e` | mire de rotation logicielle **cas 13** (antihoraire) |
+| `b` | boot CPC dans le cas retenu (et curseur clignotant) |
+| `r` | rétablit le cas 12, configuré par défaut |
+| `m` / `0..7` | anciens huit cas matériels conservés pour comparaison |
+
+**Protocole réel :** flasher le dernier HEAD, regarder le boot par défaut **cas 12**, tourner physiquement le CYD en paysage pour juger texte et marges, puis essayer `d`, `b` et `e`, `b`. Pour isoler le chemin natif-large essayer `8`, `b`. Fournir les photos et le journal des marqueurs `HW3 ORIENTATION_CASE`, `HW3 SOFTWARE_ROTATION_DRAWN`, `HW3 BOOT_SCREEN_DRAWN`, `HW3 DEVICE_MEMORY`. **CI verte ≠ résolution graphique prouvée** ; la PR ne doit pas être fusionnée avant preuve photographique et UART cohérente.
+
+**État HW3-C2 :** `ON_DEVICE_C1_FAILED / ON_DEVICE_C2_RETEST_PENDING / PR #66 OPEN`.
+
 ## Budget mémoire et signalisation
 
 Le rendu n'utilise qu'un **tampon DMA interne de 320 × 8 × 2 = 5 120 octets**, aligné et alloué via `heap_caps_malloc(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA)`, et une grille texte statique de **40 × 25 = 1 000 octets** en .bss. La fonte (`128 × 8 = 1 024 octets`) réside en lecture seule en Flash. Aucune allocation de **153 600 octets** (framebuffer RGB565 320 × 240), aucun recours à la PSRAM. Le tampon est conservé tant que le rendu fonctionne pour ne pas fragmenter le heap.

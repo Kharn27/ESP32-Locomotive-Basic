@@ -1,0 +1,152 @@
+name: J1.6-A independent CPC INTEGER mod
+
+on:
+  pull_request: {}
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: j16-mod-original-archive
+  cancel-in-progress: false
+
+jobs:
+  cpc-mod:
+    permissions:
+      contents: write
+      packages: read
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/j1-6-a-integer-mod-oracle' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout exact immutable PR commit and ROM-containing submodule
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Pin checkout / emulator / original ROM / allowed source diff
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$GITHUB_HEAD_SHA"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
+          test -s tests/oracles/caprice32/rom/amsdos.rom
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          tests/oracles/caprice32/cap32 --version
+          git diff origin/main...HEAD --name-only | tee "$RUNNER_TEMP/j16-files.txt"
+          if grep -E '^(core/|firmware/|tests/oracles/caprice32|tests/fixtures/cpc6128/)' "$RUNNER_TEMP/j16-files.txt" | grep -v '^tests/fixtures/cpc6128/j1_integer_mod/'; then
+            echo "FORBIDDEN CORE/HARDWARE/HISTORICAL ARCHIVE DIFF"
+            exit 1
+          fi
+          echo "J1.6-A GHCR_PINNED APT=NONE CAPRICE_BUILD=NONE HEAD=$GITHUB_HEAD_SHA"
+
+      - name: Build unchanged portable C99 comparator and CTest
+        run: |
+          set -euo pipefail
+          cmake -S . -B "$RUNNER_TEMP/j16-c99" -DBP_SANITIZERS=OFF
+          cmake --build "$RUNNER_TEMP/j16-c99" --parallel 2
+          ctest --test-dir "$RUNNER_TEMP/j16-c99" --output-on-failure
+
+      - name: Recheck sealed J1.5-A oracle and J1.5-B native F9 without changing them
+        run: |
+          set -euo pipefail
+          python3 tools/j1_5_division_verify.py --permanent --self-test
+          python3 tools/j1_5_b_native_verify.py \
+            --cli "$RUNNER_TEMP/j16-c99/loco_basic_cli" \
+            --image-cli "$RUNNER_TEMP/j16-c99/basic_program_image_cli" --self-test
+          echo "J1.5-A / J1.5-B PERMANENT AND NATIVE CONTRACTS RECHECKED"
+
+      - name: Verify immutable J1.4-A CPC multiplication archive and all negative falsifications
+        run: |
+          set -euo pipefail
+          python3 tools/j1_4_multiplication_verify.py --permanent --self-test
+          echo "J1.4-A HISTORICAL_ARCHIVE_VERIFIED NO_MODIFICATIONS"
+
+      - name: Acquire twelve fresh ROM-backed LIST/RAM and RUN/printer CPC sessions
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/j1_6_mod_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --image-cli "$RUNNER_TEMP/j16-c99/basic_program_image_cli" \
+            --native-cli "$RUNNER_TEMP/j16-c99/loco_basic_cli" \
+            --output "$RUNNER_TEMP/j16-cpc"
+          python3 tools/j1_6_mod_verify.py --evidence "$RUNNER_TEMP/j16-cpc"
+
+      - name: Archive authentic captures once, or independently reproduce permanent images
+        run: |
+          set -euo pipefail
+          DEST=tests/fixtures/cpc6128/j1_integer_mod
+          if test ! -f "$DEST/manifest.json"; then
+            test ! -e "$DEST"
+            mkdir -p "$DEST"
+            cp -a "$RUNNER_TEMP/j16-cpc/." "$DEST/"
+            python3 tools/j1_6_mod_verify.py --evidence "$DEST" --write-provisional-seal --permanent --self-test
+            if find "$DEST" -type f \( -name '*.sna' -o -name '*.rom' -o -name '*.dsk' \) | grep .; then
+              echo "FORBIDDEN ROM OR WHOLE SNAPSHOT"
+              exit 1
+            fi
+            git config user.name "loco-cyd-evidence-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$DEST"
+            git commit -m "evidence(J1.6-A): archive twelve original CPC mod sessions"
+            REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/feat/j1-6-a-integer-mod-oracle | awk '{print $1}')"
+            test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA" || {
+              echo "CONCURRENT_BRANCH_ADVANCE refusing to push archived evidence"
+              exit 1
+            }
+            git push origin HEAD:refs/heads/feat/j1-6-a-integer-mod-oracle
+          else
+            python3 tools/j1_6_mod_verify.py --evidence "$DEST" --permanent --self-test
+            for name in P6_M3 P7_M2 N7_M2 N7_M3 N5_M2 NMIN_M1 NMIN_M255 PMAX_M255 P2_M255 P255_M255 P1_M0 P0_M0; do
+              cmp "$DEST/$name/program.bin" "$RUNNER_TEMP/j16-cpc/$name/program.bin"
+              cmp "$DEST/$name/run/printer.dat" "$RUNNER_TEMP/j16-cpc/$name/run/printer.dat"
+              echo "J1.6-A $name REPRODUCED"
+            done
+          fi
+
+      - name: Export CPC evidence, never ROMs or complete SNA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: j1-6-a-original-cpc-mod
+          path: ${{ runner.temp }}/j16-cpc/
+          if-no-files-found: warn
+          retention-days: 30
+
+  permanent-mod-evidence:
+    name: J1.6-A permanent integrity and falsification (no emulator)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original CPC bytes and provisional seal, including 13 negative cases
+        run: |
+          set -euo pipefail
+          DEST=tests/fixtures/cpc6128/j1_integer_mod
+          if test -f "$DEST/manifest.json"; then
+            python3 tools/j1_6_mod_verify.py --evidence "$DEST" --permanent --self-test
+          elif test "$GITHUB_HEAD_REF" = feat/j1-6-a-integer-mod-oracle; then
+            echo "ACQUISITION_PENDING: the original archive is created by cpc-mod job"
+          else
+            echo "MISSING PERMANENT J1.6-A ORIGINAL ARCHIVE"
+            exit 1
+          fi

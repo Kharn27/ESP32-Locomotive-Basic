@@ -1,0 +1,8 @@
+exit code: 0
+Using configuration file: /__w/_temp/j16-cpc/PMAX_M255/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j16-cpc/PMAX_M255/screenshot_20261027_160858.png
+INFO    src/cap32.cpp:2212 - Dumping machine snapshot to /tmp/loco-c5-sna-_30_nsmv/snapshot_20261027_160858.sna
+
+[stderr]

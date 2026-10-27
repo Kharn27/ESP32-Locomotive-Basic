@@ -370,14 +370,14 @@ def self_test(base):
     reject("forged-operator-with-rehashed-file", lambda root:
            mutate_operator(root), "BINARY_ADD_VARS_SIGNATURE_CHANGED")
     reject("forged-printer-with-rehashed-manifest", lambda root:
-           mutate_printer(root), "EXTERNAL_SEAL_CHANGED")
+           mutate_printer(root), "PINNED_ORIGINAL_MANIFEST_MISMATCH")
     reject("manifest-provenance", lambda root:
            write_manifest(root, lambda m: m.update(rom_archived=True)),
            "HISTORICAL_GUARD_CHANGED")
     reject("missing-run-proof", lambda root:
            (root/"P2_P3/run/autocmd.json").unlink(), "FILE_ABSENT")
     reject("mutated-log-with-rehashed-manifest", lambda root:
-           mutate_run_log(root), "EXTERNAL_SEAL_CHANGED")
+           mutate_run_log(root), "PINNED_ORIGINAL_MANIFEST_MISMATCH")
     reject("truncated-printer", lambda root:
            (root/"P2_P3/run/printer.dat").write_bytes(b""),
            "FILE_DIGEST_CHANGED")

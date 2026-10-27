@@ -169,3 +169,10 @@ Après J1.1 accepté, J1.2-A est exclusivement une acquisition indépendante de 
 ### J1.2-B — gate INTEGER16 natif (27 octobre 2026, sous revue)
 
 Après acceptation et fusion de la PR #55 J1.2-A, l'extension `256..32767` a une branche de travail dédiée. **Conditions d'acceptation sans dérogation** : images CPC P256/N256/PMAX `MATCH_EXACT` (plus préservation P255/N255), LIST et RUN jusqu'à END, formatage numérique correspondant à la présentation imprimante CPC après normalisation documentée CRLF → LF sans confondre les transports, protections tronqué/non canonique/overflow/capacité/atomicité, aucune modification des archives, C99 OFF + ASan/UBSan + validations historiques + Caprice32 + Xtensa verts au HEAD final. `-32768` (REAL5) et `32768` demeurent exclus. La séparation archive/capacité courante est contrôlée par deux outils distincts. [Rapport J1.2-B](J1.2-B-integer16-native.md). **PR à examiner par Pilotage ; aucune fusion automatique ni promotion des 4 B1 historiques ou des 18 anciennes LIST/RUN**.
+
+
+### Décision J1.2-B → CI-01 (27 octobre 2026)
+
+**J1.2-B acceptée et fusionnée** par Pilotage sur [PR #56](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/56), commit squash `209fc9c58faade3fd8e5aef37eaa7a844d8d29d1`. Les quatre familles CI sur HEAD final `c403abf9` sont SUCCESS, huit check-runs verts, notamment oracle CPC #40478663225 ; cinq images CPC `MATCH_EXACT`, sérialisation `PRINT` en présentation confirmée, 34/34 tests C99 OFF/ON, correction P2 du LIST. Aucun nouveau test physique ESP32/CYD.
+
+La **priorité immédiate** est l'amélioration infrastructure **CI-01**, en deux gates successifs : CI-01-A = image Caprice32 GHCR publiée depuis sources épinglées et smoke testée ; CI-01-B = migration oracle CPC vers l'image immuable identifiée par digest, démontrant la suppression de `apt-get` et `make` de l'exécution répétée, sans dégradation des preuves. [Contrat CI-01](CI-01-caprice32-persistent.md). **Ne pas lancer J1.2-C avant la migration CI-01-B validée.**

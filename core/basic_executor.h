@@ -49,7 +49,10 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
  * plus only -32768 via exact F5 1F 00 00 00 00 90 (REAL5 payload),
  * or exactly one explicit INTEGER source reference followed by binary
  * CPC F4 (+), F5 (-), F6 (*), F9 (\\) or FB (MOD), then one unsigned
- * decimal byte literal (0..255).
+ * decimal byte literal (0..255). J1.7-B additionally permits
+ * F4 (+) followed by a SECOND explicit INTEGER reference; both sources
+ * are read before the single successful assignment commit. F5/F6/F9/FB
+ * still require a byte literal as their RHS.
  * Unary F5 and binary F5 are distinguished by operand context.
  * A non-representable sum, difference or product returns BE_INTEGER_OVERFLOW.
  * F9 division truncates toward zero; a zero divisor returns the separate

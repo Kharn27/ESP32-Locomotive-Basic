@@ -142,7 +142,8 @@ static BEStatus binding_error(BVBStatus status)
     }
 }
 
-/* Evaluate one explicit INTEGER reference (+, -, *, \\ or MOD) and unsigned byte literal.
+/* Evaluate one explicit INTEGER source and unsigned-byte operand, or
+ * exclusively for F4 one more explicit INTEGER source reference.
  * One decoder serves both executor passes; only caller-local values change.
  * The reference cache is opaque and bvb_read_explicit never edits it. */
 static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
@@ -156,6 +157,7 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
     size_t pos;
     uint8_t token, operand, operation;
     int32_t result;
+    int32_t rhs;
     BVBStatus resolved = bvb_read_explicit(body, length, source_start,
                                            variables, &source, &consumed, &value);
     if (resolved != BVB_OK) {
@@ -180,8 +182,25 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
         return BE_TRUNCATED;
     }
     token = body[pos++];
-    if (token >= 0x0eu && token <= 0x17u) {
+    if (token == 0x02u && operation == 0xf4u) {
+        BasicVariableKey right_key;
+        BasicVariableValue right_value;
+        size_t right_consumed = 0u;
+        BVBStatus right = bvb_read_explicit(body, length, pos - 1u,
+                                             variables, &right_key,
+                                             &right_consumed, &right_value);
+        if (right != BVB_OK) {
+            return binding_error(right);
+        }
+        if (right_key.type != (uint8_t)BVT_INTEGER ||
+            right_value.type != (uint8_t)BVT_INTEGER) {
+            return BE_INVALID_TYPE;
+        }
+        rhs = (int32_t)right_value.data.integer;
+        pos = pos - 1u + right_consumed;
+    } else if (token >= 0x0eu && token <= 0x17u) {
         operand = (uint8_t)(token - 0x0eu);
+        rhs = (int32_t)operand;
     } else if (token == 0x19u) {
         if (pos == length) {
             return BE_TRUNCATED;
@@ -190,25 +209,26 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
         if (operand < 10u) {
             return BE_BAD_SEQUENCE;
         }
+        rhs = (int32_t)operand;
     } else {
         return BE_BAD_SEQUENCE;
     }
     /* Check before dividing: no host UB and no destination/cache mutation.
      * C99 signed division on int32_t truncates toward zero. INT16_MIN / 1
      * is representable; an unsigned byte divisor cannot cause MIN / -1. */
-    if ((operation == 0xf9u || operation == 0xfbu) && operand == 0u) {
+    if ((operation == 0xf9u || operation == 0xfbu) && rhs == 0) {
         return BE_DIVISION_BY_ZERO;
     }
     /* Widen before arithmetic; never rely on signed overflow or wrapping. */
     result = operation == 0xf4u
-        ? (int32_t)value.data.integer + (int32_t)operand
+        ? (int32_t)value.data.integer + rhs
         : operation == 0xf5u
-          ? (int32_t)value.data.integer - (int32_t)operand
+          ? (int32_t)value.data.integer - rhs
           : operation == 0xf6u
-            ? (int32_t)value.data.integer * (int32_t)operand
+            ? (int32_t)value.data.integer * rhs
             : operation == 0xf9u
-              ? (int32_t)value.data.integer / (int32_t)operand
-              : (int32_t)value.data.integer % (int32_t)operand;
+              ? (int32_t)value.data.integer / rhs
+              : (int32_t)value.data.integer % rhs;
     if (result < INT16_MIN || result > INT16_MAX) {
         return BE_INTEGER_OVERFLOW;
     }

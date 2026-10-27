@@ -369,6 +369,20 @@ La photographie demandée pour C1 est **absente** mais son critère a été lev�
 
 **HW4-C2 AUTORISÉ** [issue #90](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/90) : console BASIC saisie UART → `bsr_submit()`/`bsr_step()` → écran CPC MODE1, entrée bornée et contrôles d'erreurs, sans REPL complet, scrolling général, tactile/SD/émulation Z80. Linux/CI/oracles + essai vrai CYD au HEAD final obligatoires. **HW4-C3 BLOQUÉ** jusqu'à revue/fusion C2. J1.7-B reste parallèle et isolé.
 
+## J1.7-B — barrière de revue (mission #88, PR #89)
+
+Admission limitée à `destination%=source1%+source2%` pour trois références INTEGER explicites et token `F4`. Les preuves CPC J1.7-A sont figées ; le comparateur J1.7-B doit être indépendant et épingler les douze SHA originaux, imposer permanence anti-falsification, 12/12 RAM, 12/12 LIST, 10/10 numériques, deux débordements `BE_INTEGER_OVERFLOW`, rollback C99 complet, >=50/50 OFF et ON et cross-build ESP32 3/3 incluant esp32_loco. Aucune déduction d'atomicité ROM depuis `C%=0` après ERR=6. Aucun changement HW4-C1 ni fusion automatique. **État en revue, pas accepté.**
+
+### Gate J1.7-B intégrée à HW4-C1 — validations du code `aa1c26bf`
+
+**SATISFIED techniquement, NON ENCORE ACCEPTÉ PAR PILOTAGE** : 50/50 OFF/ON ASan/UBSan, 12/12 RAM CPC, 12/12 LIST, 10/10 valeurs, 2/2 overflow, atomicité C99 ; permanences J1.7-A/J1.6-A et oracle verts ; HW4-C1 architecture/texte/runtime et les trois cibles Xtensa ESP-IDF v5.5.6 vertes. Seules les acquisitions conditionnelles J1.3/1.4/1.5 restent `SKIPPED` et ne constituent pas de nouvelles preuves. Merge final exclusivement du ressort du Pilotage. [Preuves et mesures](J1.7-B-integer-add-vars-native.md). Aucun nouveau test CYD J1.7-B : `ON_DEVICE_UNVERIFIED`.
+
+### Gate finale J1.7-B — SATISFIED / ACCEPTÉ ET FUSIONNÉ (27 octobre 2026)
+
+[PR #89](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/89) fusionnée (SHA final de la branche `bcf46e014aaae42d5d36fab05435ce3c41096849`, squash sur main `e94f063e3962f5820b65bf770e3e90955ef7df7b`). Les anciennes mentions « en revue », « non accepté » ci-dessus sont historiques et dépassées. Contrôles : [C99 50/50 OFF et ON ASan/UBSan #40577757802](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40577757802), **12/12 RAM exactes + 12/12 LIST + 10/10 valeurs + 2/2 overflow**, atomicité native, permanence archives J1.7-A, oracle CPC, [HW4-C1 intégrée #40577757830](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40577757830) **4/4**, [ESP32 #40577757856](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40577757856) **3/3**. Filtres d'acquisition J1.3/1.4/1.5 SKIPPED ; aucune atomicité du CPC supposée sur erreurs ; `TARGET_BUILD_VERIFIED / ON_DEVICE_UNVERIFIED`.
+
+**J1.8-A AUTORISÉ — issue #92 :** phase oracle CPC seulement pour `C%=A%-B%` (token F5 à confirmer historiquement, 12 cas, deux sessions indépendantes/cas, manifeste et anti-falsifications). Aucun changement au cœur natif. **J1.8-B BLOQUÉ** jusqu'à acceptation et fusion A. HW4-C2 #90 reste indépendant et soumis à son protocole de test CYD physique.
+
 ## HW4-C2 — consolidation dans le projet matériel existant
 
 **Décision après retour PO :** garder le seul dossier de travail historique `firmware/esp32_display_probe/` comme cible interactive HW4-C2, en sélectionnant la branche Git normale via `git switch` ; pas de worktree ni de nouveau projet VSCode. Conserver l'ancien `main.c` du banc HW3/HW4 derrière le choix de build `HW4_C2_CONSOLE=OFF`, sans supprimer la preuve HW4-C1 fusionnée : l'ancien `esp32_loco` est restauré exactement à l'état main et non utilisé pour le test C2.

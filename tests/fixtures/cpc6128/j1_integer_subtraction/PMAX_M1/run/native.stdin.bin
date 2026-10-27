@@ -1,0 +1,7 @@
+10 A%=32767
+20 B%=A%-1
+30 PRINT B%
+40 END
+RUN
+:step 100
+:quit

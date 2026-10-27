@@ -334,8 +334,8 @@ static uint16_t logical_diag_pixel(int x, int y)
     if (x >= HW3_W - 18 && y < 18) return 0x07E0U;
     if (x < 18 && y >= HW3_H - 18) return HW3_YELLOW_RGB565;
     if (x >= HW3_W - 18 && y >= HW3_H - 18) return 0xFFFFU;
-    if (y >= 38 && y < 46 && x >= 128 && x < 192) {
-        const char *label = "ROT 12 / ROT 13";
+    if (y >= 38 && y < 46) {
+        const char *label = s_active_case == HW3_SOFTWARE_ROTATE_CW ? "ROT 12" : "ROT 13";
         const int start = (HW3_W - (int)strlen(label) * 8) / 2;
         if (x >= start && x < start + (int)strlen(label) * 8) {
             uint8_t bits = hw3_glyph_row((uint8_t)label[(x - start) / 8],

@@ -116,6 +116,11 @@ static int test_tokens_and_listing(void)
         {"LET B%=A% MOD 3", {0xa5,' ',2,0,0,0xc2,0xef,2,0,0,0xc1,' ',0xfb,' ',0x11}, 15},
         {"B% = A% MOD 255", {2,0,0,0xc2,' ',0xef,' ',2,0,0,0xc1,' ',0xfb,' ',0x19,255}, 16},
         {"B%=B% MOD 1", {2,0,0,0xc2,0xef,2,0,0,0xc2,' ',0xfb,' ',0x0f}, 13},
+        /* MOD embedded in a legal identifier must not be split into FB. */
+        {"B%=AMOD% MOD 1",
+         {2,0,0,0xc2,0xef,2,0,0,'A','M','O',0xc4,' ',0xfb,' ',0x0f}, 16},
+        {"B%=A%MOD 1",
+         {2,0,0,0xc2,0xef,2,0,0,0xc1,0xfb,' ',0x0f}, 12},
         {"B%=-32768", {2,0,0,0xc2,0xef,0xf5,0x1f,0,0,0,0,0x90}, 12},
         {"B%=A%+3", {2,0,0,0xc2,0xef,2,0,0,0xc1,0xf4,0x11}, 11},
         {"B%=A%-3", {2,0,0,0xc2,0xef,2,0,0,0xc1,0xf5,0x11}, 11},
@@ -220,6 +225,8 @@ static int test_programs(void)
         CHECK(bp_export(&h.program, binary, sizeof(binary), &image_n) == BP_OK);
         CHECK(bp_init(&imported, imported_storage, sizeof(imported_storage)) == BP_OK);
         CHECK(bp_import(&imported, binary, image_n) == BP_OK);
+        /* A truncated CPC program image must not be admitted as a whole. */
+        CHECK(image_n >= 2u && bp_validate_image(binary, image_n - 1u) != BP_OK);
         CHECK(bp_export(&imported, rebuilt, sizeof(rebuilt), &image_m) == BP_OK);
         CHECK(image_m == image_n && memcmp(binary, rebuilt, image_n) == 0);
         CHECK(bl_list_program(&imported, listing, sizeof(listing), &list_n) == BL_OK);
@@ -285,6 +292,20 @@ static int test_failure_cases(void)
     CHECK(put(&h, 10u, "B%=A% MOD 1") == 0);
     CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
     CHECK(failure(&h, BE_VARIABLE_NOT_FOUND) == 0);
+    /* An imported destination of the wrong CPC explicit type is rejected.
+     * No bytes or variables are committed on a type error. */
+    {
+        static const uint8_t wrong_destination[] = {
+            3,0,0,0xc2,0xef,2,0,0,0xc1,' ',0xfb,' ',0x0f
+        };
+        CHECK(setup(&h, 3u) == 0);
+        CHECK(inject(&h, 'A', 8) == 0);
+        CHECK(bp_put(&h.program, 10u, wrong_destination,
+                     sizeof(wrong_destination)) == BP_OK);
+        CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+        CHECK(failure(&h, BE_INVALID_TYPE) == 0);
+        CHECK(equal(&h, 'A', 8) == 0);
+    }
     /* One statement per line, even if source accepted a colon. */
     CHECK(setup(&h, 3u) == 0);
     CHECK(inject(&h, 'A', 4) == 0);

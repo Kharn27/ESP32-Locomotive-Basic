@@ -128,7 +128,8 @@ def negative(image_cli):
     for legacy in ("10 B%=A%+3\n20 END\n",
                    "10 B%=A%-3\n20 END\n",
                    "10 B%=-32768\n20 END\n",
-                   "10 B%=A%*3\n20 END\n",\n                   "10 B%=A%\\\\3\n20 END\n"):
+                   "10 B%=A%*3\n20 END\n",
+                   "10 B%=A%\\3\n20 END\n"):
         require(execute(image_cli,legacy.encode("ascii"),"LEGACY")
                 .stdout.endswith(b"\x00\x00"),"OLD_GRAMMAR_REGRESSED")
     # A tokenizable but forbidden compound assignment is covered by the C

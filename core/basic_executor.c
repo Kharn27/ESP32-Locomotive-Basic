@@ -143,7 +143,7 @@ static BEStatus binding_error(BVBStatus status)
 }
 
 /* Evaluate one explicit INTEGER source and unsigned-byte operand, or
- * exclusively for F4 one more explicit INTEGER source reference.
+ * exclusively for binary F4/F5 one more explicit INTEGER source reference.
  * One decoder serves both executor passes; only caller-local values change.
  * The reference cache is opaque and bvb_read_explicit never edits it. */
 static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
@@ -182,7 +182,8 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
         return BE_TRUNCATED;
     }
     token = body[pos++];
-    if (token == 0x02u && operation == 0xf4u) {
+    if (token == 0x02u &&
+        (operation == 0xf4u || operation == 0xf5u)) {
         BasicVariableKey right_key;
         BasicVariableValue right_value;
         size_t right_consumed = 0u;

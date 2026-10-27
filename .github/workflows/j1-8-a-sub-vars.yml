@@ -170,12 +170,20 @@ jobs:
         run: |
           set -euo pipefail
           base="$(git merge-base origin/main HEAD)"
-          git diff --exit-code "$base" HEAD -- core/ firmware/ video/ hal/
+          # J1.8-A is an oracle-only acquisition; it may never modify core.
+          # Other native J1 missions are allowed to change core, but must
+          # preserve the original J1.8-A archive and all HW4 boundaries.
+          if test "$GITHUB_HEAD_REF" = feat/j1-8-a-cpc-integer-sub-vars-oracle; then
+            git diff --exit-code "$base" HEAD -- core/ firmware/ video/ hal/
+          else
+            git diff --exit-code "$base" HEAD -- \
+              firmware/ video/ hal/ tests/fixtures/cpc6128/j1_integer_sub_vars/
+          fi
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
           ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_loco/main --include='*.c'
           test "$(grep -c '^void app_main(void)' firmware/esp32_loco/main/main.c)" -eq 1
           ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_loco/main/
-          echo "J1.8-A HW4-C1_BRIDGE_AND_CORE_UNCHANGED"
+          echo "J1.8-A HW4-C1_BRIDGE_UNCHANGED_AND_ORACLE_ARCHIVE_GUARDED"
 
   xtensa-three-targets:
     name: J1.8-A three independent Xtensa IDF 5.5.6 images

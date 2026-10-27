@@ -51,3 +51,24 @@ idf.py -p /dev/ttyUSB0 monitor
 Sur vrai ESP32-2432S028R : BOOT CPC (cas 9), `v` trois fois (MODE0/1/2), `p` couleurs, `z` curseur, `w` viewport MODE2, `r` retour BOOT ; envoyer journaux UART et retour visuel explicite, heap8_free, heap8_largest, stack_margin_bytes, aucune réinitialisation ni `DMA_FAIL`.
 
 **En attente** : résultats CI à inscrire après exécution et rapport matériel réel du PO. `TARGET_BUILD_UNVERIFIED` et `ON_DEVICE_UNVERIFIED` tant que ces preuves n'existent pas ; pas de merge autonome ; HW4-C reste bloqué.
+
+
+## Mesures vérifiées — candidat compilé `276ae1773997b219888c1a85898b41f76714b8c8`
+
+Deux compilations croisées ESP-IDF **v5.5.6** au même SHA, mesurées séparément dans les logs GitHub Actions :
+
+| Image autonome | IRAM | DRAM | Flash Code | Taille image |
+|---|---:|---:|---:|---:|
+| `loco_esp32_display_probe` | 67 279 / 131 072 o (51,33 %) | 30 400 / 180 736 o (16,82 %) | 82 538 o | 208 333 o |
+| `loco_esp32_probe` | 51 807 / 131 072 o (39,53 %) | 30 428 / 180 736 o (16,84 %) | 66 346 o | 157 657 o |
+
+Comparées à HW4-A, la sonde augmente de **40 o DRAM et 1 244 o Flash Code**; le firmware BASIC série, qui n'initialise pas le LCD et ne lie qu'une fonction de diagnostic, augmente de **32 o DRAM et 160 o Flash Code**. Ces chiffres ne prédisent **pas** la RAM libre ou la taille du firmware BASIC + vidéo actif, à mesurer après HW4-C. Les allocations DMA sont dynamiques à l'initialisation et ne figurent pas comme 5120 o de BSS.
+
+Preuves du candidat `276ae177…` :
+- [Sonde Xtensa](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40549401436) : `SUCCESS`.
+- [Firmware BASIC Xtensa](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40549401185) : `SUCCESS`.
+- [Linux C99 + sanitizer, 44/44 chacun, PPM inclus](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40549401149) : jobs Linux OFF/ON `SUCCESS` et gate architecture `SUCCESS`; le job supplémentaire des deux builds est distinct.
+- [CPC 6128 oracle historique](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40549401350) : `SUCCESS`.
+- [J1.6-A oracle](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40549401165) : `SUCCESS`.
+
+Le rapport de validation physique HW4-B est encore **NON FOURNI**. Aucune réussite sur CYD réel ne peut être déduite des builds. Une mise à jour documentaire de ce rapport change le HEAD : les checks doivent être recontrôlés sur le HEAD final.

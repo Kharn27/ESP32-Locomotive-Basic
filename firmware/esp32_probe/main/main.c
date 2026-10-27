@@ -110,12 +110,15 @@ static void build_identity(void)
 {
     static const char alphabet[] = "0123456789abcdef";
     const esp_app_desc_t *desc = esp_app_get_description();
+    /* ESP-IDF fills the app descriptor's ELF hash post-link; a volatile
+     * read avoids compiler folding the pre-patched initial bytes to zero. */
+    const volatile uint8_t *const digest_bytes = desc->app_elf_sha256;
     char sha[65];
     size_t i;
     /* Embedded application ELF identity. Compare with the exact ELF/flash
      * artifact used, not with a source-branch HEAD guessed from this text. */
     for (i = 0u; i < sizeof(desc->app_elf_sha256); ++i) {
-        const uint8_t byte = desc->app_elf_sha256[i];
+        const uint8_t byte = digest_bytes[i];
         sha[2u * i] = alphabet[byte >> 4];
         sha[2u * i + 1u] = alphabet[byte & 0x0fu];
     }

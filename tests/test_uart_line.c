@@ -87,9 +87,10 @@ static void ansi_delete(void)
     assert(feed_string("\x1b[3~")==UART_LINE_DELETE);
     assert(guard.line.length==2U && memcmp(guard.line.data,"AB",2U)==0);
     assert(feed_string("\x1b[3~")==UART_LINE_DELETE);
+    assert(feed_string("\x1b[3~")==UART_LINE_DELETE);
     assert(feed_string("\x1b[3~")==UART_LINE_NONE);
     assert(guard.line.length==0U);
-    assert(guard.line.ansi_sequences_deleted==4U);
+    assert(guard.line.ansi_sequences_deleted==5U);
     guarded();
 }
 static void ansi_ignored(void)

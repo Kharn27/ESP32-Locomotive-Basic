@@ -25,9 +25,191 @@ from j1_10_if_then_oracle import MAIN_CASES, EXPLORATORY, GHCR_PIN, checkout_ide
 BASE=ROOT/"tests/fixtures/cpc6128/j1_10_if_then"
 # Filled ONLY AFTER the first original GHCR acquisition, from its bot archive.
 # Do not infer these values from C99, an emulator guess or a hand-built image.
-PINNED_MANIFEST_SHA=None
-PINNED_RAM={}
-PINNED_PRINTER={}
+# Independently transcribed from the FIRST GHCR bot archive after capture.
+# Source: Actions 40602423356 / checkout 30ce7f843b416bcd05ddd66bde32fae9c0ad19c1.
+PINNED_MANIFEST_SHA="4439054c55c9422aba315c3e5e4cc4303c38b34c4b1f2f13ba56e60f69661796"
+PINNED_RAM={
+    "F_ZERO_FORWARD": "d439897bbbfc3fdbfeb99cbdcf62833522a06235bb08f4e3f7a90f055ad5aa79",
+    "F_ONE_FORWARD": "8489eac269389ec5e8e7d5750ba6df8637580d8db30ee67ddadc5eb431f0848b",
+    "F_NEGONE_FORWARD": "f0df22156c230395ea0cbceff30fc64122b43783b85de3072601563a2c814a3b",
+    "F_NMIN_FORWARD": "cb20711036e7b35a9560fadd0f6e39d4dc37c45f79706460c49a3f8c0dbcdd70",
+    "F_PMAX_FORWARD": "b7d7e9fa1413484d847819148a4e7891a55685792d3e5c5a5b1a3e48f77776bf",
+    "F_FALSE_MISSING": "b207d211113591f9f272f97ab6d6a5d3b9658dc97da22f791d3d04fed762860d",
+    "F_TRUE_MISSING": "fb55c820bf149704ae143ea32c6ba719261cfb3f39b82e9852f7fe6e7ac4f2fc",
+    "F_TRUE_SKIP_TWO": "adf8d77bcc0cc8ccc4c5f014387e0b782bb391c7f4065a67c8f1e8c18903a629",
+    "F_FALSE_TWO_PRINT": "0ac78bee4ffab917691fe8fb463833139cd053df9b722791f63cf49dc0d45ff1",
+    "F_TRUE_BACK": "d870c8a5e1e6f6be5f2c2d0a80b1498631f309617e4599b6a00210f10e452498",
+    "F_TRUE_TARGET_END": "82a1656ae816962c76736f9641c911ce707c7cdb611e761b016932b4e792dfa6",
+    "F_FALSE_TARGET_END": "b44fe3ce750e530c184ab2ddbd972827a6acad0f0fc2e1b4cc4bbd3ab3c46f86",
+    "F_TRUE_AFTER_PRINT": "0673fdd33c32ab79ee87a4507ba190308baf4a20fa74052a66be3833ba23f8f5",
+    "F_ZERO_AFTER_PRINT": "fb34b7efe2e4f0439c5d3658b9e2762f3247915fb4d39342a73e79ccd03f1fbb"
+}
+PINNED_PRINTER={
+    "F_ZERO_FORWARD": "a60849e4bf95456cf582c54d8727a5cdecc84e80d1d888df80cd4c5aebeb76aa",
+    "F_ONE_FORWARD": "e825063dd55047794bc0685ad071c92903c16df56f18893de70a04c1381c0321",
+    "F_NEGONE_FORWARD": "e825063dd55047794bc0685ad071c92903c16df56f18893de70a04c1381c0321",
+    "F_NMIN_FORWARD": "e825063dd55047794bc0685ad071c92903c16df56f18893de70a04c1381c0321",
+    "F_PMAX_FORWARD": "e825063dd55047794bc0685ad071c92903c16df56f18893de70a04c1381c0321",
+    "F_FALSE_MISSING": "a60849e4bf95456cf582c54d8727a5cdecc84e80d1d888df80cd4c5aebeb76aa",
+    "F_TRUE_MISSING": "5a235bf5c786deeba8260805d584c34f1a2eebbef1b3db24cea1075372bb2356",
+    "F_TRUE_SKIP_TWO": "1919a2bb1aaec89ba0d8b006da302c52c06eaca8a2eb0bae2a749a5107176d3f",
+    "F_FALSE_TWO_PRINT": "3b42a6de53eed806dd1ccfaaaba60258e35b32f0f7203be763531ca7af53a684",
+    "F_TRUE_BACK": "17c87b8a719c53991e1443082e459dd0c3efb4ad7cc7ba91104a7f7e410c8327",
+    "F_TRUE_TARGET_END": "37945bf7b406cce0ad7c77718e3e66d128ac15f3f81d6f389d32c5f6aed664f9",
+    "F_FALSE_TARGET_END": "a60849e4bf95456cf582c54d8727a5cdecc84e80d1d888df80cd4c5aebeb76aa",
+    "F_TRUE_AFTER_PRINT": "109a4fa57722852561ec62209e6cb18839791dc6e5fe0743693a4eaee291c33f",
+    "F_ZERO_AFTER_PRINT": "080949a0ee84333240e1eae0d822cffb07a8b4b6b3676eb0717ef22a13730bc2"
+}
+PINNED_OUTCOMES={
+    "F_ZERO_FORWARD": [
+        [
+            31
+        ],
+        0,
+        0
+    ],
+    "F_ONE_FORWARD": [
+        [
+            61
+        ],
+        0,
+        0
+    ],
+    "F_NEGONE_FORWARD": [
+        [
+            61
+        ],
+        0,
+        0
+    ],
+    "F_NMIN_FORWARD": [
+        [
+            61
+        ],
+        0,
+        0
+    ],
+    "F_PMAX_FORWARD": [
+        [
+            61
+        ],
+        0,
+        0
+    ],
+    "F_FALSE_MISSING": [
+        [
+            31
+        ],
+        0,
+        0
+    ],
+    "F_TRUE_MISSING": [
+        [],
+        8,
+        20
+    ],
+    "F_TRUE_SKIP_TWO": [
+        [
+            71
+        ],
+        0,
+        0
+    ],
+    "F_FALSE_TWO_PRINT": [
+        [
+            31,
+            41
+        ],
+        0,
+        0
+    ],
+    "F_TRUE_BACK": [
+        [
+            71,
+            31
+        ],
+        0,
+        0
+    ],
+    "F_TRUE_TARGET_END": [
+        [],
+        0,
+        0
+    ],
+    "F_FALSE_TARGET_END": [
+        [
+            31
+        ],
+        0,
+        0
+    ],
+    "F_TRUE_AFTER_PRINT": [
+        [
+            21,
+            71
+        ],
+        0,
+        0
+    ],
+    "F_ZERO_AFTER_PRINT": [
+        [
+            21,
+            41
+        ],
+        0,
+        0
+    ]
+}
+PINNED_EXPLORATIONS={
+    "E_TRUE_THEN_GOTO": [
+        [
+            61
+        ],
+        0,
+        0
+    ],
+    "E_FALSE_THEN_GOTO": [
+        [
+            31
+        ],
+        0,
+        0
+    ],
+    "E_ELSE": [
+        [
+            31
+        ],
+        0,
+        0
+    ],
+    "E_COMPARISON": [
+        [
+            61
+        ],
+        0,
+        0
+    ],
+    "E_THEN_STATEMENT": [
+        [
+            22,
+            31
+        ],
+        0,
+        0
+    ],
+    "E_REAL": [
+        [
+            61
+        ],
+        0,
+        0
+    ],
+    "E_STRING": [
+        [],
+        13,
+        20
+    ]
+}
 
 class Invalid(ValueError):
     pass
@@ -182,6 +364,27 @@ def verify(base,permanent=False):
                 item["ram_exact_2of2"] is True and
                 item["printer_exact_2of2"] is True,
                 name+": TWO_PROCESS_PROVENANCE_CHANGED")
+        # Locomotive BASIC 1.1 token sequences measured from CPC pre-RUN RAM:
+        # A1=IF, EB=THEN, 02/cache/name=INTEGER ref, 1E=line reference.
+        # Preserve and validate caches as opaque bytes, never normalize them.
+        for n,line in enumerate(src.splitlines()):
+            match=re.fullmatch(rb"([0-9]+) IF A% THEN ([0-9]+)",line)
+            if match:
+                line_number=int(match.group(1))
+                target_number=int(match.group(2))
+                for mode in ("original","repeat"):
+                    ram=read(base/mode/name/"program.bin")
+                    _, recs=oracle.records(ram)
+                    pos=nums.index(line_number)
+                    meta=recs[pos]
+                    expr=ram[meta["offset"]:meta["offset"]+meta["length"]]
+                    expected=bytes((0x11,0x00,line_number & 255,
+                                    line_number >> 8,
+                                    0xa1,0x20,0x02,0x00,0x00,0xc1,
+                                    0x20,0xeb,0x20,0x1e,
+                                    target_number & 255,
+                                    target_number >> 8,0x00))
+                    require(expr==expected,name+": OBSERVED_IF_THEN_LINE_REF_MISMATCH_"+mode)
         first,second=[],[]
         for mode,target in (("original",first),("repeat",second)):
             proof=item[mode]
@@ -190,6 +393,10 @@ def verify(base,permanent=False):
             same_files(base/mode/name,proof["all_files_sha256"],
                        name+"/ALL/"+mode)
         require(first==second,name+": TWO_CPC_SESSIONS_DISAGREE")
+        require([item["original"]["run"]["program_trace"],
+                 item["original"]["run"]["err_probe"],
+                 item["original"]["run"]["erl_probe"]]==PINNED_OUTCOMES[name] if permanent else True,
+                name+": EXTERNALLY_PINNED_CPC_FLOW_MISMATCH")
     for item in explore:
         name=item["case"]
         require(item["scope"]=="EXPLORATION_ONLY_NEVER_J1_10_B_PROOF",
@@ -200,6 +407,10 @@ def verify(base,permanent=False):
                 read(folder/"original.bas")==src,
                 name+": EXPLORATION_SOURCE_CHANGED")
         run=item["run"]
+        if permanent:
+            require([run["program_trace"],run["err_probe"],run["erl_probe"]]==
+                    PINNED_EXPLORATIONS[name],
+                    name+": EXPLORATORY_OBSERVATION_CHANGED")
         require(run["fresh_cpc_run_process"] is True and
                 run["printer_raw_hex"]==
                 (read(folder/"run/printer.dat").hex(" ").upper()

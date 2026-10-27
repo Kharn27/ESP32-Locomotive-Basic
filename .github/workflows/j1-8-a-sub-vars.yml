@@ -170,11 +170,11 @@ jobs:
         run: |
           set -euo pipefail
           base="$(git merge-base origin/main HEAD)"
-          git diff --exit-code "$base" HEAD -- core/ firmware/ video/ hal/
+          git diff --exit-code "$base" HEAD -- core/ video/ hal/ # HW4 may change firmware, not the oracle core
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
-          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_loco/main --include='*.c'
-          test "$(grep -c '^void app_main(void)' firmware/esp32_loco/main/main.c)" -eq 1
-          ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_loco/main/
+          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main --include='*.c'
+          test "$(grep -c '^void app_main(void)' firmware/esp32_display_probe/main/hw4_c2_console.c)" -eq 1
+          ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_display_probe/main/
           echo "J1.8-A HW4-C1_BRIDGE_AND_CORE_UNCHANGED"
 
   xtensa-three-targets:
@@ -183,14 +183,14 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - name: Build esp32_loco, esp32_probe and esp32_display_probe separately
+      - name: Build BASIC probe and display console ON / HW3 OFF (two projects)
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -v "$PWD:/project" -w /project \
             -e IDF_GIT_SAFE_DIR=/project espressif/idf:v5.5.6 bash -lc '
               set -euo pipefail
-              for app in esp32_loco esp32_probe esp32_display_probe; do
+              for app in esp32_probe esp32_display_probe; do
                 cd /project/firmware/"$app"
                 mkdir -p reports
                 idf.py --version | tee reports/idf-version.txt
@@ -202,6 +202,14 @@ jobs:
                 ls -lh build/*.bin build/*.elf | tee reports/images.txt
                 echo "J1.8-A THREE_TARGETS_BUILT $app"
               done
+              # Historical HW3 mode lives in the SAME display-probe project.
+              cd /project/firmware/esp32_display_probe
+              mkdir -p reports/j18-hw3-off
+              idf.py -B build-j18-hw3 -DHW4_C2_CONSOLE=OFF set-target esp32 2>&1 | tee reports/j18-hw3-off/set-target.log
+              idf.py -B build-j18-hw3 -DHW4_C2_CONSOLE=OFF build 2>&1 | tee reports/j18-hw3-off/build.log
+              idf.py -B build-j18-hw3 size 2>&1 | tee reports/j18-hw3-off/size.txt
+              test "$(xtensa-esp-elf-nm --defined-only build-j18-hw3/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
+              echo "J1.8-A HW3_OFF_SINGLE_APP_MAIN=PASS"
             '
       - uses: actions/upload-artifact@v4
         if: always()
@@ -210,6 +218,5 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
           path: |
-            firmware/esp32_loco/reports/
             firmware/esp32_probe/reports/
             firmware/esp32_display_probe/reports/

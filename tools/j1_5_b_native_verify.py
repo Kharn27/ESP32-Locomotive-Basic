@@ -108,13 +108,13 @@ def check_case(case, cli, image_cli):
               "CPC_ERR=0 VALUE="+str(expected),"RUN=END",
               "PRINTER_CRLF_NATIVE_LF_SEPARATE",flush=True)
 
-def negative(image_cli):
+def negative(cli, image_cli):
     invalid = [
         r"B%=A%\256", r"B%=A%\-1", r"B%=A%\ -1", r"B%=A%\+1",
         r"B%=A%\1\2", r"B%=A%\1+2", r"B%=A%\C%", r"B%=A!\2",
         r"B%=A$\2", r"B%=A%\(2)", r"B%=A%\1.2", r"B%=A%\1E2",
         r"B%=A%\1:PRINT 2:", r"B%=A%\32768", "B%=A%\\",
-        "B%=A%/2", r"B%=A%\2/2", r"B%=A%\0:PRINT B%"
+        "B%=A%/2", r"B%=A%\2/2"
     ]
     for expression in invalid:
         source=("10 A%=5\n20 "+expression+"\n30 END\n").encode("ascii")
@@ -129,7 +129,17 @@ def negative(image_cli):
                    "10 B%=A%*3\n20 END\n"):
         require(execute(image_cli,legacy.encode("ascii"),"LEGACY")
                 .stdout.endswith(b"\x00\x00"),"OLD_GRAMMAR_REGRESSED")
-    print("PASS 18 negative grammar + legacy plus/minus/multiply/NMIN",flush=True)
+    # A colon-composed line can be tokenized for historical listing, but an
+    # assignment with a suffix is forbidden at execution and must stay atomic.
+    composite = (b"10 A%=5\n20 B%=A%\\0:PRINT B%\n30 END\n"
+                 b"RUN\n:step 2\n:quit\n")
+    result = execute(cli, composite, "FORBIDDEN_COMPOSITE")
+    require(result.stdout == b"" and
+            b"BE_UNSUPPORTED" in result.stderr and
+            b"BSR_EXECUTOR_ERROR" in result.stderr,
+            "COMPOSITE_ASSIGNMENT_EXECUTION_ACCEPTED")
+    print("PASS 17 negative token grammars + 1 execution-only composition"
+          " + legacy plus/minus/multiply/NMIN",flush=True)
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
@@ -150,7 +160,7 @@ def main():
             historical_self_test(EVIDENCE)
         for case in CASES:
             check_case(case,args.cli,args.image_cli)
-        negative(args.image_cli)
+        negative(args.cli,args.image_cli)
         print("PASS J1.5-B 12/12 MATCH_EXACT, 10/10 values, 2/2 division-by-zero",
               "J1.5-A UNSUPPORTED classifications retained",flush=True)
     except (Invalid, ValueError, OSError, KeyError, TypeError,

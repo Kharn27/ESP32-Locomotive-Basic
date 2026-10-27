@@ -46,6 +46,8 @@
 #define HW3_CURSOR_COL 0
 #define HW3_CURSOR_MS 500
 #define HW3_MATRIX_HOLD_MS 2500
+#define HW3_SOFTWARE_ROTATE_CW 12U
+#define HW3_SOFTWARE_ROTATE_CCW 13U
 
 /* CPC firmware defaults: INK 0=colour 1 (#000080), INK 1=colour 24 (#FFFF00).
  * Deterministic RGB565, sent high byte first to the ILI9341.
@@ -71,6 +73,7 @@ static esp_lcd_panel_handle_t s_panel;
 static uint8_t *s_dma_band;
 static SemaphoreHandle_t s_transfer_done;
 static uint8_t s_screen[HW3_ROWS][HW3_COLS];
+static unsigned int s_active_case;
 
 static bool IRAM_ATTR on_color_done(esp_lcd_panel_io_handle_t io,
                                     esp_lcd_panel_io_event_data_t *event,
@@ -182,8 +185,19 @@ static esp_err_t draw_cursor(bool visible)
         s_dma_band[2 * i] = (uint8_t)(color >> 8);
         s_dma_band[2 * i + 1] = (uint8_t)color;
     }
-    const int x = HW3_CURSOR_COL * HW3_TILE;
-    const int y = HW3_CPC_Y + HW3_CURSOR_ROW * HW3_TILE;
+    int x = HW3_CURSOR_COL * HW3_TILE;
+    int y = HW3_CPC_Y + HW3_CURSOR_ROW * HW3_TILE;
+    if (s_active_case == HW3_SOFTWARE_ROTATE_CW) {
+        /* Portrait GRAM u=239-logical_y, v=logical_x. */
+        int u = HW3_H - (y + HW3_TILE);
+        int v = x;
+        x = u; y = v;
+    } else if (s_active_case == HW3_SOFTWARE_ROTATE_CCW) {
+        /* Portrait GRAM u=logical_y, v=319-logical_x. */
+        int u = y;
+        int v = HW3_W - (x + HW3_TILE);
+        x = u; y = v;
+    }
     return lcd_send(x, y, HW3_TILE, HW3_TILE);
 }
 
@@ -193,18 +207,20 @@ static esp_err_t draw_cursor(bool visible)
  * This covers the 80-pixel stale strip seen on physical CYD when a 320x240
  * logical bitmap was sent but the panel remained effectively in portrait.
  */
-static esp_err_t clear_native_gram(void)
+static esp_err_t clear_native_gram(bool wide)
 {
     esp_err_t err = esp_lcd_panel_swap_xy(s_panel, false);
     if (err != ESP_OK) return err;
     err = esp_lcd_panel_mirror(s_panel, false, false);
     if (err != ESP_OK) return err;
-    for (int i = 0; i < HW3_NATIVE_W * HW3_TILE; ++i) {
+    const int width = wide ? HW3_W : HW3_NATIVE_W;
+    const int height = wide ? HW3_H : HW3_NATIVE_H;
+    for (int i = 0; i < width * HW3_TILE; ++i) {
         s_dma_band[2 * i] = (uint8_t)(HW3_BLUE_RGB565 >> 8);
         s_dma_band[2 * i + 1] = (uint8_t)HW3_BLUE_RGB565;
     }
-    for (int top = 0; top < HW3_NATIVE_H; top += HW3_TILE) {
-        err = lcd_send(0, top, HW3_NATIVE_W, HW3_TILE);
+    for (int top = 0; top < height; top += HW3_TILE) {
+        err = lcd_send(0, top, width, HW3_TILE);
         if (err != ESP_OK) return err;
     }
     return ESP_OK;
@@ -216,17 +232,28 @@ static esp_err_t clear_native_gram(void)
  */
 static esp_err_t set_orientation(unsigned int idx)
 {
-    const bool swap = (idx & 1U) != 0;
-    const bool mirror_x = (idx & 2U) != 0;
-    const bool mirror_y = (idx & 4U) != 0;
-    ESP_LOGI(TAG, "HW3 ORIENTATION_CASE index=%u swap_xy=%u mirror_x=%u mirror_y=%u geometry=%ux%u",
-             idx, (unsigned)swap, (unsigned)mirror_x, (unsigned)mirror_y,
-             swap ? HW3_W : HW3_NATIVE_W, swap ? HW3_H : HW3_NATIVE_H);
-    esp_err_t err = clear_native_gram();
+    const bool native_wide = idx >= 8U && idx <= 11U;
+    const bool software = idx == HW3_SOFTWARE_ROTATE_CW || idx == HW3_SOFTWARE_ROTATE_CCW;
+    const bool swap = !native_wide && !software && (idx & 1U) != 0;
+    const bool mirror_x = native_wide ? ((idx - 8U) & 1U) != 0
+                                 : (!software && (idx & 2U) != 0);
+    const bool mirror_y = native_wide ? ((idx - 8U) & 2U) != 0
+                                 : (!software && (idx & 4U) != 0);
+    const int width = (native_wide || swap) ? HW3_W : HW3_NATIVE_W;
+    const int height = (native_wide || swap) ? HW3_H : HW3_NATIVE_H;
+    ESP_LOGI(TAG, "HW3 ORIENTATION_CASE index=%u mode=%s swap_xy=%u mirror_x=%u mirror_y=%u geometry=%dx%d",
+             idx, software ? "SOFTWARE_ROTATED" : native_wide ? "NATIVE_LANDSCAPE" : "MADCTL_MATRIX",
+             (unsigned)swap, (unsigned)mirror_x, (unsigned)mirror_y, width, height);
+    /* Full GRAM coverage in the addressing model under test. Note that
+     * the 320x240-MV0 path is intentionally a separate hardware hypothesis.
+     */
+    esp_err_t err = clear_native_gram(native_wide);
     if (err != ESP_OK) return err;
     err = esp_lcd_panel_swap_xy(s_panel, swap);
     if (err != ESP_OK) return err;
-    return esp_lcd_panel_mirror(s_panel, mirror_x, mirror_y);
+    err = esp_lcd_panel_mirror(s_panel, mirror_x, mirror_y);
+    if (err == ESP_OK) s_active_case = idx;
+    return err;
 }
 
 /* A geometric test independent of BASIC, CPC characters or font layout.
@@ -279,28 +306,98 @@ static esp_err_t draw_diagnostic(unsigned int idx)
     return ESP_OK;
 }
 
+/* The fallback never sets MV. A 240x8 DMA strip is written in native
+ * portrait GRAM coordinates and filled by inverse-mapping to a logical
+ * 320x240 landscape pixel. No 153600-byte framebuffer or malloc needed.
+ *
+ * Case 12: physical (u,v) -> logical (x=v,y=239-u).
+ * Case 13: physical (u,v) -> logical (x=319-v,y=u).
+ */
+static uint16_t logical_boot_pixel(int x, int y)
+{
+    if (y < HW3_CPC_Y || y >= HW3_CPC_Y + HW3_CPC_H) {
+        return HW3_BLUE_RGB565;
+    }
+    const int ly = y - HW3_CPC_Y;
+    uint8_t ch = s_screen[ly / 8][x / 8];
+    uint8_t row = hw3_glyph_row(ch, (unsigned)ly % 8U);
+    return ((row & (0x80U >> (x % 8))) != 0) ?
+           HW3_YELLOW_RGB565 : HW3_BLUE_RGB565;
+}
+
+static uint16_t logical_diag_pixel(int x, int y)
+{
+    if (x < 2 || x >= HW3_W - 2 || y < 2 || y >= HW3_H - 2) {
+        return HW3_YELLOW_RGB565;
+    }
+    if (x < 18 && y < 18) return 0xF800U;
+    if (x >= HW3_W - 18 && y < 18) return 0x07E0U;
+    if (x < 18 && y >= HW3_H - 18) return HW3_YELLOW_RGB565;
+    if (x >= HW3_W - 18 && y >= HW3_H - 18) return 0xFFFFU;
+    if (y >= 38 && y < 46 && x >= 128 && x < 192) {
+        const char *label = "ROT 12 / ROT 13";
+        const int start = (HW3_W - (int)strlen(label) * 8) / 2;
+        if (x >= start && x < start + (int)strlen(label) * 8) {
+            uint8_t bits = hw3_glyph_row((uint8_t)label[(x - start) / 8],
+                                          (unsigned)(y - 38));
+            if (bits & (0x80U >> ((x - start) % 8))) return HW3_YELLOW_RGB565;
+        }
+    }
+    return HW3_BLUE_RGB565;
+}
+
+static esp_err_t draw_software_rotated(bool boot, unsigned int idx)
+{
+    if (boot) build_boot_screen();
+    for (int top = 0; top < HW3_NATIVE_H; top += HW3_TILE) {
+        for (int by = 0; by < HW3_TILE; ++by) {
+            const int v = top + by;
+            for (int u = 0; u < HW3_NATIVE_W; ++u) {
+                const int x = idx == HW3_SOFTWARE_ROTATE_CW ? v : HW3_W - 1 - v;
+                const int y = idx == HW3_SOFTWARE_ROTATE_CW ? HW3_H - 1 - u : u;
+                const uint16_t rgb = boot ? logical_boot_pixel(x,y)
+                                          : logical_diag_pixel(x,y);
+                const size_t at = ((size_t)by * HW3_NATIVE_W + (size_t)u) * 2U;
+                s_dma_band[at] = (uint8_t)(rgb >> 8);
+                s_dma_band[at + 1] = (uint8_t)rgb;
+            }
+        }
+        esp_err_t err = lcd_send(0, top, HW3_NATIVE_W, HW3_TILE);
+        if (err != ESP_OK) return err;
+    }
+    return ESP_OK;
+}
+
 static esp_err_t show_case(unsigned int idx, bool boot, bool *is_boot)
 {
     esp_err_t err = set_orientation(idx);
     if (err != ESP_OK) return err;
-    *is_boot = boot && ((idx & 1U) != 0);
-    if (*is_boot) {
+    const bool native_wide = idx >= 8U && idx <= 11U;
+    const bool software = idx == HW3_SOFTWARE_ROTATE_CW || idx == HW3_SOFTWARE_ROTATE_CCW;
+    *is_boot = boot && (native_wide || software || ((idx & 1U) != 0));
+    if (software) {
+        err = draw_software_rotated(*is_boot, idx);
+        if (err == ESP_OK) ESP_LOGI(TAG, "HW3 SOFTWARE_ROTATION_DRAWN case=%u boot=%u", idx,
+                                    (unsigned)*is_boot);
+        if (err == ESP_OK && *is_boot) err = draw_cursor(true);
+    } else if (*is_boot) {
         err = draw_boot_screen();
         if (err == ESP_OK) err = draw_cursor(true);
-        if (err == ESP_OK) ESP_LOGI(TAG, "HW3 BOOT_SCREEN_DRAWN case=%u", idx);
     } else {
-        if (boot && (idx & 1U) == 0) {
-            ESP_LOGW(TAG, "HW3 PORTRAIT_CASE: CPC 320x240 boot requires swap_xy=1; showing 240x320 diagnostic");
+        if (boot) {
+            ESP_LOGW(TAG, "HW3 PORTRAIT_CASE: CPC landscape boot requires width 320; drawing diagnostic");
         }
         err = draw_diagnostic(idx);
     }
+    if (err == ESP_OK && *is_boot) ESP_LOGI(TAG, "HW3 BOOT_SCREEN_DRAWN case=%u", idx);
     return err;
 }
 
 static void print_uart_help(void)
 {
-    ESP_LOGI(TAG, "HW3 UART_CALIBRATION: m=8-case matrix, 0..7=one case, b=boot for selected landscape case, r=restore configured boot, ?=help");
-    ESP_LOGI(TAG, "HW3 CASE_BITS: index=(swap_xy?1:0)+(mirror_x?2:0)+(mirror_y?4:0); EVEN=portrait 240x320, ODD=landscape 320x240");
+    ESP_LOGI(TAG, "HW3 UART_CALIBRATION: m=8 MADCTL, n=6 fallback cases; 0..9,a,c,d,e=select case; b=boot; r=default; ?=help");
+    ESP_LOGI(TAG, "HW3 ALT_CASES: 8..11=native 320x240 with MV0; d=12 software clockwise; e=13 software counterclockwise");
+    ESP_LOGI(TAG, "HW3 CASE_BITS: index 0..7=(swap_xy?1:0)+(mirror_x?2:0)+(mirror_y?4:0); 8..11=MV0 native 320x240 (mirror combinations)");
 }
 
 static esp_err_t lcd_initialize(void)
@@ -372,9 +469,9 @@ static esp_err_t lcd_initialize(void)
 
 void app_main(void)
 {
-    const unsigned int default_case = (HW3_SWAP_XY ? 1U : 0U) |
-                                      (HW3_MIRROR_X ? 2U : 0U) |
-                                      (HW3_MIRROR_Y ? 4U : 0U);
+    /* Prefer the independent native-GRAM software rotation until the CYD
+     * owner confirms an orientation with real photos. */
+    const unsigned int default_case = HW3_SOFTWARE_ROTATE_CW;
     unsigned int selected_case = default_case;
     bool is_boot = false;
     ESP_LOGI(TAG, "HW3 START");
@@ -427,10 +524,22 @@ void app_main(void)
                     if (err != ESP_OK) break;
                     vTaskDelay(pdMS_TO_TICKS(HW3_MATRIX_HOLD_MS));
                 }
-                if (err == ESP_OK) err = show_case(selected_case, (selected_case & 1U) != 0, &is_boot);
+                if (err == ESP_OK) err = show_case(selected_case, true, &is_boot);
                 ESP_LOGI(TAG, "HW3 MATRIX_END restored_case=%u", selected_case);
-            } else if (key >= '0' && key <= '7') {
-                selected_case = (unsigned int)(key - '0');
+            } else if (key == 'n' || key == 'N') {
+                ESP_LOGI(TAG, "HW3 FALLBACK_MATRIX_BEGIN cases=8..13 hold_ms=%d", HW3_MATRIX_HOLD_MS);
+                for (unsigned int idx = 8; idx <= HW3_SOFTWARE_ROTATE_CCW; ++idx) {
+                    err = show_case(idx, false, &is_boot);
+                    if (err != ESP_OK) break;
+                    vTaskDelay(pdMS_TO_TICKS(HW3_MATRIX_HOLD_MS));
+                }
+                if (err == ESP_OK) err = show_case(selected_case, true, &is_boot);
+                ESP_LOGI(TAG, "HW3 FALLBACK_MATRIX_END restored_case=%u", selected_case);
+            } else if ((key >= '0' && key <= '9') || key == 'a' || key == 'c' ||
+                       key == 'd' || key == 'e') {
+                selected_case = (key >= '0' && key <= '9') ? (unsigned int)(key - '0')
+                              : key == 'a' ? 10U : key == 'c' ? 11U
+                              : key == 'd' ? 12U : 13U;
                 err = show_case(selected_case, false, &is_boot);
             } else if (key == 'b' || key == 'B') {
                 err = show_case(selected_case, true, &is_boot);

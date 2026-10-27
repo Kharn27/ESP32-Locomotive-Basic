@@ -350,3 +350,12 @@ Après fusion acceptée de [J1.3-B PR #67](https://github.com/Kharn27/ESP32-Loco
 - **En revue, non fusionnée** ; pas de J1.5, pas de graphique ni de HW3 / PR #66. `ON_DEVICE_UNVERIFIED` tant qu'un test physique CYD n'a pas été réalisé.
 - Rapport dédié : [J1.4-B-integer-multiplication-native.md](J1.4-B-integer-multiplication-native.md).
 
+
+
+### J1.5-A — oracle CPC indépendant pour division INTEGER (27 octobre 2026)
+
+- **J1.4-B est accepté et fusionné** via PR #71 ; `main=420735eb87d69ad1bc195fe18be68e56fcd756f9`.
+- J1.5-A (#72) est **probatoire uniquement** : douze programmes CPC 6128, **deux sessions Caprice32 GHCR indépendantes par cas**, images RAM tokenisées avant RUN, captures LIST/RUN, imprimante directe `ERR` et `B%`, archive SHA provisoirement scellée ; source `B%=A%\\n`.
+- Opcode, règle d'arrondi, erreurs et numéros sont **à mesurer sur CPC**, jamais supposés. `\\` diffère de la division réelle `/`. Les anciens manifestes, classifications et archives sont intacts. C99 `core/` et firmware inchangés.
+- [Rapport et protocole J1.5-A](J1.5-A-integer-division-oracle.md) ; PR dédiée non fusionnée, J1.5-B non autorisé, `ON_DEVICE_UNVERIFIED`.
+

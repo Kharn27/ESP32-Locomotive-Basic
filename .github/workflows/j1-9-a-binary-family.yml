@@ -181,25 +181,26 @@ jobs:
               firmware/ video/ hal/ tests/fixtures/cpc6128/j1_integer_binary_family/
           fi
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
-          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_loco/main --include='*.c'
-          test "$(grep -c '^void app_main(void)' firmware/esp32_loco/main/main.c)" -eq 1
-          ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_loco/main/
+          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main --include='*.c'
+          test "$(grep -c '^void app_main(void)' firmware/esp32_display_probe/main/hw4_c2_console.c)" -eq 1
+          test ! -e firmware/esp32_loco/CMakeLists.txt
+          ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_display_probe/main/
           echo "J1.9-A HW4-C1_BRIDGE_UNCHANGED_AND_ORACLE_ARCHIVE_GUARDED"
 
   xtensa-three-targets:
-    name: J1.9-A three independent Xtensa IDF 5.5.6 images
+    name: J1.9-A three Xtensa IDF 5.5.6 images (two projects)
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - name: Build esp32_loco, esp32_probe and esp32_display_probe separately
+      - name: Build BASIC probe and display-console ON plus HW3 OFF (three images)
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -v "$PWD:/project" -w /project \
             -e IDF_GIT_SAFE_DIR=/project espressif/idf:v5.5.6 bash -lc '
               set -euo pipefail
-              for app in esp32_loco esp32_probe esp32_display_probe; do
+              for app in esp32_probe esp32_display_probe; do
                 cd /project/firmware/"$app"
                 mkdir -p reports
                 idf.py --version | tee reports/idf-version.txt
@@ -209,8 +210,18 @@ jobs:
                 idf.py size 2>&1 | tee reports/size.txt
                 idf.py size-components 2>&1 | tee reports/size-components.txt
                 ls -lh build/*.bin build/*.elf | tee reports/images.txt
-                echo "J1.9-A THREE_TARGETS_BUILT $app"
+                echo "J1.9-A PROJECT_BUILT $app"
               done
+              # The legacy firmware/esp32_loco target no longer exists;
+              # three images are built using two current ESP-IDF projects.
+              cd /project/firmware/esp32_display_probe
+              mkdir -p reports/j19-hw3-off
+              idf.py -B build-j19-hw3 -DHW4_C2_CONSOLE=OFF set-target esp32 2>&1 | tee reports/j19-hw3-off/set-target.log
+              idf.py -B build-j19-hw3 -DHW4_C2_CONSOLE=OFF build 2>&1 | tee reports/j19-hw3-off/build.log
+              idf.py -B build-j19-hw3 size 2>&1 | tee reports/j19-hw3-off/size.txt
+              idf.py -B build-j19-hw3 size-components 2>&1 | tee reports/j19-hw3-off/size-components.txt
+              test "$(xtensa-esp-elf-nm --defined-only build-j19-hw3/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
+              echo "J1.9-B THREE_IMAGES_BUILT_ON_TWO_PROJECTS"
             '
       - uses: actions/upload-artifact@v4
         if: always()
@@ -219,6 +230,5 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
           path: |
-            firmware/esp32_loco/reports/
             firmware/esp32_probe/reports/
             firmware/esp32_display_probe/reports/

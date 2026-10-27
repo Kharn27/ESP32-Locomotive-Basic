@@ -162,3 +162,12 @@ L'oracle CPC6128 pour la multiplication INTEGER `B%=A%*n` est désormais captur�
 - **En revue, non fusionnée** ; pas de J1.5, pas de graphique ni de HW3 / PR #66. `ON_DEVICE_UNVERIFIED` tant qu'un test physique CYD n'a pas été réalisé.
 - Rapport dédié : [J1.4-B-integer-multiplication-native.md](docs/J1.4-B-integer-multiplication-native.md).
 
+
+
+### J1.5-A — oracle CPC indépendant pour division INTEGER (27 octobre 2026)
+
+- **J1.4-B est accepté et fusionné** via PR #71 ; `main=420735eb87d69ad1bc195fe18be68e56fcd756f9`.
+- J1.5-A (#72) est **probatoire uniquement** : douze programmes CPC 6128, **deux sessions Caprice32 GHCR indépendantes par cas**, images RAM tokenisées avant RUN, captures LIST/RUN, imprimante directe `ERR` et `B%`, archive SHA scellée `af4b873f62e0fa8304f9389c149dcc6475463c498eea6834d4ce6ffda60ba5b9` (provisoire `PENDING_PILOTAGE`), 13 falsifications rejetées ; source `B%=A%\2`.
+- Observations authentiques du CPC : opérateur `F9` sur 12/12 images RAM, **troncature vers zéro** sur ce corpus, `ERR=11` pour les deux divisions par zéro ; classification C99 actuelle `UNSUPPORTED` sur 12/12. L'opcode et les résultats ont été **mesurés**, jamais supposés. `\\` diffère de la division réelle `/`. Les anciens manifestes, classifications et archives sont intacts. C99 `core/` et firmware inchangés.
+- [Rapport et protocole J1.5-A](docs/J1.5-A-integer-division-oracle.md) ; PR dédiée non fusionnée, J1.5-B non autorisé, `ON_DEVICE_UNVERIFIED`.
+

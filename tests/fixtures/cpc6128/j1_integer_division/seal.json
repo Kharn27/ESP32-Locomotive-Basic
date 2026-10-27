@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "phase": "J1.5-A-PROVISIONAL",
+  "approval": "PENDING_PILOTAGE",
+  "manifest_sha256": "af4b873f62e0fa8304f9389c149dcc6475463c498eea6834d4ce6ffda60ba5b9",
+  "acquisition_run_id": "40525845816",
+  "acquisition_head_sha": "070cd93138e64ff4fa95bca5cd5f122ad5a8ac23",
+  "program_sha256": {
+    "P6_ID3": "d4fbb0dfe3f6b874eb6932eb90b16598d6c7514af8790a3aa6c26eea740cdb07",
+    "P7_ID2": "0ff9fdee358a91cbef00a47219ce904b786f20d5a5bef930315ca13f5faa4e1a",
+    "P5_ID2": "dae3e2d47ba7f3f1f7156c077ba50b87c758d855711c53dbd7eefc1b26806f4f",
+    "N7_ID2": "c0068ea334a9e941e528c4d491831ec371e33e3aa862c46e916c22ec96d295e8",
+    "N5_ID2": "d08422983da6d4ab45ca2648f4beea41a26154050d36b51b708a5f98ae98b58e",
+    "NMIN_ID1": "31ce0ad77b0f7f76eda2ebaefc61acfa89f3b33fe4faee330a313e8876b9fed9",
+    "PMAX_ID1": "dabc95d3be65f5649f3f442fed897b69dfc669fc7d7f4246a6ffdb79e2ad52be",
+    "PMAX_ID2": "515aedc84ff55093ea78de78e3cc1ebefbc48191f557006caa6957c340fbdc81",
+    "P1_ID0": "7368cdec51577a2d3db10a1b56eb80c6ef042cef5a0cc299b19725bc6f110753",
+    "P0_ID0": "556cf7ec33b79af8d191dc1aab8656fe11552de5f81e51e915772a08c7450ab7",
+    "P255_ID255": "05d99328ff550cd3e719665b6ed2041180cf5b9499c9e1241b4e81c582079209",
+    "P2_ID255": "b52011685b947e4d20d7b642aef2243a1f0ded2ba695c56e643bf24adde575b3"
+  }
+}

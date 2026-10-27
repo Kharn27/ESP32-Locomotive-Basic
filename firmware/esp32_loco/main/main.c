@@ -262,8 +262,10 @@ static bool execute_line(void)
     } else if(is_command(source,length,"!DEMO")) {
         if(!diagnostic_demo()) return false;
     } else {
-        const bool run=is_command(source,length,"RUN") ||
-                       is_command(source,length,"run"); /* runtime accepts case */
+        size_t a=0U,b=length;
+        while(a<b && source[a]==' ') ++a;
+        while(b>a && source[b-1U]==' ') --b;
+        const bool run=is_command(source+a,b-a,"RUN");
         if(!basic_submit(source,length)) return false;
         if(run && s_basic.runtime.state==BSR_RUNNING)
             if(!basic_run()) return false;

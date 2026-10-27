@@ -46,7 +46,7 @@
 #define HW3_BAND_BYTES (HW3_W * HW3_TILE * 2)
 #define HW3_CURSOR_ROW 13
 #define HW3_CURSOR_COL 0
-#define HW3_CURSOR_MS 500
+#define HW3_CURSOR_MS 500 /* diagnostic only; disabled at boot */
 #define HW3_MATRIX_HOLD_MS 2500
 #define HW3_SOFTWARE_ROTATE_CW 12U
 #define HW3_SOFTWARE_ROTATE_CCW 13U
@@ -183,7 +183,7 @@ static esp_err_t draw_boot_screen(void)
     return ESP_OK;
 }
 
-/* Cursor cell only: never re-send the 320x200 screen to blink. */
+/* Cursor cell only: no full-screen refresh for a visibility change. */
 static esp_err_t draw_cursor(bool visible)
 {
     uint16_t color = visible ? HW3_YELLOW_RGB565 : HW3_BLUE_RGB565;
@@ -278,6 +278,12 @@ static esp_err_t set_orientation(unsigned int idx)
 static uint8_t s_hw4_pixels[CPC_VIDEO_BYTES];
 static CpcVideo s_hw4_video;
 static bool s_hw4_active;
+/* The HW3 boot screen has its own cursor, distinct from the HW4 VRAM cursor.
+ * PO reports the real CPC 6128 startup cursor as steady; default is fixed.
+ * Optional UART 't' retains the prior 500 ms HW3 diagnostic experiment.
+ */
+static bool s_boot_cursor_enabled = true;
+static bool s_boot_cursor_blink = false;
 static unsigned s_hw4_mode = 2U;
 static unsigned s_hw4_palette = 24U;
 static bool s_hw4_cursor_visible = true;
@@ -476,10 +482,10 @@ static esp_err_t show_case(unsigned int idx, bool boot, bool *is_boot)
         err = draw_software_rotated(*is_boot, idx);
         if (err == ESP_OK) ESP_LOGI(TAG, "HW3 SOFTWARE_ROTATION_DRAWN case=%u boot=%u", idx,
                                     (unsigned)*is_boot);
-        if (err == ESP_OK && *is_boot) err = draw_cursor(true);
+        if (err == ESP_OK && *is_boot) err = draw_cursor(s_boot_cursor_enabled);
     } else if (*is_boot) {
         err = draw_boot_screen();
-        if (err == ESP_OK) err = draw_cursor(true);
+        if (err == ESP_OK) err = draw_cursor(s_boot_cursor_enabled);
     } else {
         if (boot) {
             ESP_LOGW(TAG, "HW3 PORTRAIT_CASE: CPC landscape boot requires width 320; drawing diagnostic");
@@ -498,7 +504,8 @@ static void print_uart_help(void)
 {
     ESP_LOGI(TAG, "HW3 UART_CALIBRATION: m=8 MADCTL, n=6 fallback cases; 0..9,a,c,d,e=select case; b=boot; r=default; ?=help");
     ESP_LOGI(TAG, "HW3 ALT_CASES: 8=MV0 MX0 MY0, 9=MV0 MX1 MY0 (default candidate), a=MV0 MX0 MY1, c=MV0 MX1 MY1; d/e=software experiments");
-    ESP_LOGI(TAG, "HW4 UART_VIDEO: v=next MODE0/1/2, p=next palette ink1 colour 0..26, z=cursor toggle, w=MODE2 OR/viewport, r=HW3 boot");
+    ESP_LOGI(TAG, "HW4 UART_VIDEO: v=next MODE0/1/2, p=next palette ink1 colour 0..26, z=cursor toggle BOTH BOOT/HW4, w=MODE2 OR/viewport, r=HW3 boot");
+    ESP_LOGI(TAG, "HW3 BOOT_CURSOR_HELP: steady by default; t=toggle 500ms diagnostic blink on BOOT only");
     ESP_LOGI(TAG, "HW3 CASE_BITS: index 0..7=(swap_xy?1:0)+(mirror_x?2:0)+(mirror_y?4:0); 8..11=MV0 native 320x240 (mirror combinations)");
 }
 
@@ -604,17 +611,18 @@ void app_main(void)
         return;
     }
     log_device_memory("BOOT_SCREEN_DRAWN");
-    ESP_LOGI(TAG, "HW3 CURSOR_BLINK_ACTIVE when_boot_visible=%u", (unsigned)is_boot);
+    ESP_LOGI(TAG, "HW3 BOOT_CURSOR_POLICY visible=%u blink=%u case=%u (blink experimental OFF by default)",
+             (unsigned)s_boot_cursor_enabled, (unsigned)s_boot_cursor_blink, selected_case);
 
     /* Console still uses UART0 for ESP_LOGx, and UART driver gives us
      * single-character control from idf.py monitor (no keyboard dependency).
      */
     bool input_ready = uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0) == ESP_OK;
-    if (!input_ready) ESP_LOGW(TAG, "HW3 UART_RX_UNAVAILABLE: boot and blinking remain active");
+    if (!input_ready) ESP_LOGW(TAG, "HW3 UART_RX_UNAVAILABLE: boot cursor remains steady; UART controls unavailable");
     print_uart_help();
 
     TickType_t last_toggle = xTaskGetTickCount();
-    bool cursor_visible = true;
+    bool cursor_visible = s_boot_cursor_enabled;
     for (;;) {
         uint8_t key = 0;
         int received = input_ready
@@ -633,11 +641,28 @@ void app_main(void)
                 (void)cpc_video_set_ink(&s_hw4_video, 1U, s_hw4_palette);
                 ESP_LOGI(TAG, "HW4 PALETTE colour=%u ink=1", s_hw4_palette);
                 err = hw4_repaint();
-            } else if ((key == 'z' || key == 'Z') && s_hw4_active) {
-                s_hw4_cursor_visible = !s_hw4_cursor_visible;
-                (void)cpc_video_cursor(&s_hw4_video, 1U, 5U, s_hw4_cursor_visible);
-                ESP_LOGI(TAG, "HW4 CURSOR visible=%u", (unsigned)s_hw4_cursor_visible);
-                err = hw4_repaint();
+            } else if (key == 'z' || key == 'Z') {
+                if (s_hw4_active) {
+                    s_hw4_cursor_visible = !s_hw4_cursor_visible;
+                    (void)cpc_video_cursor(&s_hw4_video, 1U, 5U, s_hw4_cursor_visible);
+                    ESP_LOGI(TAG, "HW4 CURSOR visible=%u", (unsigned)s_hw4_cursor_visible);
+                    err = hw4_repaint();
+                } else if (is_boot) {
+                    s_boot_cursor_enabled = !s_boot_cursor_enabled;
+                    cursor_visible = s_boot_cursor_enabled;
+                    err = draw_cursor(cursor_visible);
+                    ESP_LOGI(TAG, "HW3 BOOT_CURSOR visible=%u blink=%u case=%u",
+                             (unsigned)s_boot_cursor_enabled,
+                             (unsigned)s_boot_cursor_blink, selected_case);
+                } else {
+                    ESP_LOGI(TAG, "HW3 BOOT_CURSOR_IGNORED reason=not_on_boot");
+                }
+            } else if ((key == 't' || key == 'T') && is_boot && !s_hw4_active) {
+                s_boot_cursor_blink = !s_boot_cursor_blink;
+                cursor_visible = s_boot_cursor_enabled;
+                err = draw_cursor(cursor_visible);
+                ESP_LOGI(TAG, "HW3 BOOT_CURSOR_BLINK enabled=%u interval_ms=%u (diagnostic only)",
+                         (unsigned)s_boot_cursor_blink, (unsigned)HW3_CURSOR_MS);
             } else if ((key == 'w' || key == 'W') && s_hw4_active && s_hw4_mode == 2U) {
                 CpcMode2Display next = s_hw4_video.mode2_display == CPC_MODE2_OR_PAIR
                      ? CPC_MODE2_VIEWPORT : CPC_MODE2_OR_PAIR;
@@ -646,7 +671,7 @@ void app_main(void)
                 ESP_LOGI(TAG, "HW4 MODE2_VIEW display=%u left=%u", (unsigned)next, left);
                 err = hw4_repaint();
             } else if (key == 'm' || key == 'M') {
-
+                s_hw4_active = false;
                 ESP_LOGI(TAG, "HW3 MATRIX_BEGIN count=8 hold_ms=%d", HW3_MATRIX_HOLD_MS);
                 for (unsigned int idx = 0; idx < 8; ++idx) {
                     err = show_case(idx, false, &is_boot);
@@ -687,10 +712,12 @@ void app_main(void)
                 log_device_memory("CALIBRATION_FAIL");
                 return;
             }
-            cursor_visible = true;
+            if (is_boot && key != 'z' && key != 'Z' && key != 't' && key != 'T')
+                cursor_visible = s_boot_cursor_enabled;
             last_toggle = xTaskGetTickCount();
         }
-        if (is_boot && (TickType_t)(xTaskGetTickCount() - last_toggle) >= pdMS_TO_TICKS(HW3_CURSOR_MS)) {
+        if (is_boot && s_boot_cursor_enabled && s_boot_cursor_blink &&
+            (TickType_t)(xTaskGetTickCount() - last_toggle) >= pdMS_TO_TICKS(HW3_CURSOR_MS)) {
             cursor_visible = !cursor_visible;
             err = draw_cursor(cursor_visible);
             if (err != ESP_OK) {

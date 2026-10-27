@@ -284,6 +284,47 @@ static int failure_and_alias(void)
         CHECK(bp_export(&h.program, text, 0u, &written) == BP_NO_SPACE);
         CHECK(memcmp(h.storage, image, length) == 0);
     }
+    /* CPC multi-statement text may tokenize, but native be_step must
+     * reject without the earlier assignment or PRINT side effect. */
+    CHECK(setup(&h, 6u) == 0);
+    CHECK(inject(&h, 'A', 3) == 0);
+    CHECK(inject(&h, 'B', 2) == 0);
+    CHECK(put(&h, 10u, "C%=A%+B%:PRINT 4") == 0);
+    CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+    CHECK(fails(&h, BE_UNSUPPORTED) == 0);
+    /* No partial write on rejection of a wrong-type destination. */
+    {
+        static const uint8_t wrong_dest[] = {
+            3,0,0,0xc3,0xef,2,0,0,0xc1,0xf4,2,0,0,0xc2
+        };
+        CHECK(setup(&h, 6u) == 0);
+        CHECK(inject(&h, 'A', 3) == 0);
+        CHECK(inject(&h, 'B', 2) == 0);
+        CHECK(bp_put(&h.program, 10u, wrong_dest, sizeof(wrong_dest)) == BP_OK);
+        CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+        CHECK(fails(&h, BE_BAD_SEQUENCE) == 0);
+    }
+    /* Preserve output/written on insufficient output space at PRINT,
+     * after a successful two-reference INTEGER assignment. */
+    CHECK(setup(&h, 6u) == 0);
+    CHECK(inject(&h, 'A', 3) == 0);
+    CHECK(inject(&h, 'B', 2) == 0);
+    CHECK(put(&h, 10u, "C%=A%+B%") == 0);
+    CHECK(put(&h, 20u, "PRINT C%") == 0);
+    CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+    CHECK(step(&h) == 0);
+    CHECK(equal(&h, 'C', 5) == 0);
+    {
+        size_t n = 678u;
+        uint8_t snapshot[sizeof(h.output)];
+        memset(h.output, 0x6c, sizeof(h.output));
+        memcpy(snapshot, h.output, sizeof(snapshot));
+        CHECK(be_step(&h.executor, h.output, 0u, &n) == BE_NO_SPACE);
+        CHECK(n == 678u && memcmp(snapshot, h.output, sizeof(snapshot)) == 0);
+        CHECK(equal(&h, 'C', 5) == 0);
+        CHECK(be_step(&h.executor, (uint8_t *)&h.executor, sizeof(h.executor),
+                      &n) == BE_OVERLAP && n == 678u);
+    }
     return 0;
 }
 

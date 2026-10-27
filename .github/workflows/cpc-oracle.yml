@@ -40,6 +40,11 @@ jobs:
   caprice32-oracle:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Container jobs default to /bin/sh (dash); old scripts require bash
+    # for 'set -euo pipefail'. Keep their original shell semantics.
+    defaults:
+      run:
+        shell: bash
     # CI-01-B: immutable, ROM-free oracle runtime published by CI-01-A.
     # Container digest (not mutable tag) is the reviewed artifact identity.
     container:

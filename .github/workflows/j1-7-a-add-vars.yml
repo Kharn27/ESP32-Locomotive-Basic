@@ -9,7 +9,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j17-mod-original-archive
+  group: j17-add-vars-original-archive
   cancel-in-progress: false
 
 jobs:
@@ -138,14 +138,14 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Verify original CPC bytes and provisional seal, including 13 negative cases
+      - name: Verify original CPC bytes and provisional seal, including 14 negative cases + fake checkout
         run: |
           set -euo pipefail
           DEST=tests/fixtures/cpc6128/j1_integer_add_vars
           if test -f "$DEST/manifest.json"; then
             python3 tools/j1_7_add_vars_verify.py --evidence "$DEST" --permanent --self-test
           elif test "$GITHUB_HEAD_REF" = feat/j1-7-a-integer-var-add-oracle; then
-            echo "ACQUISITION_PENDING: the original archive is created by cpc-mod job"
+            echo "ACQUISITION_PENDING: the original archive is created by cpc-add-vars job"
           else
             echo "MISSING PERMANENT J1.7-A ORIGINAL ARCHIVE"
             exit 1

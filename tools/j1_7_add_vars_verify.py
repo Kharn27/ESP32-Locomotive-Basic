@@ -42,6 +42,24 @@ def scalar_token(value):
 
 EXPECTED_IMAGE = "ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c"
 
+# Permanent original anchors copied from the one-time ROM-backed bot acquisition.
+# Never derive these expected values from a newly generated native image.
+PINNED_MANIFEST_SHA = "0608ba7d9548bae7972f02d0a929d0abde70fc325f49af97175f915aae08e2d5"
+PINNED_PROGRAM_SHA = {
+    "P2_P3": "f6633183dcec7b06efdabd5a4d17b1d100352c1c9f23fe934b5f4cf443842220",
+    "P7_N2": "847cc4a6210d112ae40ff6077ce03a53c3f1d393313502d855b838f21f28bd1e",
+    "N7_P2": "8b56356703e3738f091da3cf99c86cc9b261ec8c4d0ea383dac61722f7b6118d",
+    "N7_N3": "fe78f54904512e20bf8bccaf2e226fc1cb5bc3d0238730be9b378dde241a8d0c",
+    "NMIN_P1": "15bdf377f4c8365d612e46db77b235067695a63f21631d2d6be5affec05c54fc",
+    "NMIN_Z": "aeba202bcc5ffc715d7b617b671463e1b2d381dc35b932679b8e8476af4a4d3a",
+    "PMAX_Z": "decbdbbd4049ae524219648f13f8deeefdc422c3089ba273278c366d46397103",
+    "PMAX_P1": "36a9f5ccb3f358a53c5822bbbbb98fa09adb6f3cfad36e44d9e08cea1ffbe010",
+    "NMIN_N1": "694845f8a620834b2150bb818e9bb9782ec395354154a7675d8304e5f857559d",
+    "P255_P255": "7ee4fa53dad3a6b8bb645749ddea737c26c149ae2f8980e0dc66a5f14b3f4c9b",
+    "Z_Z": "19c2e42164e0a26fcaef634df9d17ceee19b9c297f33be3497f72e3df3c96c87",
+    "P1_N1": "a5c10abb1a874c2c6c75b1ae63a310080a8f9d24aef7c2b74ce72b37d64ed08d",
+}
+
 PRE_ALLOWED = {"original.bas", "program.bin", "c99.bin", "c99_error.txt",
                "cap32.cfg", "autocmd.json", "caprice.log", "list.png",
                "comparison.json"}
@@ -296,6 +314,11 @@ def verify(base, permanent=False):
                     if p.is_file() or p.is_symlink()}
     require(actual_paths == inventory, "UNEXPECTED_OR_MISSING_ARCHIVE_FILES")
     if permanent:
+        require(sha((base / "manifest.json").read_bytes()) == PINNED_MANIFEST_SHA,
+                "PINNED_ORIGINAL_MANIFEST_MISMATCH")
+        for case, digest in PINNED_PROGRAM_SHA.items():
+            require(sha((base / case / "program.bin").read_bytes()) == digest,
+                    "PINNED_ORIGINAL_RAM_MISMATCH")
         require((base / "seal.json").is_file(), "SEAL_MISSING")
         require(json.loads((base / "seal.json").read_text()) == seal_for(base,m),
                 "EXTERNAL_SEAL_CHANGED")
@@ -310,7 +333,7 @@ def write_manifest(base, change):
 def self_test(base):
     # Each mutation starts from a successfully validated independent copy.
     def reject(label, mutation, code):
-        with tempfile.TemporaryDirectory(prefix="j15-negative-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="j17-negative-") as tmp:
             root = Path(tmp) / "proof"
             shutil.copytree(base, root)
             verify(root, permanent=True)
@@ -375,7 +398,7 @@ def self_test(base):
                 "WRONG_CHECKOUT_REJECTION")
     else:
         raise Invalid("FORGED_CHECKOUT_SHA_ACCEPTED")
-    print("PASS J1.7-A thirteen falsifications + checkout mismatch", flush=True)
+    print("PASS J1.7-A fourteen falsifications + checkout mismatch", flush=True)
 
 def mutate_run_log(root):
     # An attacker changes the process log AND rehashes its manifest entry,

@@ -284,7 +284,7 @@ def self_test(base):
                    classification="MATCH_EXACT" if
                    m["captures"][0]["pre_run"]["comparison"]["classification"] !=
                    "MATCH_EXACT" else "UNSUPPORTED")),
-           "TOKEN_CLASSIFICATION_FALSE")
+           "COMPARISON_REPORT_CHANGED")
     reject("forged-operator-with-rehashed-file", lambda root:
            mutate_operator(root), "BINARY_MUL_SIGNATURE_CHANGED")
     reject("forged-printer-with-rehashed-manifest", lambda root:

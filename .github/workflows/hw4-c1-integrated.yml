@@ -28,7 +28,18 @@ jobs:
           ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main --include='*.c'
           base="$(git merge-base origin/main HEAD)"
           # Always protect CPC archives and the shared display transport.
-          git diff --exit-code "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
+          # An oracle-only J1.10-A PR may ADD only its own captured files.
+          # No past archive, shared video/driver, firmware or HW4 file changes.
+          if test "$GITHUB_HEAD_REF" = "oracle/j1-10-a-if-then-integer"; then
+            git diff --name-only "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/ > "$RUNNER_TEMP/hw4-j110-diff.txt"
+            if grep -Ev '^(tests/fixtures/cpc6128/j1_10_if_then/|tests/oracles/inputs/j1_10_a/|tests/oracles/j1_10_if_then_oracle.py$)' "$RUNNER_TEMP/hw4-j110-diff.txt"; then
+              echo "FORBIDDEN OLD_ORACLE_OR_HW4_MODIFICATION"
+              exit 1
+            fi
+            python3 tools/j1_10_if_then_verify.py --permanent --self-test
+          else
+            git diff --exit-code "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
+          fi
           # The historical HW4-C1 no-core-change rule only applies when the
           # PR actually changes HW4-C1 product files. A parallel J1 core PR
           # must not fail the HW4-C1 integration check merely for touching core/.

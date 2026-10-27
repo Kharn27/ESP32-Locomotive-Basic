@@ -455,8 +455,23 @@ HW4-B **ACCEPTÉ ET FUSIONNÉ** — [PR #83](https://github.com/Kharn27/ESP32-Lo
 
 **Prochain jalon cœur autorisé : [J1.7-B / issue #88](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/88)** — implémentation C99 strictement bornée de `C%=A%+B%`, F4 à deux variables INTEGER explicites, différentiel **12/12 RAM + 12/12 LIST**, **10/10 valeurs**, **2/2 débordements natifs BE_INTEGER_OVERFLOW**, **atomicité native**, cible CI **48/48 OFF et ON**. J1.7-B doit livrer sa propre PR non fusionnée. Les preuves J1.7-A restent immuables. Le chantier matériel [HW4-C1 / issue #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86) demeure indépendant et son obligation de test sur CYD physique ne s'applique pas à l'oracle/cœur portable.
 
+### HW4-C1 — premier PRINT BASIC natif sur TFT (issue #86)
+
+**Autorisé / en développement, ON_DEVICE_UNVERIFIED.** Branche dédiée `feat/hw4-c1-native-basic-tft` construite depuis `main` après intégration HW4-A / HW4-B. Troisième image ESP-IDF `firmware/esp32_loco`; sortie de `bsr_step()` vers l'adaptateur texte C99 et VRAM MODE 1 puis DMA du pilote unique. Les deux bancs historiques restent indépendants. Preuves Linux, Xtensa et essai PO au HEAD final restent à consigner ; ne pas confondre preuve de build et test physique. J1.7-A reste indépendant, HW4-C2 non autorisé, fusion réservée à Pilotage. Voir [rapport HW4-C1](HW4-C1-native-print-TFT.md).
+
+
+### Décision Pilotage — HW4-C1 ACCEPTÉ / FUSIONNÉ, HW4-C2 AUTORISÉ (27 octobre 2026)
+
+**HW4-C1 ACCEPTÉ ET FUSIONNÉ** ([PR #87](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/87), squash `f1a82aae130eab78a67ed463236caa9899607fa5`, 27 octobre 2026). Première image BASIC native + TFT via `bsr_step()` → `cpc_text` → `cpc_video` → DMA partagé. CI SHA `8b9d08e9ecbd620a59937267c0dec4599a2e1dae` : Linux **48/48 OFF/ON**, 3 builds Xtensa ESP-IDF v5.5.6, CPC/J1.7-A verts. **Retour matériel PO UART et observation visuelle positifs, PHOTO_UNAVAILABLE** ; dérogation photographique documentaire accordée pour C1 uniquement, pas de revendication PHOTO_VERIFIED.
+
+Image intégrée C1 mesurée en CI : IRAM **62 515/131 072 (47,70 %)**, DRAM **47 192/180 736 (26,11 %)**, Flash Code **90 078 o**, binaire **205 541 o**. Sur CYD réel : heap libre final **260 772 o**, largest **131 072 o**, pile **4 888 o**, **62 DMA / 0 timeout**, octets `20 35 20 0a`, `BSR_END`.
+
+[Issue #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86) clôturée. [HW4-C2 / issue #90](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/90) autorisé pour saisir des lignes BASIC depuis l'UART, les exécuter avec le runtime existant, et rendre les sorties réelles sur TFT, sans modifier `core/` ni les oracles. Essai physique obligatoire au HEAD final. **HW4-C3 non autorisé**. La PR parallèle J1.7-B #89 ne fait pas partie de HW4-C1 et conserve son indépendance.
+
 ## J1.7-B — branche native F4 variable + variable (en revue)
 
 - Issue [#88](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/88), [PR #89](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/89) indépendante et non fusionnée ; main vérifié au départ : `e7bc4fdc7932bef8a11781f242721c92c9218afb`.
 - Extension de `destination%=source1%+source2%` uniquement ; références BVR explicites CPC et atomicité native, tests 12 cas historiques. Préserve J1.7-A et chantier HW4-C1.
 - Gates validés sur HEAD de code `5840ff2` : 12/12 RAM, 12/12 LIST, 10/10 numériques, 2/2 OVERFLOW, 48/48 OFF/ON ASan/UBSan, ESP32 3/3 ; [rapport](J1.7-B-integer-add-vars-native.md). **Pilotage exclusivement compétent pour accepter et fusionner.**
+
+**Synchronisation J1.7-B** : `main` `e05e9a295c130de051006da55ed1cc67860e8bed` inclut HW4-C1. Barrière d'intégration au nouveau SHA : **50/50 OFF/ON ASan/UBSan**, trois cibles Xtensa dont `esp32_loco`, oracle et J1.7-A scellés. `ON_DEVICE_UNVERIFIED` pour J1.7-B, revue et fusion réservées au Pilotage.

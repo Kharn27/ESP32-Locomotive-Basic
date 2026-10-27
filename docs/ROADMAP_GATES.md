@@ -356,6 +356,19 @@ La mention antérieure « gate accepté ? NON » est dépassée par la fusion ci
 
 **Prochain jalon cœur autorisé : [J1.7-B / issue #88](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/88)** — implémentation C99 strictement bornée de `C%=A%+B%`, F4 à deux variables INTEGER explicites, différentiel **12/12 RAM + 12/12 LIST**, **10/10 valeurs**, **2/2 débordements natifs BE_INTEGER_OVERFLOW**, **atomicité native**, cible CI **48/48 OFF et ON**. J1.7-B doit livrer sa propre PR non fusionnée. Les preuves J1.7-A restent immuables. Le chantier matériel [HW4-C1 / issue #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86) demeure indépendant et son obligation de test sur CYD physique ne s'applique pas à l'oracle/cœur portable.
 
+### Gate HW4-C1 — sortie réelle BASIC vers TFT
+
+**EN COURS — ON_DEVICE_UNVERIFIED.** Critères : deux nouvelles suites C99 + régressions historiques OFF/ON ASan/UBSan et PPM ; builds ESP-IDF 5.5.6 des trois images ; preuves IRAM/DRAM/Flash et métriques heap/stack intégrées ; photographie lisible du chiffre issu de `bsr_step()` et UART `PRINT_BYTES` au SHA exact ; analyse de risques ; revue contradictoire Pilotage. Aucun feu vert HW4-C2, aucun merge automatique. J1.7-A inchangé. Voir [HW4-C1](HW4-C1-native-print-TFT.md).
+
+
+### HW4-C1 — SATISFIED avec dérogation photographique ; HW4-C2 autorisé (27 octobre 2026)
+
+**HW4-C1 ACCEPTÉ ET FUSIONNÉ** ([PR #87](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/87), squash `f1a82aae130eab78a67ed463236caa9899607fa5`, 27 octobre 2026). Première image BASIC native + TFT via `bsr_step()` → `cpc_text` → `cpc_video` → DMA partagé. CI SHA `8b9d08e9ecbd620a59937267c0dec4599a2e1dae` : Linux **48/48 OFF/ON**, 3 builds Xtensa ESP-IDF v5.5.6, CPC/J1.7-A verts. **Retour matériel PO UART et observation visuelle positifs, PHOTO_UNAVAILABLE** ; dérogation photographique documentaire accordée pour C1 uniquement, pas de revendication PHOTO_VERIFIED.
+
+La photographie demandée pour C1 est **absente** mais son critère a été levé explicitement par Pilotage après journal physique + attestation visuelle PO. Ceci **ne certifie pas un test image indépendant** et ne s'applique pas aux futures missions. Image intégrée C1 mesurée en CI : IRAM **62 515/131 072 (47,70 %)**, DRAM **47 192/180 736 (26,11 %)**, Flash Code **90 078 o**, binaire **205 541 o**. Sur CYD réel : heap libre final **260 772 o**, largest **131 072 o**, pile **4 888 o**, **62 DMA / 0 timeout**, octets `20 35 20 0a`, `BSR_END`.
+
+**HW4-C2 AUTORISÉ** [issue #90](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/90) : console BASIC saisie UART → `bsr_submit()`/`bsr_step()` → écran CPC MODE1, entrée bornée et contrôles d'erreurs, sans REPL complet, scrolling général, tactile/SD/émulation Z80. Linux/CI/oracles + essai vrai CYD au HEAD final obligatoires. **HW4-C3 BLOQUÉ** jusqu'à revue/fusion C2. J1.7-B reste parallèle et isolé.
+
 ## J1.7-B — barrière de revue (mission #88, PR #89)
 
-Admission limitée à `destination%=source1%+source2%` pour trois références INTEGER explicites et token `F4`. Les preuves CPC J1.7-A sont figées ; le comparateur J1.7-B doit être indépendant et épingler les douze SHA originaux, imposer permanence anti-falsification, 12/12 RAM, 12/12 LIST, 10/10 numériques, deux débordements `BE_INTEGER_OVERFLOW`, rollback C99 complet, >=48/48 OFF et ON et cross-build ESP32 3/3. Aucune déduction d'atomicité ROM depuis `C%=0` après ERR=6. Aucun changement HW4-C1 ni fusion automatique. **État en revue, pas accepté.**
+Admission limitée à `destination%=source1%+source2%` pour trois références INTEGER explicites et token `F4`. Les preuves CPC J1.7-A sont figées ; le comparateur J1.7-B doit être indépendant et épingler les douze SHA originaux, imposer permanence anti-falsification, 12/12 RAM, 12/12 LIST, 10/10 numériques, deux débordements `BE_INTEGER_OVERFLOW`, rollback C99 complet, >=50/50 OFF et ON et cross-build ESP32 3/3 incluant esp32_loco. Aucune déduction d'atomicité ROM depuis `C%=0` après ERR=6. Aucun changement HW4-C1 ni fusion automatique. **État en revue, pas accepté.**

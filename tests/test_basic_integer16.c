@@ -216,12 +216,162 @@ static int test_malformed(void)
     return 0;
 }
 
+
+/* C1: imported token streams must not cause LIST to advertise expressions
+ * rejected by both the native tokenizer and the executor. Unlike the
+ * preceding vectors, these 1A-addend images are NOT created by C99. */
+static int test_imported_integer16_addend_rejection(void)
+{
+    static const uint8_t implicit[] = {
+        2u,0u,0u,0xc2u,0xefu,2u,0u,0u,0xc2u,0xf4u,0x1au,0u,1u
+    };
+    static const uint8_t explicit_let[] = {
+        0xa5u,' ',2u,0u,0u,0xc2u,0xefu,2u,0u,0u,0xc2u,
+        0xf4u,0x1au,0u,1u
+    };
+    static const struct {
+        const uint8_t *bytes;
+        size_t length;
+        const char *source;
+    } bad[] = {
+        {implicit, sizeof(implicit), "B%=B%+256"},
+        {explicit_let, sizeof(explicit_let), "LET B%=B%+256"}
+    };
+    size_t i;
+    for (i = 0u; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+        Harness h;
+        BasicExecutor executor;
+        BasicProgramLine imported_line;
+        BasicVariableKey key;
+        BasicVariableValue value = {0};
+        BasicVariableEntry entries_before[4];
+        uint8_t token_buf[96], listed[128], before_list[128];
+        uint8_t source_buf[96], before_source[96];
+        uint8_t storage_before[1024];
+        size_t tokens = 555u, written = 777u, j, cursor_before;
+
+        CHECK(init(&h) == 0);
+        /* Preceding valid line makes program LIST partial output observable. */
+        CHECK(bt_tokenize((const uint8_t *)"PRINT \"PREFIX\"",
+                          strlen("PRINT \"PREFIX\""), token_buf,
+                          sizeof(token_buf), &tokens) == BT_OK);
+        CHECK(bp_put(&h.program, 10u, token_buf, tokens) == BP_OK);
+        CHECK(bp_put(&h.program, 20u, bad[i].bytes, bad[i].length) == BP_OK);
+        memcpy(storage_before, h.storage, sizeof(storage_before));
+
+        memset(listed, 0x6cu, sizeof(listed));
+        memcpy(before_list, listed, sizeof(before_list));
+        CHECK(bl_detokenize(bad[i].bytes, bad[i].length, listed,
+                            sizeof(listed), &written) == BL_BAD_SEQUENCE);
+        CHECK(written == 777u &&
+              memcmp(listed, before_list, sizeof(listed)) == 0);
+        CHECK(bl_list_program(&h.program, listed, sizeof(listed),
+                              &written) == BL_BAD_SEQUENCE);
+        CHECK(written == 777u &&
+              memcmp(listed, before_list, sizeof(listed)) == 0);
+        /* Full session LIST must reject as well, before publishing a prefix. */
+        h.written = 888u;
+        memset(h.output, 0x73, sizeof(h.output));
+        {
+            BSRResult result = bsr_submit(
+                &h.runtime, (const uint8_t *)"LIST", 4u,
+                h.scratch, sizeof(h.scratch), h.output, sizeof(h.output),
+                &h.written);
+            CHECK(result.status == BSR_SESSION_ERROR &&
+                  result.session.listing_status == BL_BAD_SEQUENCE);
+        }
+        CHECK(h.written == 888u);
+        for (j = 0u; j < sizeof(h.output); ++j) {
+            CHECK(h.output[j] == 0x73u);
+        }
+
+        memset(source_buf, 0xb9, sizeof(source_buf));
+        memcpy(before_source, source_buf, sizeof(before_source));
+        CHECK(bt_tokenize((const uint8_t *)bad[i].source,
+                          strlen(bad[i].source), source_buf,
+                          sizeof(source_buf), &written) ==
+              BT_NUMBER_OUT_OF_RANGE);
+        CHECK(written == 777u &&
+              memcmp(source_buf, before_source, sizeof(source_buf)) == 0);
+
+        /* Ensure the reference B% really resolves before evaluation fails. */
+        memset(&key, 0, sizeof(key));
+        key.type = (uint8_t)BVT_INTEGER;
+        key.name_length = 1u;
+        key.name[0] = (uint8_t)'B';
+        value.type = (uint8_t)BVT_INTEGER;
+        value.data.integer = 42;
+        CHECK(bvs_assign(&h.store, &key, &value) == BVS_OK);
+        memcpy(entries_before, h.entries, sizeof(entries_before));
+        CHECK(bp_find(&h.program, 20u, &imported_line) == BP_OK);
+        CHECK(be_init_with_store(&executor, &h.program, &h.store) == BE_OK);
+        executor.cursor = imported_line.offset;
+        cursor_before = executor.cursor;
+        CHECK(be_step(&executor, listed, sizeof(listed), &written) ==
+              BE_BAD_SEQUENCE);
+        CHECK(executor.cursor == cursor_before &&
+              written == 777u && h.store.count == 1u &&
+              memcmp(entries_before, h.entries, sizeof(entries_before)) == 0 &&
+              memcmp(listed, before_list, sizeof(listed)) == 0 &&
+              memcmp(storage_before, h.storage, sizeof(storage_before)) == 0);
+        CHECK(bvs_get(&h.store, &key, &value) == BVS_OK &&
+              value.data.integer == 42);
+    }
+    return 0;
+}
+
+/* The accepted old addition and direct 16-bit forms remain reversible. */
+static int test_integer16_context_roundtrips(void)
+{
+    static const char *const inputs[] = {
+        "B%=B%+255", "LET B%=B%+255", "B%=256", "B%=-256",
+        "B%=32767", "B%=255", "B%=-255"
+    };
+    size_t i;
+    for (i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
+        uint8_t tokens[96], listed[96], repeated[96];
+        size_t n = 0u, m = 0u, r = 0u;
+        CHECK(bt_tokenize((const uint8_t *)inputs[i], strlen(inputs[i]),
+                          tokens, sizeof(tokens), &n) == BT_OK);
+        CHECK(bl_detokenize(tokens, n, listed, sizeof(listed), &m) == BL_OK);
+        CHECK(m == strlen(inputs[i]) &&
+              memcmp(listed, inputs[i], m) == 0);
+        CHECK(bt_tokenize(listed, m, repeated, sizeof(repeated), &r) == BT_OK);
+        CHECK(r == n && memcmp(repeated, tokens, n) == 0);
+    }
+    /* Addition with 255 still runs; no widening to a 1A addend. */
+    {
+        Harness h;
+        BSRResult result;
+        CHECK(init(&h) == 0);
+        CHECK(submit(&h, "10 B%=0") == 0);
+        CHECK(submit(&h, "20 B%=B%+255") == 0);
+        CHECK(submit(&h, "30 PRINT B%") == 0);
+        CHECK(submit(&h, "40 END") == 0);
+        CHECK(submit(&h, "RUN") == 0);
+        result = bsr_step(&h.runtime, h.output, sizeof(h.output), &h.written);
+        CHECK(result.status == BSR_OK && h.written == 0u);
+        result = bsr_step(&h.runtime, h.output, sizeof(h.output), &h.written);
+        CHECK(result.status == BSR_OK && h.written == 0u);
+        result = bsr_step(&h.runtime, h.output, sizeof(h.output), &h.written);
+        CHECK(result.status == BSR_OK && h.written == 6u &&
+              memcmp(h.output, " 255 \n", 6u) == 0);
+        CHECK(bsr_step(&h.runtime, h.output, sizeof(h.output),
+                       &h.written).status == BSR_OK);
+        CHECK(bsr_step(&h.runtime, h.output, sizeof(h.output),
+                       &h.written).status == BSR_END);
+    }
+    return 0;
+}
+
 int main(void)
 {
     CHECK(test_vectors() == 0);
     CHECK(test_end_to_end() == 0);
     CHECK(test_reject_tokenizer() == 0);
     CHECK(test_malformed() == 0);
+    CHECK(test_imported_integer16_addend_rejection() == 0);
+    CHECK(test_integer16_context_roundtrips() == 0);
     puts("J1.2-B INTEGER16: vector/list/run/capacity/atomicity PASS");
     return 0;
 }

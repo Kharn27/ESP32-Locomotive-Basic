@@ -54,6 +54,15 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
+      - name: Trust container workspace and export container TEMP path
+        id: cpc_env
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          printf 'runner_temp=%s\n' "$RUNNER_TEMP" >> "$GITHUB_OUTPUT"
+
       - name: Verify pinned Caprice32 revision
         shell: bash
         run: |
@@ -195,7 +204,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-c6-run-behavior
-          path: ${{ runner.temp }}/cpc-run-behavior/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/cpc-run-behavior/
           if-no-files-found: warn
           retention-days: 14
 
@@ -229,7 +238,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-c7-list-printer
-          path: ${{ runner.temp }}/cpc-list-printer/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/cpc-list-printer/
           if-no-files-found: warn
           retention-days: 30
 
@@ -274,7 +283,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-c8-list-screen
-          path: ${{ runner.temp }}/cpc-list-screen/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/cpc-list-screen/
           if-no-files-found: warn
           retention-days: 30
 
@@ -329,7 +338,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-j027-numeric-print
-          path: ${{ runner.temp }}/j027-numeric-print/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/j027-numeric-print/
           if-no-files-found: warn
           retention-days: 30
 
@@ -368,7 +377,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-j027-b1-signed-print
-          path: ${{ runner.temp }}/j027-b1-signed-print/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/j027-b1-signed-print/
           if-no-files-found: warn
           retention-days: 30
 
@@ -391,7 +400,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-basic-token-ram-evidence
-          path: ${{ runner.temp }}/cpc-token-oracle/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/cpc-token-oracle/
           if-no-files-found: warn
           retention-days: 14
 
@@ -400,7 +409,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-caprice32-evidence
-          path: ${{ runner.temp }}/cpc-oracle/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/cpc-oracle/
           if-no-files-found: warn
           retention-days: 14
 
@@ -434,6 +443,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-j1-signed-negative-program-ram
-          path: ${{ runner.temp }}/j1-signed-tokens/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/j1-signed-tokens/
           if-no-files-found: warn
           retention-days: 30

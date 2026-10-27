@@ -29,6 +29,7 @@ jobs:
         with:
           ref: feat/j1-2-a-integer-boundary-oracle
           submodules: recursive
+          fetch-depth: 0
           persist-credentials: true
 
       - name: Verify pinned Caprice32 and absence of historical mutations

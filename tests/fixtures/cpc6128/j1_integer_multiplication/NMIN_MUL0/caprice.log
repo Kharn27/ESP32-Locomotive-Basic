@@ -1,0 +1,8 @@
+exit code: 0
+Using configuration file: /__w/_temp/j14-cpc/NMIN_MUL0/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j14-cpc/NMIN_MUL0/screenshot_20261027_134600.png
+INFO    src/cap32.cpp:2212 - Dumping machine snapshot to /tmp/loco-c5-sna-_5_h__lh/snapshot_20261027_134601.sna
+
+[stderr]

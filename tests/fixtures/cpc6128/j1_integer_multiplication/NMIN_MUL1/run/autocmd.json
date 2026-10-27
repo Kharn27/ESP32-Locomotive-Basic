@@ -1,0 +1,16 @@
+{
+  "commands": [
+    "10 A%=-32768",
+    "20 B%=A%*1",
+    "30 PRINT B%",
+    "40 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+    "PRINT #8,ERR",
+    "PRINT #8,B%",
+    "CAP32_DELAY CAP32_EXIT"
+  ],
+  "original_sha256": "04bc86c328a3782c0156f2c5811c1b5b00bd8cf6910b94748c8acc3a471f6a0c",
+  "screenshot_after_run_before_direct_printer_probes": true,
+  "printer_is_not_screen_bytes": true
+}

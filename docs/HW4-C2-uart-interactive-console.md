@@ -1,58 +1,47 @@
-# HW4-C2 — console BASIC UART0 vers TFT CYD (prototype natif)
+# HW4-C2 — BASIC interactif dans le projet ESP32 existant
 
-## Point de départ et non-régressions
+## Organisation corrigée après retour utilisateur
 
-Basé sur `main` **e05e9a295c130de051006da55ed1cc67860e8bed** après HW4-C1 (#87) accepté/fusionné. Issue de mission **#90**. Le chantier J1.7-B (#89) reste distinct ; aucun `core/`, archive CPC, oracle, `cpc_video`, pilote LCD partagé ni autre banc firmware modifié. L'application `firmware/esp32_loco/` est la seule intégrée interactive.
+**AUCUN nouveau projet VSCode, AUCUN worktree, AUCUN dossier local à créer.**
+Le répertoire de compilation est **`firmware/esp32_display_probe/`**, celui du banc matériel déjà présent dans l'espace de travail. Le firmware C2 est maintenant dans **`firmware/esp32_display_probe/main/hw4_c2_console.c`**. L'ancien `main.c` de ce même projet reste **intact** pour les essais HW3/HW4. La sélection d'un et un seul `app_main` est faite par CMake :
+- par défaut : `HW4_C2_CONSOLE=ON` = BASIC interactif sur LCD ;
+- `idf.py -DHW4_C2_CONSOLE=OFF reconfigure build` = ancien banc de calibration sans BASIC.
 
-## Chaîne réelle
+Le répertoire historique `firmware/esp32_loco/` était créé et fusionné **en HW4-C1**. Il est **restauré exactement à sa version `main`**, n'héberge plus HW4-C2, n'est plus à ouvrir ni à flasher pour C2. Il subsiste seulement pour préserver le jalon C1 accepté, pas comme nouvel environnement de travail.
 
-```text
-PC 115200 UART0 bytes -- uart_read_bytes
-                        |
-                        v
-            io/uart_line.c  (C99, 120 octets, CR LF CRLF, BS DEL)
-                        |
-                input validé / refus
-                        |
-                        v
-        bsr_submit() [core original] -> LIST/NEW/RUN/ligne stockée
-                          -> bsr_step() [max 256 lignes par RUN]
-                        |
-              octets originaux PRINT/LIST
-                        |
-           video/cpc_text.c -> VRAM MODE1 16000 octets
-                        |
-      video/cpc_video_render_row -> LCD DMA 5120 octets (pilote unique)
-```
+## Comment tester directement la branche, sans recréer de dossier
 
-Les octets affichés sont ceux de `bsr_submit` pour `LIST` et `bsr_step` pour `PRINT`. Aucun interpréteur, tokeniseur, exécution Z80 ni valeur `5` construite pour l'écran. Le vieux programme HW4-C1 subsiste uniquement comme **diagnostic explicite `!DEMO`**, via les appels réels BASIC.
-
-## Contrat de saisie et limite de l'écran
-
-- Entrée : UART0 115200 8N1, lignes ASCII 0x20..0x7e, sans terminaison stockée ; CR, LF ou CRLF = **un seul** submit ; BS et DEL effacent une cellule visuelle. Caractères non ASCII / contrôles ignorés. Prompt `>` : marqueur **hôte**, non BASIC.
-- Mémoire de ligne statique : **120 octets utiles + sentinelle**. Au 121e caractère, signal `INPUT_OVERFLOW` et **rejet intégral** au Enter suivant, même si BS a ensuite raccourci la ligne. Aucune mutation du programme sur refus. Les 120 premiers octets peuvent rester visibles pendant le rejet ; le dépassement est annoncé sur UART.
-- Écho : `cpc_uart_console_append` passe par `cpc_text_write`, BS/DEL repeint une cellule vide via `cpc_video_put_cell` et remet le curseur superposé. Les caractères `% = + - > " : /` ont un complément original provisoire au jeu HW3 ; police CPC ROM authentique non revendiquée.
-- **Politique transitoire non CPC** : après toute commande, le prochain prompt exige assez de place pour la ligne maximale (4 rangées) ; s'il reste moins de quatre lignes, l'écran logique est automatiquement vidé et le journal inscrit `SCREEN_PAGE_RESET ... program_preserved=1`. Les variables/programmes ne sont pas touchés. Une sortie trop longue pour 25 lignes (ex. `LIST` de 100 lignes) est **clippée sans déborder**, diagnostic `SCREEN_FULL_OUTPUT_CLIPPED` sur UART ; le prochain prompt pagine. Cela n'est **ni un scrolling** ni une pagination CPC fidèle.
-- **`!CLS`** : commande hôte pour effacer uniquement le TFT ; n'est pas transmise à BASIC et ne modifie ni programme ni variables.
-- **`!DEMO`** : commande hôte qui effectue `NEW`, quatre saisies BASIC HW4-C1 et `RUN` ; elle **remplace le programme courant**, ce qui est volontairement annoncé.
-- `RUN` : 256 pas `bsr_step()` maximum ; à la limite, `bsr_stop()`, `BSR_STEP_BUDGET_EXCEEDED` et diagnostic `ERROR` **hôte** (pas code d'erreur CPC). Erreur d'exécution : `BSR_STEP_FAIL`, arrêt conservateur, récupération de l'interface. `LIST` est plafonné au buffer de sortie BASIC existant de 4096 octets. Les erreurs `BSR/BS/BT/BP/BL/BE` sont reportées en valeurs de diagnostics internes, jamais présentées comme `ERR` CPC.
-
-## Test console prévu sur vrai CYD
-
-Après CI entièrement verte, employer le **SHA final de la PR** (ne pas flasher `main` par erreur), dans un nouveau worktree :
+Depuis **le dépôt habituel déjà ouvert dans VSCode** (terminaux du dépôt, état `git status` propre ; sauvegarder/stasher son travail local si nécessaire) :
 
 ```bash
 git fetch origin
-git worktree add --detach ../loco-hw4c2 <FULL_PR_HEAD_SHA>
-cd ../loco-hw4c2/firmware/esp32_loco
-git rev-parse HEAD
-idf.py set-target esp32
-idf.py build
+git switch --track origin/feat/hw4-c2-uart-console
+cd firmware/esp32_display_probe
+idf.py -DHW4_C2_CONSOLE=ON reconfigure build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-Saisir manuellement au terminal, via un moniteur permettant l'envoi brut CR ou LF :
+Si la branche locale existe déjà, remplacer `git switch --track origin/...` par `git switch feat/hw4-c2-uart-console`. Le `git rev-parse HEAD` doit correspondre au **SHA HEAD C2 final communiqué** ; aucun `git worktree add`, aucun VSCode « nouveau projet ». Le flash remplace évidemment le programme actuellement sur la carte.
 
+## Chaîne technique et limites de C2
+
+```text
+UART0 115200 => io/uart_line (C99, 120 caractères, CR/LF/CRLF, BS/DEL)
+             => bsr_submit()/bsr_step() NATIFS (store original)
+             => octets LIST/PRINT réels
+             => cpc_text/cpc_uart_console => CPC VRAM MODE1 16 Ko
+             => cpc_video_render_row => cyd_ili9341 DMA (buffer pilote 5120 o)
+```
+
+Les diagnostics série `UART_LINE`, `BASIC_SUBMIT`, `LIST_BYTES`, `PRINT_BYTES`, `BSR_END` sont distincts de l'écho écran et des octets BASIC. Seul le `main` interactif compile par défaut dans l'image `loco_esp32_display_probe`, et un seul propriétaire manipule l'affichage/DMA.
+
+Entrée statique de 120 octets ASCII 0x20..0x7e. Le 121e octet poison et rejette la ligne entièrement, sans appeler le runtime ; retour arrière BS (0x08)/DEL (0x7f), validation CR/LF/CRLF unique. Ligne saisie et écho TFT sont séparés. Programme 8192 o, variables 64 entrées, temporary 2048 o, output 4096 o, VRAM 16000 o statiques ; pas de framebuffer RGB565, PSRAM, allocation de heap par frappe/rendu ni second pilote SPI.
+
+Écran 40×25 : sans scrolling CPC, les sorties LIST/PRINT qui dépassent sont clippées **avec diagnostic**, la prochaine invite efface automatiquement la surface lorsqu'il reste moins de quatre lignes (`SCREEN_PAGE_RESET`) mais ne modifie pas le programme. `!CLS` efface **uniquement l'écran**, `!DEMO` exécute les lignes BASIC originales C1 via le vrai runtime après NEW (et écrase volontairement le programme). Ces commandes sont diagnostics **hôte**, pas du BASIC CPC. `RUN` maximum 256 appels `bsr_step`, puis `bsr_stop` ; diagnostic erreur hôte, pas code `ERR` CPC. Police originale HW3 complétée par quelques glyphes de syntaxe ; police ROM CPC non revendiquée.
+
+## Test matériel PO obligatoire après CI sur HEAD final
+
+Saisir dans le terminal série (configurer 115200 8N1 et l'envoi de CR/LF) :
 ```basic
 10 A%=2
 20 B%=A%+3
@@ -62,30 +51,12 @@ RUN
 LIST
 NEW
 LIST
-!DEMO
-!CLS
 ```
 
-Vérifier `PRINT_BYTES length=4 hex=2035200a`, `BSR_END`, `LIST_BYTES` provenant du core, `NEW` puis `LIST` vide, corrections BS/DEL (tester une lettre erronée puis BS), ligne malformée volontaire, saturation de l'écran et état mémoire/DMA. **Attention : `idf.py monitor` utilise habituellement Ctrl+] pour sortir ; selon la configuration du terminal il peut traiter Backspace localement ou envoyer 0x08 / 0x7f.** Employer un vrai terminal série approprié s'il n'envoie pas les octets bruts.
+Attendre `PRINT_BYTES length=4 hex=2035200a`, `BSR_END status=BE_END steps=4`, `LIST_BYTES` authentique avant NEW, vide après NEW, et constater visuellement `5` sur fond bleu, texte de saisie/curseur. Tester une faute corrigée avec Backspace/DEL, une commande volontairement refusée (`PRINT 2` direct), `!CLS`, `!DEMO` et au moins une pagination ; noter `DEVICE_MEMORY`, heap libre/mini/plus grand bloc, stack et DMA/timeouts. Photo souhaitée, dérogation documentaire C1 NON transférable.
 
-**Photo souhaitée** mais l'absence de photo n'est pas automatiquement couverte par la dérogation de C1. La preuve physique doit inclure journal UART, compte rendu visuel PO et SHA du firmware flashé. Les marqueurs d'exécution logiciels ne prouvent pas un essai physique.
+## Preuves et interdictions
 
-## Architecture, budgets et gate
+Les suites Linux C99 incluent trois modules nouveaux : entrée UART et 100 lignes/canaris, gestion VRAM/canaris et pagination, intégration réelle `bsr_submit` / `bsr_step` / `LIST` / `NEW` / erreur atomique. Objectif : **51/51 OFF/ON** ASan+UBSan. Trois firmwares ESP-IDF 5.5.6 : C2 **dans `esp32_display_probe`**, banc BASIC `esp32_probe`, historique C1 `esp32_loco` inchangé. L'ancienne image de calibration doit rester compilable via `HW4_C2_CONSOLE=OFF`. Aucune modification `core/`, CPC fixtures/oracles, ancien moteur vidéo ou pilote DMA.
 
-Deux modules C99 sans heap (`io/uart_line` et `video/cpc_uart_console`), tests Linux séparés : caractères, CRLF, effacements, 121e caractère, 100 lignes et canaris ; intégration native avec `LIST`, `RUN`, `NEW` et exact `2035200a`, échec atomique. `video/cpc_text`, `cpc_video` et anciens tests restent inchangés. Aucun buffer RGB565 plein écran, PSRAM ni second SPI ; render/send au même propriétaire (tâche principale). Seuls buffers ajoutés : `UartLine` statique et RX UART interne installé une fois au boot. `CydLcdDiagnostics` : heap libre/min/largest, pile et DMA à vérifier physiquement. Les trois images Xtensa IDF 5.5.6 doivent être compilées indépendamment, résultats `idf.py size` archivé.
-
-**Critères à remplir avant acceptation** : tests Linux OFF/ON **51/51**, CI des trois images, validation réelle PO sur HEAD final, réserves de compatibilité documentées, revue contradictoire Pilotage. **PR non fusionnée ; HW4-C3 non autorisé.**
-
-### Validation CI HW4-C2 — empreinte de référence `d88992d` (27 octobre 2026)
-
-[HW4-C2 architecture + C99](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695420) : **SUCCESS**, **51/51 CTest OFF et 51/51 ON ASan/UBSan** (48 suites antérieures + 3 dédiées). [HW4-C1 intégré et trois builds Xtensa](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575694984) : **4/4 jobs SUCCESS**, images indépendantes ESP-IDF v5.5.6. [Oracle J1.7-A](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695259), [Oracle CPC historique](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695099), [C99 BASIC](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695017) : **SUCCESS**. Jobs optionnels filtrés SKIPPED non présentés comme validations.
-
-| Image ESP32-IDF 5.5.6 | Flash Code | IRAM / 131 072 | DRAM / 180 736 | Image IDF |
-| --- | ---: | ---: | ---: | ---: |
-| `esp32_loco` intégrée, UART + BASIC + TFT | 99 942 o | 67 279 o (51,33 %) | 47 520 o (26,29 %) | 225 161 o |
-| `esp32_probe` historique BASIC | 66 446 o | 51 807 o (39,53 %) | 30 428 o (16,84 %) | 157 773 o |
-| `esp32_display_probe` historique TFT | 82 538 o | 67 279 o (51,33 %) | 30 400 o (16,82 %) | 208 333 o |
-
-Image intégrée `.bin` **0x37000 o**, partition **0x300000 o**, marge annoncée **93 %**. Compilations sur checkout synthétique PR (version intégrée dans l'ELF `cfece77`), associé au HEAD de branche `d88992d` ; ce n'est pas un flash du HEAD physique. Lorsqu'une nouvelle révision documentaire est publiée, **revalider les jobs au SHA final** avant demande d'essai.
-
-**Statut preuve : `LINUX_51_51_OFF_ON — TARGET_BUILD_VERIFIED (référence d88992d) — ON_DEVICE_UNVERIFIED`.** HW4-C3 demeure bloqué ; la dérogation photo de C1 ne s'applique pas.
+Jalon **HW4-C3 bloqué**, PR non fusionnée ; essai physique PO et revue/fusion réservées à Pilotage. CI des anciennes configurations *avant déplacement* ne valide pas automatiquement ce nouvel agencement.

@@ -468,22 +468,8 @@ Image intégrée C1 mesurée en CI : IRAM **62 515/131 072 (47,70 %)**, DRAM **4
 
 [Issue #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86) clôturée. [HW4-C2 / issue #90](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/90) autorisé pour saisir des lignes BASIC depuis l'UART, les exécuter avec le runtime existant, et rendre les sorties réelles sur TFT, sans modifier `core/` ni les oracles. Essai physique obligatoire au HEAD final. **HW4-C3 non autorisé**. La PR parallèle J1.7-B #89 ne fait pas partie de HW4-C1 et conserve son indépendance.
 
-## HW4-C2 — console UART interactive vers TFT — développement (27 octobre 2026)
+## HW4-C2 — disposition corrigée dans le banc matériel existant (27 octobre 2026)
 
-**Point de départ** : `main e05e9a295c130de051006da55ed1cc67860e8bed`, HW4-C1 accepté fusionné et issue #86 close. **Mission [#90](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/90)**. Branche de travail `feat/hw4-c2-uart-console` : modules C99 `io/uart_line` et `video/cpc_uart_console`, firmware `esp32_loco` UART0 115200, écho TFT, RUN/LIST/NEW par le runtime existant, refus 121e octet sans mutation, retour arrière, écran 40×25 saturé paginé de manière transitoire, limites RUN 256, diagnostic `!DEMO`/`!CLS`. Trois nouvelles suites Linux (objectif **51/51**), réutilisation des trois images cible du workflow HW4-C1. Documentation [HW4-C2](HW4-C2-uart-interactive-console.md).
+Suite au retour du propriétaire, le firmware interactif **HW4-C2 est déplacé de `firmware/esp32_loco/` vers `firmware/esp32_display_probe/`** dans la [PR #91](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/91), branche `feat/hw4-c2-uart-console` ; la démo C1 historique dans `esp32_loco` a été restaurée sans modification. **Un seul espace de travail VSCode et un simple `git switch`**, aucun worktree ni projet à recréer. Projet display existant : C2 par défaut `HW4_C2_CONSOLE=ON` ; ancien HW3/HW4 conservé sur `OFF`. Modules C99 `uart_line`, `cpc_uart_console`, test intégration avec vrai runtime, 120 caractères max, RUN 256 steps, pagination bornée. [Contrat corrigé](HW4-C2-uart-interactive-console.md).
 
-**Gates** : code/CI encore en cours de revue, **TARGET_BUILD_UNVERIFIED**, **ON_DEVICE_UNVERIFIED**, `PHOTO_UNAVAILABLE` de HW4-C1 sans dérogation transmissible. Ne pas confondre journal de développement et preuve de CYD physique. PR et fusion exclusivement Pilotage. **HW4-C3 interdit** jusqu'à acceptation et fusion C2. **J1.7-B PR #89 indépendant**, aucune source cœur/historique CPC modifiée.
-
-### Validation CI HW4-C2 — empreinte de référence `d88992d` (27 octobre 2026)
-
-[HW4-C2 architecture + C99](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695420) : **SUCCESS**, **51/51 CTest OFF et 51/51 ON ASan/UBSan** (48 suites antérieures + 3 dédiées). [HW4-C1 intégré et trois builds Xtensa](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575694984) : **4/4 jobs SUCCESS**, images indépendantes ESP-IDF v5.5.6. [Oracle J1.7-A](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695259), [Oracle CPC historique](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695099), [C99 BASIC](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695017) : **SUCCESS**. Jobs optionnels filtrés SKIPPED non présentés comme validations.
-
-| Image ESP32-IDF 5.5.6 | Flash Code | IRAM / 131 072 | DRAM / 180 736 | Image IDF |
-| --- | ---: | ---: | ---: | ---: |
-| `esp32_loco` intégrée, UART + BASIC + TFT | 99 942 o | 67 279 o (51,33 %) | 47 520 o (26,29 %) | 225 161 o |
-| `esp32_probe` historique BASIC | 66 446 o | 51 807 o (39,53 %) | 30 428 o (16,84 %) | 157 773 o |
-| `esp32_display_probe` historique TFT | 82 538 o | 67 279 o (51,33 %) | 30 400 o (16,82 %) | 208 333 o |
-
-Image intégrée `.bin` **0x37000 o**, partition **0x300000 o**, marge annoncée **93 %**. Compilations sur checkout synthétique PR (version intégrée dans l'ELF `cfece77`), associé au HEAD de branche `d88992d` ; ce n'est pas un flash du HEAD physique. Lorsqu'une nouvelle révision documentaire est publiée, **revalider les jobs au SHA final** avant demande d'essai.
-
-**Statut preuve : `LINUX_51_51_OFF_ON — TARGET_BUILD_VERIFIED (référence d88992d) — ON_DEVICE_UNVERIFIED`.** HW4-C3 demeure bloqué ; la dérogation photo de C1 ne s'applique pas.
+**Gates** : CI et budgets Xtensa à REVALIDER sur le SHA post-déplacement ; ancienne preuve 51/51 au SHA `da3c34a` valide le code portable mais pas la nouvelle intégration. `ON_DEVICE_UNVERIFIED`, revue Pilotage, test physique obligatoire sans transfert de dérogation photo HW4-C1, PR non fusionnée ; J1.7-B indépendant. **HW4-C3 bloqué.**

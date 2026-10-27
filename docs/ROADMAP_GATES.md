@@ -333,3 +333,10 @@ La PR vidéo [#78](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/78) re
 ## HW4-B — gate accepté ? NON (autorisation de développement seulement)
 
 Critères : pilote ILI9341 unique, aucun transport dupliqué, deux builds ESP-IDF 5.5.6 avec tailles IRAM/DRAM/Flash séparées, Linux C99 OFF/ON et oracles sans changement, puis flash du SHA exact sur vrai CYD avec BOOT, `v×3`, `p`, `z`, `w`, `r`, logs heap/stack et images/retour visuel. PR HW4-B liée à issue #82 en attente revue Pilotage, non fusionnée ; **HW4-C NON AUTORISÉ**.
+
+
+### HW4-B — SATISFIED ; HW4-C1 autorisé (27 octobre 2026)
+
+HW4-B **ACCEPTÉ ET FUSIONNÉ** — [PR #83](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/83), squash `6be495dca0a7fa768839960de661ece8dc58cea2`. Code pilote SPI2/ILI9341 partagé ; deux compilations Xtensa v5.5.6 et Linux 46/46 OFF + 46/46 ON ASan/UBSan, oracle CPC historique et J1.6-A verts sur HEAD de revue `594c8ec83ea09e1f6d6f48b2eed5155371ca0f91`. Essai PO sur vrai CYD au `7971d66eafec0bb590a28e890822d2826b21e71e` ; 19 fichiers firmware identiques après synchronisation, sans revendiquer de flash du nouveau SHA.
+
+La mention antérieure « gate accepté ? NON » est dépassée par la fusion ci-dessus. **HW4-C1 AUTORISÉ** — [issue #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86), firmware intégré BASIC+TFT, sortie PRINT native de bsr_step, affichage MODE1, tests Linux/ESP32, nouveau flash et photos/logs PO du HEAD final. Exiger propriétaire unique du tampon DMA, pas de duplication driver, sans émulation ni REPL, clavier tactile ou SD. **HW4-C2 BLOQUÉ** jusqu'à revue et fusion C1 ; J1.7-A indépendant.

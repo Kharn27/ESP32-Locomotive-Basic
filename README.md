@@ -234,3 +234,8 @@ Le moteur vidéo C99 du projet est **accepté et intégré** via [PR #78](https:
 ### HW4-B — composant ILI9341 partagé (en revue)
 
 Le pilote SPI2/ILI9341 DMA du CYD est désormais placé dans `firmware/components/cyd_ili9341/`, partagé entre la sonde HW3/HW4 et la compilation du firmware BASIC série. `core/` et `video/` restent autonomes, aucun `PRINT` vers l'écran. Voir [le contrat HW4-B](docs/HW4-B-ili9341-driver.md), [issue #82](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/82). CI et test physique PO au SHA de branche obligatoires avant fusion. HW4-C non autorisé.
+
+
+### Décision Pilotage — HW4-B fusionné ; HW4-C1 autorisé (27 octobre 2026)
+
+HW4-B **ACCEPTÉ ET FUSIONNÉ** — [PR #83](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/83), squash `6be495dca0a7fa768839960de661ece8dc58cea2`. Code pilote SPI2/ILI9341 partagé ; deux compilations Xtensa v5.5.6 et Linux 46/46 OFF + 46/46 ON ASan/UBSan, oracle CPC historique et J1.6-A verts sur HEAD de revue `594c8ec83ea09e1f6d6f48b2eed5155371ca0f91`. Essai PO sur vrai CYD au `7971d66eafec0bb590a28e890822d2826b21e71e` ; 19 fichiers firmware identiques après synchronisation, sans revendiquer de flash du nouveau SHA. [Issue HW4-C1 #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86) : premier PRINT natif sur TFT, sans REPL tactile ni SD. J1.7-A reste indépendant.

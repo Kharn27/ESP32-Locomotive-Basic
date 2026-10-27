@@ -432,3 +432,10 @@ Correctif C2 relu : invalidation unique de la bande du curseur visible après ch
 - Issue #82, branche `feat/hw4-b-ili9341-shared-driver` issue de `f8832715933f730dbbb787ad5dd555afce9ed7d9`.
 - Transport SPI2/DMA/ILI9341 factorisé dans `firmware/components/cyd_ili9341`. Sonde graphique conservée ; firmware BASIC uniquement lié, sans PRINT→TFT ni modification fonctionnelle de `core/`.
 - En attente de CI Linux/ESP-IDF et du nouveau test PO sur CYD physique. Statut provisoire : `TARGET_BUILD_UNVERIFIED — ON_DEVICE_UNVERIFIED`. Pas de fusion. HW4-C bloqué. Protéger les évolutions J1.6-B parallèles.
+
+
+### Décision Pilotage — HW4-B ACCEPTÉ / FUSIONNÉ (27 octobre 2026)
+
+HW4-B **ACCEPTÉ ET FUSIONNÉ** — [PR #83](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/83), squash `6be495dca0a7fa768839960de661ece8dc58cea2`. Code pilote SPI2/ILI9341 partagé ; deux compilations Xtensa v5.5.6 et Linux 46/46 OFF + 46/46 ON ASan/UBSan, oracle CPC historique et J1.6-A verts sur HEAD de revue `594c8ec83ea09e1f6d6f48b2eed5155371ca0f91`. Essai PO sur vrai CYD au `7971d66eafec0bb590a28e890822d2826b21e71e` ; 19 fichiers firmware identiques après synchronisation, sans revendiquer de flash du nouveau SHA.
+
+[Issue HW4-B #82](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/82) clôturée. Mesures séparées au HEAD de revue : sonde IRAM 67279 o, DRAM 30400 o, Flash Code 82538 o ; BASIC IRAM 51807 o, DRAM 30428 o, Flash Code 66446 o. Il ne s'agit **pas** du firmware BASIC+TFT combiné. [HW4-C1 #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86) autorisé : premier affichage des octets réellement émis par bsr_step(), propriétaire unique des transferts LCD ; test PO et revue obligatoires. HW4-C2 non autorisé. J1.7-A poursuit sa branche indépendante.

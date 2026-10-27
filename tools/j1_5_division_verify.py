@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """J1.5-A CPC division evidence: fail-closed independent archive checker.
 
-The division opcode and overflow outcomes MUST be measured from CPC RAM
+The division opcode and division-by-zero observations MUST be measured from CPC RAM
 and printer, not assumed from C99 or inferred using host arithmetic.
 No screen/console/printer byte-equivalence is claimed.
 """
@@ -23,7 +23,7 @@ from signed_print_oracle import parse_integer
 from j1_5_division_oracle import CASES, validate_checkout_identity
 
 BASE = ROOT / "tests/fixtures/cpc6128/j1_integer_division"
-# Known historical INTEGER literal signatures, but NO assumed MUL token.
+# Known historical INTEGER literal signatures, but NO assumed division token.
 LHS = {
     "P6_ID3": "14", "P7_ID2": "15", "P5_ID2": "13",
     "N7_ID2": "F5 15", "N5_ID2": "F5 13",
@@ -256,7 +256,7 @@ def write_manifest(base, change):
 def self_test(base):
     # Each mutation starts from a successfully validated independent copy.
     def reject(label, mutation, code):
-        with tempfile.TemporaryDirectory(prefix="j14-negative-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="j15-negative-") as tmp:
             root = Path(tmp) / "proof"
             shutil.copytree(base, root)
             verify(root, permanent=True)

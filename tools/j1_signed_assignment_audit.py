@@ -182,7 +182,7 @@ def main():
             live_case(name, args.cli, args.image_cli)
         if args.self_test:
             self_test(meta)
-        print("PASS J1.1 2 CURRENT EXECUTABLE / 2 CURRENT UNSUPPORTED / "
+        print("PASS J1.1 3 CURRENT EXECUTABLE / 1 CURRENT UNSUPPORTED / "
               "4 HISTORICALLY UNSUPPORTED / 18 UNVERIFIED", flush=True)
     except (AuditError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as err:
         print("J1.1 SIGNED AUDIT FAILED:", err, file=sys.stderr)

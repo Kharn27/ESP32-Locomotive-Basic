@@ -82,10 +82,10 @@ static int test_naming(void)
 static int test_rejections(void)
 {
     static const char *bad[] = {
-        "A%=256", "A%=B%", "A%=1+2",
-        "A%=--1", "A%=-A%", "A%=1-2", "A%=-32768", "A%=32767",
+        "A%=32768", "A%=B%", "A%=1+2",
+        "A%=--1", "A%=-A%", "A%=1-2", "A%=-32768", "A%=65535",
         "A!=1.5", "A$=\"CPC\"", "A=5", "DEFINT A-Z", "A%=",
-        "LET A%=", "LET A%=256", "A%%=2", "A%$=2", "A%1=2",
+        "LET A%=", "LET A%=32768", "A%%=2", "A%$=2", "A%1=2",
         "A_%=2", "1A%=2", "%A=2", "A#=2", "A.%%=2",
         "A%=2:","A%=2::END", "A%=2 PRINT 3", "A%==2",
         "LET %=2", "LET 9A%=2", "LET A!=2", "LET A$=2",

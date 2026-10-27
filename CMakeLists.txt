@@ -417,3 +417,17 @@ if(BUILD_TESTING)
                           cpc_text basic_session_runtime)
     add_test(NAME hw4_c1_native_runtime_tft_bytes COMMAND test_hw4_c1_integration)
 endif()
+
+# J1.7-B: F4 explicit INTEGER+INTEGER. Original J1.7-A captures are READ ONLY.
+# Two portable suites added to 48 main suites, including HW4-C1.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_add_vars tests/test_basic_integer_add_vars.c)
+    target_link_libraries(test_basic_integer_add_vars PRIVATE
+                          basic_session_runtime basic_variable_binding)
+    add_test(NAME integer_add_vars_f4 COMMAND test_basic_integer_add_vars)
+    add_test(NAME j1_7_b_native_cpc_differential COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_7_b_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

@@ -368,3 +368,11 @@ La mention antérieure « gate accepté ? NON » est dépassée par la fusion ci
 La photographie demandée pour C1 est **absente** mais son critère a été levé explicitement par Pilotage après journal physique + attestation visuelle PO. Ceci **ne certifie pas un test image indépendant** et ne s'applique pas aux futures missions. Image intégrée C1 mesurée en CI : IRAM **62 515/131 072 (47,70 %)**, DRAM **47 192/180 736 (26,11 %)**, Flash Code **90 078 o**, binaire **205 541 o**. Sur CYD réel : heap libre final **260 772 o**, largest **131 072 o**, pile **4 888 o**, **62 DMA / 0 timeout**, octets `20 35 20 0a`, `BSR_END`.
 
 **HW4-C2 AUTORISÉ** [issue #90](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/90) : console BASIC saisie UART → `bsr_submit()`/`bsr_step()` → écran CPC MODE1, entrée bornée et contrôles d'erreurs, sans REPL complet, scrolling général, tactile/SD/émulation Z80. Linux/CI/oracles + essai vrai CYD au HEAD final obligatoires. **HW4-C3 BLOQUÉ** jusqu'à revue/fusion C2. J1.7-B reste parallèle et isolé.
+
+## J1.7-B — barrière de revue (mission #88, PR #89)
+
+Admission limitée à `destination%=source1%+source2%` pour trois références INTEGER explicites et token `F4`. Les preuves CPC J1.7-A sont figées ; le comparateur J1.7-B doit être indépendant et épingler les douze SHA originaux, imposer permanence anti-falsification, 12/12 RAM, 12/12 LIST, 10/10 numériques, deux débordements `BE_INTEGER_OVERFLOW`, rollback C99 complet, >=50/50 OFF et ON et cross-build ESP32 3/3 incluant esp32_loco. Aucune déduction d'atomicité ROM depuis `C%=0` après ERR=6. Aucun changement HW4-C1 ni fusion automatique. **État en revue, pas accepté.**
+
+### Gate J1.7-B intégrée à HW4-C1 — validations du code `aa1c26bf`
+
+**SATISFIED techniquement, NON ENCORE ACCEPTÉ PAR PILOTAGE** : 50/50 OFF/ON ASan/UBSan, 12/12 RAM CPC, 12/12 LIST, 10/10 valeurs, 2/2 overflow, atomicité C99 ; permanences J1.7-A/J1.6-A et oracle verts ; HW4-C1 architecture/texte/runtime et les trois cibles Xtensa ESP-IDF v5.5.6 vertes. Seules les acquisitions conditionnelles J1.3/1.4/1.5 restent `SKIPPED` et ne constituent pas de nouvelles preuves. Merge final exclusivement du ressort du Pilotage. [Preuves et mesures](J1.7-B-integer-add-vars-native.md). Aucun nouveau test CYD J1.7-B : `ON_DEVICE_UNVERIFIED`.

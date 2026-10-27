@@ -78,7 +78,7 @@ static int test_rejections_and_capacity(void)
 {
     static const char *bad[] = {
         "B%=A%", "B%=A%+3+4", "B%=A%*C%",
-        "B%=A%+C%", "B%=3+A%", "B%=A!+3", "B%=A$+3",
+        "B%=A%+C%+D%", "B%=3+A%", "B%=A!+3", "B%=A$+3",
         "B%=A%+256", "B%=A%+-1", "B%=(A%+3)",
         "B%=A%+","B%=A% + 3X","B%=A%%+3",
         "B%=A%/3", "B%=A%+10.5"

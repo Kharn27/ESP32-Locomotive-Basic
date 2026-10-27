@@ -459,4 +459,4 @@ HW4-B **ACCEPTÉ ET FUSIONNÉ** — [PR #83](https://github.com/Kharn27/ESP32-Lo
 
 - Issue [#88](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/88), [PR #89](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/89) indépendante et non fusionnée ; main vérifié au départ : `e7bc4fdc7932bef8a11781f242721c92c9218afb`.
 - Extension de `destination%=source1%+source2%` uniquement ; références BVR explicites CPC et atomicité native, tests 12 cas historiques. Préserve J1.7-A et chantier HW4-C1.
-- Gates **PENDING** jusqu'aux preuves finales : 12/12 RAM, 12/12 LIST, 10/10 numériques, 2/2 OVERFLOW, 48/48 OFF/ON ASan/UBSan, ESP32 3/3 ; [rapport](J1.7-B-integer-add-vars-native.md). **Pilotage exclusivement compétent pour accepter et fusionner.**
+- Gates validés sur HEAD de code `5840ff2` : 12/12 RAM, 12/12 LIST, 10/10 numériques, 2/2 OVERFLOW, 48/48 OFF/ON ASan/UBSan, ESP32 3/3 ; [rapport](J1.7-B-integer-add-vars-native.md). **Pilotage exclusivement compétent pour accepter et fusionner.**

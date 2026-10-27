@@ -23,11 +23,13 @@ jobs:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/j1-2-a-integer-boundary-oracle' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 55
+    env:
+      GITHUB_HEAD_SHA: "${{ github.event.pull_request.head.sha }}"
     steps:
       - name: Checkout exact dedicated branch and pinned submodule
         uses: actions/checkout@v4
         with:
-          ref: feat/j1-2-a-integer-boundary-oracle
+          ref: ${{ github.event.pull_request.head.sha }}
           submodules: recursive
           fetch-depth: 0
           persist-credentials: true
@@ -36,6 +38,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test -n "$GITHUB_HEAD_SHA"
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          test "$ACTUAL_HEAD" = "$GITHUB_HEAD_SHA" || {
+            echo "J1.2-A-C1 CHECKOUT_SHA_MISMATCH actual=$ACTUAL_HEAD event=$GITHUB_HEAD_SHA"
+            exit 1
+          }
+          echo "J1.2-A-C1 CHECKOUT_SHA_VERIFIED $ACTUAL_HEAD"
           test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
           test "$(git ls-tree HEAD tests/oracles/caprice32 | awk '{print $1}')" = "160000"
           git diff origin/main...HEAD --name-only | tee /tmp/j12_changed_files.txt
@@ -67,8 +76,6 @@ jobs:
           python3 tools/j1_signed_assignment_audit.py --cli "$RUNNER_TEMP/c99-build/loco_basic_cli" --image-cli "$RUNNER_TEMP/c99-build/basic_program_image_cli" --self-test
 
       - name: Acquire six independent pre-RUN LIST and post-RUN CPC sessions
-        env:
-          GITHUB_HEAD_SHA: "${{ github.event.pull_request.head.sha }}"
         run: |
           set -euo pipefail
           python3 tests/oracles/j1_2_boundary_oracle.py \
@@ -97,7 +104,15 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add "$DEST"
             git commit -m "evidence(J1.2-A): archive six original CPC RAM and RUN captures"
-            git push origin HEAD:feat/j1-2-a-integer-boundary-oracle
+            # Never overwrite a branch advanced since this PR event.
+            REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/feat/j1-2-a-integer-boundary-oracle | awk '{print $1}')"
+            test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA" || {
+              echo "J1.2-A-C1 CONCURRENT_BRANCH_CHANGE remote=$REMOTE_HEAD event=$GITHUB_HEAD_SHA"
+              exit 1
+            }
+            # Non-force push: a concurrent update between ls-remote and push
+            # produces a non-fast-forward failure. Do not retry or bypass it.
+            git push origin HEAD:refs/heads/feat/j1-2-a-integer-boundary-oracle
           else
             python3 tools/j1_2_boundary_verify.py --evidence "$DEST" --permanent --self-test
             for name in P255 P256 PMAX N255 N256 NMIN; do

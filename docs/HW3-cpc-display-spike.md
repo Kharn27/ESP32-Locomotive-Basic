@@ -12,7 +12,7 @@ La palette déterministe de cette sonde utilise les deux valeurs par défaut doc
 
 Chaque pixel RGB565 est transmis **octet fort puis octet faible**. La configuration ILI9341 utilise `LCD_RGB_DATA_ENDIAN_BIG` et `LCD_RGB_ELEMENT_ORDER_RGB` par défaut ; pour un module dont la polarité rouge/bleu est inversée, essayer `HW3_LCD_BGR=1` et consigner la valeur choisie sur le CYD réel. Les couleurs perçues sur une photo de CRT/convertisseur vidéo dépendent aussi de l'appareil photographique, du gamma et de l'affichage.
 
-Écran statique : bannière `Amstrad 128K Microcomputer (v3)`, `©1985 Amstrad Consumer Electronics plc`, `and Locomotive Software Ltd.`, `BASIC 1.1`, `Ready`. Le curseur est une cellule 8 × 8 en **colonne 0, ligne texte 11 (indice zéro)**, sous `Ready` (ligne 10), clignotant toutes les 500 ms. Le code source du désassemblage BASIC 1.1 (adresse `C033`) contient `" BASIC 1.1",10,10,0`, et à `C0D7`, `"Ready",10,0`. La disposition de la bannière ROM/OS ainsi que les espaces verticaux demeurent **une approximation visuelle**, à comparer avec une photo réelle de CPC 6128 ; le désassemblage BASIC fourni n'est pas à lui seul une preuve de l'espacement de la bannière système.
+Écran statique : bannière `Amstrad 128K Microcomputer (v3)`, `©1985 Amstrad Consumer Electronics plc`, `and Locomotive Software Ltd.`, `BASIC 1.1`, `Ready`. Le curseur est une cellule 8 × 8 en **colonne 0, ligne texte 13 (indice zéro)**, sous `Ready` (ligne 12), clignotant toutes les 500 ms. Le code source du désassemblage BASIC 1.1 (adresse `C033`) contient `" BASIC 1.1",10,10,0`, et à `C0D7`, `"Ready",10,0`. La disposition de la bannière ROM/OS ainsi que les espaces verticaux demeurent **une approximation visuelle**, à comparer avec une photo réelle de CPC 6128 ; le désassemblage BASIC fourni n'est pas à lui seul une preuve de l'espacement de la bannière système.
 
 Références de contrôle visuel et technique (images **non copiées** dans le firmware) :
 - [Issue HW3 #64](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/64) : cahier des charges matériel / frontières.
@@ -131,6 +131,21 @@ L'index vaut `(swap_xy ? 1 : 0) + (mirror_x ? 2 : 0) + (mirror_y ? 4 : 0)`.
 4. Conserver le journal UART comprenant `HW3 ORIENTATION_CASE`, `HW3 DIAGNOSTIC_GEOMETRY`, `HW3 BOOT_SCREEN_DRAWN` et les éventuelles erreurs. Aucune photographie n'est inventée, et `ON_DEVICE_PASS` reste interdit jusqu'au contrôle.
 
 **Statut :** `HW3-C3 POUSSÉ — ON_DEVICE_C2_FAILED — ON_DEVICE_C3_RETEST_PENDING — PR #66 NON FUSIONNÉE`.
+
+
+## HW3-C4 — Retest terrain C3 : paysage lisible et espacement du texte
+
+**Éléments réellement reçus :** le Product Owner a photographié le démarrage C3 **cas 9** (réglage initial, carte tenue en paysage), puis les séquences **9/b**, **a/b** (cas 10), **c/b** (cas 11). Aucun journal UART complet ni chronométrage du curseur ne sont joints à ces photos.
+
+**Résultat de géométrie :** le **cas 9** (`swap_xy=0`, `mirror_x=1`, `mirror_y=0`, dessin 320×240, sans swap matériel) donne enfin un boot BASIC **lisible et dans le bon sens** dans l'orientation de carte photographiée. Le fond bleu couvre la surface visible ; `BASIC 1.1`, `Ready` et le curseur bloc sont reconnaissables, sans reliquat de l'ancienne image visible sur cette photo. Les trois lignes de crédits sont visuellement **trop serrées**. Ce constat valide un **candidat fort pour l'orientation**, mais ne prouve pas l'exactitude des couleurs, des temps du curseur ni la fidélité bit à bit CPC.
+
+Le **cas 10** (`a`, puis `b`) donne lui aussi un boot reconnaissable si la carte est **physiquement retournée de 180 degrés**. Les photos sans retournement donnent des textes inversés, ce qui est attendu pour cette orientation. Le cas 11 (`c`, puis `b`) présente encore un texte visuellement renversé / peu exploitable dans l'orientation photographiée.
+
+**Modification limitée HW3-C4 :** garder le **cas 9** comme démarrage par défaut, mais séparer les trois lignes de crédits par une ligne de texte vide (lignes 3, 5, 7 au lieu de 4, 5, 6), puis `BASIC 1.1` ligne 10, `Ready` ligne 12 et curseur ligne 13. La grille CPC reste **40×25** en **320×200** logique centré à y=20..219. Il s'agit d'une *approximation de présentation* adaptée au TFT et **non** d'une preuve de fidélité aux sauts de ligne exacts de la ROM CPC. Aucune modification du tokenizer, du cœur BASIC, de l'interface SPI, des GPIO ou du budget mémoire.
+
+**Retest de clôture attendu :** flasher le HEAD C4, conserver le boot par défaut (cas 9), photographier en paysage, vérifier que les crédits ne se touchent plus, observer plusieurs cycles du curseur jaune plein sous `Ready`, et conserver le journal UART de l'initialisation aux marqueurs de démarrage avec les mesures mémoire. Au besoin envoyer `9` pour la mire et vérifier les quatre coins en paysage, puis `b` pour revenir au boot. Un essai satisfaisant donnera au Pilotage des éléments pour une décision de fusion ; les photos disponibles ne suffisent pas à elles seules à valider la cadence du curseur.
+
+**Statut à ce point :** `HW3-C3 ON_DEVICE_LANDSCAPE_VISUALLY_PROMISING / HW3-C4 RETEST_PENDING / PR #66 OPEN — NOT MERGED`.
 
 ## Budget mémoire et signalisation
 

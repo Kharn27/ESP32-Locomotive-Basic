@@ -17,7 +17,7 @@ else()
         SRCS "main.c" "cpc_font.c"
              "../../../video/cpc_video.c" "../../../video/cpc_palette.c"
         INCLUDE_DIRS "." "../../../video"
-        REQUIRES loco_core cyd_ili9341 esp_driver_uart freertos heap esp_system
+        REQUIRES loco_core cyd_ili9341 esp_driver_uart freertos heap esp_system esp_app_format
     )
 endif()
 # Original board-calibration flags remain available for the probe variant.

@@ -17,7 +17,8 @@ permissions:
   packages: write
 
 concurrency:
-  group: cpc-oracle-image-${{ github.ref }}
+  # Per revision while bootstrapping: one stalled smoke must not block newer fixes.
+  group: cpc-oracle-image-${{ github.sha }}
   # Superseded PR builds are disposable; canonical main publication is not.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 

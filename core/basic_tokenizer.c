@@ -376,15 +376,27 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 status = emit(out, 0xf5u);
             }
             if (status == BT_OK) {
-                status = decimal(source, length, &index, 255u, &number);
+                /* Only a standalone INTEGER immediate can use CPC 1A.
+                 * Existing variable + byte grammar stays capped at 255. */
+                status = decimal(source, length, &index,
+                                 reference_rhs ? 255u : 32767u, &number);
             }
             if (status == BT_OK) {
                 if (number < 10u) {
                     status = emit(out, (uint8_t)(0x0eu + number));
-                } else {
+                } else if (number <= 255u) {
                     status = emit(out, 0x19u);
                     if (status == BT_OK) {
                         status = emit(out, (uint8_t)number);
+                    }
+                } else {
+                    /* Explicit byte shifts: independent of host endianness. */
+                    status = emit(out, 0x1au);
+                    if (status == BT_OK) {
+                        status = emit(out, (uint8_t)(number & 0xffu));
+                    }
+                    if (status == BT_OK) {
+                        status = emit(out, (uint8_t)(number >> 8));
                     }
                 }
             }

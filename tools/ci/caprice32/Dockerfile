@@ -14,7 +14,9 @@ RUN git clone --no-checkout https://github.com/ColinPitrat/caprice32.git /opt/ca
 WORKDIR /opt/caprice32
 # Deliberately omit APP_PATH: the runtime uses cwd (the checked-out oracle
 # submodule), so it can load the CPC ROM and cap32.cfg from that checkout.
-RUN make -j 2 WITHOUT_GL=1 && test -x cap32 && test -s COPYING.txt
+# Build only the emulator executable: upstream default 'all' also packages
+# a distribution archive and requires unrelated bzip2 tooling.
+RUN make -j 2 cap32 WITHOUT_GL=1 && test -x cap32 && test -s COPYING.txt
 
 FROM ubuntu:24.04
 LABEL org.opencontainers.image.source="https://github.com/Kharn27/ESP32-Locomotive-Basic" \

@@ -9,6 +9,7 @@
 #include <inttypes.h>
 
 #include "driver/gpio.h"
+#include "driver/uart.h"
 #include "driver/spi_master.h"
 #include "esp_err.h"
 #include "esp_heap_caps.h"
@@ -32,6 +33,8 @@
 #define HW3_LCD_BL GPIO_NUM_21
 #define HW3_LCD_CLOCK_HZ (20 * 1000 * 1000)
 #define HW3_W 320
+#define HW3_NATIVE_W 240
+#define HW3_NATIVE_H 320
 #define HW3_H 240
 #define HW3_CPC_Y 20
 #define HW3_CPC_H 200
@@ -42,6 +45,7 @@
 #define HW3_CURSOR_ROW 11
 #define HW3_CURSOR_COL 0
 #define HW3_CURSOR_MS 500
+#define HW3_MATRIX_HOLD_MS 2500
 
 /* CPC firmware defaults: INK 0=colour 1 (#000080), INK 1=colour 24 (#FFFF00).
  * Deterministic RGB565, sent high byte first to the ILI9341.
@@ -49,14 +53,17 @@
 #define HW3_BLUE_RGB565 0x0010U
 #define HW3_YELLOW_RGB565 0xFFE0U
 
+#ifndef HW3_SWAP_XY
+#define HW3_SWAP_XY 1
+#endif
 #ifndef HW3_LCD_BGR
 #define HW3_LCD_BGR 0
 #endif
 #ifndef HW3_MIRROR_X
-#define HW3_MIRROR_X 1
+#define HW3_MIRROR_X 0
 #endif
 #ifndef HW3_MIRROR_Y
-#define HW3_MIRROR_Y 0
+#define HW3_MIRROR_Y 1
 #endif
 
 static const char *TAG = "HW3";
@@ -180,6 +187,122 @@ static esp_err_t draw_cursor(bool visible)
     return lcd_send(x, y, HW3_TILE, HW3_TILE);
 }
 
+
+/*
+ * Clear all 240x320 native GRAM in portrait BEFORE applying a new MADCTL.
+ * This covers the 80-pixel stale strip seen on physical CYD when a 320x240
+ * logical bitmap was sent but the panel remained effectively in portrait.
+ */
+static esp_err_t clear_native_gram(void)
+{
+    esp_err_t err = esp_lcd_panel_swap_xy(s_panel, false);
+    if (err != ESP_OK) return err;
+    err = esp_lcd_panel_mirror(s_panel, false, false);
+    if (err != ESP_OK) return err;
+    for (int i = 0; i < HW3_NATIVE_W * HW3_TILE; ++i) {
+        s_dma_band[2 * i] = (uint8_t)(HW3_BLUE_RGB565 >> 8);
+        s_dma_band[2 * i + 1] = (uint8_t)HW3_BLUE_RGB565;
+    }
+    for (int top = 0; top < HW3_NATIVE_H; top += HW3_TILE) {
+        err = lcd_send(0, top, HW3_NATIVE_W, HW3_TILE);
+        if (err != ESP_OK) return err;
+    }
+    return ESP_OK;
+}
+
+/* Index bits encode all eight hardware MADCTL combinations:
+ * bit0=swap_xy, bit1=mirror_x, bit2=mirror_y.
+ * swap=0 MUST use 240x320 coordinates; swap=1 uses 320x240.
+ */
+static esp_err_t set_orientation(unsigned int idx)
+{
+    const bool swap = (idx & 1U) != 0;
+    const bool mirror_x = (idx & 2U) != 0;
+    const bool mirror_y = (idx & 4U) != 0;
+    ESP_LOGI(TAG, "HW3 ORIENTATION_CASE index=%u swap_xy=%u mirror_x=%u mirror_y=%u geometry=%ux%u",
+             idx, (unsigned)swap, (unsigned)mirror_x, (unsigned)mirror_y,
+             swap ? HW3_W : HW3_NATIVE_W, swap ? HW3_H : HW3_NATIVE_H);
+    esp_err_t err = clear_native_gram();
+    if (err != ESP_OK) return err;
+    err = esp_lcd_panel_swap_xy(s_panel, swap);
+    if (err != ESP_OK) return err;
+    return esp_lcd_panel_mirror(s_panel, mirror_x, mirror_y);
+}
+
+/* A geometric test independent of BASIC, CPC characters or font layout.
+ * It has full-panel perimeter and four DISTINCT corner colors. It can be
+ * drawn within either legal address space without out-of-range rectangles.
+ */
+static void diagnostic_band(int top, int width, int height, unsigned int idx)
+{
+    static const char label[] = "CASE 0";
+    const int label_x = (width - (int)(sizeof(label) - 1U) * 8) / 2;
+    const int label_y = 36;
+    for (int by = 0; by < HW3_TILE; ++by) {
+        const int y = top + by;
+        for (int x = 0; x < width; ++x) {
+            uint16_t rgb = HW3_BLUE_RGB565;
+            if (x < 2 || x >= width - 2 || y < 2 || y >= height - 2) {
+                rgb = HW3_YELLOW_RGB565;
+            }
+            if (x < 18 && y < 18) rgb = 0xF800U;               /* top-left red */
+            if (x >= width - 18 && y < 18) rgb = 0x07E0U;      /* top-right green */
+            if (x < 18 && y >= height - 18) rgb = 0xFFE0U;     /* bottom-left yellow */
+            if (x >= width - 18 && y >= height - 18) rgb = 0xFFFFU; /* bottom-right white */
+            if (y >= label_y && y < label_y + 8 &&
+                x >= label_x && x < label_x + (int)(sizeof(label) - 1U) * 8) {
+                int col = (x - label_x) / 8;
+                char ch = col == 5 ? (char)('0' + idx) : label[col];
+                uint8_t pixels = hw3_glyph_row((uint8_t)ch, (unsigned)(y - label_y));
+                if ((pixels & (0x80U >> ((x - label_x) % 8))) != 0) {
+                    rgb = HW3_YELLOW_RGB565;
+                }
+            }
+            const size_t at = ((size_t)by * (size_t)width + (size_t)x) * 2U;
+            s_dma_band[at] = (uint8_t)(rgb >> 8);
+            s_dma_band[at + 1] = (uint8_t)rgb;
+        }
+    }
+}
+
+static esp_err_t draw_diagnostic(unsigned int idx)
+{
+    const int width = (idx & 1U) ? HW3_W : HW3_NATIVE_W;
+    const int height = (idx & 1U) ? HW3_H : HW3_NATIVE_H;
+    for (int top = 0; top < height; top += HW3_TILE) {
+        diagnostic_band(top, width, height, idx);
+        esp_err_t err = lcd_send(0, top, width, HW3_TILE);
+        if (err != ESP_OK) return err;
+    }
+    ESP_LOGI(TAG, "HW3 CALIBRATION_DRAWN case=%u corners=TL_RED,TR_GREEN,BL_YELLOW,BR_WHITE",
+             idx);
+    return ESP_OK;
+}
+
+static esp_err_t show_case(unsigned int idx, bool boot, bool *is_boot)
+{
+    esp_err_t err = set_orientation(idx);
+    if (err != ESP_OK) return err;
+    *is_boot = boot && ((idx & 1U) != 0);
+    if (*is_boot) {
+        err = draw_boot_screen();
+        if (err == ESP_OK) err = draw_cursor(true);
+        if (err == ESP_OK) ESP_LOGI(TAG, "HW3 BOOT_SCREEN_DRAWN case=%u", idx);
+    } else {
+        if (boot && (idx & 1U) == 0) {
+            ESP_LOGW(TAG, "HW3 PORTRAIT_CASE: CPC 320x240 boot requires swap_xy=1; showing 240x320 diagnostic");
+        }
+        err = draw_diagnostic(idx);
+    }
+    return err;
+}
+
+static void print_uart_help(void)
+{
+    ESP_LOGI(TAG, "HW3 UART_CALIBRATION: m=8-case matrix, 0..7=one case, b=boot for selected landscape case, r=restore configured boot, ?=help");
+    ESP_LOGI(TAG, "HW3 CASE_BITS: index=(swap_xy?1:0)+(mirror_x?2:0)+(mirror_y?4:0); EVEN=portrait 240x320, ODD=landscape 320x240");
+}
+
 static esp_err_t lcd_initialize(void)
 {
     /* Backlight remains OFF until a complete frame is sent successfully. */
@@ -243,20 +366,21 @@ static esp_err_t lcd_initialize(void)
     if (err != ESP_OK) return err;
     err = esp_lcd_panel_init(s_panel);
     if (err != ESP_OK) return err;
-    err = esp_lcd_panel_swap_xy(s_panel, true);
-    if (err != ESP_OK) return err;
-    err = esp_lcd_panel_mirror(s_panel, HW3_MIRROR_X, HW3_MIRROR_Y);
-    if (err != ESP_OK) return err;
+    /* MADCTL is configured by set_orientation AFTER the native clear. */
     return esp_lcd_panel_disp_on_off(s_panel, true);
 }
 
 void app_main(void)
 {
+    const unsigned int default_case = (HW3_SWAP_XY ? 1U : 0U) |
+                                      (HW3_MIRROR_X ? 2U : 0U) |
+                                      (HW3_MIRROR_Y ? 4U : 0U);
+    unsigned int selected_case = default_case;
+    bool is_boot = false;
     ESP_LOGI(TAG, "HW3 START");
-    ESP_LOGI(TAG, "HW3 BUILD_IDENT project=loco_esp32_display_probe target=esp32 idf=%s rgb_order=%s mirror_x=%d mirror_y=%d",
+    ESP_LOGI(TAG, "HW3 BUILD_IDENT project=loco_esp32_display_probe target=esp32 idf=%s rgb_order=%s swap_xy=%d mirror_x=%d mirror_y=%d default_case=%u",
              esp_get_idf_version(), HW3_LCD_BGR ? "BGR" : "RGB",
-             HW3_MIRROR_X, HW3_MIRROR_Y);
-
+             HW3_SWAP_XY, HW3_MIRROR_X, HW3_MIRROR_Y, default_case);
     esp_err_t err = lcd_initialize();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "HW3 LCD_INIT_FAIL err=%s", esp_err_to_name(err));
@@ -266,10 +390,7 @@ void app_main(void)
     ESP_LOGI(TAG, "HW3 LCD_INIT_PASS");
     log_device_memory("LCD_INIT_PASS");
 
-    err = draw_boot_screen();
-    if (err == ESP_OK) {
-        err = draw_cursor(true);
-    }
+    err = show_case(selected_case, true, &is_boot);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "HW3 LCD_DRAW_FAIL err=%s", esp_err_to_name(err));
         log_device_memory("LCD_DRAW_FAIL");
@@ -280,19 +401,62 @@ void app_main(void)
         ESP_LOGE(TAG, "HW3 LCD_BACKLIGHT_FAIL err=%s", esp_err_to_name(err));
         return;
     }
-    ESP_LOGI(TAG, "HW3 BOOT_SCREEN_DRAWN");
     log_device_memory("BOOT_SCREEN_DRAWN");
-    ESP_LOGI(TAG, "HW3 CURSOR_BLINK_ACTIVE");
+    ESP_LOGI(TAG, "HW3 CURSOR_BLINK_ACTIVE when_boot_visible=%u", (unsigned)is_boot);
 
+    /* Console still uses UART0 for ESP_LOGx, and UART driver gives us
+     * single-character control from idf.py monitor (no keyboard dependency).
+     */
+    bool input_ready = uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0) == ESP_OK;
+    if (!input_ready) ESP_LOGW(TAG, "HW3 UART_RX_UNAVAILABLE: boot and blinking remain active");
+    print_uart_help();
+
+    TickType_t last_toggle = xTaskGetTickCount();
     bool cursor_visible = true;
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(HW3_CURSOR_MS));
-        cursor_visible = !cursor_visible;
-        err = draw_cursor(cursor_visible);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "HW3 CURSOR_DRAW_FAIL err=%s", esp_err_to_name(err));
-            log_device_memory("CURSOR_DRAW_FAIL");
-            return;
+        uint8_t key = 0;
+        int received = input_ready
+            ? uart_read_bytes(UART_NUM_0, &key, 1, pdMS_TO_TICKS(30))
+            : 0;
+        if (!input_ready) vTaskDelay(pdMS_TO_TICKS(30));
+        if (received == 1) {
+            if (key == 'm' || key == 'M') {
+                ESP_LOGI(TAG, "HW3 MATRIX_BEGIN count=8 hold_ms=%d", HW3_MATRIX_HOLD_MS);
+                for (unsigned int idx = 0; idx < 8; ++idx) {
+                    err = show_case(idx, false, &is_boot);
+                    if (err != ESP_OK) break;
+                    vTaskDelay(pdMS_TO_TICKS(HW3_MATRIX_HOLD_MS));
+                }
+                if (err == ESP_OK) err = show_case(selected_case, (selected_case & 1U) != 0, &is_boot);
+                ESP_LOGI(TAG, "HW3 MATRIX_END restored_case=%u", selected_case);
+            } else if (key >= '0' && key <= '7') {
+                selected_case = (unsigned int)(key - '0');
+                err = show_case(selected_case, false, &is_boot);
+            } else if (key == 'b' || key == 'B') {
+                err = show_case(selected_case, true, &is_boot);
+            } else if (key == 'r' || key == 'R') {
+                selected_case = default_case;
+                err = show_case(selected_case, true, &is_boot);
+            } else if (key == '?') {
+                print_uart_help();
+            }
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "HW3 CALIBRATION_FAIL case=%u err=%s", selected_case, esp_err_to_name(err));
+                log_device_memory("CALIBRATION_FAIL");
+                return;
+            }
+            cursor_visible = true;
+            last_toggle = xTaskGetTickCount();
+        }
+        if (is_boot && (TickType_t)(xTaskGetTickCount() - last_toggle) >= pdMS_TO_TICKS(HW3_CURSOR_MS)) {
+            cursor_visible = !cursor_visible;
+            err = draw_cursor(cursor_visible);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "HW3 CURSOR_DRAW_FAIL err=%s", esp_err_to_name(err));
+                log_device_memory("CURSOR_DRAW_FAIL");
+                return;
+            }
+            last_toggle = xTaskGetTickCount();
         }
     }
 }

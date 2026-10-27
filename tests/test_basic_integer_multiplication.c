@@ -201,7 +201,7 @@ static int test_programs(void)
         BasicVariableValue v;
         CHECK(setup(&h, 4u) == 0);
         (void)snprintf(first, sizeof(first), "A%%=%d", (int)cases[i].a);
-        (void)snprintf(second, sizeof(second), "B%%=A%%-%u", cases[i].n);
+        (void)snprintf(second, sizeof(second), "B%%=A%%*%u", cases[i].n);
         (void)snprintf(expected_source, sizeof(expected_source),
                        "10 %s\n20 %s\n30 PRINT B%%\n40 END\n", first, second);
         CHECK(put(&h, 10u, first) == 0);

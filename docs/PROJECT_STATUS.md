@@ -544,3 +544,18 @@ Au HEAD final : [workflow oracle J1.9-A #40593124571](https://github.com/Kharn27
 Preuves **physiques bornées** : sur CYD au SHA `a333767`, journaux de `ESC[3~` = `1b5b337e`, `RUN`→`2035200a`, `LIST` 38 octets, `NEW`, `PRINT 2` refusé sans mutation, heap libre **258540 o**, largest **131072**, pile **4840**, DMA faute/timeout **0**. `PRINT 2` demeure une instruction CPC valide mais absente du runtime actuel. Dernière correction `>` retiré sur HEAD `fa5dd0b` : retour visuel PO et LIST satisfaisants **sans log UART ni nouvelle photo finale**. Deux projets ESP-IDF conservés ; ancien `esp32_loco` supprimé, démo `!DEMO` conservée. La fusion préserve les développements J1.9 parallèles de `main`.
 
 **Prochain HW autorisé** : [HW4-C3-A #101](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101), écran de démarrage HW3 / BASIC 1.1 et glyphes U/W ; essais CYD requis au HEAD final. **HW4-C3-B bloqué** jusqu'à revue/fusion C3-A. Backlogs #96 (vraie navigation édition/DELETE CPC), #97 (police ASCII complète), indépendants des jalons BASIC J1.
+
+
+## HW4-C3-A — console CYD : bandeau BASIC 1.1 (27 octobre 2026)
+
+Mission [#101](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101),
+branche `feat/hw4-c3-a-cpc-boot-console` : **en développement/revue,
+non fusionnée**. Bandeau HW3 partagé en C99 par HW3 OFF et console ON,
+sans second framebuffer : rangées 3/5/7/10/12, curseur non destructif
+(0,13), copyright HW3 0x7f, nouveau titre console ON
+`ESP32 CYD 128K Microcomputer (v3)` et glyphes originaux U/W/Y.
+Banc HW3 OFF : ancien titre Amstrad conservé. Cette personnalisation du
+titre n'est pas une assertion d'identité historique CPC.
+Jalons #96 (édition) et #97 (ASCII intégral) hors périmètre.
+Preuves définitives Linux/ESP32 à attester dans la PR au HEAD final ;
+**ON_DEVICE_UNVERIFIED** avant photo/log physique PO.

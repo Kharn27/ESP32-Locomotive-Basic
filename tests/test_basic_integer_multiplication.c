@@ -331,7 +331,7 @@ static int test_failure_cases(void)
     memcpy(before_output, h.output, sizeof(before_output));
     CHECK(be_step(&h.executor, h.output, 0u, &n) == BE_NO_SPACE);
     CHECK(n == 787u && memcmp(before_output, h.output, sizeof(h.output)) == 0);
-    CHECK(equal(&h, 'B', 6) == 0);
+    CHECK(equal(&h, 'B', 27) == 0);
     CHECK(h.executor.cursor != 0u);
     CHECK(be_step(&h.executor, h.output, sizeof(h.output), &n) == BE_OK);
     CHECK(n == 5u && memcmp(h.output, " 27 \n", 5u) == 0);

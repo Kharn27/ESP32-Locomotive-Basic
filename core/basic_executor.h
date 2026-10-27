@@ -49,11 +49,12 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
  * plus only -32768 via exact F5 1F 00 00 00 00 90 (REAL5 payload),
  * or exactly one explicit INTEGER source reference followed by binary
  * CPC F4 (+), F5 (-), F6 (*) or F9 (\\), then one unsigned
-  * decimal byte literal (0..255).
+ * decimal byte literal (0..255).
  * Unary F5 and binary F5 are distinguished by operand context.
- * A non-representable sum or difference returns BE_INTEGER_OVERFLOW without
- * wrapping or mutating the destination.
- * This is a provisional internal diagnostic, NOT a historic CPC error.
+ * A non-representable sum, difference or product returns BE_INTEGER_OVERFLOW.
+ * F9 division truncates toward zero; a zero divisor returns the separate
+ * BE_DIVISION_BY_ZERO before any division or mutation of the destination.
+ * These are internal status names, NOT historic CPC ERR numeric codes.
  *
  * With a store, PRINT reads existing explicit INTEGER (%) scalars only.
  * Missing variables return BE_VARIABLE_NOT_FOUND; without a store the

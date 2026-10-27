@@ -58,7 +58,11 @@ jobs:
           cmake -S . -B build -DBP_SANITIZERS=${{ matrix.sanitizers }}
           cmake --build build -j 2
           ctest --test-dir build --output-on-failure 2>&1 | tee ctest-hw4-c2-${{ matrix.sanitizers }}.txt
-          ctest --test-dir build -N | grep 'Total Tests: 55'
+          # HW4-C2 baseline had 55 CTest suites; later J1 native PRs
+          # add suites and must not fail because this count increases.
+          count="$(ctest --test-dir build -N | awk '/Total Tests:/ {print $3}')"
+          test "$count" -ge 55
+          echo "HW4-C2 BASELINE_MINIMUM=55 ACTUAL=$count"
       - uses: actions/upload-artifact@v4.6.2
         if: always()
         with:

@@ -50,7 +50,8 @@ jobs:
           cmake -S . -B build -DBP_SANITIZERS=${{ matrix.sanitizers }}
           cmake --build build -j 2
           ctest --test-dir build --output-on-failure 2>&1 | tee ctest-hw4-c2-${{ matrix.sanitizers }}.txt
-          ctest --test-dir build -N | grep 'Total Tests: 55'
+          # HW4-C3-A adds one portable screen-boot test; fail closed at 56.
+          ctest --test-dir build -N | grep 'Total Tests: 56'
       - uses: actions/upload-artifact@v4.6.2
         if: always()
         with:

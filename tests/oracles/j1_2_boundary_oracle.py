@@ -23,6 +23,26 @@ VALUES = {"P255": 255, "P256": 256, "PMAX": 32767,
           "N255": -255, "N256": -256, "NMIN": -32768}
 SOURCE_DIR = ROOT / "tests/oracles/inputs/j1_2_a"
 
+def validate_checkout_identity(declared_sha):
+    """Fail closed: the PR event SHA must be the commit actually checked out.
+
+    The manifest must use the measured checkout SHA, never environment text
+    without verification. Call before writing any acquisition output.
+    """
+    measured_sha = subprocess.check_output(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
+    ).strip()
+    if (not isinstance(declared_sha, str) or
+            not re.fullmatch(r"[0-9a-f]{40}", declared_sha)):
+        raise ValueError("J12_ACQUISITION_EVENT_SHA_MISSING")
+    if measured_sha != declared_sha:
+        raise ValueError(
+            "J12_ACQUISITION_CHECKOUT_SHA_MISMATCH "
+            f"actual={measured_sha} declared={declared_sha}"
+        )
+    return measured_sha
+
+
 def run_observation(cap, work, original, cli):
     """Capture actual RUN screen and non-equivalent direct printer probes."""
     dest = work / "run"
@@ -104,6 +124,7 @@ def main():
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     cap, out = args.caprice.resolve(), args.output.resolve()
+    measured_sha = validate_checkout_identity(os.environ.get("GITHUB_HEAD_SHA"))
     oracle.self_test()
     oracle.check(not out.exists(), "fresh output directory required")
     oracle.check(subprocess.check_output(
@@ -118,7 +139,7 @@ def main():
         "schema_version": 1, "phase": "J1.2-A",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "github_run_id": os.environ.get("GITHUB_RUN_ID"),
-        "github_head_sha": os.environ.get("GITHUB_HEAD_SHA"),
+        "github_head_sha": measured_sha,
         "oracle": {"emulator": "Caprice32", "commit": oracle.PIN,
                    "version_output": version, "rom_sha256": oracle.ROM_SHA,
                    "model": "CPC6128", "basic": "1.1", "ram_kb": 128},
@@ -149,7 +170,8 @@ def main():
               "NATIVE", run["native_status"], flush=True)
     (out / "manifest.json").write_text(json.dumps(
         manifest, indent=2, ensure_ascii=True) + "\n")
-    print("J1.2-A six original CPC pre-RUN/token and post-RUN captures completed", flush=True)
+    print("J1.2-A six original CPC pre-RUN/token and post-RUN captures completed "
+          f"CHECKOUT_SHA_VERIFIED={measured_sha}", flush=True)
 
 if __name__ == "__main__":
     try:

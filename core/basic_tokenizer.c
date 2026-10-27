@@ -386,14 +386,10 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                     status = spaces(source, length, &index, out);
                 }
             }
-            /* J1.7-B/J1.8-B: binary F4/F5 between TWO explicit INTEGER
-             * references. Unary F5 only precedes numeric literals.
-             * F6/F9/FB still accept unsigned-byte RHS only. */
+            /* J1.9-B: all five binary operators permit a second explicit
+             * INTEGER reference, while unary F5 remains numeric-only. */
             if (status == BT_OK && reference_rhs &&
                 index < length && ascii_letter(source[index])) {
-                if (binary_operator != 0xf4u && binary_operator != 0xf5u) {
-                    return BT_UNSUPPORTED_CONSTRUCT;
-                }
                 status = explicit_variable(source, length, &index, out,
                                            BVR_TYPE_INTEGER);
                 variable_rhs = 1;

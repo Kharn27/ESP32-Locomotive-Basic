@@ -431,3 +431,18 @@ Jalon développé séparément depuis le main `3e903147012aedca530c9367ce130f4f8
 [PR #91](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/91) acceptée et fusionnée (`d2262a9d9b2fbc1620ea8e8f80aed30ecbd5cd3e`). Portes franchies : ANSI CSI borné `ESC[3~`, Backspace, pas de pollution source/VRAM ; `RUN/LIST/NEW` réels, erreur directe atomique, suppression du faux `>`. CI **55/55 Linux OFF/ON ASan/UBSan**, trois variantes Xtensa IDF 5.5.6 console ON/HW3 OFF/BASIC ; oracles CPC verts. **Preuve physique différenciée** : UART détaillé et métriques au `a333767`, dernier `fa5dd0b` vérifié visuellement par le PO seulement pour le prompt et LIST (sans nouveau journal complet). Limites de fidélité toujours ouvertes : vraie sémantique Delete CPC/bip #96, polices ASCII incomplètes #97, boot Amstrad absent, scrolling, microSD/tactile.
 
 [**HW4-C3-A #101**](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101) **autorisé** : réemployer le bandeau HW3 dans la console BASIC ON, compléter les U/W nécessaires, conserver variante HW3 OFF, vérifier Linux/CI et tester sur le CYD au SHA final. **HW4-C3-B non autorisé**. Tronc J1.9 reste parallèle et non touché.
+
+
+## Gate HW4-C3-A — démarrage ESP32 CYD / BASIC 1.1
+
+Autorisation issue [#101](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101),
+après fusion HW4-C2-C1 / #91. Le titre de la console ON est adapté à
+`ESP32 CYD 128K Microcomputer (v3)` sur demande PO ; le mode HW3 OFF
+conserve son titre historique. Exiger : 55+ tests Linux OFF/ON et ASan/UBSan,
+trois variantes ESP-IDF Xtensa, aucune modification core/oracle, rendu des
+cinq lignes (U/W/Y, copyright, Ready), mémoire bornée, saisie
+LIST/RUN/NEW, !CLS et pagination. **Essai physique du PO sur le
+HEAD final obligatoire** avant toute acceptation : photo et logs UART
+incluant identité firmware, heap/pile et DMA. Une CI verte ne prouve pas
+le rendu sur la CYD. Une seule PR non fusionnée, revue Pilotage.
+HW4-C3-B, éditeur #96 et couverture ASCII #97 restent non autorisés ici.

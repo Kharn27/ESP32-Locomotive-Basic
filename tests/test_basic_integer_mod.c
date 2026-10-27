@@ -294,14 +294,14 @@ static int test_failure_cases(void)
      * No bytes or variables are committed on a type error. */
     {
         static const uint8_t wrong_destination[] = {
-            3,0,0,0xc2,0xef,2,0,0,0xc1,' ',0xfb,' ',0x0f
+            0xa5,3,0,0,0xc2,0xef,2,0,0,0xc1,' ',0xfb,' ',0x0f
         };
         CHECK(setup(&h, 3u) == 0);
         CHECK(inject(&h, 'A', 8) == 0);
         CHECK(bp_put(&h.program, 10u, wrong_destination,
                      sizeof(wrong_destination)) == BP_OK);
         CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
-        CHECK(failure(&h, BE_INVALID_TYPE) == 0);
+        CHECK(failure(&h, BE_BAD_SEQUENCE) == 0);
         CHECK(equal(&h, 'A', 8) == 0);
     }
     /* One statement per line, even if source accepted a colon. */

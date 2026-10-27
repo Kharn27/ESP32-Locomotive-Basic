@@ -192,7 +192,7 @@ static int test_tokens_and_listing(void)
 
 static int test_programs(void)
 {
-    /* Results are the twelve CPC ERR/B% printer observations from J1.5-A. */
+    /* Results are the twelve CPC ERR/B% printer observations from J1.6-A. */
     static const struct { int16_t a; unsigned n; int16_t b; int zero; } cases[] = {
         {6,3,0,0}, {7,2,1,0}, {-7,2,-1,0}, {-7,3,-1,0},
         {-5,2,-1,0}, {INT16_MIN,1,0,0}, {INT16_MIN,255,-128,0},
@@ -334,16 +334,16 @@ static int test_failure_cases(void)
     CHECK(put(&h, 10u, "B%=A% MOD 3") == 0);
     CHECK(put(&h, 20u, "PRINT B%") == 0);
     CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
-    CHECK(step(&h) == 0 && equal(&h, 'B', 3) == 0);
+    CHECK(step(&h) == 0 && equal(&h, 'B', 0) == 0);
     n = 787u;
     memset(h.output, 0x75, sizeof(h.output));
     memcpy(before_output, h.output, sizeof(before_output));
     CHECK(be_step(&h.executor, h.output, 0u, &n) == BE_NO_SPACE);
     CHECK(n == 787u && memcmp(before_output, h.output, sizeof(h.output)) == 0);
-    CHECK(equal(&h, 'B', 3) == 0);
+    CHECK(equal(&h, 'B', 0) == 0);
     CHECK(h.executor.cursor != 0u);
     CHECK(be_step(&h.executor, h.output, sizeof(h.output), &n) == BE_OK);
-    CHECK(n == 4u && memcmp(h.output, " 3 \n", 4u) == 0);
+    CHECK(n == 4u && memcmp(h.output, " 0 \n", 4u) == 0);
     return 0;
 }
 

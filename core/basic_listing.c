@@ -179,6 +179,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             unsigned int number;
             int reference_operation = 0;
             int negative = 0;
+            int reference_plus = 0;
             /* A5 is explicit LET, 02 begins implicit LET; both reuse the
              * CPC explicit INTEGER reference decoder, ignoring cache values. */
             if (ref_start >= length) {
@@ -294,6 +295,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (t != 0xf4u && t != 0xf5u && t != 0xf6u && t != 0xf9u && t != 0xfbu) {
                     return BL_BAD_SEQUENCE;
                 }
+                reference_plus = t == 0xf4u;
                 if (t == 0xfbu) {
                     status = append_word(out, "MOD");
                 } else {
@@ -313,7 +315,33 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 }
                 t = body[pos++];
             }
-            if (t >= 0x0eu && t <= 0x17u) {
+            if (reference_operation && t == 0x02u) {
+                if (!reference_plus) {
+                    return BL_BAD_SEQUENCE;
+                }
+                /* F4 is the only authorized two-reference INTEGER form.
+                 * BVR cache bytes are opaque, even if they look like tokens. */
+                BasicVariableRef second;
+                size_t right_start = pos - 1u;
+                 ref_status = bvr_decode(body, length, right_start, &second);
+                if (ref_status == BVR_TRUNCATED) {
+                    return BL_TRUNCATED;
+                }
+                if (ref_status != BVR_OK ||
+                    second.family != BVR_FAMILY_EXPLICIT ||
+                    second.explicit_type != BVR_TYPE_INTEGER) {
+                    return BL_BAD_SEQUENCE;
+                }
+                for (i = 0u; i < second.name_length; ++i) {
+                    status = append_byte(out,
+                        (uint8_t)(body[second.name_offset + i] & 0x7fu));
+                    if (status != BL_OK) {
+                        return status;
+                    }
+                }
+                status = append_byte(out, (uint8_t)'%');
+                pos = second.reference_offset + second.consumed;
+            } else if (t >= 0x0eu && t <= 0x17u) {
                 number = (unsigned int)(t - 0x0eu);
             } else if (t == 0x19u) {
                 if (pos == length) {
@@ -360,7 +388,9 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 return t >= 0x80u || (t >= 0x0eu && t <= 0x1fu)
                         ? BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
             }
-            status = append_decimal(out, number);
+            if (!reference_operation || t != 0x02u) {
+                status = append_decimal(out, number);
+            }
             if (status != BL_OK) {
                 return status;
             }

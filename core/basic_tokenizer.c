@@ -319,7 +319,9 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
         } else if (statement == ST_ASSIGN) {
             unsigned int number;
             int reference_rhs = 0;
+            int variable_rhs = 0;
             int negative_immediate = 0;
+            uint8_t binary_operator = 0u;
             /* Limited solely to standalone signed numeric literals. */
             /* E03A-E0A4: explicit INTEGER variable 02, cache 00 00,
              * high-bit terminated name. E736: '=' is operator EF. */
@@ -363,7 +365,8 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                     /* CPC BASIC 1.1 MOD is the single FB token. This only
                      * matches a whole keyword after the explicit INTEGER
                      * reference, never a prefix of an identifier. */
-                    status = emit(out, 0xfbu);
+                    binary_operator = 0xfbu;
+                    status = emit(out, binary_operator);
                     index += count;
                 } else {
                     uint8_t symbol = source[index];
@@ -373,14 +376,27 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                         symbol != (uint8_t)'\\') {
                         return BT_UNSUPPORTED_CONSTRUCT;
                     }
-                    status = emit(out, symbol == (uint8_t)'+' ? 0xf4u :
-                                       symbol == (uint8_t)'-' ? 0xf5u :
-                                       symbol == (uint8_t)'*' ? 0xf6u : 0xf9u);
+                    binary_operator = symbol == (uint8_t)'+' ? 0xf4u :
+                                      symbol == (uint8_t)'-' ? 0xf5u :
+                                      symbol == (uint8_t)'*' ? 0xf6u : 0xf9u;
+                    status = emit(out, binary_operator);
                     ++index;
                 }
                 if (status == BT_OK) {
                     status = spaces(source, length, &index, out);
                 }
+            }
+            /* J1.7-B: exclusively F4 between TWO explicit INTEGER refs.
+             * Emit a second CPC 02/cache/name; never encode a literal.
+             * All other binary operators retain their byte-only RHS. */
+            if (status == BT_OK && reference_rhs &&
+                index < length && ascii_letter(source[index])) {
+                if (binary_operator != 0xf4u) {
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                }
+                status = explicit_variable(source, length, &index, out,
+                                           BVR_TYPE_INTEGER);
+                variable_rhs = 1;
             }
             /* CPC unary minus token F5, followed by an ordinary
              * positive numerical token. Never fold the sign into a
@@ -396,7 +412,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 negative_immediate = 1;
                 status = emit(out, 0xf5u);
             }
-            if (status == BT_OK) {
+            if (status == BT_OK && !variable_rhs) {
                 /* Only a standalone INTEGER immediate can use CPC 1A.
                  * Existing variable + byte grammar stays capped at 255. */
                 status = decimal(source, length, &index,
@@ -404,7 +420,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                                  (negative_immediate ? 32768u : 32767u),
                                  &number);
             }
-            if (status == BT_OK) {
+            if (status == BT_OK && !variable_rhs) {
                 if (number == 32768u) {
                     /* NMIN: CPC unary F5 is already emitted; the positive
                      * magnitude is the one permitted REAL5, never 1A 0080.

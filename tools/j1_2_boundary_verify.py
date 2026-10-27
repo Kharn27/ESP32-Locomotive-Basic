@@ -299,7 +299,7 @@ def self_test(base):
                     variable_probe=254)), "OBSERVED_VALUES_CHANGED")
     reject_case(base, "native-image-classification",
                 lambda r: tweak_manifest(r, lambda m: m["captures"][0]["pre_run"]["comparison"].update(
-                    classification="DIFF")), "CLASSIFICATION_CHANGED")
+                    classification="DIFF")), "NATIVE_TOKEN_EXPECTATION_CHANGED")
     reject_case(base, "historical-run",
                 lambda r: tweak_manifest(r, lambda m: m.update(
                     historical_list_run="VERIFIED")), "HISTORICAL_GUARD_CHANGED")

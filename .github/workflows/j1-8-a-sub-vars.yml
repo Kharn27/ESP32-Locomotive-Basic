@@ -119,7 +119,10 @@ jobs:
             git push origin HEAD:refs/heads/feat/j1-8-a-cpc-integer-sub-vars-oracle
           else
             python3 tools/j1_8_sub_vars_verify.py --evidence "$DEST" --permanent --self-test
-            for name in P2_P3 P7_N2 N7_P2 N7_N3 NMIN_P1 NMIN_Z PMAX_Z PMAX_P1 NMIN_N1 P255_P255 Z_Z P1_N1; do
+            for source in tests/oracles/inputs/j1_8_a/*.bas; do
+              name="${source##*/}"
+              name="${name%.bas}"
+              name="${name^^}"
               cmp "$DEST/$name/program.bin" "$RUNNER_TEMP/j18-cpc/$name/program.bin"
               cmp "$DEST/$name/run/printer.dat" "$RUNNER_TEMP/j18-cpc/$name/run/printer.dat"
               echo "J1.8-A $name REPRODUCED"

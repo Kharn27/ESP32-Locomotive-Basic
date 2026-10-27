@@ -1,5 +1,6 @@
 /* HW4-C2 40x25 pagination, prompt, echo and bounded erase with canaries. */
 #include "cpc_uart_console.h"
+#include "uart_line.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>

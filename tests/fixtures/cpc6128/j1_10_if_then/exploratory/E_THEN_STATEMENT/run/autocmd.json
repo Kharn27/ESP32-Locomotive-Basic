@@ -1,0 +1,21 @@
+{
+  "commands": [
+    "10 A%=1",
+    "20 IF A% THEN PRINT #8,22",
+    "30 PRINT #8,31",
+    "40 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+    "PRINT #8,ERR",
+    "PRINT #8,ERL",
+    "CAP32_DELAY CAP32_EXIT"
+  ],
+  "program_sha256": "6bea3a3f0865cb0c537431644c3b502d6791500c8572e9cacbc8c5a3c1e110b0",
+  "runtime_printer_in_program": true,
+  "post_run_direct_probe": [
+    "ERR",
+    "ERL"
+  ],
+  "screenshot_before_post_run_probes": true,
+  "printer_is_not_screen_output": true
+}

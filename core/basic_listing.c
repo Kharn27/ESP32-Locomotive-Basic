@@ -176,7 +176,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             size_t ref_start = token == 0x02u ? pos - 1u : pos;
             size_t i;
             uint8_t t;
-            unsigned int number;
+            unsigned int number = 0u;
             int reference_operation = 0;
             int negative = 0;
             int reference_plus = 0;

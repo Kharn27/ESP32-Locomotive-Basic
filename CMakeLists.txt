@@ -465,3 +465,19 @@ if(BUILD_TESTING)
                           uart_line cpc_uart_console basic_session_runtime)
     add_test(NAME hw4_c2_native_uart_runtime_tft COMMAND test_hw4_c2_integration)
 endif()
+
+
+# J1.9-B: grouped F6/F9/FB, two CTest gates, immutable original archives.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_binary_family
+                   tests/test_basic_integer_binary_family.c)
+    target_link_libraries(test_basic_integer_binary_family PRIVATE
+                          basic_session_runtime basic_variable_binding)
+    add_test(NAME integer_binary_family_f6_f9_fb
+             COMMAND test_basic_integer_binary_family)
+    add_test(NAME j1_9_b_native_cpc_differential COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_9_b_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

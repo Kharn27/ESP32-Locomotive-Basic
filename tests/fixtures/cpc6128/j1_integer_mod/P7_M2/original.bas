@@ -1,0 +1,4 @@
+10 A%=7
+20 B%=A% MOD 2
+30 PRINT B%
+40 END

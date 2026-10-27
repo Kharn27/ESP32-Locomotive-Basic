@@ -1,0 +1,13 @@
+{
+  "commands": [
+    "10 A%=255",
+    "20 B%=A% MOD 255",
+    "30 PRINT B%",
+    "40 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "9896f1cb65f0896ed11fd7880c7bd8c5d9a0768fbff576d2a7cc66b118262577",
+  "list_requested": true
+}

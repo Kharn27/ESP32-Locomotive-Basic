@@ -340,3 +340,13 @@ Après fusion acceptée de [J1.3-B PR #67](https://github.com/Kharn27/ESP32-Loco
 ### J1.4-A — huit observations CPC authentiques archivées (27 octobre 2026)
 
 [Acquisition GHCR #40514871560](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40514871560), HEAD d'acquisition `aac6f89f5061cc5fa6471481174690e557add9a9`, commit archive `2a2c1b235ec98220c21732a54319ed19aa226dce`, [artefact #12738342818](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40514871560/artifacts/12738342818) SHA256 `3b4470034ee2f63e14b5bb70a31553df214c9e87db88adce95f653558977c343` ; manifeste SHA256 `611f655ef0b7100fb51d90a0b473b11ddebd1b41fc7dfbeecf883649214bd26b` ; sceau `PENDING_PILOTAGE`. **Opcode CPC multiplication mesuré `F6` dans les huit RAM, non présumé**. `2*3=6`, `-2*3=-6`, `-32768*0=0`, `-32768*1=-32768`, `32767*1=32767`, `2*255=510`, tous `ERR=0`. `32767*2` et `255*255` affichent **Overflow in 20**, `ERR=6`, sonde `B%=0` après erreur non interprétable comme résultat ni preuve d'atomicité. Huit export/RUN C99 `UNSUPPORTED` **historiquement et actuellement**, aucun code métier modifié. Treize falsifications négatives + faux checkout rejetés. [Rapport et huit SHA](J1.4-A-integer-multiplication-oracle.md). En attente de CI finale et de revue Pilotage ; **J1.4-B interdit**, HW3 séparé.
+
+
+### J1.4-B — multiplication INTEGER native (27 octobre 2026 ; en revue Pilotage)
+
+- J1.4-A **acceptée et fusionnée** via PR #69 ; merge commit `49586583ef0b877798837bd9b894be666afb3f29`. Ses huit preuves CPC authentiques restent immuables, y compris la classification C99 **historique** `UNSUPPORTED`.
+- J1.4-B (#70) : opérateur `*` CPC `F6` pour une unique affectation `destination%=source%*n`, entier littéral non signé `0..255`, avec calcul `int32_t`, vérification INT16 et commit atomique. Le nouvel oracle live est indépendant de l'archive J1.4-A.
+- Validation requise : 8/8 images RAM MATCH_EXACT, 6/6 produits CPC, 2/2 débordements sans mutation, CI Linux ASan/UBSan + GHCR + Xtensa IDF v5.5.6. Les résultats de CI du **HEAD final** doivent être attestés dans la PR.
+- **En revue, non fusionnée** ; pas de J1.5, pas de graphique ni de HW3 / PR #66. `ON_DEVICE_UNVERIFIED` tant qu'un test physique CYD n'a pas été réalisé.
+- Rapport dédié : [J1.4-B-integer-multiplication-native.md](J1.4-B-integer-multiplication-native.md).
+

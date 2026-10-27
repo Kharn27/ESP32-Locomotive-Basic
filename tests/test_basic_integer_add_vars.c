@@ -239,7 +239,7 @@ static int failure_and_alias(void)
         CHECK(put(&h, 10u, alias[i].s) == 0);
         CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
         CHECK(step(&h) == 0);
-        CHECK(equal(&h, alias[i].s[0], (int16_t)alias[i].result) == 0);
+        CHECK(equal(&h, (uint8_t)alias[i].s[0], (int16_t)alias[i].result) == 0);
     }
     CHECK(setup(&h, 6u) == 0);
     CHECK(inject(&h, 'B', 3) == 0);

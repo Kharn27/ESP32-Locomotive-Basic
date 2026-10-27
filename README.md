@@ -239,3 +239,8 @@ Le pilote SPI2/ILI9341 DMA du CYD est désormais placé dans `firmware/component
 ### Décision Pilotage — HW4-B fusionné ; HW4-C1 autorisé (27 octobre 2026)
 
 HW4-B **ACCEPTÉ ET FUSIONNÉ** — [PR #83](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/83), squash `6be495dca0a7fa768839960de661ece8dc58cea2`. Code pilote SPI2/ILI9341 partagé ; deux compilations Xtensa v5.5.6 et Linux 46/46 OFF + 46/46 ON ASan/UBSan, oracle CPC historique et J1.6-A verts sur HEAD de revue `594c8ec83ea09e1f6d6f48b2eed5155371ca0f91`. Essai PO sur vrai CYD au `7971d66eafec0bb590a28e890822d2826b21e71e` ; 19 fichiers firmware identiques après synchronisation, sans revendiquer de flash du nouveau SHA. [Issue HW4-C1 #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86) : premier PRINT natif sur TFT, sans REPL tactile ni SD. J1.7-A reste indépendant.
+
+
+### HW4-C1 — BASIC PRINT natif vers écran CYD (en développement)
+
+Une troisième image ESP-IDF indépendante, `firmware/esp32_loco/`, relie directement les octets de `bsr_step()` à `video/cpc_text` (MODE 1 40×25) puis au pilote DMA commun `cyd_ili9341`. Démonstration déterministe `10 A%=2`, `20 B%=A%+3`, `30 PRINT B%`, `40 END`. Les bancs série et graphique sont préservés. Voir [contrat technique HW4-C1](docs/HW4-C1-native-print-TFT.md). Validation physique du nouveau firmware **non encore obtenue** ; PR réservée au Pilotage, aucune fusion autonome.

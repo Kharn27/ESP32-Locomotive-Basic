@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'firmware/esp32_display_probe/**'
+      - 'video/**'
+      - 'tests/test_cpc_video.c'
+      - 'docs/HW4-A-cpc-video-contract.md'
       - 'docs/HW3-cpc-display-spike.md'
       - '.github/workflows/hw3-display.yml'
   workflow_dispatch:

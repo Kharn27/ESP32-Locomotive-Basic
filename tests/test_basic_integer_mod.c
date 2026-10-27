@@ -275,6 +275,7 @@ static int test_failure_cases(void)
     CHECK(put(&h, 10u, "B%=A% MOD 0") == 0);
     CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
     CHECK(failure(&h, BE_DIVISION_BY_ZERO) == 0);
+    CHECK(failure(&h, BE_DIVISION_BY_ZERO) == 0);
     CHECK(h.store.count == 1u);
     CHECK(bvs_get(&h.store, &missing, &value) == BVS_NOT_FOUND);
     CHECK(equal(&h, 'A', INT16_MIN) == 0);
@@ -320,6 +321,8 @@ static int test_failure_cases(void)
             {{2,0,0,0xc2,0xef,2,0,0,0xc1,0xfb,0x1f,0,0,0,0,0x90},16,BE_BAD_SEQUENCE},
             {{2,0,0,0xc2,0xef,2,0,0,0xc1,0xfb,0xfb,0x0f},12,BE_BAD_SEQUENCE},
             {{2,0,0,0xc2,0xef,3,0,0,0xc1,0xfb,0x0f},11,BE_BAD_SEQUENCE},
+            /* Imported source is STRING, not INTEGER: fail before store mutation. */
+            {{2,0,0,0xc2,0xef,3,0,0,0xc1,' ',0xfb,' ',0x0f},13,BE_BAD_SEQUENCE},
             {{2,0,0,0xc2,0xef,2,0,0,0xc1,0xef,0x0f},11,BE_BAD_SEQUENCE},
             {{2,0,0,0xc2,0xef,2,0,0,0xc1,0xfb,0x0f,0xf4,0x0f},13,BE_BAD_SEQUENCE}
         };

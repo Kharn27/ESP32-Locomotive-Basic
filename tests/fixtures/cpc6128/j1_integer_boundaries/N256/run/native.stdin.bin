@@ -1,0 +1,6 @@
+10 B%=-256
+20 PRINT B%
+30 END
+RUN
+:step 100
+:quit

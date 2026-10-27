@@ -291,12 +291,16 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 /* F5 is a binary minus ONLY after an INTEGER reference;
                  * the earlier F5 path remains the unary literal sign. */
                 t = body[pos++];
-                if (t != 0xf4u && t != 0xf5u && t != 0xf6u && t != 0xf9u) {
+                if (t != 0xf4u && t != 0xf5u && t != 0xf6u && t != 0xf9u && t != 0xfbu) {
                     return BL_BAD_SEQUENCE;
                 }
-                status = append_byte(out, t == 0xf4u ? (uint8_t)'+' :
-                                            t == 0xf5u ? (uint8_t)'-' :
-                                             t == 0xf6u ? (uint8_t)'*' : (uint8_t)'\\');
+                if (t == 0xfbu) {
+                    status = append_word(out, "MOD");
+                } else {
+                    status = append_byte(out, t == 0xf4u ? (uint8_t)'+' :
+                                               t == 0xf5u ? (uint8_t)'-' :
+                                               t == 0xf6u ? (uint8_t)'*' : (uint8_t)'\\');
+                }
                 if (status != BL_OK) {
                     return status;
                 }

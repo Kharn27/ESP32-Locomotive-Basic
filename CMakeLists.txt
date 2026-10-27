@@ -386,3 +386,17 @@ if(BUILD_TESTING)
         "$<TARGET_FILE:cpc_video_ppm>"
         "${CMAKE_CURRENT_BINARY_DIR}/hw4_preview_verified")
 endif()
+
+# J1.6-B: CPC FB MOD INTEGER, immutable J1.6-A original evidence only.
+# Two new portable suites, preserving all 42 previous regressions unchanged.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_mod tests/test_basic_integer_mod.c)
+    target_link_libraries(test_basic_integer_mod PRIVATE
+                          basic_session_runtime basic_variable_binding)
+    add_test(NAME integer_mod_fb COMMAND test_basic_integer_mod)
+    add_test(NAME j1_6_b_native_cpc_differential COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_6_b_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

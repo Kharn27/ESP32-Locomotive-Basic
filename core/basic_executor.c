@@ -142,7 +142,7 @@ static BEStatus binding_error(BVBStatus status)
     }
 }
 
-/* Evaluate precisely one explicit INTEGER reference (+, -, *, \\) unsigned byte literal.
+/* Evaluate one explicit INTEGER reference (+, -, *, \\ or MOD) and unsigned byte literal.
  * One decoder serves both executor passes; only caller-local values change.
  * The reference cache is opaque and bvb_read_explicit never edits it. */
 static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
@@ -172,7 +172,7 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
     }
     operation = body[pos++];
     if (operation != 0xf4u && operation != 0xf5u &&
-        operation != 0xf6u && operation != 0xf9u) {
+        operation != 0xf6u && operation != 0xf9u && operation != 0xfbu) {
         return BE_BAD_SEQUENCE;
     }
     skip_spaces(body, length, &pos);
@@ -196,7 +196,7 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
     /* Check before dividing: no host UB and no destination/cache mutation.
      * C99 signed division on int32_t truncates toward zero. INT16_MIN / 1
      * is representable; an unsigned byte divisor cannot cause MIN / -1. */
-    if (operation == 0xf9u && operand == 0u) {
+    if ((operation == 0xf9u || operation == 0xfbu) && operand == 0u) {
         return BE_DIVISION_BY_ZERO;
     }
     /* Widen before arithmetic; never rely on signed overflow or wrapping. */
@@ -206,7 +206,9 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
           ? (int32_t)value.data.integer - (int32_t)operand
           : operation == 0xf6u
             ? (int32_t)value.data.integer * (int32_t)operand
-            : (int32_t)value.data.integer / (int32_t)operand;
+            : operation == 0xf9u
+              ? (int32_t)value.data.integer / (int32_t)operand
+              : (int32_t)value.data.integer % (int32_t)operand;
     if (result < INT16_MIN || result > INT16_MAX) {
         return BE_INTEGER_OVERFLOW;
     }

@@ -39,8 +39,7 @@ def checkout_identity(claim):
 def source(name):
     path = SOURCES / (name.lower() + ".bas")
     raw = path.read_bytes()
-    check(raw.endswith(b"
-") and b"" not in raw and
+    check(raw.endswith(b"\n") and b"\r" not in raw and
           all(re.fullmatch(rb"[1-9][0-9]* .+", l)
               for l in raw.splitlines()), name+": BAD_SOURCE")
     numbers = [int(l.split(b" ",1)[0]) for l in raw.splitlines()]
@@ -82,8 +81,7 @@ def run_observation(cap, work, raw, exploratory=False):
         "post_run_direct_probe": ["ERR","ERL"],
         "screenshot_before_post_run_probes": True,
         "printer_is_not_screen_output": True
-    }, indent=2)+"
-")
+    }, indent=2)+"\n")
     cmd = ["xvfb-run","-a",str(cap/"cap32"),"-c",str(dest/"cap32.cfg")]
     for command in commands:
         cmd += ["-a",command]
@@ -93,18 +91,13 @@ def run_observation(cap, work, raw, exploratory=False):
                             timeout=120,check=False)
     end = datetime.now(timezone.utc).isoformat()
     (dest/"caprice.log").write_bytes(
-        f"exit code: {result.returncode}
-".encode()+
-        result.stdout+b"
-[stderr]
-"+result.stderr)
+        f"exit code: {result.returncode}\n".encode()+
+        result.stdout+b"\n[stderr]\n"+result.stderr)
     if result.returncode != 0 and not exploratory:
         raise ValueError("CPC_RUN_PROCESS_FAILED "+repr(result.stderr[-300:]))
     pngs = sorted(dest.glob("screenshot_*.png"))
     if len(pngs) == 1:
-        check(pngs[0].read_bytes().startswith(b"PNG
-
-"),
+        check(pngs[0].read_bytes().startswith(b"\x89PNG\r\n\x1a\n"),
               "INVALID_RUN_PNG")
         pngs[0].rename(dest/"run.png")
     elif not exploratory:
@@ -138,7 +131,7 @@ def one(cap, dest, name, raw, numbers, image_cli):
     nums, records=oracle.records(ram)
     check(nums == numbers, name+": CPC_LINE_SET_CHANGED")
     if_line=next(i for i,line in enumerate(raw.splitlines())
-                 if re.search(rb"IF",line))
+                 if re.search(rb"\bIF\b",line))
     rec=records[if_line]
     encoded=ram[rec["offset"]:rec["offset"]+rec["length"]]
     pre["if_line_number"]=numbers[if_line]
@@ -232,8 +225,7 @@ def main():
               "ERR",item["run"]["err_probe"],"ERL",item["run"]["erl_probe"],
               "CLASS",item["run"]["result_class"],flush=True)
     (out/"manifest.json").write_text(json.dumps(manifest,indent=2,
-                                                 ensure_ascii=True)+"
-")
+                                                 ensure_ascii=True)+"\n")
     print("J1.10-A ACQUIRED 14 MANDATORY PAIRS + 7 EXPLORATIONS; HEAD="+head,
           flush=True)
 

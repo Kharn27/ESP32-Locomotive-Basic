@@ -1,4 +1,4 @@
-name: J1.9-A independent CPC INTEGER variable subtraction
+name: J1.9-A independent CPC INTEGER grouped binary arithmetic
 
 on:
   pull_request: {}
@@ -111,7 +111,7 @@ jobs:
             git config user.name "loco-cyd-evidence-bot"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add "$DEST"
-            git commit -m "evidence(J1.9-A): archive twenty-four original CPC variable-sub sessions"
+            git commit -m "evidence(J1.9-A): archive twenty-four original CPC binary-family sessions"
             REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/feat/j1-9-a-cpc-integer-binary-family-oracle | awk '{print $1}')"
             test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA" || {
               echo "CONCURRENT_BRANCH_ADVANCE refusing to push archived evidence"

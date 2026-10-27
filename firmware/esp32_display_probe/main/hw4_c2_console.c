@@ -343,6 +343,14 @@ void app_main(void)
                 (void)fail("ECHO",-1); return;
             }
         } else if(event==UART_LINE_DELETE) {
+            /* Raw-byte provenance for the PO's keyboard investigation.
+             * A lone '~' never triggers DELETE; only decoded ESC[3~ does. */
+            if(ch==(uint8_t)'~')
+                printf("HW4-C2 UART_EDIT sequence_hex=1b5b337e "
+                       "key=ANSI_DELETE action=backspace\n");
+            else
+                printf("HW4-C2 UART_EDIT key_hex=%02x "
+                       "action=backspace\n",(unsigned)ch);
             if(!cpc_uart_console_backspace(&s_text) || !repaint_dirty()) {
                 (void)fail("DELETE",-1); return;
             }
@@ -354,8 +362,10 @@ void app_main(void)
             uart_line_ack(&s_line);
             memory_report("after_line");
         } else if(event==UART_LINE_REJECTED) {
-            printf("HW4-C2 UART_LINE_REJECTED reason=overflow "
-                   "program_preserved=1\n");
+            printf("HW4-C2 UART_LINE_REJECTED reason=%s "
+                   "program_preserved=1\n",
+                   s_line.rejected_ansi_incomplete ?
+                       "incomplete_ansi" : "overflow");
             if(!cpc_uart_console_end_line(&s_text) ||
                !display_error() || !prompt()) return;
             uart_line_ack(&s_line);

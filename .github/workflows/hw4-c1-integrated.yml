@@ -2,6 +2,7 @@ name: HW4-C1 integrated BASIC TFT
 on:
   pull_request:
     paths:
+      - 'firmware/esp32_display_probe/**'
       - 'firmware/esp32_loco/**'
       - 'video/cpc_text.*'
       - 'tests/test_cpc_text.c'
@@ -24,18 +25,19 @@ jobs:
         run: |
           set -euo pipefail
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
-          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_loco/main --include='*.c'
+          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main --include='*.c'
           base="$(git merge-base origin/main HEAD)"
           # Always protect CPC archives and the shared display transport.
           git diff --exit-code "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
           # The historical HW4-C1 no-core-change rule only applies when the
           # PR actually changes HW4-C1 product files. A parallel J1 core PR
           # must not fail the HW4-C1 integration check merely for touching core/.
-          if git diff --name-only "$base" HEAD -- firmware/esp32_loco/ video/cpc_text.c video/cpc_text.h tests/test_cpc_text.c tests/test_hw4_c1_integration.c | grep -q .; then
+          if git diff --name-only "$base" HEAD -- video/cpc_text.c video/cpc_text.h tests/test_cpc_text.c tests/test_hw4_c1_integration.c | grep -q .; then
             git diff --exit-code "$base" HEAD -- core/
           fi
-          test "$(grep -c '^void app_main(void)' firmware/esp32_loco/main/main.c)" -eq 1
-          ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_loco/main/
+          test "$(grep -c '^void app_main(void)' firmware/esp32_display_probe/main/hw4_c2_console.c)" -eq 1
+          test ! -e firmware/esp32_loco/CMakeLists.txt
+          ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_display_probe/main/
 
   linux:
     runs-on: ubuntu-22.04
@@ -65,14 +67,14 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4.2.2
-      - name: Three independent Xtensa ESP-IDF 5.5.6 images
+      - name: Xtensa 5.5.6 image with BASIC TFT, independent J0.25 probe
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -v "$PWD:/project" -w /project \
             -e IDF_GIT_SAFE_DIR=/project espressif/idf:v5.5.6 bash -lc '
               set -euo pipefail
-              for app in esp32_loco esp32_probe esp32_display_probe; do
+              for app in esp32_display_probe esp32_probe; do
                 cd /project/firmware/"$app"
                 mkdir -p reports
                 idf.py --version | tee reports/idf-version.txt
@@ -91,8 +93,7 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
           path: |
-            firmware/esp32_loco/reports/
-            firmware/esp32_probe/reports/
             firmware/esp32_display_probe/reports/
-            firmware/esp32_loco/build/loco_esp32_loco.bin
-            firmware/esp32_loco/build/loco_esp32_loco.elf
+            firmware/esp32_probe/reports/
+            firmware/esp32_display_probe/build/loco_esp32_display_probe.bin
+            firmware/esp32_display_probe/build/loco_esp32_display_probe.elf

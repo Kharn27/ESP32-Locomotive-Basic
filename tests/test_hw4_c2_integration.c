@@ -125,9 +125,46 @@ static void rejected_input_does_not_mutate(void)
     assert(b.program.size==n);
     assert(memcmp(b.bytes,copy,sizeof(copy))==0);
 }
+
+/* A malformed/incomplete ANSI sequence must never be submitted to BASIC.
+ * The same isolation applies even with a nonempty stored program. */
+static void ansi_atomic_program_guard(void)
+{
+    static uint8_t snapshot[8192];
+    assert(submit("10 PRINT 7").status==BSR_OK);
+    size_t before=b.program.size;
+    memcpy(snapshot,b.bytes,sizeof(snapshot));
+    uart_line_init(&line);
+    assert(uart_line_feed(&line,'2')==UART_LINE_APPEND);
+    assert(uart_line_feed(&line,'0')==UART_LINE_APPEND);
+    assert(uart_line_feed(&line,0x1bU)==UART_LINE_IGNORED);
+    assert(uart_line_feed(&line,'[')==UART_LINE_IGNORED);
+    assert(uart_line_feed(&line,'3')==UART_LINE_IGNORED);
+    assert(uart_line_feed(&line,'\n')==UART_LINE_REJECTED);
+    assert(line.poisoned && line.ansi_incomplete_rejected==1U);
+    /* Firmware routes REJECTED to ERROR/prompt, never bsr_submit(). */
+    uart_line_ack(&line);
+    assert(b.program.size==before);
+    assert(memcmp(b.bytes,snapshot,sizeof(snapshot))==0);
+    assert(submit("LIST").status==BSR_OK);
+    assert(b.written==strlen("10 PRINT 7\n"));
+    assert(memcmp(b.output,"10 PRINT 7\n",b.written)==0);
+    uart_line_init(&line);
+    assert(uart_line_feed(&line,'X')==UART_LINE_APPEND);
+    static const uint8_t seq[]={0x1bU,'[','3','~'};
+    for(size_t i=0;i<3U;++i)
+        assert(uart_line_feed(&line,seq[i])==UART_LINE_IGNORED);
+    assert(uart_line_feed(&line,seq[3])==UART_LINE_DELETE);
+    assert(line.length==0U);
+    assert(uart_line_feed(&line,'\r')==UART_LINE_READY);
+    /* Empty candidate submission is benign, unchanged source. */
+    uart_line_ack(&line);
+    assert(b.program.size==before);
+    assert(memcmp(b.bytes,snapshot,sizeof(snapshot))==0);
+}
 int main(void)
 {
-    setup(); real_run(); list_new_and_fail_atomic(); rejected_input_does_not_mutate();
+    setup(); real_run(); list_new_and_fail_atomic(); rejected_input_does_not_mutate(); ansi_atomic_program_guard();
     puts("HW4-C2 actual interactive bytes -> runtime -> VRAM, LIST NEW PASS");
     return 0;
 }

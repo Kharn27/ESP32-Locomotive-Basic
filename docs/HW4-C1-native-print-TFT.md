@@ -1,5 +1,11 @@
 # HW4-C1 — premier PRINT du Locomotive BASIC natif sur TFT CYD
 
+> **Note de conservation historique (HW4-C2-C1, 27/10/2026).**
+> Ce document décrit la conception **telle qu'elle existait au jalon C1** ; le troisième projet `firmware/esp32_loco/` a ensuite été **supprimé du dépôt** sur demande du PO.
+> Les fonctions natives sont maintenant exécutées par `firmware/esp32_display_probe/` (console `HW4_C2_CONSOLE=ON`), tandis que la calibration HW3 reste accessible avec `OFF`.
+> Les anciennes instructions de worktree/flash ci-dessous sont **archivées et ne doivent plus être suivies**. Utiliser la [procédure active HW4-C2](HW4-C2-uart-interactive-console.md).
+>
+
 Issue [#86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86). Branche de développement `feat/hw4-c1-native-basic-tft`.
 État au développement : **ON_DEVICE_UNVERIFIED**. Aucune validation sur la carte ne doit être déduite des tests Linux ou d'une compilation Xtensa.
 

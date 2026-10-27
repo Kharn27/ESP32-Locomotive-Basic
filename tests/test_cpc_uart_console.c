@@ -56,6 +56,50 @@ static void wrap_erase(void) {
     assert(t.row==0U && t.column==39U);
     guarded();
 }
+
+/* A single UART parser event drives exactly one matching VRAM mutation.
+ * ESC/CSI intermediate bytes MUST leave both source and pixels unchanged. */
+static void ansi_screen_sync(void) {
+    bool page=false;
+    UartLine line;
+    uint8_t p=7U;
+    init();
+    uart_line_init(&line);
+    assert(cpc_uart_console_prompt(&t,&page) && !page);
+    for(size_t i=0;i<3U;++i) {
+        uint8_t ch=(uint8_t)("ABC"[i]);
+        assert(uart_line_feed(&line,ch)==UART_LINE_APPEND);
+        assert(cpc_uart_console_append(&t,ch));
+    }
+    assert(line.length==3U && t.column==4U);
+    assert(cpc_video_get(&v,3U*8U,0U,&p) && p==1U);
+    const uint8_t ansi[]={0x1bU,'[','3','~'};
+    for(size_t i=0;i<3U;++i) {
+        assert(uart_line_feed(&line,ansi[i])==UART_LINE_IGNORED);
+        assert(t.column==4U && line.length==3U);
+        assert(cpc_video_get(&v,3U*8U,0U,&p) && p==1U);
+    }
+    assert(uart_line_feed(&line,ansi[3U])==UART_LINE_DELETE);
+    assert(cpc_uart_console_backspace(&t));
+    assert(t.column==3U && line.length==2U);
+    assert(memcmp(line.data,"AB",2U)==0);
+    assert(cpc_video_get(&v,3U*8U,0U,&p) && p==0U);
+    assert(cpc_video_get(&v,2U*8U,0U,&p) && p==1U);
+    static const uint8_t unknown[]={0x1bU,'[','1',';','2','D'};
+    for(size_t i=0;i<sizeof(unknown);++i)
+        assert(uart_line_feed(&line,unknown[i])==UART_LINE_IGNORED);
+    assert(line.length==2U && t.column==3U);
+    assert(cpc_video_get(&v,2U*8U,0U,&p) && p==1U);
+    assert(uart_line_feed(&line,0x08U)==UART_LINE_DELETE);
+    assert(cpc_uart_console_backspace(&t));
+    assert(t.column==2U && line.length==1U && line.data[0]=='A');
+    assert(cpc_video_get(&v,2U*8U,0U,&p) && p==0U);
+    assert(uart_line_feed(&line,'\r')==UART_LINE_READY);
+    assert(line.length==1U && line.data[0]=='A');
+    uart_line_ack(&line);
+    guarded();
+}
+
 static void saturation(void) {
     bool page = false;
     size_t pages=0U;
@@ -74,7 +118,7 @@ static void saturation(void) {
     guarded();
 }
 int main(void) {
-    edits(); wrap_erase(); saturation();
+    edits(); wrap_erase(); ansi_screen_sync(); saturation();
     puts("HW4-C2 visual echo/page canaries PASS");
     return 0;
 }

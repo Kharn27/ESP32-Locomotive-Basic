@@ -1,0 +1,57 @@
+name: J1.2-B INTEGER16 CPC native differential
+
+on:
+  pull_request:
+    paths:
+      - "core/basic_tokenizer.c"
+      - "core/basic_listing.c"
+      - "core/basic_executor.c"
+      - "core/basic_executor.h"
+      - "tests/test_basic_integer16.c"
+      - "tests/test_basic_integer_assignment_tokens.c"
+      - "tests/test_basic_integer_assignment_runtime.c"
+      - "tests/oracles/j1_native_capabilities.json"
+      - "tools/j0_post_c1_audit.py"
+      - "tools/j1_signed_assignment_audit.py"
+      - "tools/j1_2_b_native_verify.py"
+      - ".github/workflows/j1-2-b-integer16.yml"
+      - "CMakeLists.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  j1-2-b-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizers: [OFF, ON]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Guard original CPC J1.2-A and prior independent archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only origin/main...HEAD | tee /tmp/changes.txt
+          if grep -E '^(tests/fixtures/cpc6128/|tests/oracles/inputs/j1_2_a/|tools/j1_2_boundary_verify.py|tests/oracles/j1_2_boundary_oracle.py)' /tmp/changes.txt; then
+            echo "J1.2-B must not rewrite J1.2-A or any earlier history"
+            exit 1
+          fi
+      - name: Configure native C99
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBP_SANITIZERS=${{ matrix.sanitizers }}
+      - name: Build native C99
+        run: cmake --build build --parallel 2
+      - name: Run all regression suites and both oracles
+        run: ctest --test-dir build --output-on-failure
+      - name: Publish five original CPC SHA and native evidence side-by-side
+        run: |
+          set -euo pipefail
+          python3 tools/j1_2_boundary_verify.py --permanent --self-test
+          python3 tools/j1_2_b_native_verify.py --cli build/loco_basic_cli \
+            --image-cli build/basic_program_image_cli --self-test

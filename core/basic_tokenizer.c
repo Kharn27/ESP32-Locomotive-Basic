@@ -342,7 +342,8 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (status == BT_OK) {
                 status = spaces(source, length, &index, out);
             }
-            /* One INTEGER reference, '+', and an unsigned byte constant.
+            /* One INTEGER reference, binary '+' or '-', and an unsigned
+             * byte constant. CPC encodes '-' with F5 in this context.
              * Shared BVR encoder preserves the historical CPC name format. */
             if (status == BT_OK && index < length &&
                 ascii_letter(source[index])) {
@@ -355,10 +356,12 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 if (status != BT_OK) {
                     return status;
                 }
-                if (index == length || source[index] != (uint8_t)'+') {
+                if (index == length ||
+                    (source[index] != (uint8_t)'+' &&
+                     source[index] != (uint8_t)'-')) {
                     return BT_UNSUPPORTED_CONSTRUCT;
                 }
-                status = emit(out, 0xf4u);
+                status = emit(out, source[index] == (uint8_t)'+' ? 0xf4u : 0xf5u);
                 ++index;
                 if (status == BT_OK) {
                     status = spaces(source, length, &index, out);
@@ -366,7 +369,8 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             }
             /* CPC unary minus token F5, followed by an ordinary
              * positive numerical token. Never fold the sign into a
-             * host-only signed literal or accept binary subtraction. */
+             * host-only signed literal or accept a second sign on the
+             * binary RHS (A%- -1 and A%--1 remain unsupported). */
             if (status == BT_OK && index < length &&
                 source[index] == (uint8_t)'-') {
                 if (reference_rhs || index + 1u >= length ||

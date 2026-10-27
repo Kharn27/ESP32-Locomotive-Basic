@@ -142,3 +142,8 @@ Le **Product Owner** fixe la vision et les priorités. **ChatGPT Pilotage** assu
 ---
 
 **En une phrase : ce projet veut transformer une ESP32 CYD en ordinateur exécutant le véritable Locomotive BASIC 1.1 du CPC 6128, avec pour cible une compatibilité complète — pas inventer un BASIC supplémentaire.**
+
+
+## J1.3-B — nouvelle tranche en développement (27 octobre 2026)
+
+La soustraction INTEGER native bornée `B%=A%-n` (`n` décimal non signé 0..255) fait l'objet du [ticket #65](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/65). Le dossier [J1.3-B](docs/J1.3-B-integer-subtraction-native.md) sépare clairement capacités C99 en cours de revue et six preuves CPC J1.3-A figées. Un résultat de CI Linux ou de compilation Xtensa ne confirme pas l'exécution physique de cette nouvelle fonctionnalité : **ON_DEVICE_UNVERIFIED**. Les périphériques écran/tactile/microSD demeurent hors périmètre.

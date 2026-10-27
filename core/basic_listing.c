@@ -177,7 +177,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             size_t i;
             uint8_t t;
             unsigned int number;
-            int reference_addition = 0;
+            int reference_operation = 0;
             int negative = 0;
             /* A5 is explicit LET, 02 begins implicit LET; both reuse the
              * CPC explicit INTEGER reference decoder, ignoring cache values. */
@@ -256,7 +256,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 }
             }
             if (t == 0x02u) {
-                reference_addition = 1;
+                reference_operation = 1;
                 /* RHS CPC cache bytes remain opaque (20, EF, F4 included). */
                 BasicVariableRef rhs;
                 size_t rhs_start = pos - 1u;
@@ -288,10 +288,13 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (pos >= length) {
                     return BL_TRUNCATED;
                 }
-                if (body[pos++] != 0xf4u) {
+                /* F5 is a binary minus ONLY after an INTEGER reference;
+                 * the earlier F5 path remains the unary literal sign. */
+                t = body[pos++];
+                if (t != 0xf4u && t != 0xf5u) {
                     return BL_BAD_SEQUENCE;
                 }
-                status = append_byte(out, (uint8_t)'+');
+                status = append_byte(out, t == 0xf4u ? (uint8_t)'+' : (uint8_t)'-');
                 if (status != BL_OK) {
                     return status;
                 }
@@ -315,9 +318,9 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                     return BL_BAD_SEQUENCE;
                 }
             } else if (t == 0x1au) {
-                /* Addition remains restricted to an 8-bit addend. A 1A
+                /* Binary INTEGER RHS remains restricted to an 8-bit operand. A 1A
                  * here is not a LIST-representable native expression. */
-                if (reference_addition) {
+                if (reference_operation) {
                     return BL_BAD_SEQUENCE;
                 }
                 if (length - pos < 2u) {
@@ -334,7 +337,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             } else if (t == 0x1fu) {
                 /* Only the archived negative INTEGER immediate NMIN is
                  * representable here. This is NOT a REAL5 decoder. */
-                if (!negative || reference_addition) {
+                if (!negative || reference_operation) {
                     return BL_BAD_SEQUENCE;
                 }
                 if (length - pos < 5u) {

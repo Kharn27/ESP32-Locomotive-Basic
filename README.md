@@ -61,7 +61,7 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 | --- | --- |
 | Programme BASIC, tokens, LIST et RUN | Numérotation et stockage des lignes, import/export CPC, LIST et RUN sur le sous-ensemble testé ; confrontations CPC indépendantes |
 | INTEGER natif | Littéraux signés `-32768..32767`, stockage et PRINT INTEGER ; addition simple `B%=A%+n` (n de 0 à 255) et diagnostics bornés |
-| Soustraction binaire `B%=A%-n` | **Non implémentée** ; la mission [J1.3-A / #62](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/62) acquiert exclusivement l'oracle CPC |
+| Soustraction binaire `B%=A%-n` | **Non implémentée dans le C99** ; l'oracle CPC indépendant [J1.3-A / PR #63](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/63) est accepté et archivé ; J1.3-B est l'incrément suivant |
 | Linux et Caprice32 | CI C99 sans/avec ASan/UBSan ; Caprice32 CPC 6128 via image GHCR au digest immuable |
 | ESP32 CYD réel | Deux sondes ciblées exécutées ; J1.2-HW2 confirme les frontières INTEGER, la tokenisation NMIN et la stabilité apparente des ressources |
 | Écran BASIC, tactile, microSD | **Non intégrés / non validés** ; l'écran TFT n'est pas encore un terminal BASIC utilisable |

@@ -147,6 +147,32 @@ Le **cas 10** (`a`, puis `b`) donne lui aussi un boot reconnaissable si la carte
 
 **Statut à ce point :** `HW3-C3 ON_DEVICE_LANDSCAPE_VISUALLY_PROMISING / HW3-C4 RETEST_PENDING / PR #66 OPEN — NOT MERGED`.
 
+
+## HW3-C5 — Régression déterminante sur les redessins du même cas
+
+**Observations réelles du PO, à préserver sans extrapolation :**
+
+| Manipulation | Résultat |
+|---|---|
+| démarrage frais en cas 9 | écran CPC paysage, lisible, sans résidu visible |
+| `9` puis `b` | écran illisible / décrit comme portrait |
+| `a` puis `b` (cas 10) | lisible si le CYD est tenu dans l'autre sens (rotation physique de 180°) |
+| `c` puis `b` (cas 11) | caractères reconnaissables mais en miroir |
+
+Ces résultats **ne valident pas** le redessin ni la robustesse des transitions. Ils distinguent le succès au démarrage de la reproduction fiable du même rendu. Une photo correcte après reset ne vaut pas validation fonctionnelle.
+
+**Défaut plausible dans le code C4 :** chaque invocation de `show_case()` appelait `set_orientation()` sans distinguer le cas déjà actif. Même lors de `9` puis `b`, le code réappliquait les registres de permutation / miroir (`MADCTL`) et repassait par `clear_native_gram()` avant de redessiner. Il n'est pas démontré que cela soit l'unique cause des pixels corrompus, mais la séquence constitue une variable parasite évitable.
+
+**Expérience ciblée C5 :**
+- `s_active_case` démarre à `UINT_MAX` (aucune orientation connue).
+- Si `set_orientation(idx)` reçoit le **même index** que `s_active_case`, sauter **uniquement** l'effacement et l'écriture de MADCTL ; redessiner la mire ou le boot sur la totalité de la zone **320×240** avec les mêmes transferts DMA.
+- Si l'index change, conserver le protocole expérimental d'avant (clear + configuration), **sans affirmer que ces transitions sont bonnes**.
+- UART : `HW3 ORIENTATION_REUSED case=9 MADCTL_UNCHANGED=1 CLEAR_SKIPPED=1` et `HW3 FULL_REPAINT_PASS case=9 mode=MIRE|BOOT` ; les changements d'orientation marquent `HW3 ORIENTATION_APPLIED case=...`.
+
+**Protocole discriminant, à réaliser sur le CYD après compilation C5 :** rebooter, photographier l'écran initial ; envoyer `9` (mire), puis `b` (boot), **sans passer par `a` ni `c`**. Comparer au démarrage et conserver le journal UART. Si cet aller-retour devient conforme, répéter `9`/`b` trois fois. Si l'échec subsiste **malgré les marqueurs `ORIENTATION_REUSED`**, l'hypothèse « réécriture répétée de MADCTL » n'est pas suffisante ; arrêter les essais de miroir et instrumenter fenêtres `CASET/RASET`, transferts `RAMWR` et intégrité du tampon avant/après DMA. Tester les transitions 9→10→9 séparément, car la correction C5 ne prétend pas les traiter.
+
+**Statut :** `HW3-C5 — CORRECTION DE CONTRÔLE D'ÉTAT, NON VALIDÉE SUR CYD — PR #66 OUVERTE / NON FUSIONNÉE`.
+
 ## Budget mémoire et signalisation
 
 Le rendu n'utilise qu'un **tampon DMA interne de 320 × 8 × 2 = 5 120 octets**, aligné et alloué via `heap_caps_malloc(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA)`, et une grille texte statique de **40 × 25 = 1 000 octets** en .bss. La fonte (`128 × 8 = 1 024 octets`) réside en lecture seule en Flash. Aucune allocation de **153 600 octets** (framebuffer RGB565 320 × 240), aucun recours à la PSRAM. Le tampon est conservé tant que le rendu fonctionne pour ne pas fragmenter le heap.

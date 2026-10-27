@@ -235,9 +235,21 @@ def self_test(base):
                 "FILE_DIGEST_CHANGED")
     reject_case(base, "forged-sha-and-byte",
                 lambda r: alter_program(r, True), "SEAL_OR_BYTES_CHANGED")
-    reject_case(base, "sign", lambda r: (r / "N255/program.bin").write_bytes(
-                (r / "N255/program.bin").read_bytes().replace(b"\xF5", b"\xF4", 1)),
-                "FILE_DIGEST_CHANGED")
+    def forged_sign(root):
+        path = root / "N255/program.bin"
+        raw = bytearray(path.read_bytes())
+        require(raw[9] == 0xF5, "N255: original minus sign absent")
+        raw[9] = 0xF4
+        path.write_bytes(raw)
+        def update(m):
+            c = next(x for x in m["captures"] if x["case"] == "N255")
+            c["pre_run"]["files"]["program.bin"]["sha256"] = sha(raw)
+            c["pre_run"]["comparison"]["cpc_sha256"] = sha(raw)
+            if "c99.bin" in c["pre_run"]["files"]:
+                c["pre_run"]["comparison"]["classification"] = "DIFF"
+        tweak_manifest(root, update)
+    reject_case(base, "forged-sign-and-sha", forged_sign,
+                "UNARY_SIGN_CHANGED")
     reject_case(base, "provenance",
                 lambda r: tweak_manifest(r, lambda m: m["oracle"].update(
                     commit="0" * 40)), "PROVENANCE_CHANGED")
@@ -247,10 +259,16 @@ def self_test(base):
     reject_case(base, "native-status",
                 lambda r: tweak_manifest(r, lambda m: m["captures"][0]["run"].update(
                     native_status="NUMERIC_OUTPUT_FORGED")), "NATIVE_CLASSIFICATION_CHANGED")
+    reject_case(base, "printer-value",
+                lambda r: tweak_manifest(r, lambda m: m["captures"][0]["run"].update(
+                    variable_probe=254)), "OBSERVED_VALUES_CHANGED")
+    reject_case(base, "native-image-classification",
+                lambda r: tweak_manifest(r, lambda m: m["captures"][0]["pre_run"]["comparison"].update(
+                    classification="DIFF")), "CLASSIFICATION_CHANGED")
     reject_case(base, "historical-run",
                 lambda r: tweak_manifest(r, lambda m: m.update(
                     historical_list_run="VERIFIED")), "HISTORICAL_GUARD_CHANGED")
-    print("PASS J1.2-A intact proof + seven controlled negative cases", flush=True)
+    print("PASS J1.2-A intact proof + nine controlled negative cases", flush=True)
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)

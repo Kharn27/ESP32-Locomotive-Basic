@@ -44,8 +44,21 @@ EXPECTED_IMAGE = "ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac8
 
 # Permanent original anchors copied from the one-time ROM-backed bot acquisition.
 # Never derive these expected values from a newly generated native image.
-PINNED_MANIFEST_SHA = ""  # set exclusively from acquired original manifest
-PINNED_PROGRAM_SHA = {}  # add 12 independent original RAM hashes after bot archive
+PINNED_MANIFEST_SHA = "d087c7f9d1dccf4670ad0bb5e2b3443b2ba1ec7646e7a8da5f52de090cea1a3d"  # first original GHCR acquisition
+PINNED_PROGRAM_SHA = {
+    "P2_P3": "f4c0a93362bb621b5c2b5e294fe33d11fb7fcf88ad3c0dc8aaec69899cbdca86",
+    "P7_N2": "20d00ca4e89cb20981a348f386e4d22489be64092b4bb56a0a4e530c0ae678e1",
+    "N7_P2": "db6de6512a1c2764af1a28fdf48f33b40f11d95363ae3179df4e39a0c7bf24be",
+    "N7_N3": "013560abb954eaa41547bd7a8ddd76689a8583c0a4ed7062c14b97da967719bc",
+    "NMIN_N1": "6ba2eb93abb43c91efb16e504775732c72e80768a464f9fa8e4c1658fa32d09e",
+    "NMIN_Z": "f75849f897986a151dbc8db6488351df333079bc1bbebf0e70df1ba590733304",
+    "PMAX_Z": "21baa2bfcbf07df0be4afdab144305cc87a25063cd61cb4e3bac29f9dd7641bc",
+    "PMAX_N1": "cbed61c9685aa50e291c3246ac77413402963aa9011ac650b2b062ccea2f7245",
+    "NMIN_P1": "da36695d14a6fe11382153c28aa55cbcd8de127feb14818f2a8d9573199b3cd8",
+    "P255_P255": "8a86c014f995573d2c3393fac608d4edd274e59710617394be8425114d5a856a",
+    "Z_Z": "a5a39d734b0fcd2a8d1ec46d8fc8edf4199fcd933a1ee75360736213bc3c9e30",
+    "P1_N1": "d3de0932d1c5681e54c52054813475485aae650cd1db992870288cff44c92aa7",
+}
 
 PRE_ALLOWED = {"original.bas", "program.bin", "c99.bin", "c99_error.txt",
                "cap32.cfg", "autocmd.json", "caprice.log", "list.png",

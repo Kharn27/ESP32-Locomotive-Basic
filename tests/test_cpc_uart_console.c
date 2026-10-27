@@ -77,7 +77,8 @@ static void ansi_screen_sync(void) {
         assert(cpc_uart_console_append(&t,ch));
     }
     assert(line.length==3U && t.column==3U);
-    assert(cpc_video_get(&v,1U*8U,0U,&p) && p==1U);
+    assert(cpc_video_get(&v,2U*8U,0U,&p) && p==1U); /* C */
+    assert(cpc_video_get(&v,3U*8U,0U,&p) && p==0U); /* no prompt glyph */
     const uint8_t ansi[]={0x1bU,'[','3','~'};
     for(size_t i=0;i<3U;++i) {
         assert(uart_line_feed(&line,ansi[i])==UART_LINE_IGNORED);
@@ -88,17 +89,18 @@ static void ansi_screen_sync(void) {
     assert(cpc_uart_console_backspace(&t));
     assert(t.column==2U && line.length==2U);
     assert(memcmp(line.data,"AB",2U)==0);
-    assert(cpc_video_get(&v,1U*8U,0U,&p) && p==0U);
-    assert(cpc_video_get(&v,2U*8U,0U,&p) && p==1U);
+    assert(cpc_video_get(&v,2U*8U,0U,&p) && p==0U); /* C erased */
+    assert(cpc_video_get(&v,1U*8U,0U,&p) && p==1U); /* B retained */
     static const uint8_t unknown[]={0x1bU,'[','1',';','2','D'};
     for(size_t i=0;i<sizeof(unknown);++i)
         assert(uart_line_feed(&line,unknown[i])==UART_LINE_IGNORED);
     assert(line.length==2U && t.column==2U);
-    assert(cpc_video_get(&v,2U*8U,0U,&p) && p==1U);
+    assert(cpc_video_get(&v,1U*8U,0U,&p) && p==1U);
     assert(uart_line_feed(&line,0x08U)==UART_LINE_DELETE);
     assert(cpc_uart_console_backspace(&t));
     assert(t.column==1U && line.length==1U && line.data[0]=='A');
-    assert(cpc_video_get(&v,2U*8U,0U,&p) && p==0U);
+    assert(cpc_video_get(&v,1U*8U,0U,&p) && p==0U);
+    assert(cpc_video_get(&v,0U,0U,&p) && p==1U);
     assert(uart_line_feed(&line,'\r')==UART_LINE_READY);
     assert(line.length==1U && line.data[0]=='A');
     uart_line_ack(&line);

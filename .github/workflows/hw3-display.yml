@@ -33,10 +33,12 @@ jobs:
               xtensa-esp-elf-gcc --version | head -n 1 | tee reports/compiler-version.txt
               xtensa-esp-elf-gcc -dumpmachine | tee reports/compiler-target.txt
               grep -Fx "xtensa-esp-elf" reports/compiler-target.txt
-              idf.py set-target esp32 2>&1 | tee reports/set-target.log
-              idf.py build 2>&1 | tee reports/build.log
-              idf.py size 2>&1 | tee reports/size.txt
-              idf.py size-components 2>&1 | tee reports/size-components.txt
+              idf.py -DHW4_C2_CONSOLE=OFF set-target esp32 2>&1 | tee reports/set-target.log
+              idf.py -DHW4_C2_CONSOLE=OFF build 2>&1 | tee reports/build.log
+              idf.py -DHW4_C2_CONSOLE=OFF size 2>&1 | tee reports/size.txt
+              idf.py -DHW4_C2_CONSOLE=OFF size-components 2>&1 | tee reports/size-components.txt
+              test "$(xtensa-esp-elf-nm --defined-only build/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
+              echo "HISTORIC_HW3_OFF=PASS" | tee reports/hw3-option.txt
               xtensa-esp-elf-readelf -h build/loco_esp32_display_probe.elf | tee reports/elf-header.txt
               grep -q "Tensilica Xtensa" reports/elf-header.txt
               ls -lh build/loco_esp32_display_probe.bin build/loco_esp32_display_probe.elf | tee reports/binary-sizes.txt

@@ -80,6 +80,12 @@ bool cpc_video_set_border(CpcVideo *v, unsigned colour)
 bool cpc_video_set_text_colors(CpcVideo *v, unsigned pen, unsigned paper)
 {
     if (!valid(v) || pen >= cpc_video_colors(v) || paper >= cpc_video_colors(v)) return false;
+    /* Cursor pixels are an overlay rendered with the current PEN. A PEN
+     * change must repaint that cell even though VRAM itself is unchanged.
+     * The background PAPER does not affect the existing cursor overlay.
+     */
+    if (v->cursor_visible && v->pen != pen)
+        v->dirty_bands |= UINT32_C(1) << v->cursor_row;
     v->pen = (uint8_t)pen;
     v->paper = (uint8_t)paper;
     return true;

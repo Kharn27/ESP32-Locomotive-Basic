@@ -40,10 +40,10 @@ def validate_checkout_identity(declared_sha):
     ).strip()
     if (not isinstance(declared_sha, str) or
             not re.fullmatch(r"[0-9a-f]{40}", declared_sha)):
-        raise ValueError("J16_ACQUISITION_EVENT_SHA_MISSING")
+        raise ValueError("J17_ACQUISITION_EVENT_SHA_MISSING")
     if measured_sha != declared_sha:
         raise ValueError(
-            "J16_ACQUISITION_CHECKOUT_SHA_MISMATCH "
+            "J17_ACQUISITION_CHECKOUT_SHA_MISMATCH "
             f"actual={measured_sha} declared={declared_sha}"
         )
     return measured_sha

@@ -227,6 +227,9 @@ def self_test(base):
                 c = next(x for x in m["captures"] if x["case"] == "P255")
                 c["pre_run"]["files"]["program.bin"]["sha256"] = sha(raw)
                 c["pre_run"]["comparison"]["cpc_sha256"] = sha(raw)
+                if "c99.bin" in c["pre_run"]["files"]:
+                    native = (root / "P255/c99.bin").read_bytes()
+                    c["pre_run"]["comparison"]["classification"] = ("MATCH_EXACT" if native == raw else "DIFF")
             tweak_manifest(root, change)
     reject_case(base, "raw-byte", lambda r: alter_program(r, False),
                 "FILE_DIGEST_CHANGED")

@@ -1,6 +1,6 @@
 idf_component_register(
-    SRCS "main.c" "cpc_font.c"
-    INCLUDE_DIRS "."
+    SRCS "main.c" "cpc_font.c" "../../../video/cpc_video.c" "../../../video/cpc_palette.c"
+    INCLUDE_DIRS "." "../../../video"
     REQUIRES esp_lcd esp_driver_spi esp_driver_gpio esp_driver_uart freertos heap esp_system
 )
 

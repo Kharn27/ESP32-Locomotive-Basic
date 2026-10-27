@@ -305,6 +305,10 @@ Barrières HEAD final vertes : [Linux 40/40 OFF/ON #40526949454](https://github.
 
 **Suite cœur BASIC unique autorisée : [J1.6-B / issue #80 — MOD INTEGER natif FB](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/80).** Implémentation C99 strictement bornée de `B%=A% MOD n`, 12/12 RAM et LIST différentielles, 10/10 valeurs, 2/2 erreurs division par zéro natives atomiques, oracle original immuable. Le chantier graphique HW4 reste indépendant. Aucun autre jalon du cœur ne démarre avant PR J1.6-B examinée.
 
+### HW4-A-C2 — barrière de revue et de validation matérielle (27 octobre 2026)
+
+La PR vidéo [#78](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/78) reste indépendante du cœur BASIC et de J1.6-A/J1.6-B. C2 exige : changement réel de PEN avec curseur visible ⇒ bit dirty de la bande exacte, rendu RGB565 actualisé, aucun octet VRAM changé ; CTest Linux OFF/ON, golden PPM inchangés, compilation Xtensa sonde et BASIC, oracles CPC et vérification de la mergeabilité du dernier `main`. Les photos du PO prouvent l'affichage des mires HW4 initiales sur le CYD ; le correctif C1 du boot et le HEAD C2 nécessitent un nouvel essai ciblé, faute de quoi `ON_DEVICE_C1_UNVERIFIED`. Aucune fusion automatique ni autorisation HW4-B/HW4-C. [Rapport HW4-A-C2](HW4-A-cpc-video-contract.md).
+
 ### J1.6-B — MOD INTEGER FB natif : PR #81 en revue (27 octobre 2026)
 
 [PR #81](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/81) : implémentation C99 bornée de `destination%=source% MOD n`, token historique `FB`, `n=0..255`, reste signé selon l'oracle CPC, division par zéro interne `BE_DIVISION_BY_ZERO` avec atomicité native. Comparateur live à [preuves authentiques J1.6-A](tests/fixtures/cpc6128/j1_integer_mod/) ; 12 images RAM et SHA originaux de référence immuables, 12 LIST et 10 résultats + deux erreurs zéro contrôlés. Nouvelles suites CTest C99 `integer_mod_fb` et `j1_6_b_native_cpc_differential`, portant le total à 44. **Aucune extension MOD générique, aucun changement HW4/CYD ; PR non fusionnée en attente de décision Pilotage.** [Rapport technique](J1.6-B-integer-mod-native.md).

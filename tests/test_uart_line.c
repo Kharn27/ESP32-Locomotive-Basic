@@ -79,7 +79,7 @@ static void overflow(void)
     assert(guard.line.rejected_lines==1U);
     uart_line_ack(&guard.line);
     assert(!guard.line.poisoned && guard.line.length==0U);
-    assert(feed_string("NEW\r\n")==UART_LINE_NONE);
+    assert(feed_string("NEW\r\n")==UART_LINE_IGNORED);
     /* The CR produced READY before the trailing LF; explicit feed exercise. */
     reset();
     assert(feed_string("NEW\r")==UART_LINE_READY);

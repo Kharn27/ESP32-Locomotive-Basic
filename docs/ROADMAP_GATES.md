@@ -153,3 +153,8 @@ Le correctif cible uniquement la présentation des références INTEGER explicit
 **Acquis :** `B%=-1` et `B%=-12` en natif jusqu'à `END`, images RAM CPC `MATCH_EXACT`, présentation nombre `MATCH_PRESENTATION` en séparant CPC imprimante CRLF et stdout Linux LF. **Ne pas requalifier** les 4 B1 `UNSUPPORTED` historiques ni les 18 opérations LIST/RUN `UNVERIFIED`. Capacité **courante** : deux négatifs exécutables, bornes `32767`/`-32768` encore non exécutables. Pas de garantie écran ni de flash physique post-C1.
 
 **Prochaine mission autorisée : J1.2-A, acquisition/protection d'oracles CPC indépendants pour les transitions de représentation des littéraux INTEGER et valeurs frontières.** Ne pas implémenter d'encodage hôte 16 bits par hypothèse ; contrôler d'abord `basic.asm` et la RAM CPC originelle. J1.2-B implémentation sera soumise à nouvelle décision Pilotage après revue du corpus J1.2-A. Aucun jalon en parallèle.
+
+
+## Barrière J1.2-A → J1.2-B (27 octobre 2026)
+
+Après J1.1 accepté, J1.2-A est exclusivement une acquisition indépendante de six frontières INTEGER CPC 6128 BASIC 1.1, avec captures originales, provenance scellée, validation falsifiée, et retour contradictoire Pilotage. Les documents et preuves historiques J0/J1.1 ne sont pas réécrits. Le workflow peut déposer une **preuve provisoire**, jamais une acceptation automatique. Tant que Pilotage n'a pas vérifié les captures CPC, les octets, les canaux RUN/LIST, les divergences natives et toutes les CI du HEAD final, **J1.2-B est strictement interdit**.

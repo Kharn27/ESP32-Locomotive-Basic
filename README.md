@@ -276,6 +276,18 @@ Développement isolé sur branche dédiée, **en attente de revue contradictoire
 
 **Prochain jalon cœur : [J1.8-A / issue #92](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/92)**, preuve ROM CPC indépendante pour soustraction INTEGER de deux variables, **sans implémentation native préalable**. HW4-C2 [issue #90](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/90) reste le chantier matériel parallèle, avec tests réels obligatoires.
 
+### Développement J1.8-A — acquisition CPC indépendante (PR #93)
+
+[Issue #92](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/92), [PR #93](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/93), [rapport détaillé](docs/J1.8-A-integer-sub-vars-oracle.md). **Archive originale CPC acquise**, 12 programmes `C%=A%-B%` avec 24 sessions initiales : `F5` et trois références INTEGER explicites observés, 10 cas normaux `ERR=0`, deux débordements `ERR=6`, C99 pré-implémentation 12/12 `UNSUPPORTED`. Manifeste original SHA-256 `d087c7f9d1dccf4670ad0bb5e2b3443b2ba1ec7646e7a8da5f52de090cea1a3d` ; sceau provisoire `PENDING_PILOTAGE`, réacquisition indépendante + CI finale à confirmer. **Aucun changement du cœur natif, ni du chantier HW4-C2 ; J1.8-B bloqué.**
+
+**J1.8-A — preuve permanente réacquise** : [Actions #40582695200](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40582695200), 12/12 RAM et 12/12 imprimantes identiques, 18 falsifications + checkout falsifié rejetés ; [C99 50/50 OFF et ON #40582695008](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40582695008). Le workflow J1.8-A comporte désormais la compilation des **trois images Xtensa** et la vérification d'architecture HW4-C1 : résultats **à confirmer au HEAD final**, sans changement `core/` ni firmware. J1.8-B reste bloqué jusqu'à décision du Pilotage.
+
+### J1.8-A oracle de soustraction : accepté ; J1.8-B autorisé (27 octobre 2026)
+
+**J1.8-A ACCEPTÉ ET FUSIONNÉ** : [PR #93](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/93), squash `b0aa57e8974d7a9ec8ca9aa1fe2607d461bfdb90`. Captures originales CPC6128 BASIC 1.1 de `C%=A%-B%` : 12/12 images RAM et sorties imprimante réacquises exactement, token F5 confirmé, 10/10 valeurs normales et 2/2 ERR=6, 18 falsifications + faux HEAD rejetés ; 50/50 Linux OFF/ON, trois builds ESP32 et chaîne HW4-C1 verts. Phase oracle uniquement, `TARGET_BUILD_VERIFIED ; ON_DEVICE_UNVERIFIED`.
+
+**Prochaine mission cœur autorisée : [J1.8-B / issue #94](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/94)** — soustraction INTEGER native entre deux variables, sans évaluateur général et avec vérification CPC 12/12. HW4-C2 #90 reste indépendant et soumis à ses propres essais CYD.
+
 ### HW4-C2 — BASIC interactif dans le **projet ESP32 existant**
 
 [Issue #90](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/90), [PR #91](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/91). **Après retour utilisateur, aucune création de nouveau répertoire/projet VSCode, aucun worktree**. Tester **directement la branche** `feat/hw4-c2-uart-console` avec `git switch`, puis compiler/flasher **`firmware/esp32_display_probe/`**, le banc graphique existant. Le mode C2 est le défaut, l'ancien banc HW3/HW4 reste disponible en `-DHW4_C2_CONSOLE=OFF`. Le firmware C1 `firmware/esp32_loco`, déjà fusionné, est désormais restauré et non modifié par C2. Saisie UART0, `LIST`, `RUN`, `NEW`, BS/DEL, 120 caractères statiques, pagination non CPC, contrôle RUN 256. [Architecture corrigée, commandes exactes, validations PO](docs/HW4-C2-uart-interactive-console.md). **On-device encore à tester au SHA final ; PR non fusionnée, HW4-C3 bloqué, J1.7-B indépendant.**

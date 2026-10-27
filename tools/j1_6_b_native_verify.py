@@ -111,7 +111,7 @@ def check_case(case, cli, image_cli):
 def negative(image_cli):
     invalid = [
         "B%=A% MOD 256", "B%=A% MOD -1", "B%=A% MOD +1",
-        "B%=A% MOD C%", "B%=A% MOD (2)", "B%=A% MOD 1.2",
+        "B%=A% MOD C%-D%", "B%=A% MOD (2)", "B%=A% MOD 1.2",
         "B%=A% MOD 1E2", "B%=A% MOD 1 MOD 2", "B%=A% MOD 1+2",
         "B%=A% MOD 1:PRINT 3:", "B%=A% MOD 2/2",
         "B%=A% MOD 1 MOD 1", "B%=A% MODER 2", "B%=A% MOD1",

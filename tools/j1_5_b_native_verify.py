@@ -111,7 +111,7 @@ def check_case(case, cli, image_cli):
 def negative(image_cli):
     invalid = [
         r"B%=A%\256", r"B%=A%\-1", r"B%=A%\ -1", r"B%=A%\+1",
-        r"B%=A%\1\2", r"B%=A%\1+2", r"B%=A%\C%", r"B%=A!\2",
+        r"B%=A%\1\2", r"B%=A%\1+2", r"B%=A%\C%*D%", r"B%=A!\2",
         r"B%=A$\2", r"B%=A%\(2)", r"B%=A%\1.2", r"B%=A%\1E2",
         r"B%=A%\1:PRINT 2:", r"B%=A%\32768", "B%=A%\\",
         "B%=A%/2", r"B%=A%\2/2"

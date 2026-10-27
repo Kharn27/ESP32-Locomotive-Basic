@@ -142,7 +142,7 @@ static int test_tokens_and_listing(void)
         static const char *invalid[] = {
             "B%=A% MOD 256", "B%=A% MOD -1", "B%=A% MOD  -1",
             "B%=A% MOD +1", "B%=A% MOD 1-2", "B%=A% MOD 1+2",
-            "B%=A% MOD C%", "B%=A! MOD 2", "B%=A$ MOD 2",
+            "B%=A% MOD C%-D%", "B%=A! MOD 2", "B%=A$ MOD 2",
             "B%=A% MOD (2)", "B%=A% MOD 1.2", "B%=A% MOD 1E2",
             "B%=A% MOD 32768", "B%=A% MOD ", "B%=A% MOD 2/2",
             "B%=A% MOD 1:PRINT 2:", "B%=A% MOD 1: ",

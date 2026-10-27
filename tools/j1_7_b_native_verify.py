@@ -29,7 +29,7 @@ CASES = {
     "NMIN_N1": (-32768,-1,None,"694845f8a620834b2150bb818e9bb9782ec395354154a7675d8304e5f857559d"),
     "P255_P255": (255,255,510,"7ee4fa53dad3a6b8bb645749ddea737c26c149ae2f8980e0dc66a5f14b3f4c9b"),
     "Z_Z": (0,0,0,"19c2e42164e0a26fcaef634df9d17ceee19b9c297f33be3497f72e3df3c96c87"),
-    "P1_N1": (1,-1,0,"a5c10abb1a874c2cc6c75b1ae63a310080a8f9d24aef7c2b74ce72b37d64ed08d"),
+    "P1_N1": (1,-1,0,"a5c10abb1a874c2c6c75b1ae63a310080a8f9d24aef7c2b74ce72b37d64ed08d"),
 }
 class Invalid(ValueError):
     pass

@@ -315,3 +315,8 @@ La PR vidéo [#78](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/78) re
 **HW4-A-C2 = ACCEPTÉ / MERGÉ** : [PR #78](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/78) squash `188e703ff965830b1a29629143844ef20c9f13a8` au SHA revu `05bb0b47fce81cc316ad7476485e5f41dfcfc84c`. Résolution du signalement Codex PEN/dirty-band et des conflits J1.6-A, 44/44 Linux OFF et ON, builds Xtensa, oracles CPC PASS ; validation physique PO au même HEAD `ON_DEVICE_PO_REPORTED_PASS` avec UART curseur et bilan heap/stack. Les paragraphes historiques « interdiction de merge » ou « C1 non vérifié » ci-dessus sont dépassés pour HW4-A.
 
 **Barrière HW4-B levée exclusivement pour [issue #82](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/82)**. Extraction du transport ILI9341 SPI2/DMA dans un seul pilote partageable ; sonde diagnostique conservée, compilation du firmware BASIC unique, sans `PRINT` vers l'écran ni modification de `core/`. CI Xtensa et Linux, mesures mémoire et smoke test sur vrai CYD au HEAD final requis avant revue Pilotage. **HW4-C reste BLOQUÉ** tant que HW4-B non accepté/fusionné. J1.6-B du BASIC, suivi par l'issue #80, conserve son calendrier indépendant. Les limites MODE2 réduit 640→320, police CPC et le budget RAM du firmware combiné restent ouverts.
+
+
+## HW4-B — gate accepté ? NON (autorisation de développement seulement)
+
+Critères : pilote ILI9341 unique, aucun transport dupliqué, deux builds ESP-IDF 5.5.6 avec tailles IRAM/DRAM/Flash séparées, Linux C99 OFF/ON et oracles sans changement, puis flash du SHA exact sur vrai CYD avec BOOT, `v×3`, `p`, `z`, `w`, `r`, logs heap/stack et images/retour visuel. PR HW4-B liée à issue #82 en attente revue Pilotage, non fusionnée ; **HW4-C NON AUTORISÉ**.

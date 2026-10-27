@@ -412,3 +412,10 @@ CI sur le HEAD exact : [Linux C99 OFF/ON, 40/40 #40526949454](https://github.com
 Correctif C2 relu : invalidation unique de la bande du curseur visible après changement effectif de PEN, VRAM inchangée, trois modes testés, fil de revue Codex P2 résolu. CI au même SHA : Linux 44/44 OFF et 44/44 ON ASan/UBSan, Xtensa sonde et BASIC, oracles CPC + J1.6-A **SUCCESS**. Validation physique PO sur véritable CYD : boot/cursor `z/z`, `t/t`, MODE0 `v/z`, retour `r/z`, sans erreur signalée ; photos initiales des MODE0/1/2 et viewport. Heap libre en MODE0 275980 B, largest 147456 B, stack headroom 4824 B (sonde, **pas firmware BASIC+écran combiné**).
 
 **Prochain jalon matériel distinct autorisé : [HW4-B / issue #82](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/82)** — extraction du pilote ILI9341 SPI2/DMA, conservation du banc diagnostic et préparation de la compilation du firmware BASIC unique ; essais PO obligatoires. **HW4-C non lancé**, `PRINT`→LCD exclu de HW4-B ; cœur [J1.6-B / issue #80](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/80) indépendant. Dette : glyphes CPC exacts, 80 colonnes du MODE2 physique, budget RAM du binaire combiné et timings du rafraîchissement.
+
+
+## HW4-B — pilote ILI9341 partagé (27 octobre 2026)
+
+- Issue #82, branche `feat/hw4-b-ili9341-shared-driver` issue de `f8832715933f730dbbb787ad5dd555afce9ed7d9`.
+- Transport SPI2/DMA/ILI9341 factorisé dans `firmware/components/cyd_ili9341`. Sonde graphique conservée ; firmware BASIC uniquement lié, sans PRINT→TFT ni modification fonctionnelle de `core/`.
+- En attente de CI Linux/ESP-IDF et du nouveau test PO sur CYD physique. Statut provisoire : `TARGET_BUILD_UNVERIFIED — ON_DEVICE_UNVERIFIED`. Pas de fusion. HW4-C bloqué. Protéger les évolutions J1.6-B parallèles.

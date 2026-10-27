@@ -142,7 +142,7 @@ static BEStatus binding_error(BVBStatus status)
     }
 }
 
-/* Evaluate precisely one explicit INTEGER reference (+ or -) unsigned byte literal.
+/* Evaluate precisely one explicit INTEGER reference (+, -, *) unsigned byte literal.
  * One decoder serves both executor passes; only caller-local values change.
  * The reference cache is opaque and bvb_read_explicit never edits it. */
 static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
@@ -171,7 +171,7 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
         return BE_TRUNCATED;
     }
     operation = body[pos++];
-    if (operation != 0xf4u && operation != 0xf5u) {
+    if (operation != 0xf4u && operation != 0xf5u && operation != 0xf6u) {
         return BE_BAD_SEQUENCE;
     }
     skip_spaces(body, length, &pos);
@@ -195,7 +195,9 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
     /* Widen before arithmetic; never rely on signed overflow or wrapping. */
     result = operation == 0xf4u
         ? (int32_t)value.data.integer + (int32_t)operand
-        : (int32_t)value.data.integer - (int32_t)operand;
+        : operation == 0xf5u
+          ? (int32_t)value.data.integer - (int32_t)operand
+          : (int32_t)value.data.integer * (int32_t)operand;
     if (result < INT16_MIN || result > INT16_MAX) {
         return BE_INTEGER_OVERFLOW;
     }

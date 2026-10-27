@@ -342,7 +342,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (status == BT_OK) {
                 status = spaces(source, length, &index, out);
             }
-            /* One INTEGER reference, binary '+', '-' or '*', and an unsigned
+            /* One INTEGER reference, binary '+', '-', '*' or '\\', and an unsigned
              * byte constant. CPC encodes '-' with F5 in this context.
              * Shared BVR encoder preserves the historical CPC name format. */
             if (status == BT_OK && index < length &&
@@ -359,11 +359,13 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 if (index == length ||
                     (source[index] != (uint8_t)'+' &&
                      source[index] != (uint8_t)'-' &&
-                     source[index] != (uint8_t)'*')) {
+                     source[index] != (uint8_t)'*' &&
+                     source[index] != (uint8_t)'\\')) {
                     return BT_UNSUPPORTED_CONSTRUCT;
                 }
                 status = emit(out, source[index] == (uint8_t)'+' ? 0xf4u :
-                                  source[index] == (uint8_t)'-' ? 0xf5u : 0xf6u);
+                                  source[index] == (uint8_t)'-' ? 0xf5u :
+                                  source[index] == (uint8_t)'*' ? 0xf6u : 0xf9u);
                 ++index;
                 if (status == BT_OK) {
                     status = spaces(source, length, &index, out);

@@ -176,3 +176,12 @@ L'oracle CPC6128 pour la multiplication INTEGER `B%=A%*n` est désormais captur�
 ### Pilotage — J1.5-A accepté et fusionné (27 octobre 2026)
 
 [PR #73](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/73) acceptée après revue contradictoire, squash 98700abd35b0a6fd23cce10fe6dc4badb159b61e. Oracle CPC6128 : 12 programmes, 24 sessions, token F9, troncature vers zéro et ERR=11 pour diviseur nul. 12/12 images RAM et sondes imprimante réacquises exactement ; 13 falsifications rejetées et fausse identité checkout rejetée. Archive et sceau historique PENDING_PILOTAGE préservés. [Revue Pilotage](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/73#issuecomment-6445724545). Suite autorisée : [J1.5-B, issue #75](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/75), division INTEGER native, sans support de la division réelle. TARGET_BUILD_VERIFIED ; ON_DEVICE_UNVERIFIED.
+
+
+### J1.5-B — division INTEGER native F9 (27 octobre 2026)
+
+- J1.5-A, [PR #73](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/73), **acceptée et fusionnée** ; base de travail `main=443a83460dc5d4ec10dfbf54b7ed9f16d0f5009b`.
+- Natif C99 : `destination%=source%\n` avec références INTEGER explicites, diviseur 0..255 canonique, **F9** ; division signée tronquée vers zéro, diagnostic **`BE_DIVISION_BY_ZERO` interne** (non assimilé au `ERR=11` CPC).
+- Oracle indépendant J1.5-A à douze cas en **lecture seule**, douze comparaisons RAM et LIST, dix quotients, deux erreurs, atomicité. Les classifications historiques `UNSUPPORTED` ne sont pas modifiées. Pas de division réelle `/`, de grammaire étendue ou de changement matériel.
+- [Rapport et protocole J1.5-B](docs/J1.5-B-integer-division-native.md) ; PR développeur en revue non fusionnée ; `TARGET_BUILD_VERIFIED` uniquement si CI Xtensa, `ON_DEVICE_UNVERIFIED`.
+

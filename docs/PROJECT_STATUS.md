@@ -368,3 +368,12 @@ Après fusion acceptée de [J1.3-B PR #67](https://github.com/Kharn27/ESP32-Loco
 CI sur le HEAD exact : [Linux C99 OFF/ON, 40/40 #40526949454](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40526949454), [oracle CPC GHCR #40527017107](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40527017107), [archive permanente J1.4-A + J1.5-A #40526949788](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40526949788), [Xtensa 3/3 #40526949755](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40526949755) : SUCCESS. TARGET_BUILD_VERIFIED, ON_DEVICE_UNVERIFIED.
 
 **J1.5-B / [issue #75](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/75) est le seul jalon cœur BASIC désormais autorisé** : division INTEGER native bornée, 12 images/LIST exactes, dix sorties et deux erreurs, sans modification de l'oracle, sans slash réel ou généralisation des expressions. La sonde HW3 / PR #66 a été fusionnée séparément, sans dépendance envers J1.5-B. Les entrées de statut pré-revue plus haut sont préservées pour l'historique.
+
+
+### J1.5-B — division INTEGER native F9 (27 octobre 2026)
+
+- J1.5-A, [PR #73](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/73), **acceptée et fusionnée** ; base de travail `main=443a83460dc5d4ec10dfbf54b7ed9f16d0f5009b`.
+- Natif C99 : `destination%=source%\n` avec références INTEGER explicites, diviseur 0..255 canonique, **F9** ; division signée tronquée vers zéro, diagnostic **`BE_DIVISION_BY_ZERO` interne** (non assimilé au `ERR=11` CPC).
+- Oracle indépendant J1.5-A à douze cas en **lecture seule**, douze comparaisons RAM et LIST, dix quotients, deux erreurs, atomicité. Les classifications historiques `UNSUPPORTED` ne sont pas modifiées. Pas de division réelle `/`, de grammaire étendue ou de changement matériel.
+- [Rapport et protocole J1.5-B](J1.5-B-integer-division-native.md) ; PR développeur en revue non fusionnée ; `TARGET_BUILD_VERIFIED` uniquement si CI Xtensa, `ON_DEVICE_UNVERIFIED`.
+

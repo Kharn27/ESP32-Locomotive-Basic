@@ -355,3 +355,18 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+# J1.5-B: native F9 INTEGER division, immutable J1.5-A ROM acquisition.
+# Existing 40 suites remain unchanged; archive and historical classification read-only.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_division
+                   tests/test_basic_integer_division.c)
+    target_link_libraries(test_basic_integer_division PRIVATE
+                          basic_session_runtime basic_variable_binding)
+    add_test(NAME integer_division_f9 COMMAND test_basic_integer_division)
+    add_test(NAME j1_5_b_native_cpc_differential COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_5_b_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

@@ -209,7 +209,12 @@ def verify(base, permanent=False):
         if name in ARITHMETIC_REFERENCE:
             require(err == 0 and actual == ARITHMETIC_REFERENCE[name],
                     name + ": REFERENCE_RESULT_CHANGED")
-        # Overflow edge deliberately left as OBSERVED, never fabricated.
+        if name == "NMIN_M1":
+            # Independent initial GHCR CPC capture #40498147063:
+            # error 6 (Overflow); B% observed as 0 in a later direct probe.
+            # The latter is NOT a computed -32769 result.
+            require(err == 6 and actual == 0,
+                    name + ": OVERFLOW_OBSERVATION_CHANGED")
         native_stdout = (base / name / "run/native.stdout.bin").read_bytes()
         native_stderr = (base / name / "run/native.stderr.bin").read_bytes()
         native_num = parse_integer(native_stdout)
@@ -269,7 +274,7 @@ def self_test(base):
     reject("false-token-class", lambda root:
            write_manifest(root, lambda m:
                m["captures"][0]["pre_run"]["comparison"].update(
-                   classification="MATCH_EXACT")), "TOKEN_COMPARISON_FALSE")
+                   classification="MATCH_EXACT")), "TOKEN_UNSUPPORTED_FALSE")
     reject("forged-operator-with-rehashed-file", lambda root:
            mutate_operator(root), "BINARY_MINUS_SIGNATURE_CHANGED")
     reject("forged-printer-with-rehashed-manifest", lambda root:

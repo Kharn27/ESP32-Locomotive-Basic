@@ -358,7 +358,6 @@ static int reject_positive_32768(void)
     BasicProgram old_program;
     BasicVariableStore old_store;
     BasicVariableEntry old_b_entry;
-    BasicVariableKey key = {0};
     BSRState old_state;
     size_t old_cursor;
     uint32_t old_program_hash, old_entries_hash, old_output_hash;
@@ -384,9 +383,6 @@ static int reject_positive_32768(void)
     if (result.status != BSR_OK || probe.runtime.state != BSR_IDLE) {
         return fail(name, "STOP", (int)result.status, (int)BSR_OK);
     }
-    key.type = (uint8_t)BVT_INTEGER;
-    key.name_length = 1u;
-    key.name[0] = (uint8_t)'B';
     if (probe.store.count != 1u) {
         return fail(name, "seed_count", (int)probe.store.count, 1);
     }

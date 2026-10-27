@@ -142,10 +142,10 @@ static BEStatus binding_error(BVBStatus status)
     }
 }
 
-/* Evaluate precisely one explicit INTEGER reference + unsigned byte literal.
+/* Evaluate precisely one explicit INTEGER reference (+ or -) unsigned byte literal.
  * One decoder serves both executor passes; only caller-local values change.
  * The reference cache is opaque and bvb_read_explicit never edits it. */
-static BEStatus evaluate_integer_addition(const uint8_t *body, size_t length,
+static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
                                           size_t source_start,
                                           const BasicVariableStore *variables,
                                           size_t *next_pos, int16_t *number)
@@ -154,8 +154,8 @@ static BEStatus evaluate_integer_addition(const uint8_t *body, size_t length,
     BasicVariableValue value;
     size_t consumed = 0u;
     size_t pos;
-    uint8_t token, addend;
-    int32_t sum;
+    uint8_t token, operand, operation;
+    int32_t result;
     BVBStatus resolved = bvb_read_explicit(body, length, source_start,
                                            variables, &source, &consumed, &value);
     if (resolved != BVB_OK) {
@@ -170,7 +170,8 @@ static BEStatus evaluate_integer_addition(const uint8_t *body, size_t length,
     if (pos == length) {
         return BE_TRUNCATED;
     }
-    if (body[pos++] != 0xf4u) {
+    operation = body[pos++];
+    if (operation != 0xf4u && operation != 0xf5u) {
         return BE_BAD_SEQUENCE;
     }
     skip_spaces(body, length, &pos);
@@ -179,24 +180,26 @@ static BEStatus evaluate_integer_addition(const uint8_t *body, size_t length,
     }
     token = body[pos++];
     if (token >= 0x0eu && token <= 0x17u) {
-        addend = (uint8_t)(token - 0x0eu);
+        operand = (uint8_t)(token - 0x0eu);
     } else if (token == 0x19u) {
         if (pos == length) {
             return BE_TRUNCATED;
         }
-        addend = body[pos++];
-        if (addend < 10u) {
+        operand = body[pos++];
+        if (operand < 10u) {
             return BE_BAD_SEQUENCE;
         }
     } else {
         return BE_BAD_SEQUENCE;
     }
     /* Widen before arithmetic; never rely on signed overflow or wrapping. */
-    sum = (int32_t)value.data.integer + (int32_t)addend;
-    if (sum < INT16_MIN || sum > INT16_MAX) {
+    result = operation == 0xf4u
+        ? (int32_t)value.data.integer + (int32_t)operand
+        : (int32_t)value.data.integer - (int32_t)operand;
+    if (result < INT16_MIN || result > INT16_MAX) {
         return BE_INTEGER_OVERFLOW;
     }
-    *number = (int16_t)sum;
+    *number = (int16_t)result;
     *next_pos = pos;
     return BE_OK;
 }
@@ -532,7 +535,7 @@ static BEStatus execute_line(const BasicProgram *program,
             } else if (literal == 0x02u && !negative) {
                 /* Preserve the separate reference + unsigned-byte path. */
                 reference_rhs = 1;
-                status = evaluate_integer_addition(body, length, pos - 1u,
+                status = evaluate_integer_binary(body, length, pos - 1u,
                                                     variables, &pos,
                                                     &value.data.integer);
                 if (status != BE_OK) {

@@ -178,6 +178,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             uint8_t t;
             unsigned int number;
             int reference_addition = 0;
+            int negative = 0;
             /* A5 is explicit LET, 02 begins implicit LET; both reuse the
              * CPC explicit INTEGER reference decoder, ignoring cache values. */
             if (ref_start >= length) {
@@ -239,6 +240,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             }
             t = body[pos++];
             if (t == 0xf5u) {
+                negative = 1;
                 /* CPC unary minus is an operator before the magnitude;
                  * only a literal operand is in the native J1.1 subset. */
                 status = append_byte(out, (uint8_t)'-');
@@ -329,6 +331,22 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (number < 256u || number > 32767u) {
                     return BL_BAD_SEQUENCE;
                 }
+            } else if (t == 0x1fu) {
+                /* Only the archived negative INTEGER immediate NMIN is
+                 * representable here. This is NOT a REAL5 decoder. */
+                if (!negative || reference_addition) {
+                    return BL_BAD_SEQUENCE;
+                }
+                if (length - pos < 5u) {
+                    return BL_TRUNCATED;
+                }
+                if (body[pos] != 0u || body[pos + 1u] != 0u ||
+                    body[pos + 2u] != 0u || body[pos + 3u] != 0u ||
+                    body[pos + 4u] != 0x90u) {
+                    return BL_BAD_SEQUENCE;
+                }
+                pos += 5u;
+                number = 32768u;
             } else {
                 return t >= 0x80u || (t >= 0x0eu && t <= 0x1fu)
                         ? BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;

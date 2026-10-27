@@ -238,8 +238,9 @@ static int suffix_assignment(const uint8_t *body, size_t length, size_t pos)
                     ++pos;
                 }
             } else if (!quoted && (c == 0x19u || c == 0x1au ||
-                                    c == 0x1eu || c == 0x1du)) {
-                size_t payload = c == 0x19u ? 1u : 2u;
+                                    c == 0x1eu || c == 0x1du ||
+                                    c == 0x1fu)) {
+                size_t payload = c == 0x19u ? 1u : (c == 0x1fu ? 5u : 2u);
                 pos += length - pos > payload ? payload + 1u : length - pos;
             } else {
                 ++pos;
@@ -513,6 +514,21 @@ static BEStatus execute_line(const BasicProgram *program,
                     return BE_INTEGER_OVERFLOW;
                 }
                 magnitude = (int32_t)word;
+            } else if (literal == 0x1fu) {
+                /* NMIN is the sole permitted REAL5 encoding in an INTEGER
+                 * assignment. Validate all five bytes before any mutation. */
+                static const uint8_t nmin_real5[5] = {0u, 0u, 0u, 0u, 0x90u};
+                if (!negative) {
+                    return BE_BAD_SEQUENCE;
+                }
+                if (length - pos < sizeof(nmin_real5)) {
+                    return BE_TRUNCATED;
+                }
+                if (memcmp(body + pos, nmin_real5, sizeof(nmin_real5)) != 0) {
+                    return BE_BAD_SEQUENCE;
+                }
+                pos += sizeof(nmin_real5);
+                magnitude = 32768; /* int32_t; negation is well-defined. */
             } else if (literal == 0x02u && !negative) {
                 /* Preserve the separate reference + unsigned-byte path. */
                 reference_rhs = 1;

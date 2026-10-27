@@ -319,6 +319,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
         } else if (statement == ST_ASSIGN) {
             unsigned int number;
             int reference_rhs = 0;
+            int negative_immediate = 0;
             /* Limited solely to standalone signed numeric literals. */
             /* E03A-E0A4: explicit INTEGER variable 02, cache 00 00,
              * high-bit terminated name. E736: '=' is operator EF. */
@@ -373,16 +374,29 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                     return BT_UNSUPPORTED_CONSTRUCT;
                 }
                 ++index;
+                negative_immediate = 1;
                 status = emit(out, 0xf5u);
             }
             if (status == BT_OK) {
                 /* Only a standalone INTEGER immediate can use CPC 1A.
                  * Existing variable + byte grammar stays capped at 255. */
                 status = decimal(source, length, &index,
-                                 reference_rhs ? 255u : 32767u, &number);
+                                 reference_rhs ? 255u :
+                                 (negative_immediate ? 32768u : 32767u),
+                                 &number);
             }
             if (status == BT_OK) {
-                if (number < 10u) {
+                if (number == 32768u) {
+                    /* NMIN: CPC unary F5 is already emitted; the positive
+                     * magnitude is the one permitted REAL5, never 1A 0080.
+                     * Five exact bytes, no host float or endianness. */
+                    static const uint8_t real5[] = {0u, 0u, 0u, 0u, 0x90u};
+                    size_t i;
+                    status = emit(out, 0x1fu);
+                    for (i = 0u; status == BT_OK && i < sizeof(real5); ++i) {
+                        status = emit(out, real5[i]);
+                    }
+                } else if (number < 10u) {
                     status = emit(out, (uint8_t)(0x0eu + number));
                 } else if (number <= 255u) {
                     status = emit(out, 0x19u);

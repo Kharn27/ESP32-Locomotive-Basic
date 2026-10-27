@@ -45,6 +45,7 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
 
 /* With a store, standalone INTEGER assignments accept a 0..32767
  * immediate (CPC 0E..17, 19, 1A), with optional CPC unary-minus F5,
+ * plus only -32768 via exact F5 1F 00 00 00 00 90 (REAL5 payload),
  * or exactly
  * one explicit INTEGER reference plus one unsigned byte literal (0..255).
  * A non-representable sum returns BE_INTEGER_OVERFLOW without wrapping.

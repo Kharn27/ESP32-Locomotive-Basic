@@ -73,7 +73,8 @@ static esp_lcd_panel_handle_t s_panel;
 static uint8_t *s_dma_band;
 static SemaphoreHandle_t s_transfer_done;
 static uint8_t s_screen[HW3_ROWS][HW3_COLS];
-static unsigned int s_active_case;
+/* UINT_MAX means that no display orientation has yet been applied. */
+static unsigned int s_active_case = UINT_MAX;
 
 static bool IRAM_ATTR on_color_done(esp_lcd_panel_io_handle_t io,
                                     esp_lcd_panel_io_event_data_t *event,
@@ -235,6 +236,15 @@ static esp_err_t clear_native_gram(bool wide)
  */
 static esp_err_t set_orientation(unsigned int idx)
 {
+    /* The first boot of case 9 looks correct on the physical CYD but
+     * selecting 9 then b used to corrupt the image. This guard separates
+     * ordinary redraws from explicit MADCTL state changes. It does not
+     * claim that switching between different cases is safe.
+     */
+    if (s_active_case == idx) {
+        ESP_LOGI(TAG, "HW3 ORIENTATION_REUSED case=%u MADCTL_UNCHANGED=1 CLEAR_SKIPPED=1", idx);
+        return ESP_OK;
+    }
     const bool native_wide = idx >= 8U && idx <= 11U;
     const bool software = idx == HW3_SOFTWARE_ROTATE_CW || idx == HW3_SOFTWARE_ROTATE_CCW;
     const bool swap = !native_wide && !software && (idx & 1U) != 0;
@@ -255,7 +265,10 @@ static esp_err_t set_orientation(unsigned int idx)
     err = esp_lcd_panel_swap_xy(s_panel, swap);
     if (err != ESP_OK) return err;
     err = esp_lcd_panel_mirror(s_panel, mirror_x, mirror_y);
-    if (err == ESP_OK) s_active_case = idx;
+    if (err == ESP_OK) {
+        s_active_case = idx;
+        ESP_LOGI(TAG, "HW3 ORIENTATION_APPLIED case=%u MADCTL_UPDATED=1", idx);
+    }
     return err;
 }
 
@@ -403,6 +416,10 @@ static esp_err_t show_case(unsigned int idx, bool boot, bool *is_boot)
         err = draw_diagnostic(idx);
     }
     if (err == ESP_OK && *is_boot) ESP_LOGI(TAG, "HW3 BOOT_SCREEN_DRAWN case=%u", idx);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "HW3 FULL_REPAINT_PASS case=%u mode=%s", idx,
+                 *is_boot ? "BOOT" : "MIRE");
+    }
     return err;
 }
 

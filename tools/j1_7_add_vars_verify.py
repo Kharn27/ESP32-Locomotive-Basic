@@ -353,6 +353,8 @@ def self_test(base):
            "HISTORICAL_GUARD_CHANGED")
     reject("missing-run-proof", lambda root:
            (root/"P2_P3/run/autocmd.json").unlink(), "FILE_ABSENT")
+    reject("mutated-log-with-rehashed-manifest", lambda root:
+           mutate_run_log(root), "EXTERNAL_SEAL_CHANGED")
     reject("truncated-printer", lambda root:
            (root/"P2_P3/run/printer.dat").write_bytes(b""),
            "FILE_DIGEST_CHANGED")
@@ -374,6 +376,18 @@ def self_test(base):
     else:
         raise Invalid("FORGED_CHECKOUT_SHA_ACCEPTED")
     print("PASS J1.7-A thirteen falsifications + checkout mismatch", flush=True)
+
+def mutate_run_log(root):
+    # An attacker changes the process log AND rehashes its manifest entry,
+    # but cannot silently replace the independently sealed original.
+    path = root/"P2_P3/run/caprice.log"
+    raw = path.read_bytes() + b"\\nFORGED_PROCESS_LOG\\n"
+    path.write_bytes(raw)
+    def updater(manifest):
+        row = next(c for c in manifest["captures"] if c["case"] == "P2_P3")
+        row["run"]["files"]["caprice.log"] = {
+            "sha256": sha(raw), "size_bytes": len(raw)}
+    write_manifest(root, updater)
 
 def mutate_operator(root):
     p = root/"P2_P3/program.bin"

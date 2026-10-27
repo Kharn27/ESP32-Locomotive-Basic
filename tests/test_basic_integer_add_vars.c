@@ -118,7 +118,7 @@ static int tokenizer_listing(void)
     static const char *invalid[] = {
         "C%=A!+B%", "C%=A$+B%", "C%=A%+B!", "C%=A%+B$",
         "C%=A%+B%+C%", "C%=A%+(B%)", "C%=A%+B%*C%",
-        "C%=A%+B%=A%", "C%=A%+2+B%", "C%=A%-B%",
+        "C%=A%+B%=A%", "C%=A%+2+B%", "C%=A%-B%-D%",
         "C%=A%*B%", "C%=A%\\B%", "C%=A% MOD B%",
         "C%=A%+B%%", "C%=A%+B%1", "C%=A%+_B%",
         "C%=A%+B%+", "C%=A%+B%/2"

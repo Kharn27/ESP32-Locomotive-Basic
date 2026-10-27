@@ -287,3 +287,7 @@ Développement isolé sur branche dédiée, **en attente de revue contradictoire
 **J1.8-A ACCEPTÉ ET FUSIONNÉ** : [PR #93](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/93), squash `b0aa57e8974d7a9ec8ca9aa1fe2607d461bfdb90`. Captures originales CPC6128 BASIC 1.1 de `C%=A%-B%` : 12/12 images RAM et sorties imprimante réacquises exactement, token F5 confirmé, 10/10 valeurs normales et 2/2 ERR=6, 18 falsifications + faux HEAD rejetés ; 50/50 Linux OFF/ON, trois builds ESP32 et chaîne HW4-C1 verts. Phase oracle uniquement, `TARGET_BUILD_VERIFIED ; ON_DEVICE_UNVERIFIED`.
 
 **Prochaine mission cœur autorisée : [J1.8-B / issue #94](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/94)** — soustraction INTEGER native entre deux variables, sans évaluateur général et avec vérification CPC 12/12. HW4-C2 #90 reste indépendant et soumis à ses propres essais CYD.
+
+### J1.8-B — F5 INTEGER soustraction native, issue #94
+
+Jalon développé séparément depuis le main `3e903147012aedca530c9367ce130f4f8dbef376` sur `feat/j1-8-b-native-integer-var-sub`. Syntaxe bornée `destination%=source1%-source2%`, références CPC F5 binaires, atomicité C99 et oracle J1.8-A scellé. Deux CTest nouveaux : cible **52/52 OFF et 52/52 ON ASan/UBSan**, différentiel 12 RAM / 12 LIST / 10 valeurs / 2 overflow ; trois firmwares Xtensa à contrôler. [Rapport](docs/J1.8-B-integer-sub-vars-native.md). Aucune fusion ni autorisation d'un autre jalon cœur. HW4-C2 demeure indépendant.

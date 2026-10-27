@@ -1,0 +1,7 @@
+exit code: 0
+Using configuration file: /__w/_temp/j19-cpc/R_P7_N3/run/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j19-cpc/R_P7_N3/run/screenshot_20261027_220650.png
+
+[stderr]

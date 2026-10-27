@@ -341,6 +341,9 @@ HW4-B **ACCEPTÉ ET FUSIONNÉ** — [PR #83](https://github.com/Kharn27/ESP32-Lo
 
 La mention antérieure « gate accepté ? NON » est dépassée par la fusion ci-dessus. **HW4-C1 AUTORISÉ** — [issue #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86), firmware intégré BASIC+TFT, sortie PRINT native de bsr_step, affichage MODE1, tests Linux/ESP32, nouveau flash et photos/logs PO du HEAD final. Exiger propriétaire unique du tampon DMA, pas de duplication driver, sans émulation ni REPL, clavier tactile ou SD. **HW4-C2 BLOQUÉ** jusqu'à revue et fusion C1 ; J1.7-A indépendant.
 
+### J1.7-A — Oracle CPC variable + variable (PR #85, en revue)
+
+[PR #85](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/85) — douze sources originales à cinq lignes, 24 sessions indépendantes ROM CPC6128 BASIC 1.1, opérateur `F4` et trois références INTEGER explicites observées en RAM ; dix valeurs normales `ERR=0`, deux dépassements `ERR=6`. Manifeste historique `0608ba7d9548bae7972f02d0a929d0abde70fc325f49af97175f915aae08e2d5` et sceau provisoire `PENDING_PILOTAGE` conservés. Comparateur C99 historique : **12/12 UNSUPPORTED**, aucun ajout natif. [Rapport J1.7-A](J1.7-A-integer-variable-addition-oracle.md). HW4-B demeure indépendant ; J1.7-B non autorisé avant décision du Pilotage.
 
 ### Gate HW4-C1 — sortie réelle BASIC vers TFT
 

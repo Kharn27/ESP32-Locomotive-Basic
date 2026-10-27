@@ -1,0 +1,10 @@
+[cli] J0.9 host CLI (:help)
+[cli] OK
+[cli] OK
+[cli:error] BSR_SESSION_ERROR BS_TOKENIZER_ERROR BT_MALFORMED_INPUT BP_OK BL_OK BE_OK
+[cli] OK
+[cli] OK
+[cli] RUNNING
+[cli] STEPPED 2
+[cli:error] BSR_EXECUTOR_ERROR BS_OK BT_OK BP_OK BL_OK BE_VARIABLE_NOT_FOUND
+[cli] BYE

@@ -440,6 +440,9 @@ HW4-B **ACCEPTÉ ET FUSIONNÉ** — [PR #83](https://github.com/Kharn27/ESP32-Lo
 
 [Issue HW4-B #82](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/82) clôturée. Mesures séparées au HEAD de revue : sonde IRAM 67279 o, DRAM 30400 o, Flash Code 82538 o ; BASIC IRAM 51807 o, DRAM 30428 o, Flash Code 66446 o. Il ne s'agit **pas** du firmware BASIC+TFT combiné. [HW4-C1 #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86) autorisé : premier affichage des octets réellement émis par bsr_step(), propriétaire unique des transferts LCD ; test PO et revue obligatoires. HW4-C2 non autorisé. J1.7-A poursuit sa branche indépendante.
 
+### J1.7-A — Oracle CPC variable + variable (PR #85, en revue)
+
+[PR #85](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/85) — douze sources originales à cinq lignes, 24 sessions indépendantes ROM CPC6128 BASIC 1.1, opérateur `F4` et trois références INTEGER explicites observées en RAM ; dix valeurs normales `ERR=0`, deux dépassements `ERR=6`. Manifeste historique `0608ba7d9548bae7972f02d0a929d0abde70fc325f49af97175f915aae08e2d5` et sceau provisoire `PENDING_PILOTAGE` conservés. Comparateur C99 historique : **12/12 UNSUPPORTED**, aucun ajout natif. [Rapport J1.7-A](J1.7-A-integer-variable-addition-oracle.md). HW4-B demeure indépendant ; J1.7-B non autorisé avant décision du Pilotage.
 
 ### HW4-C1 — premier PRINT BASIC natif sur TFT (issue #86)
 

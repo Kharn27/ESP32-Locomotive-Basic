@@ -3,7 +3,7 @@ on:
   pull_request:
     paths:
       - 'io/uart_line.*'
-      - 'video/cpc_uart_console.*'
+      - 'io/cpc_uart_console.*'
       - 'tests/test_uart_line.c'
       - 'tests/test_cpc_uart_console.c'
       - 'tests/test_hw4_c2_integration.c'
@@ -27,7 +27,7 @@ jobs:
           git diff --exit-code "$(git merge-base origin/main HEAD)" HEAD -- core/ tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
           test "$(grep -c '^void app_main(void)' firmware/esp32_display_probe/main/hw4_c2_console.c)" -eq 1
           ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_display_probe/main/
-          ! grep -R -E 'malloc[()]|calloc[()]|realloc[()]|free[()]' io/uart_line.c video/cpc_uart_console.c firmware/esp32_display_probe/main/hw4_c2_console.c
+          ! grep -R -E 'malloc[()]|calloc[()]|realloc[()]|free[()]' io/uart_line.c io/cpc_uart_console.c firmware/esp32_display_probe/main/hw4_c2_console.c
           grep -F 'bsr_submit(' firmware/esp32_display_probe/main/hw4_c2_console.c
           grep -F 'bsr_step(' firmware/esp32_display_probe/main/hw4_c2_console.c
   linux:

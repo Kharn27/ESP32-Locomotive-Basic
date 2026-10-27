@@ -342,7 +342,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (status == BT_OK) {
                 status = spaces(source, length, &index, out);
             }
-            /* One INTEGER reference, binary '+', '-', '*' or '\\', and an unsigned
+            /* One INTEGER reference, binary '+', '-', '*', '\\' or MOD, and an unsigned
              * byte constant. CPC encodes '-' with F5 in this context.
              * Shared BVR encoder preserves the historical CPC name format. */
             if (status == BT_OK && index < length &&
@@ -356,17 +356,28 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 if (status != BT_OK) {
                     return status;
                 }
-                if (index == length ||
-                    (source[index] != (uint8_t)'+' &&
-                     source[index] != (uint8_t)'-' &&
-                     source[index] != (uint8_t)'*' &&
-                     source[index] != (uint8_t)'\\')) {
+                if (index == length) {
                     return BT_UNSUPPORTED_CONSTRUCT;
                 }
-                status = emit(out, source[index] == (uint8_t)'+' ? 0xf4u :
-                                  source[index] == (uint8_t)'-' ? 0xf5u :
-                                  source[index] == (uint8_t)'*' ? 0xf6u : 0xf9u);
-                ++index;
+                if (keyword_matches(source, length, index, "MOD", &count)) {
+                    /* CPC BASIC 1.1 MOD is the single FB token. This only
+                     * matches a whole keyword after the explicit INTEGER
+                     * reference, never a prefix of an identifier. */
+                    status = emit(out, 0xfbu);
+                    index += count;
+                } else {
+                    uint8_t symbol = source[index];
+                    if (symbol != (uint8_t)'+' &&
+                        symbol != (uint8_t)'-' &&
+                        symbol != (uint8_t)'*' &&
+                        symbol != (uint8_t)'\\') {
+                        return BT_UNSUPPORTED_CONSTRUCT;
+                    }
+                    status = emit(out, symbol == (uint8_t)'+' ? 0xf4u :
+                                       symbol == (uint8_t)'-' ? 0xf5u :
+                                       symbol == (uint8_t)'*' ? 0xf6u : 0xf9u);
+                    ++index;
+                }
                 if (status == BT_OK) {
                     status = spaces(source, length, &index, out);
                 }

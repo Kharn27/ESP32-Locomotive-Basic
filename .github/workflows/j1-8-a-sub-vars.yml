@@ -170,7 +170,14 @@ jobs:
         run: |
           set -euo pipefail
           base="$(git merge-base origin/main HEAD)"
-          git diff --exit-code "$base" HEAD -- core/ video/ hal/ # HW4 may change firmware, not the oracle core
+          # The original J1.8-A acquisition is oracle-only; independent
+          # later native J1 branches may touch core, never the sealed corpus
+          # or firmware/HW4. Preserve the stricter original branch guard.
+          if test "$GITHUB_HEAD_REF" = feat/j1-8-a-cpc-integer-sub-vars-oracle; then
+            git diff --exit-code "$base" HEAD -- core/ video/ hal/
+          else
+            git diff --exit-code "$base" HEAD -- firmware/ video/ hal/ tests/fixtures/cpc6128/j1_integer_sub_vars/
+          fi
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
           ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main --include='*.c'
           test "$(grep -c '^void app_main(void)' firmware/esp32_display_probe/main/hw4_c2_console.c)" -eq 1

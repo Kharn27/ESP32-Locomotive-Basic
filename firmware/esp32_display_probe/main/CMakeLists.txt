@@ -1,7 +1,7 @@
 idf_component_register(
     SRCS "main.c" "cpc_font.c" "../../../video/cpc_video.c" "../../../video/cpc_palette.c"
     INCLUDE_DIRS "." "../../../video"
-    REQUIRES esp_lcd esp_driver_spi esp_driver_gpio esp_driver_uart freertos heap esp_system
+    REQUIRES cyd_ili9341 esp_driver_uart freertos heap esp_system
 )
 
 # Board variations: -DHW3_SWAP_XY=1 -DHW3_MIRROR_X=0 -DHW3_MIRROR_Y=1 (landscape candidate).

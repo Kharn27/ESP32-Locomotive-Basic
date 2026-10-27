@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'firmware/esp32_display_probe/**'
+      - 'firmware/components/cyd_ili9341/**'
       - 'video/**'
       - 'tests/test_cpc_video.c'
       - 'docs/HW4-A-cpc-video-contract.md'

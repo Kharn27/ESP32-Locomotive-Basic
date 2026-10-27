@@ -6,6 +6,7 @@
  */
 #include "basic_session_runtime.h"
 #include "basic_variable_store.h"
+#include "cyd_ili9341.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_idf_version.h"
@@ -447,6 +448,8 @@ void app_main(void)
     size_t i;
 
     printf("J1.2-HW2 START state=ON_DEVICE_UNVERIFIED_IN_CI\n");
+    CydLcdDiagnostics lcd_driver_link;
+    (void)cyd_lcd_diagnostics(&lcd_driver_link); /* HW4-B only; no TFT init */
     build_identity();
     printf("J1.2-HW2 STATIC_PROBE_BYTES=%zu ABI_POINTER_BYTES=%" PRIu32 "\n",
            sizeof(probe), loco_probe_abi_sizes[1]);

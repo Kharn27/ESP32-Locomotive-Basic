@@ -1,0 +1,5 @@
+# Official Espressif ILI9341 controller driver; Apache-2.0.
+# https://components.espressif.com/components/espressif/esp_lcd_ili9341
+dependencies:
+  idf: "==5.5.6"
+  espressif/esp_lcd_ili9341: "==2.1.0"

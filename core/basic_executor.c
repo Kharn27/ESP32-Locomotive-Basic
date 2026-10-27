@@ -142,7 +142,8 @@ static BEStatus binding_error(BVBStatus status)
     }
 }
 
-/* Evaluate one explicit INTEGER reference (+, -, *, \\ or MOD) and unsigned byte literal.
+/* Evaluate one explicit INTEGER source and unsigned-byte operand, or
+ * exclusively for F4 one more explicit INTEGER source reference.
  * One decoder serves both executor passes; only caller-local values change.
  * The reference cache is opaque and bvb_read_explicit never edits it. */
 static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,

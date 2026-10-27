@@ -75,3 +75,17 @@ Vérifier `PRINT_BYTES length=4 hex=2035200a`, `BSR_END`, `LIST_BYTES` provenant
 Deux modules C99 sans heap (`io/uart_line` et `video/cpc_uart_console`), tests Linux séparés : caractères, CRLF, effacements, 121e caractère, 100 lignes et canaris ; intégration native avec `LIST`, `RUN`, `NEW` et exact `2035200a`, échec atomique. `video/cpc_text`, `cpc_video` et anciens tests restent inchangés. Aucun buffer RGB565 plein écran, PSRAM ni second SPI ; render/send au même propriétaire (tâche principale). Seuls buffers ajoutés : `UartLine` statique et RX UART interne installé une fois au boot. `CydLcdDiagnostics` : heap libre/min/largest, pile et DMA à vérifier physiquement. Les trois images Xtensa IDF 5.5.6 doivent être compilées indépendamment, résultats `idf.py size` archivé.
 
 **Critères à remplir avant acceptation** : tests Linux OFF/ON **51/51**, CI des trois images, validation réelle PO sur HEAD final, réserves de compatibilité documentées, revue contradictoire Pilotage. **PR non fusionnée ; HW4-C3 non autorisé.**
+
+### Validation CI HW4-C2 — empreinte de référence `d88992d` (27 octobre 2026)
+
+[HW4-C2 architecture + C99](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695420) : **SUCCESS**, **51/51 CTest OFF et 51/51 ON ASan/UBSan** (48 suites antérieures + 3 dédiées). [HW4-C1 intégré et trois builds Xtensa](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575694984) : **4/4 jobs SUCCESS**, images indépendantes ESP-IDF v5.5.6. [Oracle J1.7-A](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695259), [Oracle CPC historique](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695099), [C99 BASIC](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695017) : **SUCCESS**. Jobs optionnels filtrés SKIPPED non présentés comme validations.
+
+| Image ESP32-IDF 5.5.6 | Flash Code | IRAM / 131 072 | DRAM / 180 736 | Image IDF |
+| --- | ---: | ---: | ---: | ---: |
+| `esp32_loco` intégrée, UART + BASIC + TFT | 99 942 o | 67 279 o (51,33 %) | 47 520 o (26,29 %) | 225 161 o |
+| `esp32_probe` historique BASIC | 66 446 o | 51 807 o (39,53 %) | 30 428 o (16,84 %) | 157 773 o |
+| `esp32_display_probe` historique TFT | 82 538 o | 67 279 o (51,33 %) | 30 400 o (16,82 %) | 208 333 o |
+
+Image intégrée `.bin` **0x37000 o**, partition **0x300000 o**, marge annoncée **93 %**. Compilations sur checkout synthétique PR (version intégrée dans l'ELF `cfece77`), associé au HEAD de branche `d88992d` ; ce n'est pas un flash du HEAD physique. Lorsqu'une nouvelle révision documentaire est publiée, **revalider les jobs au SHA final** avant demande d'essai.
+
+**Statut preuve : `LINUX_51_51_OFF_ON — TARGET_BUILD_VERIFIED (référence d88992d) — ON_DEVICE_UNVERIFIED`.** HW4-C3 demeure bloqué ; la dérogation photo de C1 ne s'applique pas.

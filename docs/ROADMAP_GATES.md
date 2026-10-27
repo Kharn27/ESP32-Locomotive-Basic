@@ -374,3 +374,17 @@ La photographie demandée pour C1 est **absente** mais son critère a été lev�
 Autorisé après fusion HW4-C1 (`f1a82aa`) et dérogation documentaire photo **spécifique à C1**. Le jalon doit connecter UART0 115200 → collecteur C99 120 octets → `bsr_submit`/`bsr_step` → `cpc_text_write` → MODE1 40×25 → pilote DMA. Scénario : saisies réelles 4 lignes, `RUN` et `5`, `LIST` exact, `NEW`, corrections BS/DEL, erreur, lignes longues, 100 lignes et écran plein sans corruption. En complément `!CLS`/`!DEMO` restent uniquement des commandes diagnostics hôte ; pagination proactive et clipping documentés non CPC. Éxécution bornée à 256 étapes.
 
 **Critères de sortie non satisfaits jusqu'aux preuves** : 51/51 CTest OFF/ON ASan/UBSan ; 3/3 builds Xtensa ESP-IDF 5.5.6 et tailles ; CI oracles CPC et J1.7-A sans régression ; retour PO du **HEAD final** sur vrai CYD avec UART et visuel, heap/pile/DMA ; éventuelle absence de photo soumise à dérogation **distincte** ; revue Pilotage et PR non fusionnée. J1.7-B isolé, aucun changement de `core/` ni des oracles/fixtures. Documentation [HW4-C2](HW4-C2-uart-interactive-console.md). **HW4-C3 NON AUTORISÉ.**
+
+### Validation CI HW4-C2 — empreinte de référence `d88992d` (27 octobre 2026)
+
+[HW4-C2 architecture + C99](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695420) : **SUCCESS**, **51/51 CTest OFF et 51/51 ON ASan/UBSan** (48 suites antérieures + 3 dédiées). [HW4-C1 intégré et trois builds Xtensa](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575694984) : **4/4 jobs SUCCESS**, images indépendantes ESP-IDF v5.5.6. [Oracle J1.7-A](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695259), [Oracle CPC historique](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695099), [C99 BASIC](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40575695017) : **SUCCESS**. Jobs optionnels filtrés SKIPPED non présentés comme validations.
+
+| Image ESP32-IDF 5.5.6 | Flash Code | IRAM / 131 072 | DRAM / 180 736 | Image IDF |
+| --- | ---: | ---: | ---: | ---: |
+| `esp32_loco` intégrée, UART + BASIC + TFT | 99 942 o | 67 279 o (51,33 %) | 47 520 o (26,29 %) | 225 161 o |
+| `esp32_probe` historique BASIC | 66 446 o | 51 807 o (39,53 %) | 30 428 o (16,84 %) | 157 773 o |
+| `esp32_display_probe` historique TFT | 82 538 o | 67 279 o (51,33 %) | 30 400 o (16,82 %) | 208 333 o |
+
+Image intégrée `.bin` **0x37000 o**, partition **0x300000 o**, marge annoncée **93 %**. Compilations sur checkout synthétique PR (version intégrée dans l'ELF `cfece77`), associé au HEAD de branche `d88992d` ; ce n'est pas un flash du HEAD physique. Lorsqu'une nouvelle révision documentaire est publiée, **revalider les jobs au SHA final** avant demande d'essai.
+
+**Statut preuve : `LINUX_51_51_OFF_ON — TARGET_BUILD_VERIFIED (référence d88992d) — ON_DEVICE_UNVERIFIED`.** HW4-C3 demeure bloqué ; la dérogation photo de C1 ne s'applique pas.

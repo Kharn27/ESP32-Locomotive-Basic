@@ -1,0 +1,59 @@
+name: HW4-C2 UART interactive BASIC
+on:
+  pull_request:
+    paths:
+      - 'io/uart_line.*'
+      - 'video/cpc_uart_console.*'
+      - 'tests/test_uart_line.c'
+      - 'tests/test_cpc_uart_console.c'
+      - 'tests/test_hw4_c2_integration.c'
+      - 'firmware/esp32_loco/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/hw4-c2-interactive.yml'
+  workflow_dispatch:
+jobs:
+  architecture:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+      - name: One owner, immutable core/fixtures and driver, no second LCD
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
+          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_loco/main --include='*.c'
+          git diff --exit-code "$(git merge-base origin/main HEAD)" HEAD -- core/ tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
+          test "$(grep -c '^void app_main(void)' firmware/esp32_loco/main/main.c)" -eq 1
+          ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_loco/main/
+          ! grep -R -E 'malloc[()]|calloc[()]|realloc[()]|free[()]' io/uart_line.c video/cpc_uart_console.c firmware/esp32_loco/main/main.c
+          grep -F 'bsr_submit(' firmware/esp32_loco/main/main.c
+          grep -F 'bsr_step(' firmware/esp32_loco/main/main.c
+  linux:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizers: ['OFF','ON']
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Strict C99 all suites including 3 HW4-C2 cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -DBP_SANITIZERS=${{ matrix.sanitizers }}
+          cmake --build build -j 2
+          ctest --test-dir build --output-on-failure 2>&1 | tee ctest-hw4-c2-${{ matrix.sanitizers }}.txt
+          ctest --test-dir build -N | grep 'Total Tests: 51'
+      - uses: actions/upload-artifact@v4.6.2
+        if: always()
+        with:
+          name: hw4-c2-linux-${{ matrix.sanitizers }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: ctest-hw4-c2-${{ matrix.sanitizers }}.txt
+  # The existing HW4-C1 integrated workflow is triggered by the changed
+  # firmware/esp32_loco/main files and builds *three* independent Xtensa
+  # IDF 5.5.6 images with full size reports; avoid duplicating huge Docker
+  # downloads/builds for the same commit.

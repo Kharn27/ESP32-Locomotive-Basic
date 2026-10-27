@@ -18,8 +18,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(grep -RlE 'spi_bus_initialize\\(|esp_lcd_panel_draw_bitmap\\(|esp_lcd_new_panel_ili9341\\(' firmware --include='*.c' | wc -l)" -eq 1
-          ! grep -RE 'spi_bus_initialize\\(|esp_lcd_panel_draw_bitmap\\(' firmware/esp32_display_probe/main firmware/esp32_probe/main --include='*.c'
+          test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
+          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main firmware/esp32_probe/main --include='*.c'
           git diff --exit-code "$(git merge-base origin/main HEAD)" HEAD -- core/ video/ tests/fixtures/
   linux:
     runs-on: ubuntu-22.04

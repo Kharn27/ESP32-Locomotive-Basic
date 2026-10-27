@@ -25,6 +25,12 @@ Références de contrôle visuel et technique (images **non copiées** dans le f
 
 `main/cpc_font.c` contient une **fonte originale, dessinée pour HW3**, couvrant uniquement les caractères de ces messages. Elle ne reproduit **aucune ROM/dump, aucun caractère extrait d'une ROM CPC, aucune source de police tierce**. Les fichiers `cpc_font.c` et `cpc_font.h` portent `SPDX-License-Identifier: MIT` ; les nouveaux dessins sont proposés sous licence MIT. La forme 8 × 8 (majoritairement un alphabet 5 × 7 occupant une cellule 8 × 8) **s'inspire du genre de présentation micro-ordinateur**, sans revendiquer une correspondance bit à bit avec la fonte historique CPC. Le caractère `0x7F` est ici un glyphe `©` original, propre à la sonde. Les autres caractères ASCII non implémentés restent blancs/vides ; ce n'est pas une police CPC générale.
 
+## Dépendance du contrôleur ILI9341
+
+ESP-IDF **v5.5.6 fournit l'API générale `esp_lcd` mais n'embarque pas le pilote spécifique ILI9341**. HW3 déclare dans `main/idf_component.yml` : **`espressif/esp_lcd_ili9341 == 2.1.0`** (composant officiel Espressif, licence **Apache-2.0**, [source et versions](https://components.espressif.com/components/espressif/esp_lcd_ili9341)). Le gestionnaire de composants IDF télécharge cette dépendance pendant la configuration. Ni Arduino, ni LVGL, ni copie d'une ROM.
+
+La version du pilote est **verrouillée à une version exacte** et le workflow de compilation fixe `espressif/idf:v5.5.6`. Une compilation fraîche exige un accès réseau au registre de composants Espressif lors de la première résolution.
+
 ## GPIO, SPI, options
 
 | Fonction | GPIO | Note |

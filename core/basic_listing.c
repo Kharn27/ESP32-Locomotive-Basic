@@ -295,7 +295,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (t != 0xf4u && t != 0xf5u && t != 0xf6u && t != 0xf9u && t != 0xfbu) {
                     return BL_BAD_SEQUENCE;
                 }
-                reference_pair = t == 0xf4u || t == 0xf5u;
+                reference_pair = 1;
                 if (t == 0xfbu) {
                     status = append_word(out, "MOD");
                 } else {
@@ -319,7 +319,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (!reference_pair) {
                     return BL_BAD_SEQUENCE;
                 }
-                /* F4/F5 are the only authorized two-reference INTEGER forms.
+                /* F4/F5/F6/F9/FB are the authorized two-reference INTEGER forms.
                  * BVR cache bytes are opaque, even if they look like tokens. */
                 BasicVariableRef second;
                 size_t right_start = pos - 1u;

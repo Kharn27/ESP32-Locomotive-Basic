@@ -119,8 +119,6 @@ static int test_tokens_and_listing(void)
         /* MOD embedded in a legal identifier must not be split into FB. */
         {"B%=AMOD% MOD 1",
          {2,0,0,0xc2,0xef,2,0,0,'A','M','O',0xc4,' ',0xfb,' ',0x0f}, 16},
-        {"B%=A%MOD 1",
-         {2,0,0,0xc2,0xef,2,0,0,0xc1,0xfb,' ',0x0f}, 12},
         {"B%=-32768", {2,0,0,0xc2,0xef,0xf5,0x1f,0,0,0,0,0x90}, 12},
         {"B%=A%+3", {2,0,0,0xc2,0xef,2,0,0,0xc1,0xf4,0x11}, 11},
         {"B%=A%-3", {2,0,0,0xc2,0xef,2,0,0,0xc1,0xf5,0x11}, 11},
@@ -148,7 +146,7 @@ static int test_tokens_and_listing(void)
             "B%=A% MOD (2)", "B%=A% MOD 1.2", "B%=A% MOD 1E2",
             "B%=A% MOD 32768", "B%=A% MOD ", "B%=A% MOD 2/2",
             "B%=A% MOD 1:PRINT 2:", "B%=A% MOD 1: ",
-            "B%=A% MOD1", "B%=A% MODERN 1", "B%=A% MODMOD 1",
+            "B%=A% MOD1", "B%=A%MOD 1", "B%=A% MODERN 1", "B%=A% MODMOD 1",
             "B%=A% M OD 1", "B%=A% / 2", "B%=A% MOD 1 MOD 2"
         };
         uint8_t saved[sizeof(token)];

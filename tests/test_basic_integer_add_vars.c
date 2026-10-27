@@ -119,7 +119,7 @@ static int tokenizer_listing(void)
         "C%=A!+B%", "C%=A$+B%", "C%=A%+B!", "C%=A%+B$",
         "C%=A%+B%+C%", "C%=A%+(B%)", "C%=A%+B%*C%",
         "C%=A%+B%=A%", "C%=A%+2+B%", "C%=A%-B%-D%",
-        "C%=A%*B%", "C%=A%\\B%", "C%=A% MOD B%",
+        "C%=A%*B%+D%", "C%=A%\\B%*C%", "C%=A% MOD B%-D%",
         "C%=A%+B%%", "C%=A%+B%1", "C%=A%+_B%",
         "C%=A%+B%+", "C%=A%+B%/2"
     };
@@ -228,7 +228,7 @@ static int failure_and_alias(void)
         {{2,0,0,0xc3,0xef,2,0,0,0xc1,0xf4,3,0,0,0xc2},14,BE_BAD_SEQUENCE},
         {{2,0,0,0xc3,0xef,2,0,0,0xc1,0xf4,4,0,0,0xc2},14,BE_BAD_SEQUENCE},
         {{2,0,0,0xc3,0xef,2,0,0,0xc1,0xf4,2,0,0,0xc2,0xf4,0x0f},16,BE_BAD_SEQUENCE},
-        {{2,0,0,0xc3,0xef,2,0,0,0xc1,0xf6,2,0,0,0xc2},14,BE_BAD_SEQUENCE}
+        {{2,0,0,0xc3,0xef,2,0,0,0xc1,0xef,2,0,0,0xc2},14,BE_BAD_SEQUENCE}
     };
     Harness h;
     size_t i;

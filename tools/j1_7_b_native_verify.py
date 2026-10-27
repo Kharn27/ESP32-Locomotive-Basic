@@ -130,8 +130,8 @@ def one(name, values, cli, image_cli):
 def negative(image_cli):
     lexical = ("C%=A%+B%+C%", "C%=A%+(B%)", "C%=A%+B%*C%",
                "C%=A%+B%=C%", "C%=A%+2+B%", "C%=A%+B$",
-               "C%=A%+B!", "C%=A%*B%", "C%=A%-B%-D%", "C%=A%\\B%",
-               "C%=A% MOD B%", "C%=A%+B%%")
+               "C%=A%+B!", "C%=A%*B%+D%", "C%=A%-B%-D%", "C%=A%\\B%*C%",
+               "C%=A% MOD B%-D%", "C%=A%+B%%")
     for expr in lexical:
         data = ("10 A%=1\n20 B%=2\n30 "+expr+"\n40 END\n").encode("ascii")
         outcome = subprocess.run([str(image_cli)], input=data,

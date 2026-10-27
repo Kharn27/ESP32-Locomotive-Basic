@@ -25,7 +25,15 @@ jobs:
           set -euo pipefail
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
           ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main/hw4_c2_console.c
-          git diff --exit-code "$(git merge-base origin/main HEAD)" HEAD -- core/ tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
+          base="$(git merge-base origin/main HEAD)"
+          git diff --exit-code "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
+          # HW4 product changes still forbid core/ changes. A parallel J1
+          # core-only PR must instead preserve ALL HW4 firmware and IO files.
+          if git diff --name-only "$base" HEAD -- io/uart_line.c io/cpc_uart_console.c firmware/esp32_display_probe/ tests/test_uart_line.c tests/test_cpc_uart_console.c tests/test_hw4_c2_integration.c | grep -q .; then
+            git diff --exit-code "$base" HEAD -- core/
+          else
+            git diff --exit-code "$base" HEAD -- firmware/ io/
+          fi
           test "$(grep -c '^void app_main(void)' firmware/esp32_display_probe/main/hw4_c2_console.c)" -eq 1
           ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_display_probe/main/
           ! grep -R -E 'malloc[()]|calloc[()]|realloc[()]|free[()]' io/uart_line.c io/cpc_uart_console.c firmware/esp32_display_probe/main/hw4_c2_console.c
@@ -50,8 +58,17 @@ jobs:
           cmake -S . -B build -DBP_SANITIZERS=${{ matrix.sanitizers }}
           cmake --build build -j 2
           ctest --test-dir build --output-on-failure 2>&1 | tee ctest-hw4-c2-${{ matrix.sanitizers }}.txt
-          # HW4-C3-A adds one portable screen-boot test; fail closed at 56.
-          ctest --test-dir build -N | grep 'Total Tests: 56'
+          # HW4-C2 baseline had 55 CTest suites; later J1 native PRs
+          # add suites and must not fail because this count increases.
+          count="$(ctest --test-dir build -N | awk '/Total Tests:/ {print $3}')"
+          test "$count" -ge 55
+          # C3-A-C1 also contains J1.9-B's two newly integrated suites:
+          # 55 C2 baseline + 2 J1.9-B + 1 HW4-C3-A = at least 58.
+          if test "$GITHUB_HEAD_REF" = feat/hw4-c3-a-cpc-boot-console; then
+            test "$count" -ge 58
+            ctest --test-dir build -N | grep 'hw4_c3_boot_screen'
+          fi
+          echo "HW4-C2 BASELINE_MINIMUM=55 ACTUAL=$count"
       - uses: actions/upload-artifact@v4.6.2
         if: always()
         with:

@@ -97,3 +97,24 @@ Transmettre le log UART, photo si possible, `DEVICE_MEMORY`
 Core BASIC et oracles CPC ; véritable éditeur CPC à flèches/Suppr
 (#96), police ASCII complète (#97), scrolling CPC fidèle, audio,
 tactile, SD, Z80 et HW4-C3-B. Une seule PR, non fusionnée.
+
+
+## HW4-C3-A-C1 — consolidation avec J1.9-B (28 octobre 2026)
+
+- Synchronisation effective avec `main` `446b0a34e44fe8a744352ca56dde505efcc43959` intégrant J1.9-B (#102).
+- Oracle CPC et cœur BASIC repris de `main` **sans édition** ; seule la
+  configuration racine CMake ajoute la suite `hw4_c3_boot_screen` à J1.9-B.
+  **58 tests** au minimum attendus en CTest Linux OFF et ON ASan/UBSan.
+- `tools/hw4_c3_a_scope_gate.sh` énumère explicitement les seules mutations
+  sous `video/` et `firmware/` permises pour cette branche : deux fichiers
+  `video/cpc_boot.*` et quatre fichiers `esp32_display_probe/main`.
+  Toute modification du cœur, des fixtures, oracles, HAL ou transport échoue.
+- Adaptations limitées des jobs *architecture* HW4-B, J1.8-A et J1.9-A :
+  leur garde originelle demeure active pour **toutes les autres branches**,
+  en particulier pour les branches d'acquisition historiques. J1.9-A utilise
+  les deux projets ESP-IDF courants, sans recréer `esp32_loco`.
+- Le rendu et les glyphes C3-A restent identiques à la version physique
+  `c69e4c2`. **Toute nouvelle preuve CYD doit utiliser le HEAD C1 final** ;
+  ne pas réutiliser automatiquement l'ancien PASS pour le nouveau binaire.
+- Les résultats CI, l'empreinte de merge et les mémoires cibles sont à
+  relever depuis les exécutions GitHub Actions sur le HEAD C1 exact.

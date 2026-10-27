@@ -316,3 +316,24 @@ Jalon développé séparément depuis le main `3e903147012aedca530c9367ce130f4f8
 ### HW4-C2-C1 : ACCEPTÉ / FUSIONNÉ — HW4-C3-A autorisé (27 octobre 2026)
 
 [PR #91](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/91) fusionnée (squash `d2262a9d9b2fbc1620ea8e8f80aed30ecbd5cd3e`). Console BASIC UART/TFT dans le **projet existant** `firmware/esp32_display_probe/`, option `HW4_C2_CONSOLE=ON`, variante graphique HW3 conservée en `OFF`; `firmware/esp32_probe/` indépendant. Ancien `esp32_loco` supprimé ; scénario natif C1 reste accessible via `!DEMO`. Tests **55/55 OFF/ON ASan/UBSan**, **3/3 Xtensa ESP-IDF 5.5.6** (ON/OFF/BASIC), oracles historiques verts. PO a confirmé sur CYD : `RUN/LIST/NEW`, `ESC[3~`, erreur directe sans mutation ; retrait du faux `>` visuellement accepté au HEAD final, sans nouveau log UART intégral. Prochain matériel autorisé : [HW4-C3-A / #101](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101), restauration du bandeau Amstrad/Locomotive BASIC 1.1 depuis HW3 + glyphes nécessaires. Suivis indépendants : éditeur CPC fidèle #96 et police ASCII complète #97.
+
+
+## HW4-C3-A — démarrage BASIC ESP32 CYD (branche en revue)
+
+Dans la console interactive `firmware/esp32_display_probe/`, option
+`HW4_C2_CONSOLE=ON`, le bandeau HW3 s'affiche dans la VRAM MODE1
+existante avant la première saisie. **Adaptation voulue par le PO :**
+le titre est `ESP32 CYD 128K Microcomputer (v3)` ; le banc HW3 OFF
+garde `Amstrad 128K Microcomputer (v3)`. Les crédits historiques
+déjà présents en HW3 (dont le copyright original 0x7f), `BASIC 1.1`,
+`Ready` et le curseur à (0,13) sont conservés ; `U/W/Y` sont dessinés
+dans la police originale non-ROM. Ce rendu est une approximation visuelle
+inspirée du CPC, **pas une preuve de fidélité bit-à-bit à la ROM**.
+`LIST/RUN/NEW` utilisent toujours le runtime C99 natif.
+
+Voir [issue #101](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101)
+et [rapport HW4-C3-A](docs/HW4-C3-A-cpc-boot-console.md). Les issues
+[#96](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/96)
+(éditeur CPC) et [#97](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/97)
+(police ASCII complète) sont séparées. **ON_DEVICE_UNVERIFIED** jusqu'au
+test physique du HEAD final par le PO.

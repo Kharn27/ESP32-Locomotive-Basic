@@ -267,3 +267,5 @@ Une troisième image ESP-IDF indépendante, `firmware/esp32_loco/`, relie direct
 ### J1.7-B — addition INTEGER entre deux références explicites (PR #89)
 
 Développement isolé sur branche dédiée, **en attente de revue contradictoire** : `destination%=source1%+source2%`, token CPC `F4`, deux BVR INTEGER explicites, calcul `int32_t` et vérification de débordement avant commit. Les 12 références CPC J1.7-A restent immuables ; nouveau comparateur différentiel et tests C99 d'atomicité. 48/48 OFF, 48/48 ON ASan/UBSan, 12/12 RAM et LIST, 10/10 valeurs, 2/2 OVERFLOW, ESP32 Xtensa 3/3 validés sur le HEAD de code du 27 octobre ; aucun changement à HW4-C1. PR non fusionnée. Voir [rapport J1.7-B](docs/J1.7-B-integer-add-vars-native.md).
+
+**J1.7-B / PR #89 — synchronisation HW4-C1** : fusion Git de `main=e05e9a2` dans la branche indépendante, aucun fichier matériel écrasé ; 50/50 OFF et ON ASan/UBSan, suites texte/TFT natives et 3 images Xtensa verts sur le code `aa1c26bf`. [Preuves CI et métriques](docs/J1.7-B-integer-add-vars-native.md). La PR demeure non fusionnée, en attente du Pilotage.

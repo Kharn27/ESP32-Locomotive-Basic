@@ -372,3 +372,7 @@ La photographie demandée pour C1 est **absente** mais son critère a été lev�
 ## J1.7-B — barrière de revue (mission #88, PR #89)
 
 Admission limitée à `destination%=source1%+source2%` pour trois références INTEGER explicites et token `F4`. Les preuves CPC J1.7-A sont figées ; le comparateur J1.7-B doit être indépendant et épingler les douze SHA originaux, imposer permanence anti-falsification, 12/12 RAM, 12/12 LIST, 10/10 numériques, deux débordements `BE_INTEGER_OVERFLOW`, rollback C99 complet, >=50/50 OFF et ON et cross-build ESP32 3/3 incluant esp32_loco. Aucune déduction d'atomicité ROM depuis `C%=0` après ERR=6. Aucun changement HW4-C1 ni fusion automatique. **État en revue, pas accepté.**
+
+### Gate J1.7-B intégrée à HW4-C1 — validations du code `aa1c26bf`
+
+**SATISFIED techniquement, NON ENCORE ACCEPTÉ PAR PILOTAGE** : 50/50 OFF/ON ASan/UBSan, 12/12 RAM CPC, 12/12 LIST, 10/10 valeurs, 2/2 overflow, atomicité C99 ; permanences J1.7-A/J1.6-A et oracle verts ; HW4-C1 architecture/texte/runtime et les trois cibles Xtensa ESP-IDF v5.5.6 vertes. Seules les acquisitions conditionnelles J1.3/1.4/1.5 restent `SKIPPED` et ne constituent pas de nouvelles preuves. Merge final exclusivement du ressort du Pilotage. [Preuves et mesures](J1.7-B-integer-add-vars-native.md). Aucun nouveau test CYD J1.7-B : `ON_DEVICE_UNVERIFIED`.

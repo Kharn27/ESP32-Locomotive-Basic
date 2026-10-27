@@ -7,6 +7,8 @@ on:
       - 'tests/test_cpc_text.c'
       - 'tests/test_hw4_c1_integration.c'
       - 'CMakeLists.txt'
+      # Revalidate the already-integrated BASIC-to-TFT bridge for core changes.
+      - 'core/**'
       - '.github/workflows/hw4-c1-integrated.yml'
   workflow_dispatch:
 

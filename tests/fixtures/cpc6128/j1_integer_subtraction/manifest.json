@@ -1,0 +1,902 @@
+{
+  "schema_version": 1,
+  "phase": "J1.3-A",
+  "generated_at": "2026-10-27T11:44:33.816438+00:00",
+  "github_run_id": "40498357272",
+  "github_head_sha": "800577045f7ea7d64076a35ef6c3b2a5f0167922",
+  "oracle": {
+    "emulator": "Caprice32",
+    "commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "version_output": "Caprice32 v4.6.0-8c778bf072a06fb7c23b9cccd179041db7f79a52\nAPP_PATH: Not provided\nCompiled with:\nNumber of video plugins available: 11",
+    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "model": "CPC6128",
+    "basic": "1.1",
+    "ram_kb": 128
+  },
+  "rom_archived": false,
+  "snapshots_archived": false,
+  "screen_bytes_extracted": false,
+  "printer_screen_equivalent": false,
+  "historical_list_run": "UNVERIFIED",
+  "screen_vs_printer": "NOT_BYTE_COMPARABLE",
+  "j1_3_b_authorized": false,
+  "historical_archives_modified": false,
+  "captures": [
+    {
+      "case": "P5_M3",
+      "lhs": 5,
+      "rhs": 3,
+      "source_path": "tests/oracles/inputs/j1_3_a/p5_m3.bas",
+      "pre_run": {
+        "case": "P5_M3",
+        "source_sha256": "94ba268ac59d383cf74f544c484d0c5a86179b0b3a3b46370f631e5863f9c32f",
+        "snapshot_taken_before_run": true,
+        "list_requested": true,
+        "region": {
+          "base_pointer_address": 44644,
+          "end_pointer_address": 44646,
+          "base_pointer_value": 367,
+          "start_address": 368,
+          "end_exclusive": 414,
+          "snapshot_data_offset": 256,
+          "snapshot_program_offset": 624,
+          "length": 46,
+          "records": [
+            {
+              "line": 10,
+              "offset": 0,
+              "length": 11,
+              "terminator_offset": 10
+            },
+            {
+              "line": 20,
+              "offset": 11,
+              "length": 16,
+              "terminator_offset": 26
+            },
+            {
+              "line": 30,
+              "offset": 27,
+              "length": 11,
+              "terminator_offset": 37
+            },
+            {
+              "line": 40,
+              "offset": 38,
+              "length": 6,
+              "terminator_offset": 43
+            }
+          ],
+          "line_numbers": [
+            10,
+            20,
+            30,
+            40
+          ],
+          "terminator_hex": "0000",
+          "bank": "physical bank 0, Gate Array RAM config 0",
+          "sentinel_offset": 44
+        },
+        "comparison": {
+          "classification": "UNSUPPORTED",
+          "basis": "raw contiguous RAM records including 0000 sentinel",
+          "first_difference": null,
+          "cpc_size": 46,
+          "c99_size": null,
+          "cpc_sha256": "be4d19eea32a0c978e25ac313610ee011e6da1ff3a82b3f833b5770b97695d23",
+          "c99_sha256": null,
+          "c99_rejection": "image-cli: input rejected: BS=8 BT=4 BP=0 BL=0"
+        },
+        "files": {
+          "c99_error.txt": {
+            "size_bytes": 47,
+            "sha256": "1336826854dbffbff9330cba83ba2353234ee50820964ceb058272812e76b166"
+          },
+          "list.png": {
+            "size_bytes": 5875,
+            "sha256": "5f4cf053e0939dcae203e6b4faf59d7b14767d406eda3c179dfd3a90a9c4612b"
+          },
+          "caprice.log": {
+            "size_bytes": 365,
+            "sha256": "5046d47be200ae79ee99276d772797d09e5055a860d74b0e56de444e672fcafd"
+          },
+          "autocmd.json": {
+            "size_bytes": 317,
+            "sha256": "8e21f32d24a848ad339d90aeb9a0abb2b134a3dda5747bc70238def16330682f"
+          },
+          "cap32.cfg": {
+            "size_bytes": 1106,
+            "sha256": "edb29276f9bf0be2d8701363e2feff0d2cbd02f8f68d84ee5aebc1eac90c9c67"
+          },
+          "program.bin": {
+            "size_bytes": 46,
+            "sha256": "be4d19eea32a0c978e25ac313610ee011e6da1ff3a82b3f833b5770b97695d23"
+          },
+          "comparison.json": {
+            "size_bytes": 344,
+            "sha256": "d0bd51ead9275ad5cebc6e5a82c4c884bc5c384a372df5a98b12a98ce339d26a"
+          },
+          "original.bas": {
+            "sha256": "94ba268ac59d383cf74f544c484d0c5a86179b0b3a3b46370f631e5863f9c32f",
+            "size_bytes": 38
+          }
+        }
+      },
+      "run": {
+        "fresh_cpc_run_session": true,
+        "screenshot": "VISUAL_OBSERVATION",
+        "printer_semantics": "direct-mode PRINT #8,ERR then PRINT #8,B% AFTER screenshot, never screen bytes",
+        "printer_raw_hex": "20 30 20 0D 0A 20 32 20 0D 0A",
+        "err_probe": 0,
+        "variable_probe": 2,
+        "native_status": "UNSUPPORTED",
+        "native_number": null,
+        "native_returncode": 0,
+        "files": {
+          "caprice.log": {
+            "sha256": "a52f070a090b2843340330db8d8c344e3de9ff9abd7946fb931150e5e0bc8e88",
+            "size_bytes": 261
+          },
+          "autocmd.json": {
+            "sha256": "938218f49215cac7488c7e3fd734a5d8c001cc07d3b22d344853e9102432242a",
+            "size_bytes": 404
+          },
+          "printer.dat": {
+            "sha256": "b578750ceca83a7047a9d2d31a71bbb8189f6e2a0ee33bc2337e97b6f2c4b0b1",
+            "size_bytes": 10
+          },
+          "native.stdin.bin": {
+            "sha256": "c20fd9257c151206dd3964b749cce10750ee46eae66cf3184f44640201e8c5ec",
+            "size_bytes": 58
+          },
+          "native.stdout.bin": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size_bytes": 0
+          },
+          "native.stderr.bin": {
+            "sha256": "4c2f09492085a7d48fa8dc6ced42383c0dfa4b50e7c99da46792bbce5c40c309",
+            "size_bytes": 264
+          },
+          "cap32.cfg": {
+            "sha256": "6c73fcece0c3d558fa06507c0b83c0790c26a5858484b910450a60d6038a788c",
+            "size_bytes": 1112
+          },
+          "run.png": {
+            "sha256": "e61d2c9641ebffb90ceb6e9ab1bd01ef6944e94b72195db2125d2ef33bc499bf",
+            "size_bytes": 5279
+          }
+        }
+      }
+    },
+    {
+      "case": "P2_M3",
+      "lhs": 2,
+      "rhs": 3,
+      "source_path": "tests/oracles/inputs/j1_3_a/p2_m3.bas",
+      "pre_run": {
+        "case": "P2_M3",
+        "source_sha256": "2899b669cc3a840e934edb04319e23cd4ccfa4e97fe815c0efd0ddfc10cda1f9",
+        "snapshot_taken_before_run": true,
+        "list_requested": true,
+        "region": {
+          "base_pointer_address": 44644,
+          "end_pointer_address": 44646,
+          "base_pointer_value": 367,
+          "start_address": 368,
+          "end_exclusive": 414,
+          "snapshot_data_offset": 256,
+          "snapshot_program_offset": 624,
+          "length": 46,
+          "records": [
+            {
+              "line": 10,
+              "offset": 0,
+              "length": 11,
+              "terminator_offset": 10
+            },
+            {
+              "line": 20,
+              "offset": 11,
+              "length": 16,
+              "terminator_offset": 26
+            },
+            {
+              "line": 30,
+              "offset": 27,
+              "length": 11,
+              "terminator_offset": 37
+            },
+            {
+              "line": 40,
+              "offset": 38,
+              "length": 6,
+              "terminator_offset": 43
+            }
+          ],
+          "line_numbers": [
+            10,
+            20,
+            30,
+            40
+          ],
+          "terminator_hex": "0000",
+          "bank": "physical bank 0, Gate Array RAM config 0",
+          "sentinel_offset": 44
+        },
+        "comparison": {
+          "classification": "UNSUPPORTED",
+          "basis": "raw contiguous RAM records including 0000 sentinel",
+          "first_difference": null,
+          "cpc_size": 46,
+          "c99_size": null,
+          "cpc_sha256": "e64a4df6b48d784bc79b66a7f8c9683f37b85774e92877500ecc3796fe149dd2",
+          "c99_sha256": null,
+          "c99_rejection": "image-cli: input rejected: BS=8 BT=4 BP=0 BL=0"
+        },
+        "files": {
+          "c99_error.txt": {
+            "size_bytes": 47,
+            "sha256": "1336826854dbffbff9330cba83ba2353234ee50820964ceb058272812e76b166"
+          },
+          "list.png": {
+            "size_bytes": 5854,
+            "sha256": "4afcf813b3d5cb1f7bdcf87bf4562a93586192e35ba82805af18a4f705fea49f"
+          },
+          "caprice.log": {
+            "size_bytes": 365,
+            "sha256": "1ad7176ddabb789494ebe4240542f22c21ad532cfae4fcb132a784ed927d13c4"
+          },
+          "autocmd.json": {
+            "size_bytes": 317,
+            "sha256": "a9cf803b0b3ea9fc692e4fff33a1ecfa581d7b82d26e1453cb5191b777bd28f9"
+          },
+          "cap32.cfg": {
+            "size_bytes": 1106,
+            "sha256": "acb7c1d072a8bc084790298d6f4c1b290300f9184bc3b65843ff1764343fbad3"
+          },
+          "program.bin": {
+            "size_bytes": 46,
+            "sha256": "e64a4df6b48d784bc79b66a7f8c9683f37b85774e92877500ecc3796fe149dd2"
+          },
+          "comparison.json": {
+            "size_bytes": 344,
+            "sha256": "8b51bccdb76f7e1a32eb64dfb3ff293695d8b5198df3c2097e977e6441cb7403"
+          },
+          "original.bas": {
+            "sha256": "2899b669cc3a840e934edb04319e23cd4ccfa4e97fe815c0efd0ddfc10cda1f9",
+            "size_bytes": 38
+          }
+        }
+      },
+      "run": {
+        "fresh_cpc_run_session": true,
+        "screenshot": "VISUAL_OBSERVATION",
+        "printer_semantics": "direct-mode PRINT #8,ERR then PRINT #8,B% AFTER screenshot, never screen bytes",
+        "printer_raw_hex": "20 30 20 0D 0A 2D 31 20 0D 0A",
+        "err_probe": 0,
+        "variable_probe": -1,
+        "native_status": "UNSUPPORTED",
+        "native_number": null,
+        "native_returncode": 0,
+        "files": {
+          "caprice.log": {
+            "sha256": "0bd68ef7668dfd878dfbec3fe220926d6af4b06bf0bd03e1bf2700cf94d73567",
+            "size_bytes": 261
+          },
+          "autocmd.json": {
+            "sha256": "236da6c04af0f0403c1ca42001d289f79a2b8519c87f23b5e166ed741f8c1e15",
+            "size_bytes": 404
+          },
+          "printer.dat": {
+            "sha256": "60d94b2625e9d556068519277612b0e969bf6be904cdc431cd102860b3446fc8",
+            "size_bytes": 10
+          },
+          "native.stdin.bin": {
+            "sha256": "7545dc10923314d8c9b037377c6d482682c60fc8396595fbf6e968a2fdcc8d81",
+            "size_bytes": 58
+          },
+          "native.stdout.bin": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size_bytes": 0
+          },
+          "native.stderr.bin": {
+            "sha256": "4c2f09492085a7d48fa8dc6ced42383c0dfa4b50e7c99da46792bbce5c40c309",
+            "size_bytes": 264
+          },
+          "cap32.cfg": {
+            "sha256": "c3d81a2bd72070b3ece00b95daf85db0befab5a74813e914d7a80cf28286c533",
+            "size_bytes": 1112
+          },
+          "run.png": {
+            "sha256": "79a3b77ac26fb06b7e2ede66bbf602e0a8a87bec2eec670187c3e09e44c0e045",
+            "size_bytes": 5258
+          }
+        }
+      }
+    },
+    {
+      "case": "NMIN_M0",
+      "lhs": -32768,
+      "rhs": 0,
+      "source_path": "tests/oracles/inputs/j1_3_a/nmin_m0.bas",
+      "pre_run": {
+        "case": "NMIN_M0",
+        "source_sha256": "81c64e29ec141c974562cc3a545f35b159dafd88b0a3d6f9d936e8e9f9e7d2a9",
+        "snapshot_taken_before_run": true,
+        "list_requested": true,
+        "region": {
+          "base_pointer_address": 44644,
+          "end_pointer_address": 44646,
+          "base_pointer_value": 367,
+          "start_address": 368,
+          "end_exclusive": 420,
+          "snapshot_data_offset": 256,
+          "snapshot_program_offset": 624,
+          "length": 52,
+          "records": [
+            {
+              "line": 10,
+              "offset": 0,
+              "length": 17,
+              "terminator_offset": 16
+            },
+            {
+              "line": 20,
+              "offset": 17,
+              "length": 16,
+              "terminator_offset": 32
+            },
+            {
+              "line": 30,
+              "offset": 33,
+              "length": 11,
+              "terminator_offset": 43
+            },
+            {
+              "line": 40,
+              "offset": 44,
+              "length": 6,
+              "terminator_offset": 49
+            }
+          ],
+          "line_numbers": [
+            10,
+            20,
+            30,
+            40
+          ],
+          "terminator_hex": "0000",
+          "bank": "physical bank 0, Gate Array RAM config 0",
+          "sentinel_offset": 50
+        },
+        "comparison": {
+          "classification": "UNSUPPORTED",
+          "basis": "raw contiguous RAM records including 0000 sentinel",
+          "first_difference": null,
+          "cpc_size": 52,
+          "c99_size": null,
+          "cpc_sha256": "5ff6b68e9009a4238a6ed4d848e46d79c8b2c92fbfa4d786b32753d7c4aba992",
+          "c99_sha256": null,
+          "c99_rejection": "image-cli: input rejected: BS=8 BT=4 BP=0 BL=0"
+        },
+        "files": {
+          "c99_error.txt": {
+            "size_bytes": 47,
+            "sha256": "1336826854dbffbff9330cba83ba2353234ee50820964ceb058272812e76b166"
+          },
+          "list.png": {
+            "size_bytes": 5955,
+            "sha256": "1ddc281a138f697b8058e2762035209cb3ce7b6eeeba8c97d5edebdb2f408525"
+          },
+          "caprice.log": {
+            "size_bytes": 369,
+            "sha256": "63705da9c8f8500abc3e8d2ebf94a953024f9f44028ee0a14684ad4450bffee8"
+          },
+          "autocmd.json": {
+            "size_bytes": 322,
+            "sha256": "d78de589e09f4390dfbbf0b3930c6a36f17503db50b1b6d3adfecfd34ea921cf"
+          },
+          "cap32.cfg": {
+            "size_bytes": 1108,
+            "sha256": "bab7bd5b3d98a9e1516d893f69c665f9d5d5450c30da206da1ed66dc2335db43"
+          },
+          "program.bin": {
+            "size_bytes": 52,
+            "sha256": "5ff6b68e9009a4238a6ed4d848e46d79c8b2c92fbfa4d786b32753d7c4aba992"
+          },
+          "comparison.json": {
+            "size_bytes": 344,
+            "sha256": "c3170df729089b9a09bade798145879a7c30ace6a75e248030c03f1cfad7857b"
+          },
+          "original.bas": {
+            "sha256": "81c64e29ec141c974562cc3a545f35b159dafd88b0a3d6f9d936e8e9f9e7d2a9",
+            "size_bytes": 43
+          }
+        }
+      },
+      "run": {
+        "fresh_cpc_run_session": true,
+        "screenshot": "VISUAL_OBSERVATION",
+        "printer_semantics": "direct-mode PRINT #8,ERR then PRINT #8,B% AFTER screenshot, never screen bytes",
+        "printer_raw_hex": "20 30 20 0D 0A 2D 33 32 37 36 38 20 0D 0A",
+        "err_probe": 0,
+        "variable_probe": -32768,
+        "native_status": "UNSUPPORTED",
+        "native_number": null,
+        "native_returncode": 0,
+        "files": {
+          "caprice.log": {
+            "sha256": "52002599496154b0d350529f88d654e0acfa31df4f74cacc9e7dd0c5191add56",
+            "size_bytes": 265
+          },
+          "autocmd.json": {
+            "sha256": "0d94515044fe5d59473ec08edac1adc965b87d7e12cc1b9791b2b7efd5422ed7",
+            "size_bytes": 409
+          },
+          "printer.dat": {
+            "sha256": "09b8b4d947e11804e3a5d0de89992208917f0f42d31cb4d1effa20f208193dca",
+            "size_bytes": 14
+          },
+          "native.stdin.bin": {
+            "sha256": "f2b62590bc6b72c10d88b7b693908b1eaf03567d7d7fb5903fedcd0d67352205",
+            "size_bytes": 63
+          },
+          "native.stdout.bin": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size_bytes": 0
+          },
+          "native.stderr.bin": {
+            "sha256": "4c2f09492085a7d48fa8dc6ced42383c0dfa4b50e7c99da46792bbce5c40c309",
+            "size_bytes": 264
+          },
+          "cap32.cfg": {
+            "sha256": "4b4e1ba344d554e6c1db404f63a066ef688c01fb5bcc6880802bc423b7751dbf",
+            "size_bytes": 1116
+          },
+          "run.png": {
+            "sha256": "1b4372bed8ef372e73274e5a1c8e3909b368f3959ac7ec1ad6ef5c21074c3b5e",
+            "size_bytes": 5360
+          }
+        }
+      }
+    },
+    {
+      "case": "PMAX_M1",
+      "lhs": 32767,
+      "rhs": 1,
+      "source_path": "tests/oracles/inputs/j1_3_a/pmax_m1.bas",
+      "pre_run": {
+        "case": "PMAX_M1",
+        "source_sha256": "3fab2c5484e621737eb324e88e1112ec6bb5b23e5c842e6f26b96b5651605040",
+        "snapshot_taken_before_run": true,
+        "list_requested": true,
+        "region": {
+          "base_pointer_address": 44644,
+          "end_pointer_address": 44646,
+          "base_pointer_value": 367,
+          "start_address": 368,
+          "end_exclusive": 416,
+          "snapshot_data_offset": 256,
+          "snapshot_program_offset": 624,
+          "length": 48,
+          "records": [
+            {
+              "line": 10,
+              "offset": 0,
+              "length": 13,
+              "terminator_offset": 12
+            },
+            {
+              "line": 20,
+              "offset": 13,
+              "length": 16,
+              "terminator_offset": 28
+            },
+            {
+              "line": 30,
+              "offset": 29,
+              "length": 11,
+              "terminator_offset": 39
+            },
+            {
+              "line": 40,
+              "offset": 40,
+              "length": 6,
+              "terminator_offset": 45
+            }
+          ],
+          "line_numbers": [
+            10,
+            20,
+            30,
+            40
+          ],
+          "terminator_hex": "0000",
+          "bank": "physical bank 0, Gate Array RAM config 0",
+          "sentinel_offset": 46
+        },
+        "comparison": {
+          "classification": "UNSUPPORTED",
+          "basis": "raw contiguous RAM records including 0000 sentinel",
+          "first_difference": null,
+          "cpc_size": 48,
+          "c99_size": null,
+          "cpc_sha256": "5f04316b99b442732f94760fb4c2e12620c1eb34f60d08a9c11be8e70ba32784",
+          "c99_sha256": null,
+          "c99_rejection": "image-cli: input rejected: BS=8 BT=4 BP=0 BL=0"
+        },
+        "files": {
+          "c99_error.txt": {
+            "size_bytes": 47,
+            "sha256": "1336826854dbffbff9330cba83ba2353234ee50820964ceb058272812e76b166"
+          },
+          "list.png": {
+            "size_bytes": 5947,
+            "sha256": "edff2c6008b2217ff72d264f3755f515a88b464549adc896c0324aa6c057777e"
+          },
+          "caprice.log": {
+            "size_bytes": 369,
+            "sha256": "b9e696e46a0f763a36f57540fdc3af8cbec1a77619e12509fc71fd17a2b33e8e"
+          },
+          "autocmd.json": {
+            "size_bytes": 321,
+            "sha256": "6c405947bb53aa4062e5b89038aa46cb20f29817f719ee9c6bb1c4626e4bae5f"
+          },
+          "cap32.cfg": {
+            "size_bytes": 1108,
+            "sha256": "5db68362ebaa2adbd707eee6ca9619ab5fcf1ba6b44517900977674b3f0d5f9d"
+          },
+          "program.bin": {
+            "size_bytes": 48,
+            "sha256": "5f04316b99b442732f94760fb4c2e12620c1eb34f60d08a9c11be8e70ba32784"
+          },
+          "comparison.json": {
+            "size_bytes": 344,
+            "sha256": "7cfd13be6b58445873f85a2badab52d2b7028b837debb84bcd8481da5fa1b4ac"
+          },
+          "original.bas": {
+            "sha256": "3fab2c5484e621737eb324e88e1112ec6bb5b23e5c842e6f26b96b5651605040",
+            "size_bytes": 42
+          }
+        }
+      },
+      "run": {
+        "fresh_cpc_run_session": true,
+        "screenshot": "VISUAL_OBSERVATION",
+        "printer_semantics": "direct-mode PRINT #8,ERR then PRINT #8,B% AFTER screenshot, never screen bytes",
+        "printer_raw_hex": "20 30 20 0D 0A 20 33 32 37 36 36 20 0D 0A",
+        "err_probe": 0,
+        "variable_probe": 32766,
+        "native_status": "UNSUPPORTED",
+        "native_number": null,
+        "native_returncode": 0,
+        "files": {
+          "caprice.log": {
+            "sha256": "a50f0d74999d1b90f5194b64720b4cecec057f3017f14d0d7fa82a73e1849e1f",
+            "size_bytes": 265
+          },
+          "autocmd.json": {
+            "sha256": "4f3892af4a296fd34893239fa2544fc9ba02c208a750dff12488dd5feb0477a1",
+            "size_bytes": 408
+          },
+          "printer.dat": {
+            "sha256": "7986ee9fa977901070da09f32aa39119fab08d5a48c31f8a9b2846ca07a8d7cd",
+            "size_bytes": 14
+          },
+          "native.stdin.bin": {
+            "sha256": "787b40a057d821119d76ff56c24a273d12478aee4f915df776513c095c0d6545",
+            "size_bytes": 62
+          },
+          "native.stdout.bin": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size_bytes": 0
+          },
+          "native.stderr.bin": {
+            "sha256": "4c2f09492085a7d48fa8dc6ced42383c0dfa4b50e7c99da46792bbce5c40c309",
+            "size_bytes": 264
+          },
+          "cap32.cfg": {
+            "sha256": "29be254df7fc8e28d1b524bcb0d43f6059ebddbeee541e7cdec42f6888a31d23",
+            "size_bytes": 1116
+          },
+          "run.png": {
+            "sha256": "e16ac0fd6ecd217364c231e95bcdcc2409fe83c10f8a68c0245314ecb894f1f3",
+            "size_bytes": 5355
+          }
+        }
+      }
+    },
+    {
+      "case": "NMIN_M1",
+      "lhs": -32768,
+      "rhs": 1,
+      "source_path": "tests/oracles/inputs/j1_3_a/nmin_m1.bas",
+      "pre_run": {
+        "case": "NMIN_M1",
+        "source_sha256": "934503e848ee59bfb0018ba438b2b65c0db016359bd934d5b8fe07625c65424c",
+        "snapshot_taken_before_run": true,
+        "list_requested": true,
+        "region": {
+          "base_pointer_address": 44644,
+          "end_pointer_address": 44646,
+          "base_pointer_value": 367,
+          "start_address": 368,
+          "end_exclusive": 420,
+          "snapshot_data_offset": 256,
+          "snapshot_program_offset": 624,
+          "length": 52,
+          "records": [
+            {
+              "line": 10,
+              "offset": 0,
+              "length": 17,
+              "terminator_offset": 16
+            },
+            {
+              "line": 20,
+              "offset": 17,
+              "length": 16,
+              "terminator_offset": 32
+            },
+            {
+              "line": 30,
+              "offset": 33,
+              "length": 11,
+              "terminator_offset": 43
+            },
+            {
+              "line": 40,
+              "offset": 44,
+              "length": 6,
+              "terminator_offset": 49
+            }
+          ],
+          "line_numbers": [
+            10,
+            20,
+            30,
+            40
+          ],
+          "terminator_hex": "0000",
+          "bank": "physical bank 0, Gate Array RAM config 0",
+          "sentinel_offset": 50
+        },
+        "comparison": {
+          "classification": "UNSUPPORTED",
+          "basis": "raw contiguous RAM records including 0000 sentinel",
+          "first_difference": null,
+          "cpc_size": 52,
+          "c99_size": null,
+          "cpc_sha256": "9d28ff50bb13698edf41992dcfdd98495211346eee25a8617c4e98b835dfeb92",
+          "c99_sha256": null,
+          "c99_rejection": "image-cli: input rejected: BS=8 BT=4 BP=0 BL=0"
+        },
+        "files": {
+          "c99_error.txt": {
+            "size_bytes": 47,
+            "sha256": "1336826854dbffbff9330cba83ba2353234ee50820964ceb058272812e76b166"
+          },
+          "list.png": {
+            "size_bytes": 5929,
+            "sha256": "0d7d6c39a928dff4c04b06791468ae961765465ebfa9469540af6dc8b48dd8a7"
+          },
+          "caprice.log": {
+            "size_bytes": 369,
+            "sha256": "638d6b20f04a15db4cc9f8e069530710cb6adbbb656efbf877c7c49a5d3b35bb"
+          },
+          "autocmd.json": {
+            "size_bytes": 322,
+            "sha256": "f91f3d98fa79d0c3e74672d885546525b127eddbbcf8d2735c2a95345b3c1b5e"
+          },
+          "cap32.cfg": {
+            "size_bytes": 1108,
+            "sha256": "78a5b323afbc2816c0351281899dfe6bc11476314040fd458dbaa66563b27fa2"
+          },
+          "program.bin": {
+            "size_bytes": 52,
+            "sha256": "9d28ff50bb13698edf41992dcfdd98495211346eee25a8617c4e98b835dfeb92"
+          },
+          "comparison.json": {
+            "size_bytes": 344,
+            "sha256": "fe31fe54eade2121a0ed71ed7e3aba6d38134d74411614ec9da6adad5c0f1e00"
+          },
+          "original.bas": {
+            "sha256": "934503e848ee59bfb0018ba438b2b65c0db016359bd934d5b8fe07625c65424c",
+            "size_bytes": 43
+          }
+        }
+      },
+      "run": {
+        "fresh_cpc_run_session": true,
+        "screenshot": "VISUAL_OBSERVATION",
+        "printer_semantics": "direct-mode PRINT #8,ERR then PRINT #8,B% AFTER screenshot, never screen bytes",
+        "printer_raw_hex": "20 36 20 0D 0A 20 30 20 0D 0A",
+        "err_probe": 6,
+        "variable_probe": 0,
+        "native_status": "UNSUPPORTED",
+        "native_number": null,
+        "native_returncode": 0,
+        "files": {
+          "caprice.log": {
+            "sha256": "b030bf564a77d9b765dc9d6e58e554d614d42cb457232414b1b0f4a37f9d4e50",
+            "size_bytes": 265
+          },
+          "autocmd.json": {
+            "sha256": "14133325dc174c8b08d26de959b4f536f86ec615e2955ffdcc61909f64ff9ea9",
+            "size_bytes": 409
+          },
+          "printer.dat": {
+            "sha256": "c03814ae74f02422a213afc57fc4cba17afdf509c3c875ed464ae48850251a18",
+            "size_bytes": 10
+          },
+          "native.stdin.bin": {
+            "sha256": "b3a1c77ba309041f9b9d8892a4cba2db546da5b5fd0d20ca80341487d99ac143",
+            "size_bytes": 63
+          },
+          "native.stdout.bin": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size_bytes": 0
+          },
+          "native.stderr.bin": {
+            "sha256": "4c2f09492085a7d48fa8dc6ced42383c0dfa4b50e7c99da46792bbce5c40c309",
+            "size_bytes": 264
+          },
+          "cap32.cfg": {
+            "sha256": "23c41e84af26043dafd6f6fdd6962ed9fc942766f8a25413985754228d3dd64d",
+            "size_bytes": 1116
+          },
+          "run.png": {
+            "sha256": "a6f6aa83aed38eac76643392b416fa3203cd294d3c278006d8e5dccbe4fcaa2b",
+            "size_bytes": 5475
+          }
+        }
+      }
+    },
+    {
+      "case": "ZERO_M255",
+      "lhs": 0,
+      "rhs": 255,
+      "source_path": "tests/oracles/inputs/j1_3_a/zero_m255.bas",
+      "pre_run": {
+        "case": "ZERO_M255",
+        "source_sha256": "214e515987d27d37bffdeb4c7cc07ec595934ed54e35ce3485eac18299dd138f",
+        "snapshot_taken_before_run": true,
+        "list_requested": true,
+        "region": {
+          "base_pointer_address": 44644,
+          "end_pointer_address": 44646,
+          "base_pointer_value": 367,
+          "start_address": 368,
+          "end_exclusive": 415,
+          "snapshot_data_offset": 256,
+          "snapshot_program_offset": 624,
+          "length": 47,
+          "records": [
+            {
+              "line": 10,
+              "offset": 0,
+              "length": 11,
+              "terminator_offset": 10
+            },
+            {
+              "line": 20,
+              "offset": 11,
+              "length": 17,
+              "terminator_offset": 27
+            },
+            {
+              "line": 30,
+              "offset": 28,
+              "length": 11,
+              "terminator_offset": 38
+            },
+            {
+              "line": 40,
+              "offset": 39,
+              "length": 6,
+              "terminator_offset": 44
+            }
+          ],
+          "line_numbers": [
+            10,
+            20,
+            30,
+            40
+          ],
+          "terminator_hex": "0000",
+          "bank": "physical bank 0, Gate Array RAM config 0",
+          "sentinel_offset": 45
+        },
+        "comparison": {
+          "classification": "UNSUPPORTED",
+          "basis": "raw contiguous RAM records including 0000 sentinel",
+          "first_difference": null,
+          "cpc_size": 47,
+          "c99_size": null,
+          "cpc_sha256": "a7173a1d7cb49100ddf5379f57a49d3b96dfc9f40cf466bd9c14e5e9aa22d323",
+          "c99_sha256": null,
+          "c99_rejection": "image-cli: input rejected: BS=8 BT=4 BP=0 BL=0"
+        },
+        "files": {
+          "c99_error.txt": {
+            "size_bytes": 47,
+            "sha256": "1336826854dbffbff9330cba83ba2353234ee50820964ceb058272812e76b166"
+          },
+          "list.png": {
+            "size_bytes": 5902,
+            "sha256": "ad9f5dd9a84c9270452fd357577bd914818bcd9374cc2ed8c94b2002ff691964"
+          },
+          "caprice.log": {
+            "size_bytes": 373,
+            "sha256": "883f2f5557be4552e2c24e6a19767646357cccfacf8d6e5ee0e49c3f63986132"
+          },
+          "autocmd.json": {
+            "size_bytes": 319,
+            "sha256": "47091938bfd140cd8b9981cfbaaf067ed0d16cdc874db97aa5b7e36ceec39897"
+          },
+          "cap32.cfg": {
+            "size_bytes": 1110,
+            "sha256": "330d1c1e19bfb812bd10b5c5beb1f8bb08006de4cb3a0b4cb648ef09b38c02e7"
+          },
+          "program.bin": {
+            "size_bytes": 47,
+            "sha256": "a7173a1d7cb49100ddf5379f57a49d3b96dfc9f40cf466bd9c14e5e9aa22d323"
+          },
+          "comparison.json": {
+            "size_bytes": 344,
+            "sha256": "29376bc32ef06252583ab2dd6e39aecb8f5ea2422aff24835584e6820a4c20a5"
+          },
+          "original.bas": {
+            "sha256": "214e515987d27d37bffdeb4c7cc07ec595934ed54e35ce3485eac18299dd138f",
+            "size_bytes": 40
+          }
+        }
+      },
+      "run": {
+        "fresh_cpc_run_session": true,
+        "screenshot": "VISUAL_OBSERVATION",
+        "printer_semantics": "direct-mode PRINT #8,ERR then PRINT #8,B% AFTER screenshot, never screen bytes",
+        "printer_raw_hex": "20 30 20 0D 0A 2D 32 35 35 20 0D 0A",
+        "err_probe": 0,
+        "variable_probe": -255,
+        "native_status": "UNSUPPORTED",
+        "native_number": null,
+        "native_returncode": 0,
+        "files": {
+          "caprice.log": {
+            "sha256": "a5d40c1b127c23327f3596ff375dddd495862fa1695ca7f877e9f105f890ab83",
+            "size_bytes": 269
+          },
+          "autocmd.json": {
+            "sha256": "faa5d3702a78b96a402cfcd30271eac385b3787131890428daecc26477f80911",
+            "size_bytes": 406
+          },
+          "printer.dat": {
+            "sha256": "af70aadbc7c830c313cd02be199b8038592c2e9fd6322c7e3c3f61a8d2e852d8",
+            "size_bytes": 12
+          },
+          "native.stdin.bin": {
+            "sha256": "fa2d71dc81fa13cbe8d9441c04f7a9c29ae80e2ae579ab68af545464e731fdd0",
+            "size_bytes": 60
+          },
+          "native.stdout.bin": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size_bytes": 0
+          },
+          "native.stderr.bin": {
+            "sha256": "4c2f09492085a7d48fa8dc6ced42383c0dfa4b50e7c99da46792bbce5c40c309",
+            "size_bytes": 264
+          },
+          "cap32.cfg": {
+            "sha256": "6ca0ae34dfc3daea194a218513a4e3fc2e91615a4c2ca52857a29401d615bd38",
+            "size_bytes": 1120
+          },
+          "run.png": {
+            "sha256": "30648dc071455c12cfb51e349cda450a333c185b4b5a6d68f98a5f7272b2cbbf",
+            "size_bytes": 5331
+          }
+        }
+      }
+    }
+  ]
+}

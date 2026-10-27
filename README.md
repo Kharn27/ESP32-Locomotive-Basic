@@ -53,28 +53,22 @@ Le code Z80 sert de **spécification comportementale historique**, pas de code �
 
 L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les modes et coordonnées CPC devront être **reproduits logiquement**, puis adaptés au matériel. La même séparation s’applique au clavier, aux fichiers, au son et aux autres périphériques.
 
-## Où en sommes-nous ?
+## Où en sommes-nous ? — 27 octobre 2026
 
-**Jalons J0.1 à J0.23 et sous-missions J0.24-C1 à C7 acceptés et fusionnés (PR #43 comprise).** Le cœur C99 exécute la tranche arithmétique témoin ; **un programme CPC 6128 arbitraire reste hors périmètre**. Huit images mémoire tokenisées ont été comparées avec succès à des acquisitions CPC indépendantes, deux sondes numériques après `RUN` confirment C=5/D=2 et deux captures d'imprimante CPC pour `LIST` documentent une différence `CRLF`/`LF` avec la console Linux. **J0 reste ouvert :** la sortie écran byte-à-byte de `LIST` et `RUN` n'est pas homologuée, et aucune compilation/marge RAM/Flash/pile ESP-IDF/Xtensa réelle n'est démontrée.
+**J0 est clos (J0.28). J1 est en cours : J1.1, J1.2-A/B/C et J1.2-HW2 ont été acceptés et fusionnés.** Nous réimplémentons nativement en C99 **Locomotive BASIC 1.1 du CPC 6128** : la compatibilité visée est historique mais **reste partielle et délimitée par les preuves**.
 
-| Domaine | État vérifié sur `main` |
+| Domaine | Capacité effectivement démontrée |
 | --- | --- |
-| Programme et représentation CPC | Stockage, édition de lignes numérotées, import/export tokenisé, tokeniseur, détokéniseur, `LIST` et `NEW` pour un **sous-ensemble** (J0.1–J0.6) |
-| Exécution BASIC native | `PRINT` littéral ou constante simple, `GOTO`, `END`, `REM`, apostrophe ; `RUN` piloté pas à pas et arrêt externe (J0.7–J0.11) |
-| Environnement de test | Console Linux `loco_basic_cli` avec `:help`, `:step`, `:stop`, `:quit`, exclusivement pour le développement (J0.9) |
-| Types, références et magasin | Décodage CPC borné, types implicites, clés canoniques et magasin scalaire INT16 / REAL5 / STRING vide (J0.12–J0.15, J0.17) ; lecture/écriture INTEGER raccordées à `RUN` en J0.19/J0.20 |
-| Variables dans `PRINT` | Références `%`, `$`, `!` tokenisées et listables (J0.16) ; les INTEGER explicites `%` existants sont **désormais lus et affichés par `RUN`** (J0.20) ; STRING/REAL5 non exécutables et rendu numérique CPC non encore validé |
-| Affectations INTEGER | `A%=2` et `LET A%=2` : représentation CPC et `LIST` (J0.18), **exécutables dans `RUN`** (J0.19), avec création/réaffectation en magasin borné, constantes 0 à 255 et une seule affectation par ligne |
-| Expression INTEGER simple | `B%=A%+3` et `LET B%=A%+255` : représentés en tokens CPC (J0.21), **exécutables** en `RUN` via addition INTEGER bornée (J0.22), variables explicitement typées, écriture atomique et diagnostic interne de dépassement |
-| Évaluateur complet, nombres CPC5, autres commandes | **Non implémentés** ; ni expressions générales, ni priorités/opérateurs complexes, ni exécution des références STRING/REAL5 dans `PRINT`, ni support intégral du dialecte |
-| Écran et périphériques ESP32 CYD | **Non intégrés** : pas encore de firmware autonome, graphismes CPC, tactile ou microSD |
-| Audit mémoire CYD | J0.23 : tailles ABI et réservations mesurées sous Linux, estimation d'affichage, risque de pile CLI hôte de 170 256 octets ; faisabilité ESP32 **plausible mais non démontrée** |
-| Oracle CPC 6128 | Caprice32 v4.6.0 à commit figé ; **8 images RAM tokenisées historiques** (`MATCH_EXACT`), **2 sondes `PRINT #8,B%` après `RUN`** (`MATCH_SEMANTIC`, valeurs 5 et 2), et **2 sorties `LIST` CPC sur imprimante** (`DIFF` vs CLI Linux, CRLF/LF), archives permanentes à provenance contrôlée ; [CI oracle #40285325700](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40285325700) |
-| Compatibilité historique validée sur CPC indépendant | **Partielle** : 8 tokenisations exactes, 2 observations comportementales numériques et 2 comparaisons brutes `LIST` en `DIFF` (fin de ligne imprimante/CLI) ; 18 comparaisons `LIST`/`RUN` non vérifiées, formatage écran et compatibilité générale non homologués |
+| Programme BASIC, tokens, LIST et RUN | Numérotation et stockage des lignes, import/export CPC, LIST et RUN sur le sous-ensemble testé ; confrontations CPC indépendantes |
+| INTEGER natif | Littéraux signés `-32768..32767`, stockage et PRINT INTEGER ; addition simple `B%=A%+n` (n de 0 à 255) et diagnostics bornés |
+| Soustraction binaire `B%=A%-n` | **Non implémentée** ; la mission [J1.3-A / #62](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/62) acquiert exclusivement l'oracle CPC |
+| Linux et Caprice32 | CI C99 sans/avec ASan/UBSan ; Caprice32 CPC 6128 via image GHCR au digest immuable |
+| ESP32 CYD réel | Deux sondes ciblées exécutées ; J1.2-HW2 confirme les frontières INTEGER, la tokenisation NMIN et la stabilité apparente des ressources |
+| Écran BASIC, tactile, microSD | **Non intégrés / non validés** ; l'écran TFT n'est pas encore un terminal BASIC utilisable |
 
-Au dernier HEAD C7 validé puis fusionné par [PR #43](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/43), la CI a réussi **25/25 suites Linux et 25/25 ASan/UBSan** ([run #40285325699](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40285325699)). Le banc différentiel J0.24 réunit **8 `MATCH_EXACT` de tokenisation, 2 `MATCH_SEMANTIC` sur INTEGER post-`RUN`, et 2 `DIFF` de listing imprimante CPC contre CLI Linux** (CRLF/LF) ; **18 observations restent `UNVERIFIED`**. La fidélité écran byte-à-byte et la faisabilité ESP32 restent à vérifier. Ces preuves ciblées ne démontrent pas une compatibilité CPC 6128 complète.
+**Validation matérielle J1.2-HW2 :** [PR #61](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/61) fusionnée dans `main` au commit `d9aeb39863391d95df3a79c7192b353e7ade1230` après revue Pilotage et UART réel fourni par le Product Owner. `ON_DEVICE_TEST_PASS`, cas INTEGER `255`, `256`, `-256`, `32767`, `-32768`, NMIN `IMAGE_MATCH_EXACT` (36 octets), rejet atomique de `+32768`. Pas de panic/reboot observé ; heap 8 bits libre de **285 988 octets** et plus grand bloc **155 648 octets** stables, stack HWM minimale **2 800 octets**. SHA-256 du firmware ELF exécuté : `96db76d92949ec36cd7c2eeb97ca55ed057e522d2770410940edd3d23e9dee54`. Les CI validées du HEAD HW2 : [Linux #40492465009](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40492465009), [GHCR #40492465252](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40492465252), [Xtensa #40492465140](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40492465140). **Ce test n'est pas une validation globale des périphériques ou du langage.**
 
-Voir le [suivi des jalons et des risques](docs/PROJECT_STATUS.md), les [barrières J0 → J1](docs/ROADMAP_GATES.md) et les spécifications dans `docs/J0.*` pour la portée exacte et les preuves de chaque mission.
+Les **quatre B1 historiquement UNSUPPORTED** et les **18 LIST/RUN historiques UNVERIFIED** restent documentés comme observations à leur date, sans réécriture rétroactive. Voir [PROJECT_STATUS](docs/PROJECT_STATUS.md), [ROADMAP_GATES](docs/ROADMAP_GATES.md) et le [protocole J1.3-A](docs/J1.3-A-integer-subtraction-oracle.md).
 
 ## Sonde ESP-IDF J0.25 — exécutée sur CYD physique
 
@@ -87,7 +81,7 @@ sortie simulée. **`TARGET_BUILD_VERIFIED`** : la [CI réelle Xtensa finale #403
 a réussi (ESP-IDF v5.5.6, ELF Xtensa et binaire de 153 360 octets,
 IRAM 51 807, DRAM 30 396). **`ON_DEVICE_VERIFIED PASS`** après flash réel sur CYD par le Product Owner :
 le programme BASIC a émis `5`, avec **285 988 octets** de heap 8 bits libre avant et après, **155 648 octets** de plus grand bloc, et **2 976 octets** de marge pile restante après exécution. Provenance : transcription série fournie par le PO, [rapport matériel J0.25-HW1](docs/J0.25-HW1-cyd-physical-validation.md). Les périphériques écran/tactile/SD restent non testés.
-Voir [J0.25](docs/J0.25-esp32-xtensa-feasibility.md). **La sonde a également passé le test matériel ; J0 reste ouvert pour l'homologation différentielle CPC restante.**
+Voir [J0.25](docs/J0.25-esp32-xtensa-feasibility.md). **Cette sonde a également passé le test matériel ; depuis J0.28, J0 est clos. Les limites de couverture restent documentées.**
 
 ## Architecture du dépôt
 

@@ -258,3 +258,8 @@ HW4-B **ACCEPTÉ ET FUSIONNÉ** — [PR #83](https://github.com/Kharn27/ESP32-Lo
 ### HW4-C1 — BASIC PRINT natif vers écran CYD (en développement)
 
 Une troisième image ESP-IDF indépendante, `firmware/esp32_loco/`, relie directement les octets de `bsr_step()` à `video/cpc_text` (MODE 1 40×25) puis au pilote DMA commun `cyd_ili9341`. Démonstration déterministe `10 A%=2`, `20 B%=A%+3`, `30 PRINT B%`, `40 END`. Les bancs série et graphique sont préservés. Voir [contrat technique HW4-C1](docs/HW4-C1-native-print-TFT.md). Validation physique du nouveau firmware **non encore obtenue** ; PR réservée au Pilotage, aucune fusion autonome.
+
+
+### Décision Pilotage — HW4-C1 intégré, HW4-C2 autorisé (27 octobre 2026)
+
+**HW4-C1 ACCEPTÉ ET FUSIONNÉ** ([PR #87](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/87), squash `f1a82aae130eab78a67ed463236caa9899607fa5`, 27 octobre 2026). Première image BASIC native + TFT via `bsr_step()` → `cpc_text` → `cpc_video` → DMA partagé. CI SHA `8b9d08e9ecbd620a59937267c0dec4599a2e1dae` : Linux **48/48 OFF/ON**, 3 builds Xtensa ESP-IDF v5.5.6, CPC/J1.7-A verts. **Retour matériel PO UART et observation visuelle positifs, PHOTO_UNAVAILABLE** ; dérogation photographique documentaire accordée pour C1 uniquement, pas de revendication PHOTO_VERIFIED. [HW4-C2 / issue #90](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/90) : petite console UART de saisie BASIC native et affichage TFT, tests CYD réels obligatoires, sans clavier tactile ni scrolling CPC général. J1.7-B reste indépendant.

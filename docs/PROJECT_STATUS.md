@@ -458,3 +458,12 @@ HW4-B **ACCEPTÉ ET FUSIONNÉ** — [PR #83](https://github.com/Kharn27/ESP32-Lo
 ### HW4-C1 — premier PRINT BASIC natif sur TFT (issue #86)
 
 **Autorisé / en développement, ON_DEVICE_UNVERIFIED.** Branche dédiée `feat/hw4-c1-native-basic-tft` construite depuis `main` après intégration HW4-A / HW4-B. Troisième image ESP-IDF `firmware/esp32_loco`; sortie de `bsr_step()` vers l'adaptateur texte C99 et VRAM MODE 1 puis DMA du pilote unique. Les deux bancs historiques restent indépendants. Preuves Linux, Xtensa et essai PO au HEAD final restent à consigner ; ne pas confondre preuve de build et test physique. J1.7-A reste indépendant, HW4-C2 non autorisé, fusion réservée à Pilotage. Voir [rapport HW4-C1](HW4-C1-native-print-TFT.md).
+
+
+### Décision Pilotage — HW4-C1 ACCEPTÉ / FUSIONNÉ, HW4-C2 AUTORISÉ (27 octobre 2026)
+
+**HW4-C1 ACCEPTÉ ET FUSIONNÉ** ([PR #87](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/87), squash `f1a82aae130eab78a67ed463236caa9899607fa5`, 27 octobre 2026). Première image BASIC native + TFT via `bsr_step()` → `cpc_text` → `cpc_video` → DMA partagé. CI SHA `8b9d08e9ecbd620a59937267c0dec4599a2e1dae` : Linux **48/48 OFF/ON**, 3 builds Xtensa ESP-IDF v5.5.6, CPC/J1.7-A verts. **Retour matériel PO UART et observation visuelle positifs, PHOTO_UNAVAILABLE** ; dérogation photographique documentaire accordée pour C1 uniquement, pas de revendication PHOTO_VERIFIED.
+
+Image intégrée C1 mesurée en CI : IRAM **62 515/131 072 (47,70 %)**, DRAM **47 192/180 736 (26,11 %)**, Flash Code **90 078 o**, binaire **205 541 o**. Sur CYD réel : heap libre final **260 772 o**, largest **131 072 o**, pile **4 888 o**, **62 DMA / 0 timeout**, octets `20 35 20 0a`, `BSR_END`.
+
+[Issue #86](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/86) clôturée. [HW4-C2 / issue #90](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/90) autorisé pour saisir des lignes BASIC depuis l'UART, les exécuter avec le runtime existant, et rendre les sorties réelles sur TFT, sans modifier `core/` ni les oracles. Essai physique obligatoire au HEAD final. **HW4-C3 non autorisé**. La PR parallèle J1.7-B #89 ne fait pas partie de HW4-C1 et conserve son indépendance.

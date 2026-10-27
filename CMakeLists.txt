@@ -299,3 +299,19 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+# J1.2-B: separate current/native capability and regression suite.
+# Historical J1.2-A sealed proof and its original statuses remain untouched.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer16 tests/test_basic_integer16.c)
+    target_link_libraries(test_basic_integer16 PRIVATE basic_session_runtime
+                          basic_variable_binding)
+    add_test(NAME integer16_literals COMMAND test_basic_integer16)
+    add_test(NAME j1_2_b_native_cpc_differential
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_2_b_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+    add_test(NAME j1_2_a_historical_boundary_seal
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_2_boundary_verify.py"
+        --permanent --self-test)
+endif()

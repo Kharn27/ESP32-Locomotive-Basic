@@ -1,0 +1,10 @@
+{
+  "classification": "MATCH_EXACT",
+  "basis": "raw contiguous RAM records including 0000 sentinel",
+  "first_difference": null,
+  "cpc_size": 32,
+  "c99_size": 32,
+  "cpc_sha256": "415d67d0bc7c42d5379c83ee3bd63049473edca2561c42f8215a70e3c232ae04",
+  "c99_sha256": "415d67d0bc7c42d5379c83ee3bd63049473edca2561c42f8215a70e3c232ae04",
+  "c99_rejection": null
+}

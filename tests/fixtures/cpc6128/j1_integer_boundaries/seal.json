@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "phase": "J1.2-A-PROVISIONAL",
+  "approval": "PENDING_PILOTAGE",
+  "manifest_sha256": "44c205c783a79ade7aa5c264cffe29b8eed0efb10750c3f9a15c412ecbaf4ab5",
+  "acquisition_run_id": "40466835514",
+  "acquisition_head_sha": "f9f43844d715d63b3b694e9041633b2b19e4c20e",
+  "program_sha256": {
+    "P255": "6e15e0144aae0a5d411de9b4e41671306a2c489535a4fa19a943825404e5776b",
+    "P256": "b5b9e1e78e978aa27abcc69c6ef8fe22655117152fb3ff7b32431f88fde7eb2a",
+    "PMAX": "049afac7471df832cf9855d4a080f41ac1e2ed336ef37140e1e4902dda0b3f8e",
+    "N255": "415d67d0bc7c42d5379c83ee3bd63049473edca2561c42f8215a70e3c232ae04",
+    "N256": "c919dafaa0088e8a127bd3aa818da3e992b172abf9018109e3da993eae028040",
+    "NMIN": "dad9d7f1cff60feac8f16fed4374e4f50aac78d17bf5f342468841c0cce01a58"
+  },
+  "first_operand_hex": {
+    "P255": "19ff00",
+    "P256": "1a0001",
+    "PMAX": "1aff7f",
+    "N255": "f519ff",
+    "N256": "f51a00",
+    "NMIN": "f51f00"
+  }
+}

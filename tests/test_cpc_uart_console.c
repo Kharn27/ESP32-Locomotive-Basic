@@ -33,16 +33,21 @@ static void edits(void) {
     uint8_t p = 0;
     init();
     assert(cpc_uart_console_prompt(&t,&page) && !page);
-    assert(t.column==1U);
+    assert(t.column==0U && t.row==0U);
+    assert(v.cursor_visible && v.cursor_column==0U && v.cursor_row==0U);
+    /* Cursor is an overlay, not a rendered '>' character in CPC VRAM. */
+    assert(cpc_video_get(&v,0U,0U,&p) && p==0U);
     assert(cpc_uart_console_append(&t,'X'));
-    assert(cpc_video_get(&v,8U,0U,&p) && p==1U);
+    assert(cpc_video_get(&v,0U,0U,&p) && p==1U);
     assert(cpc_uart_console_backspace(&t));
-    assert(t.column==1U && t.row==0U);
-    assert(cpc_video_get(&v,8U,0U,&p) && p==0U);
+    assert(t.column==0U && t.row==0U);
+    assert(cpc_video_get(&v,0U,0U,&p) && p==0U);
     assert(cpc_uart_console_append(&t,'5'));
     assert(cpc_uart_console_end_line(&t) && t.row==1U);
     assert(cpc_uart_console_prompt(&t,&page) && !page);
-    assert(t.row==1U && t.column==1U);
+    assert(t.row==1U && t.column==0U);
+    assert(v.cursor_visible && v.cursor_column==0U && v.cursor_row==1U);
+    assert(cpc_video_get(&v,0U,8U,&p) && p==0U);
     guarded();
 }
 static void wrap_erase(void) {
@@ -51,9 +56,9 @@ static void wrap_erase(void) {
     assert(cpc_uart_console_prompt(&t,&page));
     for(size_t i=0U; i<45U; ++i)
         assert(cpc_uart_console_append(&t,'X'));
-    assert(t.row==1U && t.column==6U);
+    assert(t.row==1U && t.column==5U);
     for(size_t i=0U;i<7U;++i) assert(cpc_uart_console_backspace(&t));
-    assert(t.row==0U && t.column==39U);
+    assert(t.row==0U && t.column==38U);
     guarded();
 }
 
@@ -71,28 +76,28 @@ static void ansi_screen_sync(void) {
         assert(uart_line_feed(&line,ch)==UART_LINE_APPEND);
         assert(cpc_uart_console_append(&t,ch));
     }
-    assert(line.length==3U && t.column==4U);
-    assert(cpc_video_get(&v,3U*8U,0U,&p) && p==1U);
+    assert(line.length==3U && t.column==3U);
+    assert(cpc_video_get(&v,1U*8U,0U,&p) && p==1U);
     const uint8_t ansi[]={0x1bU,'[','3','~'};
     for(size_t i=0;i<3U;++i) {
         assert(uart_line_feed(&line,ansi[i])==UART_LINE_IGNORED);
-        assert(t.column==4U && line.length==3U);
-        assert(cpc_video_get(&v,3U*8U,0U,&p) && p==1U);
+        assert(t.column==3U && line.length==3U);
+        assert(cpc_video_get(&v,2U*8U,0U,&p) && p==1U);
     }
     assert(uart_line_feed(&line,ansi[3U])==UART_LINE_DELETE);
     assert(cpc_uart_console_backspace(&t));
-    assert(t.column==3U && line.length==2U);
+    assert(t.column==2U && line.length==2U);
     assert(memcmp(line.data,"AB",2U)==0);
-    assert(cpc_video_get(&v,3U*8U,0U,&p) && p==0U);
+    assert(cpc_video_get(&v,1U*8U,0U,&p) && p==0U);
     assert(cpc_video_get(&v,2U*8U,0U,&p) && p==1U);
     static const uint8_t unknown[]={0x1bU,'[','1',';','2','D'};
     for(size_t i=0;i<sizeof(unknown);++i)
         assert(uart_line_feed(&line,unknown[i])==UART_LINE_IGNORED);
-    assert(line.length==2U && t.column==3U);
+    assert(line.length==2U && t.column==2U);
     assert(cpc_video_get(&v,2U*8U,0U,&p) && p==1U);
     assert(uart_line_feed(&line,0x08U)==UART_LINE_DELETE);
     assert(cpc_uart_console_backspace(&t));
-    assert(t.column==2U && line.length==1U && line.data[0]=='A');
+    assert(t.column==1U && line.length==1U && line.data[0]=='A');
     assert(cpc_video_get(&v,2U*8U,0U,&p) && p==0U);
     assert(uart_line_feed(&line,'\r')==UART_LINE_READY);
     assert(line.length==1U && line.data[0]=='A');

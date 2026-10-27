@@ -27,15 +27,14 @@ bool cpc_uart_console_prompt(CpcText *text, bool *reset_page)
         const uint8_t lf = (uint8_t)'\n';
         if (!cpc_text_write(text, &lf, 1U)) return false;
     }
-    /* Max editable source is 120 chars + one prompt glyph; worst case 4 rows. */
+    /* CPC has no artificial '>' input marker. Keep the cursor at col 0.
+     * 120 editable ASCII bytes still require at most three text rows;
+     * reserve four rows conservatively under the existing page policy. */
     if (text->row > 20U) {
         if (!cpc_uart_console_clear(text)) return false;
         *reset_page = true;
     }
-    {
-        const uint8_t marker = (uint8_t)'>'; /* host console only; not BASIC */
-        return cpc_text_write(text, &marker, 1U);
-    }
+    return cpc_video_cursor(text->video, text->column, text->row, true);
 }
 bool cpc_uart_console_append(CpcText *text, uint8_t ch)
 {

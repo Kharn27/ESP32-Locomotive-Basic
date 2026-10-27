@@ -127,7 +127,7 @@ def test_negative(cli, image_cli):
                 item + ": OUT_OF_SCOPE_EXPORT_ACCEPTED")
     for old in ("10 B%=A%+3\n", "10 B%=-32768\n"):
         # Both old grammars must remain accepted.
-        p = run(image_cli, old + b"20 END\n", "EXISTING_GRAMMAR")
+        p = run(image_cli, old.encode("ascii") + b"20 END\n", "EXISTING_GRAMMAR")
         require(p.stdout.endswith(b"\x00\x00"),"REGRESSION_OLD_GRAMMAR")
     print("PASS J1.3-B 11 forbidden forms rejected, addition and NMIN preserved")
 

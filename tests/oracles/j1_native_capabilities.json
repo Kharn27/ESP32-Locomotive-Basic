@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "phase": "J1.2-B",
+  "phase": "J1.2-C",
   "archived_B1_native_status": {
     "minus_one": "UNSUPPORTED",
     "minus_twelve": "UNSUPPORTED",
@@ -11,7 +11,7 @@
     "minus_one": "EXECUTABLE",
     "minus_twelve": "EXECUTABLE",
     "max_int16": "EXECUTABLE",
-    "min_int16": "UNSUPPORTED"
+    "min_int16": "EXECUTABLE"
   },
   "historical_LIST_RUN": "UNVERIFIED",
   "presentation_comparison": "MATCH_PRESENTATION",

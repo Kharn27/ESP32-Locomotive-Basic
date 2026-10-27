@@ -36,21 +36,21 @@ EXECUTABLE = {
 # supported program inputs of later native engines.
 B1_UNSUPPORTED = ("minus_one", "minus_twelve", "max_int16", "min_int16")
 # Current executable surface is independent from the immutable B1 archive.
-# J1.1 added signed 8-bit literals; J1.2-B adds 32767, not -32768.
-CURRENT_B1_UNSUPPORTED = ("min_int16",)
+# J1.2-C executes -32768; the four historical B1 statuses remain sealed.
+CURRENT_B1_UNSUPPORTED = ()
 
 
 def current_capabilities():
     filename = ROOT / "tests/oracles/j1_native_capabilities.json"
     data = json.loads(filename.read_bytes())
-    require(data.get("schema_version") == 1 and data.get("phase") == "J1.2-B",
+    require(data.get("schema_version") == 1 and data.get("phase") == "J1.2-C",
             "CURRENT_CAPABILITY_SCHEMA_CHANGED")
     require(data.get("archived_B1_native_status") ==
             {name: "UNSUPPORTED" for name in B1_UNSUPPORTED},
             "ARCHIVED_B1_STATUS_REWRITTEN")
     require(data.get("current_native_B1") ==
             {"minus_one": "EXECUTABLE", "minus_twelve": "EXECUTABLE",
-             "max_int16": "EXECUTABLE", "min_int16": "UNSUPPORTED"},
+             "max_int16": "EXECUTABLE", "min_int16": "EXECUTABLE"},
             "CURRENT_B1_CAPABILITY_MISMATCH")
     require(data.get("historical_LIST_RUN") == "UNVERIFIED" and
             data.get("presentation_comparison") == "MATCH_PRESENTATION" and
@@ -308,7 +308,7 @@ def main():
         if args.self_test:
             negative_tests(root)
         print("PASS J0.28 4 HISTORICAL EXECUTABLE CASES; "
-              "4 ARCHIVED B1 UNSUPPORTED; 1 CURRENT B1 UNSUPPORTED; "
+              "4 ARCHIVED B1 UNSUPPORTED; 0 CURRENT B1 UNSUPPORTED; "
               "18 HISTORICAL UNVERIFIED; NOT AN AUTOMATIC J1 GATE", flush=True)
     except (AuditError, SignedInvalid, OSError, ValueError, KeyError,
             TypeError, subprocess.TimeoutExpired) as exc:

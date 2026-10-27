@@ -262,8 +262,11 @@ static esp_err_t set_orientation(unsigned int idx)
  */
 static void diagnostic_band(int top, int width, int height, unsigned int idx)
 {
-    static const char label[] = "CASE 0";
-    const int label_x = (width - (int)(sizeof(label) - 1U) * 8) / 2;
+    /* Label is always two decimal digits: 08, 09, 10, 11, etc. */
+    const char label[8] = {'C', 'A', 'S', 'E', ' ',
+                           (char)('0' + idx / 10U),
+                           (char)('0' + idx % 10U), '\0'};
+    const int label_x = (width - 7 * 8) / 2;
     const int label_y = 36;
     for (int by = 0; by < HW3_TILE; ++by) {
         const int y = top + by;
@@ -277,9 +280,9 @@ static void diagnostic_band(int top, int width, int height, unsigned int idx)
             if (x < 18 && y >= height - 18) rgb = 0xFFE0U;     /* bottom-left yellow */
             if (x >= width - 18 && y >= height - 18) rgb = 0xFFFFU; /* bottom-right white */
             if (y >= label_y && y < label_y + 8 &&
-                x >= label_x && x < label_x + (int)(sizeof(label) - 1U) * 8) {
+                x >= label_x && x < label_x + 7 * 8) {
                 int col = (x - label_x) / 8;
-                char ch = col == 5 ? (char)('0' + idx) : label[col];
+                char ch = label[col];
                 uint8_t pixels = hw3_glyph_row((uint8_t)ch, (unsigned)(y - label_y));
                 if ((pixels & (0x80U >> ((x - label_x) % 8))) != 0) {
                     rgb = HW3_YELLOW_RGB565;
@@ -294,8 +297,15 @@ static void diagnostic_band(int top, int width, int height, unsigned int idx)
 
 static esp_err_t draw_diagnostic(unsigned int idx)
 {
-    const int width = (idx & 1U) ? HW3_W : HW3_NATIVE_W;
-    const int height = (idx & 1U) ? HW3_H : HW3_NATIVE_H;
+    /* HW3-C3: width must agree with set_orientation() for EVERY case.
+     * Before this fix idx=8 used 240x320 while MADCTL stayed in MV=0
+     * with a 320x240 address window. That wrapped stale/corrupt pixels.
+     */
+    const bool native_wide = idx >= 8U && idx <= 11U;
+    const bool landscape = native_wide || ((idx & 1U) != 0);
+    const int width = landscape ? HW3_W : HW3_NATIVE_W;
+    const int height = landscape ? HW3_H : HW3_NATIVE_H;
+    ESP_LOGI(TAG, "HW3 DIAGNOSTIC_GEOMETRY case=%u width=%d height=%d", idx, width, height);
     for (int top = 0; top < height; top += HW3_TILE) {
         diagnostic_band(top, width, height, idx);
         esp_err_t err = lcd_send(0, top, width, HW3_TILE);
@@ -396,7 +406,7 @@ static esp_err_t show_case(unsigned int idx, bool boot, bool *is_boot)
 static void print_uart_help(void)
 {
     ESP_LOGI(TAG, "HW3 UART_CALIBRATION: m=8 MADCTL, n=6 fallback cases; 0..9,a,c,d,e=select case; b=boot; r=default; ?=help");
-    ESP_LOGI(TAG, "HW3 ALT_CASES: 8..11=native 320x240 with MV0; d=12 software clockwise; e=13 software counterclockwise");
+    ESP_LOGI(TAG, "HW3 ALT_CASES: 8=MV0 MX0 MY0, 9=MV0 MX1 MY0 (default candidate), a=MV0 MX0 MY1, c=MV0 MX1 MY1; d/e=software experiments");
     ESP_LOGI(TAG, "HW3 CASE_BITS: index 0..7=(swap_xy?1:0)+(mirror_x?2:0)+(mirror_y?4:0); 8..11=MV0 native 320x240 (mirror combinations)");
 }
 
@@ -469,9 +479,12 @@ static esp_err_t lcd_initialize(void)
 
 void app_main(void)
 {
-    /* Prefer the independent native-GRAM software rotation until the CYD
-     * owner confirms an orientation with real photos. */
-    const unsigned int default_case = HW3_SOFTWARE_ROTATE_CW;
+    /* HW3-C3: candidate MV=0 / MX=1 full 320x240. The real CYD photo
+     * for case 8 + boot shows legible but mirrored text; independently
+     * testing the X mirror is more evidence-driven than using the failed
+     * software-rotation 12/13 path. PO must confirm orientation visually.
+     */
+    const unsigned int default_case = 9U;
     unsigned int selected_case = default_case;
     bool is_boot = false;
     ESP_LOGI(TAG, "HW3 START");

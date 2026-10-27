@@ -380,6 +380,9 @@ add_executable(cpc_video_ppm tools/cpc_video_ppm.c)
 target_link_libraries(cpc_video_ppm PRIVATE cpc_video)
 if(BUILD_TESTING)
     add_test(NAME cpc_video COMMAND test_cpc_video)
-    add_test(NAME cpc_video_ppm COMMAND cpc_video_ppm
-        "${CMAKE_CURRENT_BINARY_DIR}/hw4_preview")
+    add_test(NAME cpc_video_ppm_determinism COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cpc_video_ppm.py"
+        "$<TARGET_FILE:cpc_video_ppm>"
+        "${CMAKE_CURRENT_BINARY_DIR}/hw4_preview_verified")
 endif()

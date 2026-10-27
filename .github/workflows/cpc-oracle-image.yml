@@ -76,7 +76,7 @@ jobs:
             timeout 20s xvfb-run -a true
           '
       - name: Record immutable published image digest
-        if: github.event_name != 'pull_request'
+        if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
         shell: bash
         run: |
           set -euo pipefail

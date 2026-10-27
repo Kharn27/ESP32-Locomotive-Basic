@@ -34,11 +34,19 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   caprice32-oracle:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # CI-01-B: immutable, ROM-free oracle runtime published by CI-01-A.
+    # Container digest (not mutable tag) is the reviewed artifact identity.
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout pinned emulator submodule
         uses: actions/checkout@v4
@@ -54,21 +62,22 @@ jobs:
           git ls-tree HEAD tests/oracles/caprice32
           test "$(git ls-tree HEAD tests/oracles/caprice32 | awk '{print $1}')" = "160000"
 
-      - name: Install upstream Linux build dependencies and Xvfb
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends g++ make pkg-config libsdl2-dev libfreetype6-dev zlib1g-dev libpng-dev xvfb xauth python3
-
-      - name: Build Caprice32 from pinned source
+      - name: Verify pinned GHCR toolchain and checked-out authentic CPC ROMs
         working-directory: tests/oracles/caprice32
+        shell: bash
         run: |
           set -euo pipefail
-          make -j 2 WITHOUT_GL=1 APP_PATH="$PWD"
-          ./cap32 --version
-          test -s rom/cpc6128.rom
-          sha256sum rom/cpc6128.rom
+          # The container deliberately includes no ROM. We use the git
+          # checkout's CPC files, exactly as the previous workflow did.
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 ./cap32
+          ./cap32 --version | tee /tmp/ci01-caprice32-version.txt
+          grep -Fq "8c778bf072a06fb7c23b9cccd179041db7f79a52" /tmp/ci01-caprice32-version.txt
+          test "$(sha256sum rom/cpc6128.rom | cut -d ' ' -f 1)" = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
           test -s rom/amsdos.rom
           sha256sum rom/amsdos.rom
+          echo "CI-01-B PINNED_IMAGE=sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c APT=NONE CAPRICE_BUILD=NONE"
 
       - name: Build portable C99 comparator
         run: |

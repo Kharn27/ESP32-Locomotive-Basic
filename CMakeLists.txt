@@ -315,3 +315,15 @@ if(BUILD_TESTING)
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_2_boundary_verify.py"
         --permanent --self-test)
 endif()
+
+# J1.2-C: NMIN REAL5 INTEGER boundary; archive remains immutable.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_min tests/test_basic_integer_min.c)
+    target_link_libraries(test_basic_integer_min PRIVATE basic_session_runtime
+                          basic_variable_binding)
+    add_test(NAME integer_min_real5 COMMAND test_basic_integer_min)
+    add_test(NAME j1_2_c_nmin_cpc_differential
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_2_c_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

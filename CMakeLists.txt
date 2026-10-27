@@ -400,3 +400,20 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+
+# HW4-C1: native BASIC output bytes -> portable MODE 1 text adapter -> VRAM.
+# Independent Linux verification, no ROM, TFT transport, heap or fixture edits.
+add_library(cpc_text STATIC video/cpc_text.c)
+target_include_directories(cpc_text PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/video)
+target_link_libraries(cpc_text PUBLIC cpc_video)
+if(BUILD_TESTING)
+    add_executable(test_cpc_text tests/test_cpc_text.c)
+    target_link_libraries(test_cpc_text PRIVATE cpc_text)
+    add_test(NAME hw4_c1_text_boundaries COMMAND test_cpc_text)
+
+    add_executable(test_hw4_c1_integration tests/test_hw4_c1_integration.c)
+    target_link_libraries(test_hw4_c1_integration PRIVATE
+                          cpc_text basic_session_runtime)
+    add_test(NAME hw4_c1_native_runtime_tft_bytes COMMAND test_hw4_c1_integration)
+endif()

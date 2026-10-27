@@ -370,3 +370,19 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+# HW4-A: isolated portable CPC video contract, independent of BASIC.
+add_library(cpc_video STATIC video/cpc_video.c video/cpc_palette.c)
+target_include_directories(cpc_video PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/video)
+add_executable(test_cpc_video tests/test_cpc_video.c)
+target_link_libraries(test_cpc_video PRIVATE cpc_video)
+add_executable(cpc_video_ppm tools/cpc_video_ppm.c)
+target_link_libraries(cpc_video_ppm PRIVATE cpc_video)
+if(BUILD_TESTING)
+    add_test(NAME cpc_video COMMAND test_cpc_video)
+    add_test(NAME cpc_video_ppm_determinism COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cpc_video_ppm.py"
+        "$<TARGET_FILE:cpc_video_ppm>"
+        "${CMAKE_CURRENT_BINARY_DIR}/hw4_preview_verified")
+endif()

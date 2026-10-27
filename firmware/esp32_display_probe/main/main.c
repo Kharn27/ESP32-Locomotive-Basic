@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <inttypes.h>
+#include <limits.h>
 
 #include "driver/gpio.h"
 #include "driver/uart.h"
@@ -24,6 +25,7 @@
 #include "freertos/task.h"
 
 #include "cpc_font.h"
+#include "cpc_video.h"
 
 #define HW3_LCD_HOST SPI2_HOST
 #define HW3_LCD_MOSI GPIO_NUM_13
@@ -44,7 +46,7 @@
 #define HW3_BAND_BYTES (HW3_W * HW3_TILE * 2)
 #define HW3_CURSOR_ROW 13
 #define HW3_CURSOR_COL 0
-#define HW3_CURSOR_MS 500
+#define HW3_CURSOR_MS 500 /* diagnostic only; disabled at boot */
 #define HW3_MATRIX_HOLD_MS 2500
 #define HW3_SOFTWARE_ROTATE_CW 12U
 #define HW3_SOFTWARE_ROTATE_CCW 13U
@@ -181,7 +183,7 @@ static esp_err_t draw_boot_screen(void)
     return ESP_OK;
 }
 
-/* Cursor cell only: never re-send the 320x200 screen to blink. */
+/* Cursor cell only: no full-screen refresh for a visibility change. */
 static esp_err_t draw_cursor(bool visible)
 {
     uint16_t color = visible ? HW3_YELLOW_RGB565 : HW3_BLUE_RGB565;
@@ -268,6 +270,81 @@ static esp_err_t set_orientation(unsigned int idx)
     if (err == ESP_OK) {
         s_active_case = idx;
         ESP_LOGI(TAG, "HW3 ORIENTATION_APPLIED case=%u MADCTL_UPDATED=1", idx);
+    }
+    return err;
+}
+
+/* HW4-A uses the existing HW3 SPI/DMA transport, never a second ILI9341 driver. */
+static uint8_t s_hw4_pixels[CPC_VIDEO_BYTES];
+static CpcVideo s_hw4_video;
+static bool s_hw4_active;
+/* The HW3 boot screen has its own cursor, distinct from the HW4 VRAM cursor.
+ * PO reports the real CPC 6128 startup cursor as steady; default is fixed.
+ * Optional UART 't' retains the prior 500 ms HW3 diagnostic experiment.
+ */
+static bool s_boot_cursor_enabled = true;
+static bool s_boot_cursor_blink = false;
+static unsigned s_hw4_mode = 2U;
+static unsigned s_hw4_palette = 24U;
+static bool s_hw4_cursor_visible = true;
+
+static uint8_t hw4_glyph(void *ignored, uint8_t ch, unsigned y)
+{
+    (void)ignored;
+    return hw3_glyph_row(ch, y);
+}
+
+static esp_err_t hw4_repaint(void)
+{
+    uint16_t row[HW3_W];
+    for (unsigned top = 0; top < HW3_H; top += HW3_TILE) {
+        for (unsigned dy = 0; dy < HW3_TILE; ++dy) {
+            if (!cpc_video_render_row(&s_hw4_video, top + dy, row, HW3_W))
+                return ESP_ERR_INVALID_STATE;
+            for (unsigned x = 0; x < HW3_W; ++x) {
+                size_t p = ((size_t)dy * HW3_W + x) * 2U;
+                s_dma_band[p] = (uint8_t)(row[x] >> 8U);
+                s_dma_band[p + 1U] = (uint8_t)row[x];
+            }
+        }
+        esp_err_t err = lcd_send(0, (int)top, HW3_W, HW3_TILE);
+        if (err != ESP_OK) return err;
+    }
+    (void)cpc_video_take_dirty(&s_hw4_video);
+    return ESP_OK;
+}
+
+static esp_err_t hw4_scene(unsigned mode)
+{
+    esp_err_t err = set_orientation(9U);
+    if (err != ESP_OK) return err;
+    if (!cpc_video_init(&s_hw4_video, s_hw4_pixels, sizeof(s_hw4_pixels),
+                        (CpcMode)mode)) return ESP_ERR_INVALID_ARG;
+    unsigned width = cpc_video_width(&s_hw4_video);
+    unsigned colors = cpc_video_colors(&s_hw4_video);
+    for (unsigned y = 0; y < 200U; ++y) {
+        for (unsigned x = 0; x < width; ++x) {
+            /* Palette swatch plus checker bars, exercising every logical pen. */
+            unsigned pen = (y >= 80U && y < 144U) ? 1U :
+                           (x / (width / colors) + y / 40U) % colors;
+            if (!cpc_video_put(&s_hw4_video, x, y, pen)) return ESP_ERR_INVALID_ARG;
+        }
+    }
+    (void)cpc_video_set_ink(&s_hw4_video, 1U, s_hw4_palette);
+    const char *label = mode == 0U ? "MODE 0" : mode == 1U ? "MODE 1" : "MODE 2";
+    (void)cpc_video_set_text_colors(&s_hw4_video, 1U, 0U);
+    for (unsigned i = 0U; label[i] != 0; ++i)
+        (void)cpc_video_put_cell(&s_hw4_video, i + 1U, 2U,
+                                 (uint8_t)label[i], hw4_glyph, NULL);
+    (void)cpc_video_cursor(&s_hw4_video, 1U, 5U, s_hw4_cursor_visible);
+    s_hw4_active = true;
+    ESP_LOGI(TAG, "HW4 MODE_READY mode=%u logical_width=%u colours=%u vram_bytes=%u case=9",
+             mode, width, colors, (unsigned)sizeof(s_hw4_pixels));
+    err = hw4_repaint();
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "HW4 MODE_DRAWN mode=%u TFT=320x240 viewport=0,20,320,200 border=20px cursor=%u",
+                 mode, (unsigned)s_hw4_cursor_visible);
+        log_device_memory("HW4_MODE_DRAWN");
     }
     return err;
 }
@@ -405,10 +482,10 @@ static esp_err_t show_case(unsigned int idx, bool boot, bool *is_boot)
         err = draw_software_rotated(*is_boot, idx);
         if (err == ESP_OK) ESP_LOGI(TAG, "HW3 SOFTWARE_ROTATION_DRAWN case=%u boot=%u", idx,
                                     (unsigned)*is_boot);
-        if (err == ESP_OK && *is_boot) err = draw_cursor(true);
+        if (err == ESP_OK && *is_boot) err = draw_cursor(s_boot_cursor_enabled);
     } else if (*is_boot) {
         err = draw_boot_screen();
-        if (err == ESP_OK) err = draw_cursor(true);
+        if (err == ESP_OK) err = draw_cursor(s_boot_cursor_enabled);
     } else {
         if (boot) {
             ESP_LOGW(TAG, "HW3 PORTRAIT_CASE: CPC landscape boot requires width 320; drawing diagnostic");
@@ -427,6 +504,8 @@ static void print_uart_help(void)
 {
     ESP_LOGI(TAG, "HW3 UART_CALIBRATION: m=8 MADCTL, n=6 fallback cases; 0..9,a,c,d,e=select case; b=boot; r=default; ?=help");
     ESP_LOGI(TAG, "HW3 ALT_CASES: 8=MV0 MX0 MY0, 9=MV0 MX1 MY0 (default candidate), a=MV0 MX0 MY1, c=MV0 MX1 MY1; d/e=software experiments");
+    ESP_LOGI(TAG, "HW4 UART_VIDEO: v=next MODE0/1/2, p=next palette ink1 colour 0..26, z=cursor toggle BOTH BOOT/HW4, w=MODE2 OR/viewport, r=HW3 boot");
+    ESP_LOGI(TAG, "HW3 BOOT_CURSOR_HELP: steady by default; t=toggle 500ms diagnostic blink on BOOT only");
     ESP_LOGI(TAG, "HW3 CASE_BITS: index 0..7=(swap_xy?1:0)+(mirror_x?2:0)+(mirror_y?4:0); 8..11=MV0 native 320x240 (mirror combinations)");
 }
 
@@ -532,17 +611,18 @@ void app_main(void)
         return;
     }
     log_device_memory("BOOT_SCREEN_DRAWN");
-    ESP_LOGI(TAG, "HW3 CURSOR_BLINK_ACTIVE when_boot_visible=%u", (unsigned)is_boot);
+    ESP_LOGI(TAG, "HW3 BOOT_CURSOR_POLICY visible=%u blink=%u case=%u (blink experimental OFF by default)",
+             (unsigned)s_boot_cursor_enabled, (unsigned)s_boot_cursor_blink, selected_case);
 
     /* Console still uses UART0 for ESP_LOGx, and UART driver gives us
      * single-character control from idf.py monitor (no keyboard dependency).
      */
     bool input_ready = uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0) == ESP_OK;
-    if (!input_ready) ESP_LOGW(TAG, "HW3 UART_RX_UNAVAILABLE: boot and blinking remain active");
+    if (!input_ready) ESP_LOGW(TAG, "HW3 UART_RX_UNAVAILABLE: boot cursor remains steady; UART controls unavailable");
     print_uart_help();
 
     TickType_t last_toggle = xTaskGetTickCount();
-    bool cursor_visible = true;
+    bool cursor_visible = s_boot_cursor_enabled;
     for (;;) {
         uint8_t key = 0;
         int received = input_ready
@@ -550,7 +630,48 @@ void app_main(void)
             : 0;
         if (!input_ready) vTaskDelay(pdMS_TO_TICKS(30));
         if (received == 1) {
-            if (key == 'm' || key == 'M') {
+            if (key == 'v' || key == 'V') {
+                s_hw4_mode = (s_hw4_mode + 1U) % 3U;
+                s_hw4_palette = 24U;
+                s_hw4_cursor_visible = true;
+                err = hw4_scene(s_hw4_mode);
+                is_boot = false;
+            } else if ((key == 'p' || key == 'P') && s_hw4_active) {
+                s_hw4_palette = (s_hw4_palette + 1U) % 27U;
+                (void)cpc_video_set_ink(&s_hw4_video, 1U, s_hw4_palette);
+                ESP_LOGI(TAG, "HW4 PALETTE colour=%u ink=1", s_hw4_palette);
+                err = hw4_repaint();
+            } else if (key == 'z' || key == 'Z') {
+                if (s_hw4_active) {
+                    s_hw4_cursor_visible = !s_hw4_cursor_visible;
+                    (void)cpc_video_cursor(&s_hw4_video, 1U, 5U, s_hw4_cursor_visible);
+                    ESP_LOGI(TAG, "HW4 CURSOR visible=%u", (unsigned)s_hw4_cursor_visible);
+                    err = hw4_repaint();
+                } else if (is_boot) {
+                    s_boot_cursor_enabled = !s_boot_cursor_enabled;
+                    cursor_visible = s_boot_cursor_enabled;
+                    err = draw_cursor(cursor_visible);
+                    ESP_LOGI(TAG, "HW3 BOOT_CURSOR visible=%u blink=%u case=%u",
+                             (unsigned)s_boot_cursor_enabled,
+                             (unsigned)s_boot_cursor_blink, selected_case);
+                } else {
+                    ESP_LOGI(TAG, "HW3 BOOT_CURSOR_IGNORED reason=not_on_boot");
+                }
+            } else if ((key == 't' || key == 'T') && is_boot && !s_hw4_active) {
+                s_boot_cursor_blink = !s_boot_cursor_blink;
+                cursor_visible = s_boot_cursor_enabled;
+                err = draw_cursor(cursor_visible);
+                ESP_LOGI(TAG, "HW3 BOOT_CURSOR_BLINK enabled=%u interval_ms=%u (diagnostic only)",
+                         (unsigned)s_boot_cursor_blink, (unsigned)HW3_CURSOR_MS);
+            } else if ((key == 'w' || key == 'W') && s_hw4_active && s_hw4_mode == 2U) {
+                CpcMode2Display next = s_hw4_video.mode2_display == CPC_MODE2_OR_PAIR
+                     ? CPC_MODE2_VIEWPORT : CPC_MODE2_OR_PAIR;
+                unsigned left = next == CPC_MODE2_VIEWPORT ? 320U : 0U;
+                (void)cpc_video_mode2_display(&s_hw4_video, next, left);
+                ESP_LOGI(TAG, "HW4 MODE2_VIEW display=%u left=%u", (unsigned)next, left);
+                err = hw4_repaint();
+            } else if (key == 'm' || key == 'M') {
+                s_hw4_active = false;
                 ESP_LOGI(TAG, "HW3 MATRIX_BEGIN count=8 hold_ms=%d", HW3_MATRIX_HOLD_MS);
                 for (unsigned int idx = 0; idx < 8; ++idx) {
                     err = show_case(idx, false, &is_boot);
@@ -560,6 +681,7 @@ void app_main(void)
                 if (err == ESP_OK) err = show_case(selected_case, true, &is_boot);
                 ESP_LOGI(TAG, "HW3 MATRIX_END restored_case=%u", selected_case);
             } else if (key == 'n' || key == 'N') {
+                s_hw4_active = false;
                 ESP_LOGI(TAG, "HW3 FALLBACK_MATRIX_BEGIN cases=8..13 hold_ms=%d", HW3_MATRIX_HOLD_MS);
                 for (unsigned int idx = 8; idx <= HW3_SOFTWARE_ROTATE_CCW; ++idx) {
                     err = show_case(idx, false, &is_boot);
@@ -570,13 +692,16 @@ void app_main(void)
                 ESP_LOGI(TAG, "HW3 FALLBACK_MATRIX_END restored_case=%u", selected_case);
             } else if ((key >= '0' && key <= '9') || key == 'a' || key == 'c' ||
                        key == 'd' || key == 'e') {
+                s_hw4_active = false;
                 selected_case = (key >= '0' && key <= '9') ? (unsigned int)(key - '0')
                               : key == 'a' ? 10U : key == 'c' ? 11U
                               : key == 'd' ? 12U : 13U;
                 err = show_case(selected_case, false, &is_boot);
             } else if (key == 'b' || key == 'B') {
+                s_hw4_active = false;
                 err = show_case(selected_case, true, &is_boot);
             } else if (key == 'r' || key == 'R') {
+                s_hw4_active = false;
                 selected_case = default_case;
                 err = show_case(selected_case, true, &is_boot);
             } else if (key == '?') {
@@ -587,10 +712,12 @@ void app_main(void)
                 log_device_memory("CALIBRATION_FAIL");
                 return;
             }
-            cursor_visible = true;
+            if (is_boot && key != 'z' && key != 'Z' && key != 't' && key != 'T')
+                cursor_visible = s_boot_cursor_enabled;
             last_toggle = xTaskGetTickCount();
         }
-        if (is_boot && (TickType_t)(xTaskGetTickCount() - last_toggle) >= pdMS_TO_TICKS(HW3_CURSOR_MS)) {
+        if (is_boot && s_boot_cursor_enabled && s_boot_cursor_blink &&
+            (TickType_t)(xTaskGetTickCount() - last_toggle) >= pdMS_TO_TICKS(HW3_CURSOR_MS)) {
             cursor_visible = !cursor_visible;
             err = draw_cursor(cursor_visible);
             if (err != ESP_OK) {

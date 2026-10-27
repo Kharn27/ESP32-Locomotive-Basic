@@ -135,7 +135,7 @@ static int test_tokens_and_listing(void)
     {
         static const char *invalid[] = {
             "B%=A%-256", "B%=A%--1", "B%=A%- -1", "B%=A%-+1",
-            "B%=A%-1-2", "B%=A%-1+2", "B%=A%-C%", "B%=A!-3",
+            "B%=A%-1-2", "B%=A%-1+2", "B%=A%-C%-D%", "B%=A!-3",
             "B%=A$-3", "B%=A%-1.2", "B%=A%-32768", "B%=A%-",
             "B%=A%-(1)", "B%=A%-1E2", "B%=A%-1: ",
             "B%=A%-1:PRINT 2:"

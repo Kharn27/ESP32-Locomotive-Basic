@@ -179,7 +179,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             unsigned int number = 0u;
             int reference_operation = 0;
             int negative = 0;
-            int reference_plus = 0;
+            int reference_pair = 0;
             /* A5 is explicit LET, 02 begins implicit LET; both reuse the
              * CPC explicit INTEGER reference decoder, ignoring cache values. */
             if (ref_start >= length) {
@@ -295,7 +295,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (t != 0xf4u && t != 0xf5u && t != 0xf6u && t != 0xf9u && t != 0xfbu) {
                     return BL_BAD_SEQUENCE;
                 }
-                reference_plus = t == 0xf4u;
+                reference_pair = t == 0xf4u || t == 0xf5u;
                 if (t == 0xfbu) {
                     status = append_word(out, "MOD");
                 } else {
@@ -316,10 +316,10 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 t = body[pos++];
             }
             if (reference_operation && t == 0x02u) {
-                if (!reference_plus) {
+                if (!reference_pair) {
                     return BL_BAD_SEQUENCE;
                 }
-                /* F4 is the only authorized two-reference INTEGER form.
+                /* F4/F5 are the only authorized two-reference INTEGER forms.
                  * BVR cache bytes are opaque, even if they look like tokens. */
                 BasicVariableRef second;
                 size_t right_start = pos - 1u;

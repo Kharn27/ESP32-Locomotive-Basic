@@ -113,6 +113,25 @@ L'index vaut `(swap_xy ? 1 : 0) + (mirror_x ? 2 : 0) + (mirror_y ? 4 : 0)`.
 
 **État HW3-C2 :** `ON_DEVICE_C1_FAILED / ON_DEVICE_C2_RETEST_PENDING / PR #66 OPEN`.
 
+
+## HW3-C3 — Correction de la géométrie après les six photos C2
+
+**Retour terrain :** le propriétaire du CYD a photographié les commandes `d`, `b`, `e`, `b`, `8`, `b`. Les deux variantes de rotation logicielle (12/13) montrent des bandes anormales. Le **cas 8 + boot** révèle en revanche des lignes de crédit et `Ready` presque intégralement visibles, quoique tournées et inversées. Cela encourage à tester les miroirs de l'adressage 320×240 sans permutation (`MV=0`), plutôt que de persister avec la rotation logicielle.
+
+**Bug C2 découvert et corrigé dans le code :** `set_orientation()` utilisait bien **320×240** pour les indices 8 à 11, mais `draw_diagnostic()` continuait à calculer les dimensions avec `idx & 1`. La mire du **cas 8** envoyait donc **240×320** dans une configuration déclarée **320×240**. La photo de cette mire ne permettait pas de juger la validité du mode paysage. C'est une erreur de l'implémentation C2, pas une défaillance de la carte.
+
+**Correction :** `draw_diagnostic()` calcule désormais 320×240 pour TOUS les cas 8 à 11 et journalise `HW3 DIAGNOSTIC_GEOMETRY case=... width=320 height=240`. Les étiquettes de mire sont sur deux chiffres (`CASE 08`, `CASE 09`, `CASE 10`, `CASE 11`). Les cas 12/13 restent accessibles pour comparaison, sans être sélectionnés au démarrage.
+
+**Démarrage candidat HW3-C3 :** **cas 9**, `swap_xy=false`, `mirror_x=true`, `mirror_y=false`, surface **320×240**. Il n'est **pas validé physiquement**. Les cas 8/9/10/11 restent sélectionnables sans reflash.
+
+**Retest sur vrai CYD :**
+1. Flasher le HEAD final et photographier le boot **cas 9** par défaut, en tenant physiquement le CYD en paysage.
+2. Si besoin, essayer **`a` puis `b`** (cas 10) et **`c` puis `b`** (cas 11), éventuellement **`8` puis `b`** comme témoin.
+3. Sur un candidat prometteur, afficher sa mire avec son caractère seul (`9`, `a` ou `c`) et examiner le contour entier, les quatre coins colorés et les absences de bandes résiduelles.
+4. Conserver le journal UART comprenant `HW3 ORIENTATION_CASE`, `HW3 DIAGNOSTIC_GEOMETRY`, `HW3 BOOT_SCREEN_DRAWN` et les éventuelles erreurs. Aucune photographie n'est inventée, et `ON_DEVICE_PASS` reste interdit jusqu'au contrôle.
+
+**Statut :** `HW3-C3 POUSSÉ — ON_DEVICE_C2_FAILED — ON_DEVICE_C3_RETEST_PENDING — PR #66 NON FUSIONNÉE`.
+
 ## Budget mémoire et signalisation
 
 Le rendu n'utilise qu'un **tampon DMA interne de 320 × 8 × 2 = 5 120 octets**, aligné et alloué via `heap_caps_malloc(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA)`, et une grille texte statique de **40 × 25 = 1 000 octets** en .bss. La fonte (`128 × 8 = 1 024 octets`) réside en lecture seule en Flash. Aucune allocation de **153 600 octets** (framebuffer RGB565 320 × 240), aucun recours à la PSRAM. Le tampon est conservé tant que le rendu fonctionne pour ne pas fragmenter le heap.

@@ -100,18 +100,11 @@ jobs:
             git push origin HEAD:feat/j1-2-a-integer-boundary-oracle
           else
             python3 tools/j1_2_boundary_verify.py --evidence "$DEST" --permanent --self-test
-            python3 - <<'PY'
-          import hashlib
-          import os
-          from pathlib import Path
-          stored = Path("tests/fixtures/cpc6128/j1_integer_boundaries")
-          live = Path(os.environ["RUNNER_TEMP"]) / "j12-acquisition"
-          for name in ("P255", "P256", "PMAX", "N255", "N256", "NMIN"):
-              a = (stored / name / "program.bin").read_bytes()
-              b = (live / name / "program.bin").read_bytes()
-              assert a == b, name + ": independently reacquired CPC program differs"
-              print(name, "REPRODUCED", hashlib.sha256(b).hexdigest(), flush=True)
-          PY
+            for name in P255 P256 PMAX N255 N256 NMIN; do
+              cmp "$DEST/$name/program.bin" "$RUNNER_TEMP/j12-acquisition/$name/program.bin"
+              sha256sum "$RUNNER_TEMP/j12-acquisition/$name/program.bin"
+              echo "$name REPRODUCED"
+            done
           fi
 
       - name: Archive raw CPC proof; NO ROM and NO SNA

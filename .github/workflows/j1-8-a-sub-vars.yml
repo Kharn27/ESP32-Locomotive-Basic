@@ -130,7 +130,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: j1-7-a-original-cpc-sub-vars
+          name: j1-8-a-original-cpc-sub-vars
           path: ${{ runner.temp }}/j18-cpc/
           if-no-files-found: warn
           retention-days: 30
@@ -141,7 +141,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Verify original CPC bytes and provisional seal, including 14 negative cases + fake checkout
+      - name: Verify original CPC bytes and provisional seal, including 18 negative cases + fake checkout
         run: |
           set -euo pipefail
           DEST=tests/fixtures/cpc6128/j1_integer_sub_vars

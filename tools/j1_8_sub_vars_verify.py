@@ -165,7 +165,7 @@ def verify(base, permanent=False):
             {c.get("case") for c in captures} == set(CASES),
             "CASE_SET_CHANGED")
     operator_values = set()
-    inventory = {"manifest.json"} | ({"seal.json"} if permanent else set())
+    inventory = {"manifest.json"} | ({"seal.json"} if (base / "seal.json").is_file() else set())
     for c in captures:
         name = c["case"]
         lhs, rhs = CASES[name]

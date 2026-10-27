@@ -330,6 +330,10 @@ La PR vidéo [#78](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/78) re
 **Suite autorisée pour le cœur BASIC : [J1.7-A — issue #84](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/84).** Acquisition CPC indépendante (12 cas, deux références INTEGER RHS) pour `C%=A%+B%`, enregistrement exact de cinq lignes BASIC et deux processus CPC frais par cas, archive scellée et CI. **Aucun code natif variable+variable dans J1.7-A ; J1.7-B bloqué jusqu'à revue et fusion.** Le développement du pilote partagé ILI9341 [HW4-B / PR #83](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/83) reste séparé, soumis à son propre test physique CYD au HEAD final.
 
 
+## HW4-B — gate accepté ? NON (autorisation de développement seulement)
+
+Critères : pilote ILI9341 unique, aucun transport dupliqué, deux builds ESP-IDF 5.5.6 avec tailles IRAM/DRAM/Flash séparées, Linux C99 OFF/ON et oracles sans changement, puis flash du SHA exact sur vrai CYD avec BOOT, `v×3`, `p`, `z`, `w`, `r`, logs heap/stack et images/retour visuel. PR HW4-B liée à issue #82 en attente revue Pilotage, non fusionnée ; **HW4-C NON AUTORISÉ**.
+
 ### J1.7-A — Oracle CPC variable + variable (PR #85, en revue)
 
 [PR #85](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/85) — douze sources originales à cinq lignes, 24 sessions indépendantes ROM CPC6128 BASIC 1.1, opérateur `F4` et trois références INTEGER explicites observées en RAM ; dix valeurs normales `ERR=0`, deux dépassements `ERR=6`. Manifeste historique `0608ba7d9548bae7972f02d0a929d0abde70fc325f49af97175f915aae08e2d5` et sceau provisoire `PENDING_PILOTAGE` conservés. Comparateur C99 historique : **12/12 UNSUPPORTED**, aucun ajout natif. [Rapport J1.7-A](J1.7-A-integer-variable-addition-oracle.md). HW4-B demeure indépendant ; J1.7-B non autorisé avant décision du Pilotage.

@@ -9,31 +9,18 @@
 #include <inttypes.h>
 #include <limits.h>
 
-#include "driver/gpio.h"
 #include "driver/uart.h"
-#include "driver/spi_master.h"
 #include "esp_err.h"
 #include "esp_heap_caps.h"
-#include "esp_lcd_panel_io.h"
-#include "esp_lcd_panel_ops.h"
-#include "esp_lcd_panel_vendor.h"
-#include "esp_lcd_ili9341.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 #include "freertos/task.h"
 
 #include "cpc_font.h"
 #include "cpc_video.h"
+#include "cyd_ili9341.h"
 
-#define HW3_LCD_HOST SPI2_HOST
-#define HW3_LCD_MOSI GPIO_NUM_13
-#define HW3_LCD_SCLK GPIO_NUM_14
-#define HW3_LCD_CS GPIO_NUM_15
-#define HW3_LCD_DC GPIO_NUM_2
-#define HW3_LCD_BL GPIO_NUM_21
-#define HW3_LCD_CLOCK_HZ (20 * 1000 * 1000)
 #define HW3_W 320
 #define HW3_NATIVE_W 240
 #define HW3_NATIVE_H 320
@@ -43,7 +30,7 @@
 #define HW3_COLS 40
 #define HW3_ROWS 25
 #define HW3_TILE 8
-#define HW3_BAND_BYTES (HW3_W * HW3_TILE * 2)
+#define HW3_BAND_BYTES CYD_LCD_DMA_BYTES
 #define HW3_CURSOR_ROW 13
 #define HW3_CURSOR_COL 0
 #define HW3_CURSOR_MS 500 /* diagnostic only; disabled at boot */
@@ -71,24 +58,8 @@
 #endif
 
 static const char *TAG = "HW3";
-static esp_lcd_panel_handle_t s_panel;
-static uint8_t *s_dma_band;
-static SemaphoreHandle_t s_transfer_done;
+static uint8_t *s_dma_band; /* borrowed, never freed by the probe */
 static uint8_t s_screen[HW3_ROWS][HW3_COLS];
-/* UINT_MAX means that no display orientation has yet been applied. */
-static unsigned int s_active_case = UINT_MAX;
-
-static bool IRAM_ATTR on_color_done(esp_lcd_panel_io_handle_t io,
-                                    esp_lcd_panel_io_event_data_t *event,
-                                    void *ctx)
-{
-    (void)io;
-    (void)event;
-    BaseType_t task_woken = pdFALSE;
-    xSemaphoreGiveFromISR((SemaphoreHandle_t)ctx, &task_woken);
-    return task_woken == pdTRUE;
-}
-
 static void log_device_memory(const char *phase)
 {
     /* Espressif's FreeRTOS high-water mark is in bytes (not vanilla words). */
@@ -135,17 +106,6 @@ static void build_boot_screen(void)
     put_text(12, 0, "Ready");
 }
 
-static esp_err_t lcd_send(int x, int y, int width, int height)
-{
-    esp_err_t err = esp_lcd_panel_draw_bitmap(s_panel, x, y, x + width,
-                                              y + height, s_dma_band);
-    if (err != ESP_OK) {
-        return err;
-    }
-    return xSemaphoreTake(s_transfer_done, pdMS_TO_TICKS(2000)) == pdTRUE
-               ? ESP_OK : ESP_ERR_TIMEOUT;
-}
-
 /* One 320x8 band in 16-bit RGB565, in wire byte order (MSB first). */
 static void draw_band(int top)
 {
@@ -175,7 +135,7 @@ static esp_err_t draw_boot_screen(void)
     build_boot_screen();
     for (int top = 0; top < HW3_H; top += HW3_TILE) {
         draw_band(top);
-        esp_err_t err = lcd_send(0, top, HW3_W, HW3_TILE);
+        esp_err_t err = cyd_lcd_send(0, top, HW3_W, HW3_TILE);
         if (err != ESP_OK) {
             return err;
         }
@@ -193,88 +153,26 @@ static esp_err_t draw_cursor(bool visible)
     }
     int x = HW3_CURSOR_COL * HW3_TILE;
     int y = HW3_CPC_Y + HW3_CURSOR_ROW * HW3_TILE;
-    if (s_active_case == HW3_SOFTWARE_ROTATE_CW) {
+    if (cyd_lcd_current_orientation() == HW3_SOFTWARE_ROTATE_CW) {
         /* Portrait GRAM u=239-logical_y, v=logical_x. */
         int u = HW3_H - (y + HW3_TILE);
         int v = x;
         x = u; y = v;
-    } else if (s_active_case == HW3_SOFTWARE_ROTATE_CCW) {
+    } else if (cyd_lcd_current_orientation() == HW3_SOFTWARE_ROTATE_CCW) {
         /* Portrait GRAM u=logical_y, v=319-logical_x. */
         int u = y;
         int v = HW3_W - (x + HW3_TILE);
         x = u; y = v;
     }
-    return lcd_send(x, y, HW3_TILE, HW3_TILE);
+    return cyd_lcd_send(x, y, HW3_TILE, HW3_TILE);
 }
 
 
-/*
- * Clear all 240x320 native GRAM in portrait BEFORE applying a new MADCTL.
- * This covers the 80-pixel stale strip seen on physical CYD when a 320x240
- * logical bitmap was sent but the panel remained effectively in portrait.
- */
-static esp_err_t clear_native_gram(bool wide)
+/* Transport and orientation are now owned by the shared HW4-B component. */
+static esp_err_t set_orientation_probe(unsigned index)
 {
-    esp_err_t err = esp_lcd_panel_swap_xy(s_panel, false);
-    if (err != ESP_OK) return err;
-    err = esp_lcd_panel_mirror(s_panel, false, false);
-    if (err != ESP_OK) return err;
-    const int width = wide ? HW3_W : HW3_NATIVE_W;
-    const int height = wide ? HW3_H : HW3_NATIVE_H;
-    for (int i = 0; i < width * HW3_TILE; ++i) {
-        s_dma_band[2 * i] = (uint8_t)(HW3_BLUE_RGB565 >> 8);
-        s_dma_band[2 * i + 1] = (uint8_t)HW3_BLUE_RGB565;
-    }
-    for (int top = 0; top < height; top += HW3_TILE) {
-        err = lcd_send(0, top, width, HW3_TILE);
-        if (err != ESP_OK) return err;
-    }
-    return ESP_OK;
+    return cyd_lcd_orientation(index, HW3_BLUE_RGB565);
 }
-
-/* Index bits encode all eight hardware MADCTL combinations:
- * bit0=swap_xy, bit1=mirror_x, bit2=mirror_y.
- * swap=0 MUST use 240x320 coordinates; swap=1 uses 320x240.
- */
-static esp_err_t set_orientation(unsigned int idx)
-{
-    /* The first boot of case 9 looks correct on the physical CYD but
-     * selecting 9 then b used to corrupt the image. This guard separates
-     * ordinary redraws from explicit MADCTL state changes. It does not
-     * claim that switching between different cases is safe.
-     */
-    if (s_active_case == idx) {
-        ESP_LOGI(TAG, "HW3 ORIENTATION_REUSED case=%u MADCTL_UNCHANGED=1 CLEAR_SKIPPED=1", idx);
-        return ESP_OK;
-    }
-    const bool native_wide = idx >= 8U && idx <= 11U;
-    const bool software = idx == HW3_SOFTWARE_ROTATE_CW || idx == HW3_SOFTWARE_ROTATE_CCW;
-    const bool swap = !native_wide && !software && (idx & 1U) != 0;
-    const bool mirror_x = native_wide ? ((idx - 8U) & 1U) != 0
-                                 : (!software && (idx & 2U) != 0);
-    const bool mirror_y = native_wide ? ((idx - 8U) & 2U) != 0
-                                 : (!software && (idx & 4U) != 0);
-    const int width = (native_wide || swap) ? HW3_W : HW3_NATIVE_W;
-    const int height = (native_wide || swap) ? HW3_H : HW3_NATIVE_H;
-    ESP_LOGI(TAG, "HW3 ORIENTATION_CASE index=%u mode=%s swap_xy=%u mirror_x=%u mirror_y=%u geometry=%dx%d",
-             idx, software ? "SOFTWARE_ROTATED" : native_wide ? "NATIVE_LANDSCAPE" : "MADCTL_MATRIX",
-             (unsigned)swap, (unsigned)mirror_x, (unsigned)mirror_y, width, height);
-    /* Full GRAM coverage in the addressing model under test. Note that
-     * the 320x240-MV0 path is intentionally a separate hardware hypothesis.
-     */
-    esp_err_t err = clear_native_gram(native_wide);
-    if (err != ESP_OK) return err;
-    err = esp_lcd_panel_swap_xy(s_panel, swap);
-    if (err != ESP_OK) return err;
-    err = esp_lcd_panel_mirror(s_panel, mirror_x, mirror_y);
-    if (err == ESP_OK) {
-        s_active_case = idx;
-        ESP_LOGI(TAG, "HW3 ORIENTATION_APPLIED case=%u MADCTL_UPDATED=1", idx);
-    }
-    return err;
-}
-
-/* HW4-A uses the existing HW3 SPI/DMA transport, never a second ILI9341 driver. */
 static uint8_t s_hw4_pixels[CPC_VIDEO_BYTES];
 static CpcVideo s_hw4_video;
 static bool s_hw4_active;
@@ -307,7 +205,7 @@ static esp_err_t hw4_repaint(void)
                 s_dma_band[p + 1U] = (uint8_t)row[x];
             }
         }
-        esp_err_t err = lcd_send(0, (int)top, HW3_W, HW3_TILE);
+        esp_err_t err = cyd_lcd_send(0, (int)top, HW3_W, HW3_TILE);
         if (err != ESP_OK) return err;
     }
     (void)cpc_video_take_dirty(&s_hw4_video);
@@ -316,7 +214,7 @@ static esp_err_t hw4_repaint(void)
 
 static esp_err_t hw4_scene(unsigned mode)
 {
-    esp_err_t err = set_orientation(9U);
+    esp_err_t err = set_orientation_probe(9U);
     if (err != ESP_OK) return err;
     if (!cpc_video_init(&s_hw4_video, s_hw4_pixels, sizeof(s_hw4_pixels),
                         (CpcMode)mode)) return ESP_ERR_INVALID_ARG;
@@ -390,7 +288,7 @@ static void diagnostic_band(int top, int width, int height, unsigned int idx)
 
 static esp_err_t draw_diagnostic(unsigned int idx)
 {
-    /* HW3-C3: width must agree with set_orientation() for EVERY case.
+    /* HW3-C3: width must agree with set_orientation_probe() for EVERY case.
      * Before this fix idx=8 used 240x320 while MADCTL stayed in MV=0
      * with a 320x240 address window. That wrapped stale/corrupt pixels.
      */
@@ -401,7 +299,7 @@ static esp_err_t draw_diagnostic(unsigned int idx)
     ESP_LOGI(TAG, "HW3 DIAGNOSTIC_GEOMETRY case=%u width=%d height=%d", idx, width, height);
     for (int top = 0; top < height; top += HW3_TILE) {
         diagnostic_band(top, width, height, idx);
-        esp_err_t err = lcd_send(0, top, width, HW3_TILE);
+        esp_err_t err = cyd_lcd_send(0, top, width, HW3_TILE);
         if (err != ESP_OK) return err;
     }
     ESP_LOGI(TAG, "HW3 CALIBRATION_DRAWN case=%u corners=TL_RED,TR_GREEN,BL_YELLOW,BR_WHITE",
@@ -438,7 +336,7 @@ static uint16_t logical_diag_pixel(int x, int y)
     if (x < 18 && y >= HW3_H - 18) return HW3_YELLOW_RGB565;
     if (x >= HW3_W - 18 && y >= HW3_H - 18) return 0xFFFFU;
     if (y >= 38 && y < 46) {
-        const char *label = s_active_case == HW3_SOFTWARE_ROTATE_CW ? "ROT 12" : "ROT 13";
+        const char *label = cyd_lcd_current_orientation() == HW3_SOFTWARE_ROTATE_CW ? "ROT 12" : "ROT 13";
         const int start = (HW3_W - (int)strlen(label) * 8) / 2;
         if (x >= start && x < start + (int)strlen(label) * 8) {
             uint8_t bits = hw3_glyph_row((uint8_t)label[(x - start) / 8],
@@ -465,7 +363,7 @@ static esp_err_t draw_software_rotated(bool boot, unsigned int idx)
                 s_dma_band[at + 1] = (uint8_t)rgb;
             }
         }
-        esp_err_t err = lcd_send(0, top, HW3_NATIVE_W, HW3_TILE);
+        esp_err_t err = cyd_lcd_send(0, top, HW3_NATIVE_W, HW3_TILE);
         if (err != ESP_OK) return err;
     }
     return ESP_OK;
@@ -473,7 +371,7 @@ static esp_err_t draw_software_rotated(bool boot, unsigned int idx)
 
 static esp_err_t show_case(unsigned int idx, bool boot, bool *is_boot)
 {
-    esp_err_t err = set_orientation(idx);
+    esp_err_t err = set_orientation_probe(idx);
     if (err != ESP_OK) return err;
     const bool native_wide = idx >= 8U && idx <= 11U;
     const bool software = idx == HW3_SOFTWARE_ROTATE_CW || idx == HW3_SOFTWARE_ROTATE_CCW;
@@ -509,73 +407,6 @@ static void print_uart_help(void)
     ESP_LOGI(TAG, "HW3 CASE_BITS: index 0..7=(swap_xy?1:0)+(mirror_x?2:0)+(mirror_y?4:0); 8..11=MV0 native 320x240 (mirror combinations)");
 }
 
-static esp_err_t lcd_initialize(void)
-{
-    /* Backlight remains OFF until a complete frame is sent successfully. */
-    gpio_config_t bl = {
-        .pin_bit_mask = 1ULL << HW3_LCD_BL,
-        .mode = GPIO_MODE_OUTPUT,
-    };
-    esp_err_t err = gpio_config(&bl);
-    if (err != ESP_OK) return err;
-    err = gpio_set_level(HW3_LCD_BL, 0);
-    if (err != ESP_OK) return err;
-
-    s_dma_band = heap_caps_malloc(HW3_BAND_BYTES,
-                                  MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
-    if (s_dma_band == NULL) return ESP_ERR_NO_MEM;
-    s_transfer_done = xSemaphoreCreateBinary();
-    if (s_transfer_done == NULL) return ESP_ERR_NO_MEM;
-
-    spi_bus_config_t bus_cfg = {
-        .sclk_io_num = HW3_LCD_SCLK,
-        .mosi_io_num = HW3_LCD_MOSI,
-        .miso_io_num = -1,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = HW3_BAND_BYTES + 16,
-    };
-    err = spi_bus_initialize(HW3_LCD_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
-    if (err != ESP_OK) return err;
-
-    esp_lcd_panel_io_spi_config_t io_cfg = {
-        .cs_gpio_num = HW3_LCD_CS,
-        .dc_gpio_num = HW3_LCD_DC,
-        .spi_mode = 0,
-        .pclk_hz = HW3_LCD_CLOCK_HZ,
-        .trans_queue_depth = 2,
-        .lcd_cmd_bits = 8,
-        .lcd_param_bits = 8,
-    };
-    esp_lcd_panel_io_handle_t panel_io = NULL;
-    err = esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)HW3_LCD_HOST,
-                                   &io_cfg, &panel_io);
-    if (err != ESP_OK) return err;
-
-    esp_lcd_panel_io_callbacks_t cb = {
-        .on_color_trans_done = on_color_done,
-    };
-    err = esp_lcd_panel_io_register_event_callbacks(panel_io, &cb,
-                                                      s_transfer_done);
-    if (err != ESP_OK) return err;
-
-    esp_lcd_panel_dev_config_t panel_cfg = {
-        .reset_gpio_num = -1, /* LCD reset is wired to EN on common CYD. */
-        .rgb_ele_order = HW3_LCD_BGR ? LCD_RGB_ELEMENT_ORDER_BGR
-                                    : LCD_RGB_ELEMENT_ORDER_RGB,
-        .data_endian = LCD_RGB_DATA_ENDIAN_BIG,
-        .bits_per_pixel = 16,
-    };
-    err = esp_lcd_new_panel_ili9341(panel_io, &panel_cfg, &s_panel);
-    if (err != ESP_OK) return err;
-    err = esp_lcd_panel_reset(s_panel);
-    if (err != ESP_OK) return err;
-    err = esp_lcd_panel_init(s_panel);
-    if (err != ESP_OK) return err;
-    /* MADCTL is configured by set_orientation AFTER the native clear. */
-    return esp_lcd_panel_disp_on_off(s_panel, true);
-}
-
 void app_main(void)
 {
     /* HW3-C3: candidate MV=0 / MX=1 full 320x240. The real CYD photo
@@ -590,7 +421,11 @@ void app_main(void)
     ESP_LOGI(TAG, "HW3 BUILD_IDENT project=loco_esp32_display_probe target=esp32 idf=%s rgb_order=%s swap_xy=%d mirror_x=%d mirror_y=%d default_case=%u",
              esp_get_idf_version(), HW3_LCD_BGR ? "BGR" : "RGB",
              HW3_SWAP_XY, HW3_MIRROR_X, HW3_MIRROR_Y, default_case);
-    esp_err_t err = lcd_initialize();
+    esp_err_t err = cyd_lcd_init();
+    if (err == ESP_OK) {
+        s_dma_band = cyd_lcd_band();
+        if (s_dma_band == NULL) err = ESP_ERR_INVALID_STATE;
+    }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "HW3 LCD_INIT_FAIL err=%s", esp_err_to_name(err));
         log_device_memory("LCD_INIT_FAIL");
@@ -605,12 +440,17 @@ void app_main(void)
         log_device_memory("LCD_DRAW_FAIL");
         return;
     }
-    err = gpio_set_level(HW3_LCD_BL, 1);
+    err = cyd_lcd_backlight(true);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "HW3 LCD_BACKLIGHT_FAIL err=%s", esp_err_to_name(err));
         return;
     }
     log_device_memory("BOOT_SCREEN_DRAWN");
+    CydLcdDiagnostics lcd_diag;
+    if (cyd_lcd_diagnostics(&lcd_diag))
+        ESP_LOGI(TAG, "HW4B DRIVER init=%u fault=%u case=%u transfers=%u timeouts=%u",
+                 (unsigned)lcd_diag.initialized, (unsigned)lcd_diag.dma_fault,
+                 lcd_diag.orientation, lcd_diag.transfer_count, lcd_diag.timeout_count);
     ESP_LOGI(TAG, "HW3 BOOT_CURSOR_POLICY visible=%u blink=%u case=%u (blink experimental OFF by default)",
              (unsigned)s_boot_cursor_enabled, (unsigned)s_boot_cursor_blink, selected_case);
 

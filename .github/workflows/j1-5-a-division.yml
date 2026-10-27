@@ -71,6 +71,12 @@ jobs:
           cmake --build "$RUNNER_TEMP/j15-c99" --parallel 2
           ctest --test-dir "$RUNNER_TEMP/j15-c99" --output-on-failure
 
+      - name: Verify immutable J1.4-A CPC multiplication archive and all negative falsifications
+        run: |
+          set -euo pipefail
+          python3 tools/j1_4_multiplication_verify.py --permanent --self-test
+          echo "J1.4-A HISTORICAL_ARCHIVE_VERIFIED NO_MODIFICATIONS"
+
       - name: Acquire twelve fresh ROM-backed LIST/RAM and RUN/printer CPC sessions
         run: |
           set -euo pipefail

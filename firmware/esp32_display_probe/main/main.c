@@ -42,7 +42,7 @@
 #define HW3_ROWS 25
 #define HW3_TILE 8
 #define HW3_BAND_BYTES (HW3_W * HW3_TILE * 2)
-#define HW3_CURSOR_ROW 11
+#define HW3_CURSOR_ROW 13
 #define HW3_CURSOR_COL 0
 #define HW3_CURSOR_MS 500
 #define HW3_MATRIX_HOLD_MS 2500
@@ -119,14 +119,17 @@ static void put_centered(int row, const char *text)
 static void build_boot_screen(void)
 {
     memset(s_screen, ' ', sizeof(s_screen));
-    /* Reference: CPC 6128 v3 boot and BASIC ROM 1.1 strings. The vertical
-     * placement is a visual approximation pending a real CPC photo.
+    /* HW3-C4: on-device photo with case 9 (MV=0, MX=1, MY=0)
+     * confirms readable landscape, but the three 8px credit rows are
+     * visually too close on this TFT. Add one blank text row between each
+     * credit line; the spacing remains an intentional visual approximation
+     * until a real CPC screenshot is available as an independent oracle.
      */
-    put_centered(4, "Amstrad 128K Microcomputer (v3)");
+    put_centered(3, "Amstrad 128K Microcomputer (v3)");
     put_centered(5, "\x7f""1985 Amstrad Consumer Electronics plc");
-    put_centered(6, "and Locomotive Software Ltd.");
-    put_text(8, 1, "BASIC 1.1");
-    put_text(10, 0, "Ready");
+    put_centered(7, "and Locomotive Software Ltd.");
+    put_text(10, 1, "BASIC 1.1");
+    put_text(12, 0, "Ready");
 }
 
 static esp_err_t lcd_send(int x, int y, int width, int height)

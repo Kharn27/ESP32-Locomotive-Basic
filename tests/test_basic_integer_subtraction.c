@@ -288,6 +288,7 @@ static int test_failure_cases(void)
             {{2,0,0,0xc2,0xef,2,0,0,0xc1,0xf5,0x19},11,BE_TRUNCATED},
             {{2,0,0,0xc2,0xef,2,0,0,0xc1,0xf5,0x19,9},12,BE_BAD_SEQUENCE},
             {{2,0,0,0xc2,0xef,2,0,0,0xc1,0xf5,0x1a,0,1},13,BE_BAD_SEQUENCE},
+            {{2,0,0,0xc2,0xef,2,0,0,0xc1,0xf5,0x1f,0,0,0,0,0x90},16,BE_BAD_SEQUENCE},
             {{2,0,0,0xc2,0xef,2,0,0,0xc1,0xf5,0xf5,0x0f},12,BE_BAD_SEQUENCE},
             {{2,0,0,0xc2,0xef,3,0,0,0xc1,0xf5,0x0f},11,BE_BAD_SEQUENCE},
             {{2,0,0,0xc2,0xef,2,0,0,0xc1,0xef,0x0f},11,BE_BAD_SEQUENCE},
@@ -317,6 +318,22 @@ static int test_failure_cases(void)
     CHECK(bt_tokenize((const uint8_t *)"B%=A%-3", 7u,
                       tokens, sizeof(tokens), &n) == BT_OK);
     CHECK(bl_detokenize(tokens, n, tokens, sizeof(tokens), &n) == BL_OVERLAP);
+    /* Full output-capacity guard on PRINT after a successful subtraction. */
+    CHECK(setup(&h, 3u) == 0);
+    CHECK(inject(&h, 'A', 9) == 0);
+    CHECK(put(&h, 10u, "B%=A%-3") == 0);
+    CHECK(put(&h, 20u, "PRINT B%") == 0);
+    CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+    CHECK(step(&h) == 0 && equal(&h, 'B', 6) == 0);
+    n = 787u;
+    memset(h.output, 0x75, sizeof(h.output));
+    memcpy(before_output, h.output, sizeof(before_output));
+    CHECK(be_step(&h.executor, h.output, 0u, &n) == BE_NO_SPACE);
+    CHECK(n == 787u && memcmp(before_output, h.output, sizeof(h.output)) == 0);
+    CHECK(equal(&h, 'B', 6) == 0);
+    CHECK(h.executor.cursor != 0u);
+    CHECK(be_step(&h.executor, h.output, sizeof(h.output), &n) == BE_OK);
+    CHECK(n == 4u && memcmp(h.output, " 6 \n", 4u) == 0);
     return 0;
 }
 

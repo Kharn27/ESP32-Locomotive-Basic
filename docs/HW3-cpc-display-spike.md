@@ -44,13 +44,49 @@ La version du pilote est **verrouillée à une version exacte** et le workflow d
 | LCD backlight | 21 | actif HIGH, allumé après rendu réussi |
 | XPT2046, microSD, LED RGB | aucun | pas d'initialisation |
 
-Orientation par défaut : `swap_xy=true`, `mirror_x=true`, `mirror_y=false`. La physique du module est à confirmer avec l'équipement réel. Pour essayer une variante depuis la racine du projet ESP-IDF, sans éditer la source :
+Orientation candidate HW3-C1 : `swap_xy=true`, `mirror_x=false`, `mirror_y=true` (cas **5**), à **confirmer** sur le CYD réel. La précédente configuration était `1/1/0` (cas **3**) et a donné un rendu incorrect en test matériel. Pour figer l'orientation après calibration, depuis la racine du projet ESP-IDF :
 
 ```bash
-idf.py -DHW3_LCD_BGR=1 -DHW3_MIRROR_X=1 -DHW3_MIRROR_Y=0 build
+idf.py -DHW3_SWAP_XY=1 -DHW3_MIRROR_X=0 -DHW3_MIRROR_Y=1 build
 ```
 
-Le changement de variable CMake nécessite une reconfiguration/recompilation avant nouveau flash. La fréquence du bus est volontairement limitée à 20 MHz tant que le câblage réel n'est pas validé. Pas de tactile, d'entrée clavier, ni de gestion de stockage.
+Les options CMake sont transmises au compilateur par `target_compile_definitions`; changer une option nécessite reconfiguration/recompilation avant nouveau flash. La fréquence du bus est volontairement limitée à 20 MHz tant que le câblage réel n'est pas validé. Pas de tactile, d'entrée clavier, ni de gestion de stockage.
+
+
+## HW3-C1 — Photo matérielle et calibration (27 octobre 2026)
+
+**Observation physique :** première version de la sonde sur CYD réel : affichage bleu et curseur visibles, mais texte illisible, image pré-flash encore visible sur une bande d'environ 80 pixels et orientation incorrecte. Le premier essai est `ON_DEVICE_FAILED_INITIAL`, et non « validé ». Une photo ne suffit pas à déterminer quel bit MADCTL est effectivement actif.
+
+**Correctifs :** avant chaque choix MADCTL, forcer le portrait natif (`swap_xy=0`, `mirror_x=0`, `mirror_y=0`) et vider **240×320 pixels** au moyen de 40 bandes DMA de 240×8. Puis appliquer `swap_xy` et les deux miroirs, dessiner la mire dans l'espace légal **240×320 si swap=0** ou **320×240 si swap=1**. Ne jamais envoyer 320 colonnes en mode portrait. Pas de framebuffer, pas de changement RGB/BGR.
+
+La mire affiche un contour jaune et quatre coins distincts : **haut gauche rouge, haut droit vert, bas gauche jaune, bas droit blanc**, avec `CASE n`. Elle permet de constater plein écran propre / orientation / absence de résidu indépendamment de la fonte. Un cas portrait (pair) ne peut pas héberger la zone CPC 320×200 sans conversion logicielle supplémentaire ; le boot CPC est donc réservé aux cas paysages (impairs).
+
+**Un seul flash pour tester les huit possibilités.** Commandes depuis `idf.py monitor` (UART0, 115200) :
+
+| Touche | Action |
+|---|---|
+| `m` | Parcours des 8 mires dans l'ordre 0 → 7 (2,5 secondes chacune), puis restauration du cas précédent |
+| `0` à `7` | Affiche la mire d'un cas jusqu'à nouvel ordre |
+| `b` | Affiche le boot CPC avec le cas sélectionné **si paysage** ; conserve une mire si portrait |
+| `r` | Revient au cas compilé et affiche le boot |
+| `?` | Rappelle l'aide UART |
+
+| Cas | swap_xy | mirror_x | mirror_y | Surface |
+|---:|---:|---:|---:|---|
+| 0 | 0 | 0 | 0 | 240×320 |
+| 1 | 1 | 0 | 0 | 320×240 |
+| 2 | 0 | 1 | 0 | 240×320 |
+| 3 | 1 | 1 | 0 | 320×240 — **réglage initial défaillant** |
+| 4 | 0 | 0 | 1 | 240×320 |
+| 5 | 1 | 0 | 1 | 320×240 — **nouveau candidat** |
+| 6 | 0 | 1 | 1 | 240×320 |
+| 7 | 1 | 1 | 1 | 320×240 |
+
+L'index vaut `(swap_xy ? 1 : 0) + (mirror_x ? 2 : 0) + (mirror_y ? 4 : 0)`.
+
+**Retest du Product Owner :** tourner physiquement la carte en paysage pour juger les cas impairs. Prendre les photos des **cas 1, 3, 5 et 7**, puis sélectionner le meilleur avec son chiffre et taper `b` pour contrôler bannière, « Ready », plein écran 320×240, aire CPC y=20..219, curseur jaune clignotant et absence d'ancienne image. Remonter le log depuis le reset comprenant `HW3 BUILD_IDENT`, `HW3 ORIENTATION_CASE`, `HW3 CALIBRATION_DRAWN`, `HW3 DEVICE_MEMORY` et erreurs éventuelles. Mesurer l'absence de WDT/reset. Seul ce retour peut déterminer la combinaison à figer. **Aucune validation physique finale n'est revendiquée à ce stade.**
+
+**Statut de correction tant que le nouveau test n'est pas reçu :** `HW3-C1 PUSHED — TARGET_BUILD_PENDING — ON_DEVICE_RETEST_PENDING — PR #66 OPEN / NON MERGED`.
 
 ## Budget mémoire et signalisation
 
@@ -105,4 +141,4 @@ idf.py -p /dev/ttyUSB0 flash monitor
 5. Joindre le log UART (du reset au clignotement), avec valeurs `DEVICE_MEMORY`, et déclarer tout reset/WDT.
 6. Noter les options `HW3_LCD_BGR`, `HW3_MIRROR_X`, `HW3_MIRROR_Y` réellement utilisées.
 
-**État à la création :** build CI à vérifier ; `ON_DEVICE_UNVERIFIED`. Pas de photo ni de données mémoire physiques inventées.
+**État actualisé HW3-C1 :** l’essai initial a échoué visuellement ; huit cas disponibles pour un retest physique. Pas de données mémoire physiques inventées ni de succès visuel présumé.

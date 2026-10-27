@@ -59,3 +59,12 @@ Renvoyer **photos de chacun des trois modes**, de la démonstration couleur/curs
 
 ## Limites et jalons suivants
 HW4-B (extraction du pilote), HW4-C (BASIC + écran), MODE2 fidèle 80-colonnes en sortie physique et caractères CPC complets restent **hors périmètre** de HW4-A. Ne pas confondre capture PPM, compilation Xtensa et validation matérielle.
+
+
+## HW4-A-C1 — retour réel CYD et correction du curseur de démarrage (27 octobre 2026)
+
+Le Product Owner a transmis **cinq photographies du vrai CYD** montrant le démarrage HW3, les mires MODE0, MODE1, MODE2, et le viewport diagnostique MODE2. Il rapporte que `p` modifie bien l'encre 1. **PO_REPORTED_PASS pour ces seuls sous-tests visuels de la version initiale HW4-A**, sans prétendre à une vérification pixel à pixel ni aux timings. Deux différences sur le curseur de l'écran initial sont signalées : `z` ne masquait pas ce curseur, et le clignotement logiciel toutes les 500 ms ne correspond pas à ce qu'il observe sur son CPC 6128 d'origine. Ne pas qualifier ce témoignage de caractérisation temporelle exhaustive de Locomotive BASIC.
+
+**Correction C1 :** HW3 conserve son propre curseur de boot mais expose désormais `z` pour basculer sa visibilité comme sur les surfaces HW4 ; le curseur de boot est **fixe par défaut**, tandis que `t` peut activer/désactiver un clignotement de 500 ms **diagnostique uniquement**. L'état `z` de boot est conservé par les redessins boot et retour `r` ; le curseur de la surface HW4 reste indépendant/non destructif. Le chemin de la matrice `m` réinitialise explicitement `s_hw4_active` avant son retour à HW3 pour que `z` agisse sur le bon écran.
+
+**Réacquisition physique ciblée indispensable sur HEAD C1** : conserver le SHA exact de la PR C1, flasher `firmware/esp32_display_probe/`, prendre une photo de boot fixe ; attendre environ deux secondes ; envoyer `z` (curseur masqué) puis `z` (réapparition), `t` (clignotement expérimental), `t` (fixe de nouveau), `v` puis `z` sur MODE0, `r` et `z` sur boot ; vérifier que le boot ne clignote pas par défaut et que l'état visuel correspond toujours aux logs `HW3 BOOT_CURSOR_POLICY`, `HW3 BOOT_CURSOR`, `HW3 BOOT_CURSOR_BLINK`, `HW4 CURSOR`. Le statut d'intégration C1 reste **ON_DEVICE_C1_UNVERIFIED** avant ce nouveau retour.

@@ -6,6 +6,66 @@ static uint8_t pixels[CPC_VIDEO_BYTES + 2U];
 static uint16_t line[322];
 static uint8_t glyph(void *ctx, uint8_t ch, unsigned row)
 { (void)ctx; (void)ch; return row == 0U ? 0xffU : 0x81U; }
+/* C2: a visible cursor overlays the VRAM using live PEN, so only its
+ * raster band must be dirtied when that colour index changes. Repeat in
+ * all three modes; expected TFT x depends on horizontal scaling. */
+static void test_cursor_pen_dirty(CpcMode mode)
+{
+    CpcVideo v;
+    static uint8_t saved[CPC_VIDEO_BYTES];
+    const unsigned column = 3U;
+    const unsigned row = 9U;
+    const unsigned logical_x = column * 8U;
+    const unsigned display_x = mode == CPC_MODE_0 ? logical_x * 2U :
+                               mode == CPC_MODE_1 ? logical_x : logical_x / 2U;
+    const unsigned physical_y = CPC_VIDEO_VIEW_TOP + row * 8U + 3U;
+    const uint32_t cursor_band = UINT32_C(1) << row;
+    assert(cpc_video_init(&v, pixels + 1U, CPC_VIDEO_BYTES, mode));
+    assert(cpc_video_take_dirty(&v) == UINT32_C(0x01ffffff));
+    assert(cpc_video_take_dirty(&v) == 0U);
+    assert(cpc_video_cursor(&v, column, row, true));
+    assert(cpc_video_take_dirty(&v) == (cursor_band | UINT32_C(1)));
+    assert(cpc_video_take_dirty(&v) == 0U);
+    memcpy(saved, pixels + 1U, sizeof(saved));
+    assert(cpc_video_render_row(&v, physical_y, line + 1, 320));
+    assert(line[1U + display_x] == UINT16_C(0xffe0)); /* old cursor PEN 1 */
+
+    assert(cpc_video_set_text_colors(&v, 0U, 0U));
+    assert(v.pen == 0U && v.paper == 0U);
+    assert(v.dirty_bands == cursor_band);
+    assert(cpc_video_render_row(&v, physical_y, line + 1, 320));
+    assert(line[1U + display_x] == UINT16_C(0x0010)); /* new cursor PEN 0 */
+    assert(memcmp(saved, pixels + 1U, sizeof(saved)) == 0);
+    assert(cpc_video_take_dirty(&v) == cursor_band);
+    assert(cpc_video_take_dirty(&v) == 0U);
+
+    /* Same PEN and changed PAPER do not change the cursor overlay. */
+    assert(cpc_video_set_text_colors(&v, 0U, 0U));
+    assert(cpc_video_take_dirty(&v) == 0U);
+    assert(cpc_video_set_text_colors(&v, 0U, 1U));
+    assert(cpc_video_take_dirty(&v) == 0U);
+    assert(!cpc_video_set_text_colors(&v, cpc_video_colors(&v), 0U));
+    assert(cpc_video_take_dirty(&v) == 0U);
+    assert(v.pen == 0U && v.paper == 1U);
+
+    assert(cpc_video_cursor(&v, column, row, false));
+    assert(cpc_video_take_dirty(&v) == cursor_band);
+    assert(cpc_video_set_text_colors(&v, 1U, 0U));
+    assert(cpc_video_take_dirty(&v) == 0U);
+    assert(cpc_video_render_row(&v, physical_y, line + 1, 320));
+    assert(line[1U + display_x] == UINT16_C(0x0010)); /* unchanged VRAM */
+    assert(memcmp(saved, pixels + 1U, sizeof(saved)) == 0);
+
+    /* The last legal band must remain representable by the 25-bit mask. */
+    assert(cpc_video_cursor(&v, column, 24U, true));
+    assert(cpc_video_take_dirty(&v) == ((UINT32_C(1) << 24U) | cursor_band));
+    assert(cpc_video_set_text_colors(&v, 0U, 0U));
+    assert(cpc_video_take_dirty(&v) == (UINT32_C(1) << 24U));
+    assert(cpc_video_take_dirty(&v) == 0U);
+    assert(memcmp(saved, pixels + 1U, sizeof(saved)) == 0);
+    assert(pixels[0] == 0xaa && pixels[CPC_VIDEO_BYTES + 1U] == 0xaa);
+}
+
 int main(void)
 {
     CpcVideo v;
@@ -54,6 +114,10 @@ int main(void)
         assert(cpc_video_set_mode(&v,(CpcMode)mode));
         assert(pixels[1] == 0 && pixels[CPC_VIDEO_BYTES] == 0);
         assert(v.pen == 1 && v.paper == 0 && v.cursor_visible == false);
+    }
+    for (unsigned mode = 0U; mode < 3U; ++mode) {
+        memset(pixels, 0xaa, sizeof(pixels));
+        test_cursor_pen_dirty((CpcMode)mode);
     }
     assert(cpc_video_palette_rgb565(24)==0xffe0);
     assert(cpc_video_palette_rgb565(1)==0x0010);

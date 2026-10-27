@@ -152,3 +152,13 @@ La soustraction INTEGER native bornée `B%=A%-n` (`n` décimal non signé 0..255
 ## J1.4-A — multiplication : oracle CPC mesuré (27 octobre 2026)
 
 L'oracle CPC6128 pour la multiplication INTEGER `B%=A%*n` est désormais capturé pour **8 programmes authentiques** (issue [#68](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/68)). L'opérateur binaire est le token CPC mesuré **`F6`** ; six exécutions `ERR=0`, deux dépassements `Overflow in 20`, `ERR=6`. Le cœur C99 **ne prend pas encore en charge** cette multiplication : les huit expressions ont le statut natif `UNSUPPORTED`. [Corpus, provenance et limitations](docs/J1.4-A-integer-multiplication-oracle.md). L'archive et son sceau sont en attente de revue Pilotage, **J1.4-B n'est pas autorisé**. HW3 reste indépendant et la couverture physique CYD de cette opération n'existe pas.
+
+
+### J1.4-B — multiplication INTEGER native (27 octobre 2026 ; en revue Pilotage)
+
+- J1.4-A **acceptée et fusionnée** via PR #69 ; merge commit `49586583ef0b877798837bd9b894be666afb3f29`. Ses huit preuves CPC authentiques restent immuables, y compris la classification C99 **historique** `UNSUPPORTED`.
+- J1.4-B (#70) : opérateur `*` CPC `F6` pour une unique affectation `destination%=source%*n`, entier littéral non signé `0..255`, avec calcul `int32_t`, vérification INT16 et commit atomique. Le nouvel oracle live est indépendant de l'archive J1.4-A.
+- Validation requise : 8/8 images RAM MATCH_EXACT, 6/6 produits CPC, 2/2 débordements sans mutation, CI Linux ASan/UBSan + GHCR + Xtensa IDF v5.5.6. Les résultats de CI du **HEAD final** doivent être attestés dans la PR.
+- **En revue, non fusionnée** ; pas de J1.5, pas de graphique ni de HW3 / PR #66. `ON_DEVICE_UNVERIFIED` tant qu'un test physique CYD n'a pas été réalisé.
+- Rapport dédié : [J1.4-B-integer-multiplication-native.md](docs/J1.4-B-integer-multiplication-native.md).
+

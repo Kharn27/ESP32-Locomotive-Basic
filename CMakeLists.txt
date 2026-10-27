@@ -341,3 +341,17 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+# J1.4-B: bounded native F6 multiplication; historical J1.4-A stays immutable.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_multiplication
+                   tests/test_basic_integer_multiplication.c)
+    target_link_libraries(test_basic_integer_multiplication PRIVATE
+                          basic_session_runtime basic_variable_binding)
+    add_test(NAME integer_multiplication_f6 COMMAND test_basic_integer_multiplication)
+    add_test(NAME j1_4_b_native_cpc_differential COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_4_b_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

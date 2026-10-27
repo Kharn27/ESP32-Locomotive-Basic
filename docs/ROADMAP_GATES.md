@@ -245,3 +245,13 @@ Décision après revue contradictoire au HEAD `4b3ee300611963cef6d8f37c99ec54c6b
 
 
 **J1.4-A — acquisition originale obtenue, décision toujours suspendue :** [run #40514871560](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40514871560) ; huit `program.bin` et sondes imprimante originaux archivé(s), opcode ROM `F6`, six résultats sans erreur et **deux erreurs `Overflow in 20` / ERR=6** ; manif. SHA `611f655ef0b7100fb51d90a0b473b11ddebd1b41fc7dfbeecf883649214bd26b`, 13 falsifications rejetées, archive immuable, C99 `UNSUPPORTED`. [Détails](J1.4-A-integer-multiplication-oracle.md). Les CI du HEAD final et la reproduction des fichiers originaux restent obligatoires avant revue et décision. **J1.4-B INTERDIT**.
+
+
+### J1.4-B — multiplication INTEGER native (27 octobre 2026 ; en revue Pilotage)
+
+- J1.4-A **acceptée et fusionnée** via PR #69 ; merge commit `49586583ef0b877798837bd9b894be666afb3f29`. Ses huit preuves CPC authentiques restent immuables, y compris la classification C99 **historique** `UNSUPPORTED`.
+- J1.4-B (#70) : opérateur `*` CPC `F6` pour une unique affectation `destination%=source%*n`, entier littéral non signé `0..255`, avec calcul `int32_t`, vérification INT16 et commit atomique. Le nouvel oracle live est indépendant de l'archive J1.4-A.
+- Validation requise : 8/8 images RAM MATCH_EXACT, 6/6 produits CPC, 2/2 débordements sans mutation, CI Linux ASan/UBSan + GHCR + Xtensa IDF v5.5.6. Les résultats de CI du **HEAD final** doivent être attestés dans la PR.
+- **En revue, non fusionnée** ; pas de J1.5, pas de graphique ni de HW3 / PR #66. `ON_DEVICE_UNVERIFIED` tant qu'un test physique CYD n'a pas été réalisé.
+- Rapport dédié : [J1.4-B-integer-multiplication-native.md](J1.4-B-integer-multiplication-native.md).
+

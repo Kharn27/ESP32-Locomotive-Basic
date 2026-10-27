@@ -23,7 +23,15 @@ jobs:
           set -euo pipefail
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
           ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_loco/main --include='*.c'
-          git diff --exit-code "$(git merge-base origin/main HEAD)" HEAD -- core/ tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
+          base="$(git merge-base origin/main HEAD)"
+          # Always protect CPC archives and the shared display transport.
+          git diff --exit-code "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
+          # The historical HW4-C1 no-core-change rule only applies when the
+          # PR actually changes HW4-C1 product files. A parallel J1 core PR
+          # must not fail the HW4-C1 integration check merely for touching core/.
+          if git diff --name-only "$base" HEAD -- firmware/esp32_loco/ video/cpc_text.c video/cpc_text.h tests/test_cpc_text.c tests/test_hw4_c1_integration.c | grep -q .; then
+            git diff --exit-code "$base" HEAD -- core/
+          fi
           test "$(grep -c '^void app_main(void)' firmware/esp32_loco/main/main.c)" -eq 1
           ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_loco/main/
 

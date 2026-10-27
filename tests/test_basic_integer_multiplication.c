@@ -325,7 +325,7 @@ static int test_failure_cases(void)
     CHECK(put(&h, 10u, "B%=A%*3") == 0);
     CHECK(put(&h, 20u, "PRINT B%") == 0);
     CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
-    CHECK(step(&h) == 0 && equal(&h, 'B', 6) == 0);
+    CHECK(step(&h) == 0 && equal(&h, 'B', 27) == 0);
     n = 787u;
     memset(h.output, 0x75, sizeof(h.output));
     memcpy(before_output, h.output, sizeof(before_output));

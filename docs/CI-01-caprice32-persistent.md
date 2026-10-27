@@ -47,9 +47,10 @@ et dans le dépôt consommateur.
 
 ## État
 
-Phase A proposée pour revue contradictoire : image non publiée tant que la
-PR n'est pas acceptée et fusionnée. Phase B interdite avant l'observation
-sur GitHub de la publication et de l'empreinte exacte.
+**Phase A ACCEPTÉE, fusionnée, image GHCR publiée :** [PR #57](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/57), commit `6935f01e3cad912d5b49c95875de25f39dc17c41`, [publication SUCCESS #40483979405](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40483979405).
+Digest image final (index OCI) : `sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c`.
+
+**Phase B en cours de revue technique :** migration du workflow CPC récurrent sur cette image épinglée. L'oracle Git submodule exact et les hash ROM demeurent contrôlés. Une PR constitue le nouveau banc de mesure temps/performance avant tout merge.
 
 État applicatif indépendant : J1.2-B / PR #56 acceptée et fusionnée
 le 27 octobre 2026, commit `209fc9c58faade3fd8e5aef37eaa7a844d8d29d1`.

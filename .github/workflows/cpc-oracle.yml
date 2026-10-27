@@ -34,17 +34,39 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   caprice32-oracle:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Container jobs default to /bin/sh (dash); old scripts require bash
+    # for 'set -euo pipefail'. Keep their original shell semantics.
+    defaults:
+      run:
+        shell: bash
+    # CI-01-B: immutable, ROM-free oracle runtime published by CI-01-A.
+    # Container digest (not mutable tag) is the reviewed artifact identity.
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout pinned emulator submodule
         uses: actions/checkout@v4
         with:
           submodules: recursive
           persist-credentials: false
+
+      - name: Trust container workspace and export container TEMP path
+        id: cpc_env
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          printf 'runner_temp=%s\n' "$RUNNER_TEMP" >> "$GITHUB_OUTPUT"
 
       - name: Verify pinned Caprice32 revision
         shell: bash
@@ -54,21 +76,22 @@ jobs:
           git ls-tree HEAD tests/oracles/caprice32
           test "$(git ls-tree HEAD tests/oracles/caprice32 | awk '{print $1}')" = "160000"
 
-      - name: Install upstream Linux build dependencies and Xvfb
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends g++ make pkg-config libsdl2-dev libfreetype6-dev zlib1g-dev libpng-dev xvfb xauth python3
-
-      - name: Build Caprice32 from pinned source
+      - name: Verify pinned GHCR toolchain and checked-out authentic CPC ROMs
         working-directory: tests/oracles/caprice32
+        shell: bash
         run: |
           set -euo pipefail
-          make -j 2 WITHOUT_GL=1 APP_PATH="$PWD"
-          ./cap32 --version
-          test -s rom/cpc6128.rom
-          sha256sum rom/cpc6128.rom
+          # The container deliberately includes no ROM. We use the git
+          # checkout's CPC files, exactly as the previous workflow did.
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 ./cap32
+          ./cap32 --version | tee /tmp/ci01-caprice32-version.txt
+          grep -Fq "8c778bf072a06fb7c23b9cccd179041db7f79a52" /tmp/ci01-caprice32-version.txt
+          test "$(sha256sum rom/cpc6128.rom | cut -d ' ' -f 1)" = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
           test -s rom/amsdos.rom
           sha256sum rom/amsdos.rom
+          echo "CI-01-B PINNED_IMAGE=sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c APT=NONE CAPRICE_BUILD=NONE"
 
       - name: Build portable C99 comparator
         run: |
@@ -186,7 +209,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-c6-run-behavior
-          path: ${{ runner.temp }}/cpc-run-behavior/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/cpc-run-behavior/
           if-no-files-found: warn
           retention-days: 14
 
@@ -220,7 +243,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-c7-list-printer
-          path: ${{ runner.temp }}/cpc-list-printer/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/cpc-list-printer/
           if-no-files-found: warn
           retention-days: 30
 
@@ -265,7 +288,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-c8-list-screen
-          path: ${{ runner.temp }}/cpc-list-screen/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/cpc-list-screen/
           if-no-files-found: warn
           retention-days: 30
 
@@ -320,7 +343,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-j027-numeric-print
-          path: ${{ runner.temp }}/j027-numeric-print/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/j027-numeric-print/
           if-no-files-found: warn
           retention-days: 30
 
@@ -359,7 +382,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-j027-b1-signed-print
-          path: ${{ runner.temp }}/j027-b1-signed-print/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/j027-b1-signed-print/
           if-no-files-found: warn
           retention-days: 30
 
@@ -382,7 +405,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-basic-token-ram-evidence
-          path: ${{ runner.temp }}/cpc-token-oracle/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/cpc-token-oracle/
           if-no-files-found: warn
           retention-days: 14
 
@@ -391,7 +414,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-caprice32-evidence
-          path: ${{ runner.temp }}/cpc-oracle/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/cpc-oracle/
           if-no-files-found: warn
           retention-days: 14
 
@@ -425,6 +448,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpc6128-j1-signed-negative-program-ram
-          path: ${{ runner.temp }}/j1-signed-tokens/
+          path: ${{ steps.cpc_env.outputs.runner_temp }}/j1-signed-tokens/
           if-no-files-found: warn
           retention-days: 30

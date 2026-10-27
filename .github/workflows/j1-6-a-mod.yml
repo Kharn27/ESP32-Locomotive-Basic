@@ -1,15 +1,7 @@
 name: J1.6-A independent CPC INTEGER mod
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/j1-6-a-mod.yml"
-      - "tests/oracles/j1_6_mod_oracle.py"
-      - "tests/oracles/inputs/j1_6_a/**"
-      - "tools/j1_6_mod_verify.py"
-      - "tests/fixtures/cpc6128/j1_integer_mod/**"
-      - "docs/J1.6-A-integer-mod-oracle.md"
-      - "docs/ROADMAP_GATES.md"
+  pull_request: {}
   workflow_dispatch:
 
 permissions:
@@ -71,6 +63,15 @@ jobs:
           cmake --build "$RUNNER_TEMP/j16-c99" --parallel 2
           ctest --test-dir "$RUNNER_TEMP/j16-c99" --output-on-failure
 
+      - name: Recheck sealed J1.5-A oracle and J1.5-B native F9 without changing them
+        run: |
+          set -euo pipefail
+          python3 tools/j1_5_division_verify.py --permanent --self-test
+          python3 tools/j1_5_b_native_verify.py \
+            --cli "$RUNNER_TEMP/j16-c99/loco_basic_cli" \
+            --image-cli "$RUNNER_TEMP/j16-c99/basic_program_image_cli" --self-test
+          echo "J1.5-A / J1.5-B PERMANENT AND NATIVE CONTRACTS RECHECKED"
+
       - name: Verify immutable J1.4-A CPC multiplication archive and all negative falsifications
         run: |
           set -euo pipefail
@@ -127,3 +128,22 @@ jobs:
           path: ${{ runner.temp }}/j16-cpc/
           if-no-files-found: warn
           retention-days: 30
+
+  permanent-mod-evidence:
+    name: J1.6-A permanent integrity and falsification (no emulator)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original CPC bytes and provisional seal, including 13 negative cases
+        run: |
+          set -euo pipefail
+          DEST=tests/fixtures/cpc6128/j1_integer_mod
+          if test -f "$DEST/manifest.json"; then
+            python3 tools/j1_6_mod_verify.py --evidence "$DEST" --permanent --self-test
+          elif test "$GITHUB_HEAD_REF" = feat/j1-6-a-integer-mod-oracle; then
+            echo "ACQUISITION_PENDING: the original archive is created by cpc-mod job"
+          else
+            echo "MISSING PERMANENT J1.6-A ORIGINAL ARCHIVE"
+            exit 1
+          fi

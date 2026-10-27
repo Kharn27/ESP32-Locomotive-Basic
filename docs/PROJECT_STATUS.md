@@ -359,3 +359,12 @@ Après fusion acceptée de [J1.3-B PR #67](https://github.com/Kharn27/ESP32-Loco
 - Observations authentiques du CPC : opérateur `F9` sur 12/12 images RAM, **troncature vers zéro** sur ce corpus, `ERR=11` pour les deux divisions par zéro ; classification C99 actuelle `UNSUPPORTED` sur 12/12. L'opcode et les résultats ont été **mesurés**, jamais supposés. `\\` diffère de la division réelle `/`. Les anciens manifestes, classifications et archives sont intacts. C99 `core/` et firmware inchangés.
 - [Rapport et protocole J1.5-A](J1.5-A-integer-division-oracle.md) ; PR dédiée non fusionnée, J1.5-B non autorisé, `ON_DEVICE_UNVERIFIED`.
 
+
+
+### Décision Pilotage J1.5-A — ACCEPTÉ/FUSIONNÉ ; J1.5-B autorisé (27 octobre 2026)
+
+[PR #73](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/73) acceptée après inspection des scripts, archives et logs, fusion squash [98700abd35b0a6fd23cce10fe6dc4badb159b61e](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/98700abd35b0a6fd23cce10fe6dc4badb159b61e) du HEAD revu 61d9c1c703e7f50c759c50c7555891cf11276be5. Acquis : opcode CPC F9 dans 12/12 programmes, 24 sessions fraîches, quotient tronqué vers zéro, ERR=11 pour division par zéro, reproduction byte-à-byte 12/12 des program.bin et 12/12 des printer.dat, treize falsifications et faux SHA rejetés. Le sceau PENDING_PILOTAGE est historique et volontairement immuable. [Commentaire de revue](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/73#issuecomment-6445724545).
+
+CI sur le HEAD exact : [Linux C99 OFF/ON, 40/40 #40526949454](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40526949454), [oracle CPC GHCR #40527017107](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40527017107), [archive permanente J1.4-A + J1.5-A #40526949788](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40526949788), [Xtensa 3/3 #40526949755](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40526949755) : SUCCESS. TARGET_BUILD_VERIFIED, ON_DEVICE_UNVERIFIED.
+
+**J1.5-B / [issue #75](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/75) est le seul jalon cœur BASIC désormais autorisé** : division INTEGER native bornée, 12 images/LIST exactes, dix sorties et deux erreurs, sans modification de l'oracle, sans slash réel ou généralisation des expressions. La sonde HW3 / PR #66 a été fusionnée séparément, sans dépendance envers J1.5-B. Les entrées de statut pré-revue plus haut sont préservées pour l'historique.

@@ -264,3 +264,12 @@ Décision après revue contradictoire au HEAD `4b3ee300611963cef6d8f37c99ec54c6b
 - Observations authentiques du CPC : opérateur `F9` sur 12/12 images RAM, **troncature vers zéro** sur ce corpus, `ERR=11` pour les deux divisions par zéro ; classification C99 actuelle `UNSUPPORTED` sur 12/12. L'opcode et les résultats ont été **mesurés**, jamais supposés. `\\` diffère de la division réelle `/`. Les anciens manifestes, classifications et archives sont intacts. C99 `core/` et firmware inchangés.
 - [Rapport et protocole J1.5-A](J1.5-A-integer-division-oracle.md) ; PR dédiée non fusionnée, J1.5-B non autorisé, `ON_DEVICE_UNVERIFIED`.
 
+
+
+### Gate J1.5-A franchi — J1.5-B autorisé (27 octobre 2026)
+
+[PR #73](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/73) **acceptée/fusionnée** par Pilotage (squash 98700abd35b0a6fd23cce10fe6dc4badb159b61e), [revue](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/73#issuecomment-6445724545). Preuve CPC indépendante : 12/12 opcode F9, 24 sessions, troncature vers zéro, ERR=11 sur diviseur zéro, 12/12 RAM et 12/12 imprimantes reproduites byte-à-byte, 13 falsifications et faux checkout rejetés. Archive CPC et sceau historique PENDING_PILOTAGE préservés.
+
+Barrières HEAD final vertes : [Linux 40/40 OFF/ON #40526949454](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40526949454), [CPC GHCR #40527017107](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40527017107), [oracle J1.4-A/J1.5-A #40526949788](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40526949788), [Xtensa 3/3 #40526949755](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40526949755). TARGET_BUILD_VERIFIED ; ON_DEVICE_UNVERIFIED.
+
+**Suite autorisée : [J1.5-B, issue #75](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/75)**. Ajouter seulement le token F9 pour affectation INTEGER destination%=source% avec diviseur littéral non signé de 0 à 255. Exiger 12/12 images CPC MATCH_EXACT et 12 LIST identiques, 10 calculs et 2 erreurs de division par zéro natives atomiques, suites C99 historiques, archive permanente, oracle GHCR et Xtensa verts au HEAD final. Aucune implémentation slash réel, expressions générales, REAL5 générique ou HAL/HW3. Pas de prochain jalon avant revue Pilotage.

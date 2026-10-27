@@ -171,3 +171,8 @@ L'oracle CPC6128 pour la multiplication INTEGER `B%=A%*n` est désormais captur�
 - Observations authentiques du CPC : opérateur `F9` sur 12/12 images RAM, **troncature vers zéro** sur ce corpus, `ERR=11` pour les deux divisions par zéro ; classification C99 actuelle `UNSUPPORTED` sur 12/12. L'opcode et les résultats ont été **mesurés**, jamais supposés. `\\` diffère de la division réelle `/`. Les anciens manifestes, classifications et archives sont intacts. C99 `core/` et firmware inchangés.
 - [Rapport et protocole J1.5-A](docs/J1.5-A-integer-division-oracle.md) ; PR dédiée non fusionnée, J1.5-B non autorisé, `ON_DEVICE_UNVERIFIED`.
 
+
+
+### Pilotage — J1.5-A accepté et fusionné (27 octobre 2026)
+
+[PR #73](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/73) acceptée après revue contradictoire, squash 98700abd35b0a6fd23cce10fe6dc4badb159b61e. Oracle CPC6128 : 12 programmes, 24 sessions, token F9, troncature vers zéro et ERR=11 pour diviseur nul. 12/12 images RAM et sondes imprimante réacquises exactement ; 13 falsifications rejetées et fausse identité checkout rejetée. Archive et sceau historique PENDING_PILOTAGE préservés. [Revue Pilotage](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/73#issuecomment-6445724545). Suite autorisée : [J1.5-B, issue #75](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/75), division INTEGER native, sans support de la division réelle. TARGET_BUILD_VERIFIED ; ON_DEVICE_UNVERIFIED.

@@ -417,3 +417,24 @@ if(BUILD_TESTING)
                           cpc_text basic_session_runtime)
     add_test(NAME hw4_c1_native_runtime_tft_bytes COMMAND test_hw4_c1_integration)
 endif()
+
+# HW4-C2: independent portable UART collection and screen echo/paging.
+add_library(uart_line STATIC io/uart_line.c)
+target_include_directories(uart_line PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/io)
+add_library(cpc_uart_console STATIC video/cpc_uart_console.c)
+target_include_directories(cpc_uart_console PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/video)
+target_link_libraries(cpc_uart_console PUBLIC cpc_text)
+if(BUILD_TESTING)
+    add_executable(test_uart_line tests/test_uart_line.c)
+    target_link_libraries(test_uart_line PRIVATE uart_line)
+    add_test(NAME hw4_c2_uart_line_boundaries COMMAND test_uart_line)
+
+    add_executable(test_cpc_uart_console tests/test_cpc_uart_console.c)
+    target_link_libraries(test_cpc_uart_console PRIVATE cpc_uart_console uart_line)
+    add_test(NAME hw4_c2_screen_paging COMMAND test_cpc_uart_console)
+
+    add_executable(test_hw4_c2_integration tests/test_hw4_c2_integration.c)
+    target_link_libraries(test_hw4_c2_integration PRIVATE
+                          uart_line cpc_uart_console basic_session_runtime)
+    add_test(NAME hw4_c2_native_uart_runtime_tft COMMAND test_hw4_c2_integration)
+endif()

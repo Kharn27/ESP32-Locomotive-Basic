@@ -177,6 +177,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             size_t i;
             uint8_t t;
             unsigned int number;
+            int reference_addition = 0;
             /* A5 is explicit LET, 02 begins implicit LET; both reuse the
              * CPC explicit INTEGER reference decoder, ignoring cache values. */
             if (ref_start >= length) {
@@ -253,6 +254,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 }
             }
             if (t == 0x02u) {
+                reference_addition = 1;
                 /* RHS CPC cache bytes remain opaque (20, EF, F4 included). */
                 BasicVariableRef rhs;
                 size_t rhs_start = pos - 1u;
@@ -311,6 +313,11 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                     return BL_BAD_SEQUENCE;
                 }
             } else if (t == 0x1au) {
+                /* Addition remains restricted to an 8-bit addend. A 1A
+                 * here is not a LIST-representable native expression. */
+                if (reference_addition) {
+                    return BL_BAD_SEQUENCE;
+                }
                 if (length - pos < 2u) {
                     return BL_TRUNCATED;
                 }

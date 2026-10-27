@@ -580,3 +580,17 @@ Preuves définitives Linux/ESP32 à attester dans la PR au HEAD final ;
   ne pas réutiliser automatiquement l'ancien PASS pour le nouveau binaire.
 - Les résultats CI, l'empreinte de merge et les mémoires cibles sont à
   relever depuis les exécutions GitHub Actions sur le HEAD C1 exact.
+
+ 
+### HW4-C3-A-C1 — correction visuelle ciblée après essai PO (`74abb57`)
+ 
+Le PO a flashé le HEAD `74abb574b5c47f19762b9bdba2cee270e93672d6`.
+Bandeau visible, exécution du programme natif `RUN` donnant `5`,
+sans défaut DMA. Retouche *uniquement du bandeau console ON* :
+mettre la ligne « and Locomotive Software Ltd. » en rangée **6**
+directement après le copyright « 1985 Amstrad… » en rangée **5**.
+La variante HW3 OFF reste inchangée (rangée 7). Test C99 des deux
+dispositions et du framebuffer, plus retest CYD sur le nouveau HEAD
+impératif. Le `SCREEN_PAGE_RESET` de LIST est le comportement
+`auto_page_non_cpc` de HW4-C2 et reste hors mandat C1 (scrolling exclu
+par Pilotage). Aucune modification UART, HAL, cœur, oracles ou VRAM.

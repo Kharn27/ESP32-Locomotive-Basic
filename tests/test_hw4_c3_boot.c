@@ -57,7 +57,8 @@ static void check(bool cyd)
         const char *expected=i==0U && cyd
           ? "ESP32 CYD 128K Microcomputer (v3)" : lines[i];
         assert(cpc_boot_line(i,cyd,&line));
-        assert(line.row==rows[i] && strcmp(line.text,expected)==0);
+        const unsigned expected_row=(cyd && i==2U) ? 6U : rows[i];
+        assert(line.row==expected_row && strcmp(line.text,expected)==0);
         assert(line.column==(i<3U
               ? (40U-(unsigned)strlen(expected))/2U : i==3U ? 1U : 0U));
         assert(line.column+strlen(expected)<=40U);
@@ -76,6 +77,24 @@ static void check(bool cyd)
                 }
             }
             if(ch!=' ') assert(glyph_mask!=0U);
+        }
+    }
+    /* CYD logo has credits directly below copyright; HW3 OFF unchanged. */
+    CpcBootLine copyright_line, credits_line;
+    assert(cpc_boot_line(1U,cyd,&copyright_line));
+    assert(cpc_boot_line(2U,cyd,&credits_line));
+    assert(copyright_line.row==5U);
+    assert(credits_line.row==(cyd ? 6U : 7U));
+    if(cyd) {
+        assert(credits_line.row==copyright_line.row+1U);
+    } else {
+        /* Row 6 remains fully empty in the original HW3 OFF display. */
+        for(unsigned x=0U;x<320U;++x) {
+            for(unsigned y=48U;y<56U;++y) {
+                uint8_t pen=255U;
+                assert(cpc_video_get(&video,x,y,&pen));
+                assert(pen==0U);
+            }
         }
     }
     CpcBootLine invalid;

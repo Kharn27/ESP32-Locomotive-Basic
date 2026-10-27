@@ -7,12 +7,17 @@
 ## Architecture
 
 - `video/cpc_boot.c/h` : mise en page HW3 portable C99 partagée entre
-  banc OFF et console ON ; 5 lignes/positions définies une seule fois.
+  banc OFF et console ON ; 5 textes centralisés, avec position de la
+  troisième ligne ajustée spécifiquement pour la console ON.
 - Le titre ON devient `ESP32 CYD 128K Microcomputer (v3)` à la demande
   du PO, sur la base de sa capture d'écran ; OFF conserve
   `Amstrad 128K Microcomputer (v3)` sans autre changement visuel.
-- Rangées 3, 5, 7, 10 et 12 ; copyright spécifique HW3 `0x7f`,
-  `BASIC 1.1`, `Ready` et curseur en (0,13) sans chevron.
+- Rangées **3, 5, 6, 10 et 12 sur la console ON** : la ligne
+  « and Locomotive Software Ltd. » suit immédiatement le copyright 1985
+  à la demande du PO (retour matériel sur `74abb57`).
+  **HW3 OFF conserve les rangées 3, 5, 7, 10, 12**, sans modification
+  de sa mire historique. Copyright HW3 `0x7f`, `BASIC 1.1`, `Ready`
+  et curseur en (0,13) sans chevron.
 - Le bandeau est dessiné par `cpc_video_put_cell()` dans les
   **16000 octets existants** de VRAM, après initialisation LCD/VRAM
   et avant la première invite UART. La première frappe commence à (0,13).

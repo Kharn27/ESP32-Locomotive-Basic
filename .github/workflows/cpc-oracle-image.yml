@@ -1,0 +1,81 @@
+name: CI-01 Prepare pinned Caprice32 oracle image
+
+on:
+  pull_request:
+    paths:
+      - "tools/ci/caprice32/**"
+      - ".github/workflows/cpc-oracle-image.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/ci/caprice32/**"
+      - ".github/workflows/cpc-oracle-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: cpc-oracle-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare-caprice32:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository and pinned submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Verify pinned source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+          test "$(git ls-tree HEAD tests/oracles/caprice32 | awk '{print $1}')" = "160000"
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Authenticate to GHCR only for canonical main/dispatch
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build reproducible oracle container (publish only on main)
+        uses: docker/build-push-action@v6
+        with:
+          context: tools/ci/caprice32
+          file: tools/ci/caprice32/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          tags: ghcr.io/kharn27/esp32-locomotive-basic-caprice32:cpc-8c778bf-ubuntu2404-v1
+          cache-from: type=gha,scope=loco-caprice32-v1
+          cache-to: type=gha,mode=max,scope=loco-caprice32-v1
+          provenance: mode=max
+      - name: Smoke test unprivileged image (PR)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE=ghcr.io/kharn27/esp32-locomotive-basic-caprice32:cpc-8c778bf-ubuntu2404-v1
+          docker run --rm --network none --entrypoint /bin/bash "$IMAGE" -ec '
+            test "$(cat /usr/local/share/loco-caprice32-source.sha)" = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+            test -x /usr/local/bin/cap32
+            test ! -e /opt/caprice32/rom
+            cap32 --version
+            cmake --version
+            python3 --version
+            xvfb-run -a true
+          '
+      - name: Record immutable published image digest
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE=ghcr.io/kharn27/esp32-locomotive-basic-caprice32:cpc-8c778bf-ubuntu2404-v1
+          docker buildx imagetools inspect "$IMAGE"
+          echo "CI-01_BOOTSTRAP_PUBLISHED $IMAGE"

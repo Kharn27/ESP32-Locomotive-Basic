@@ -288,13 +288,16 @@ static int demo_run(void)
         !step_expect("J0_25_FIVE", "A_assign", "") ||
         !step_expect("J0_25_FIVE", "B_addition", "") ||
         !check_value("J0_25_FIVE", 5) ||
-        !step_expect("J0_25_FIVE", "PRINT_B", " 5 \n") ||
-        !step_expect("J0_25_FIVE", "END_line", "") ||
+        !step_expect("J0_25_FIVE", "PRINT_B", " 5 \n")) {
+        return 0;
+    }
+    /* Publish the REAL interpreter's four bytes, never a fabricated 5. */
+    printf("J0.25 BASIC_OUTPUT: %.*s", (int)probe.written,
+           (const char *)probe.output);
+    if (!step_expect("J0_25_FIVE", "END_line", "") ||
         !end_expect("J0_25_FIVE")) {
         return 0;
     }
-    /* Exactly four bytes from the native numeric presentation (J0.27-C1). */
-    printf("J0.25 BASIC_OUTPUT:  5 \n");
     printf("J1.2-HW2 case=J0_25_FIVE PASS stored=5 print_bytes=4 end=BE_END\n");
     return 1;
 }

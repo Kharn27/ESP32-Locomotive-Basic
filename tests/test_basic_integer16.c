@@ -138,7 +138,6 @@ static int test_reject_tokenizer(void)
 {
     static const struct {const char *source; BTStatus reason;} bad[] = {
         {"B%=32768", BT_NUMBER_OUT_OF_RANGE},
-        {"B%=-32768", BT_NUMBER_OUT_OF_RANGE},
         {"B%=65535", BT_NUMBER_OUT_OF_RANGE},
         {"B%=-65535", BT_NUMBER_OUT_OF_RANGE},
         {"B%=B%+256", BT_NUMBER_OUT_OF_RANGE},

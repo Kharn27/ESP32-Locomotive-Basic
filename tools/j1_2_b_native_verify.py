@@ -86,7 +86,7 @@ def live(name, cli, image_cli):
           "TRANSPORT=CPC_CRLF_VS_C99_LF", flush=True)
 
 def excluded(cli, image_cli):
-    for value in (32768, -32768):
+    for value in (32768,):
         source = (f"10 B%={value}\n20 PRINT B%\n30 END\n").encode("ascii")
         for label, binary, payload in (
             ("IMAGE", image_cli, source),
@@ -103,7 +103,7 @@ def excluded(cli, image_cli):
             else:
                 require(b"[cli:error]" in result.stderr and not result.stdout,
                         str(value) + ": CLI_OUT_OF_SCOPE_ACCEPTED")
-    print("PASS J1.2-B OUT_OF_SCOPE 32768 and -32768 rejected", flush=True)
+    print("PASS J1.2-B OUT_OF_SCOPE +32768 rejected; -32768 is J1.2-C", flush=True)
 
 def self_test():
     for name in ("P256", "N256", "PMAX"):

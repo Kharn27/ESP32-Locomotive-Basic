@@ -305,3 +305,9 @@ Jalon développé séparément depuis le main `3e903147012aedca530c9367ce130f4f8
 **Suppr :** `ESC[3~` devient un seul retour arrière ; les CSI inconnues sont intégralement absorbées, les séquences incomplètes refusent la ligne sans mutation, le `0x08` et `0x7F` restent valides. Contrôles Linux C99 et compilation réelle des variantes **ON/OFF** + sonde BASIC requis au nouveau HEAD, suivis d'un nouvel essai PO. Bandeau Amstrad et bip hors correction. Voir [HW4-C2 technique](docs/HW4-C2-uart-interactive-console.md). **PR non fusionnée ; HW4-C3 bloqué.**
 
 **HW4-C2-C1 — correction visuelle du prompt :** le faux chevron `>` est retiré de l'entrée BASIC dans `firmware/esp32_display_probe/` ; curseur seul en colonne 0. Résultat physique `PRINT 2` refusé et `LIST` inchangé, confirmé sur le CYD au SHA antérieur `a333767`. La suppression du marqueur nécessite une nouvelle CI au SHA corrigé ; pas de nouveau projet ni de fusion. [Rapport HW4-C2](docs/HW4-C2-uart-interactive-console.md).
+
+### Pilotage — J1.9-A accepté, arithmétique groupée en J1.9-B (27 octobre 2026)
+
+**J1.9-A fusionné** : [PR #99](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/99), squash `7ed0bf08de9b5667de6cda543bf220f78ddb4aa6`. Preuves ROM CPC 6128 BASIC 1.1 scellées pour 24 programmes avec multiplication INTEGER, division entière et MOD entre deux variables : **24 RAM et 24 imprimantes réacquises exactes, 23 falsifications + faux checkout rejetés**, Linux **52/52 OFF et ON ASan/UBSan**, trois firmwares ESP32 compilés, HW4-C1 préservé. Phase probatoire sans modification du moteur natif et sans flash réel CYD.
+
+**Mission développeur suivante : [J1.9-B issue #100](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/100)** — implémentation native *groupée* des trois opérations F6/F9/FB variable-variable, comparateur différentiel contre les 24 originaux et au moins 54/54 tests OFF/ON, sans modification des archives historiques.

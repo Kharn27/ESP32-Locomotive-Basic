@@ -237,7 +237,8 @@ static int suffix_assignment(const uint8_t *body, size_t length, size_t pos)
                 } else {
                     ++pos;
                 }
-            } else if (!quoted && (c == 0x19u || c == 0x1eu || c == 0x1du)) {
+            } else if (!quoted && (c == 0x19u || c == 0x1au ||
+                                    c == 0x1eu || c == 0x1du)) {
                 size_t payload = c == 0x19u ? 1u : 2u;
                 pos += length - pos > payload ? payload + 1u : length - pos;
             } else {
@@ -433,6 +434,8 @@ static BEStatus execute_line(const BasicProgram *program,
             size_t consumed, start;
             uint8_t literal;
             int negative = 0;
+            int reference_rhs = 0;
+            int32_t magnitude = 0;
             BVBStatus resolved;
             /* Multi-statement lines must not commit a PRINT prefix or
              * an assignment on the same line. The probe stays pure. */
@@ -485,7 +488,7 @@ static BEStatus execute_line(const BasicProgram *program,
                 literal = body[pos++];
             }
             if (literal >= 0x0eu && literal <= 0x17u) {
-                value.data.integer = (int16_t)(literal - 0x0eu);
+                magnitude = (int32_t)(literal - 0x0eu);
             } else if (literal == 0x19u) {
                 if (pos == length) {
                     return BE_TRUNCATED;
@@ -494,10 +497,25 @@ static BEStatus execute_line(const BasicProgram *program,
                 if (literal < 10u) {
                     return BE_BAD_SEQUENCE;
                 }
-                value.data.integer = (int16_t)literal;
+                magnitude = (int32_t)literal;
+            } else if (literal == 0x1au) {
+                uint32_t word;
+                if (length - pos < 2u) {
+                    return BE_TRUNCATED;
+                }
+                word = (uint32_t)body[pos] |
+                       ((uint32_t)body[pos + 1u] << 8);
+                pos += 2u;
+                if (word < 256u) {
+                    return BE_BAD_SEQUENCE; /* 19, not noncanonical 1A. */
+                }
+                if (word > (uint32_t)INT16_MAX) {
+                    return BE_INTEGER_OVERFLOW;
+                }
+                magnitude = (int32_t)word;
             } else if (literal == 0x02u && !negative) {
-                /* The very same bounded decoder/evaluator is called by both
-                 * be_step passes; neither pass mutates the store. */
+                /* Preserve the separate reference + unsigned-byte path. */
+                reference_rhs = 1;
                 status = evaluate_integer_addition(body, length, pos - 1u,
                                                     variables, &pos,
                                                     &value.data.integer);
@@ -507,9 +525,12 @@ static BEStatus execute_line(const BasicProgram *program,
             } else {
                 return BE_BAD_SEQUENCE;
             }
-            if (negative) {
-                /* Magnitude is bounded to 0..255 by existing token grammar. */
-                value.data.integer = (int16_t)(-(int32_t)value.data.integer);
+            if (!reference_rhs) {
+                int32_t signed_value = negative ? -magnitude : magnitude;
+                if (signed_value < INT16_MIN || signed_value > INT16_MAX) {
+                    return BE_INTEGER_OVERFLOW;
+                }
+                value.data.integer = (int16_t)signed_value;
             }
             skip_spaces(body, length, &pos);
             /* Multi-statement lines with an assignment are not in J0.19.

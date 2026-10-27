@@ -310,6 +310,18 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (number < 10u) {
                     return BL_BAD_SEQUENCE;
                 }
+            } else if (t == 0x1au) {
+                if (length - pos < 2u) {
+                    return BL_TRUNCATED;
+                }
+                number = (unsigned int)body[pos] |
+                         ((unsigned int)body[pos + 1u] << 8);
+                pos += 2u;
+                /* CPC 1A is canonical only for magnitudes 256..32767
+                 * in this explicitly INTEGER assignment subset. */
+                if (number < 256u || number > 32767u) {
+                    return BL_BAD_SEQUENCE;
+                }
             } else {
                 return t >= 0x80u || (t >= 0x0eu && t <= 0x1fu)
                         ? BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;

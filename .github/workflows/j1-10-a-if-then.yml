@@ -22,6 +22,9 @@ jobs:
       packages: read
     env:
       GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    defaults:
+      run:
+        shell: bash
     container:
       image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
       credentials:

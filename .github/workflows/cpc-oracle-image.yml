@@ -55,7 +55,8 @@ jobs:
           tags: ghcr.io/kharn27/esp32-locomotive-basic-caprice32:cpc-8c778bf-ubuntu2404-v1
           cache-from: type=gha,scope=loco-caprice32-v1
           cache-to: type=gha,mode=max,scope=loco-caprice32-v1
-          provenance: mode=max
+          # Local docker exporter does not support provenance manifest lists.
+          provenance: ${{ github.event_name != 'pull_request' }}
       - name: Smoke test unprivileged image (PR)
         if: github.event_name == 'pull_request'
         shell: bash

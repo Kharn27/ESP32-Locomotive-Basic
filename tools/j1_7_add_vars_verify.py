@@ -383,7 +383,7 @@ def self_test(base):
            "FILE_DIGEST_CHANGED")
     reject("manifest-changed", lambda root:
            write_manifest(root, lambda m: m.update(generated_at="tampered")),
-           "EXTERNAL_SEAL_CHANGED")
+           "PINNED_ORIGINAL_MANIFEST_MISMATCH")
     reject("seal-changed", lambda root:
            (root/"seal.json").write_text("{}\n"), "EXTERNAL_SEAL_CHANGED")
     actual = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"],

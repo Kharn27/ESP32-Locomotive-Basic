@@ -1,0 +1,42 @@
+name: HW4-C3-B2 native MODE1 scroll
+on:
+  pull_request:
+    paths:
+      - 'video/cpc_video.c'
+      - 'video/cpc_video.h'
+      - 'video/cpc_text.c'
+      - 'video/cpc_text.h'
+      - 'io/cpc_uart_console.c'
+      - 'io/cpc_uart_console.h'
+      - 'firmware/esp32_display_probe/main/hw4_c2_console.c'
+      - 'tests/test_hw4_c3_b2_scroll.c'
+      - 'tests/test_cpc_text.c'
+      - 'tests/test_cpc_uart_console.c'
+      - 'tests/test_hw4_c2_integration.c'
+      - 'tests/test_hw4_c3_boot.c'
+      - 'CMakeLists.txt'
+      - '.github/workflows/hw4-c3-b2-scroll.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  portable-b2:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        sanitizers: [OFF, ON]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test MODE1 scroll, native BASIC and injection
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          cmake -S . -B /tmp/hw4-c3-b2 -DBP_SANITIZERS=${{ matrix.sanitizers }}
+          cmake --build /tmp/hw4-c3-b2 --parallel 2
+          ctest --test-dir /tmp/hw4-c3-b2 --output-on-failure -R 'hw4_c3_b2|hw4_c1_text_boundaries|hw4_c2_screen_paging|hw4_c2_native_uart_runtime_tft|hw4_c3_boot_screen|cpc_video$'
+          python3 tools/hw4_c3_b2_uart_po.py --dry-run >/tmp/hw4-c3-b2-uart-commands.txt
+          test "$(grep -c ' PRINT 7' /tmp/hw4-c3-b2-uart-commands.txt)" = 32

@@ -38,6 +38,10 @@ target_include_directories(basic_session PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core
 target_link_libraries(basic_session PUBLIC basic_tokenizer basic_listing basic_program)
 
 include(CTest)
+# Labels are scheduled after the complete CMakeLists has registered all tests.
+if(BUILD_TESTING)
+    include(cmake/CTestLabels.cmake)
+endif()
 if(BUILD_TESTING)
     add_executable(test_basic_program tests/test_basic_program.c)
     target_link_libraries(test_basic_program PRIVATE basic_program)
@@ -530,11 +534,17 @@ if(BUILD_TESTING)
         --permanent --self-test)
 endif()
 
-# HW4-C3-B2: MODE1 raster scroll, cursor wrap and injected dirty-band retry.
-# No CPC pixel-equality or physical LCD transfer is claimed by this C99 test.
+# HW4-C3-B2: native MODE1 scroll, bounded dirty retention under injected
+# transport errors. The host retry proves transport-conditional resumption only.
 if(BUILD_TESTING)
     add_executable(test_hw4_c3_b2_scroll tests/test_hw4_c3_b2_scroll.c)
     target_link_libraries(test_hw4_c3_b2_scroll PRIVATE cpc_uart_console)
     add_test(NAME hw4_c3_b2_mode1_scroll_dma_retry
              COMMAND test_hw4_c3_b2_scroll)
+
+    # C1: same 53-byte fixture, frame-by-frame and coalesced screen comparison.
+    add_executable(test_hw4_c3_b2_c1_batch tests/test_hw4_c3_b2_c1_batch.c)
+    target_link_libraries(test_hw4_c3_b2_c1_batch PRIVATE cpc_uart_console)
+    add_test(NAME hw4_c3_b2_c1_lcd_batch_fail_stop
+             COMMAND test_hw4_c3_b2_c1_batch)
 endif()

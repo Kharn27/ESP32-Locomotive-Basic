@@ -145,6 +145,24 @@ static int errors(void) {
     CHECK(success(&f,"")==0 && f.exec.call_depth==1u);
     CHECK(failure(&f,BE_NO_SPACE,0u)==0);
     CHECK(success(&f,"101\n")==0 && f.exec.call_depth==1u);
+    /* An emitting PRINT before RETURN must not POP when output is too small. */
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10,"GOSUB 100")==0);
+    CHECK(put(&f,20,"END")==0);
+    CHECK(put(&f,100,"PRINT 2:RETURN")==0);
+    CHECK(be_init(&f.exec,&f.program)==BE_OK);
+    CHECK(success(&f,"")==0 && f.exec.call_depth==1u);
+    CHECK(failure(&f,BE_NO_SPACE,0u)==0);
+    CHECK(success(&f,"2\n")==0 && f.exec.call_depth==0u);
+    /* An END reached inside a subroutine clears abandoned return frames. */
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10,"GOSUB 100")==0);
+    CHECK(put(&f,20,"PRINT 3")==0);
+    CHECK(put(&f,100,"END")==0);
+    CHECK(be_init(&f.exec,&f.program)==BE_OK);
+    CHECK(success(&f,"")==0 && f.exec.call_depth==1u);
+    CHECK(success(&f,"")==0 && f.exec.call_depth==0u);
+    CHECK(failure(&f,BE_END,sizeof(f.out))==0);
     return 0;
 }
 static int lifecycle(void) {

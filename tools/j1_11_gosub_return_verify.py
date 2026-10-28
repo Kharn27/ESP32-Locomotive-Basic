@@ -371,13 +371,21 @@ def verify(base, permanent=False):
     require(len(captures) == len(MAIN_CASES) == 16 and
             [c["case"] for c in captures] == list(MAIN_CASES),
             "MISSING_OR_ADDED_CASES")
+    # Git does not retain a deliberately empty exploratory/ directory.
+    # If it exists during the ephemeral acquisition it MUST remain empty;
+    # an archived checkout may omit that empty directory entirely.
+    exploratory = base/"exploratory"
     require((base/"original").is_dir() and (base/"repeat").is_dir() and
-            (base/"exploratory").is_dir() and
-            not list((base/"exploratory").iterdir()),
+            (not exploratory.exists() or
+             (exploratory.is_dir() and not exploratory.is_symlink() and
+              not list(exploratory.iterdir()))),
             "ROOT_PROOF_LAYOUT_CHANGED")
-    require({p.name for p in base.iterdir()} ==
-            {"original","repeat","exploratory","manifest.json"} |
-            ({"seal.json"} if (base/"seal.json").exists() else set()),
+    expected_root = {"original","repeat","manifest.json"}
+    if exploratory.exists():
+        expected_root.add("exploratory")
+    if (base/"seal.json").exists():
+        expected_root.add("seal.json")
+    require({p.name for p in base.iterdir()} == expected_root,
             "ROOT_FILES_CHANGED")
     for c in captures:
         name = c["case"]

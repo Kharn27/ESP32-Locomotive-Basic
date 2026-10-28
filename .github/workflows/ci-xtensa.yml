@@ -102,3 +102,60 @@ jobs:
             firmware/esp32_display_probe/build-hw3/loco_esp32_display_probe.elf
             firmware/esp32_probe/build/loco_esp32_probe.bin
             firmware/esp32_probe/build/loco_esp32_probe.elf
+
+
+  # HW4-EDIT-A: reproduce the PO's *existing* ESP-IDF project and standard
+  # VS Code "Build" action (idf.py build => default build/ cache).
+  # Run main -> PR in one and the same workspace, with no fullclean, -B,
+  # additional project, or custom configuration. A CI-only test: no flash.
+  po-standard-build:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/hw4-edit-a-cpc-cursor'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Branch-switch smoke in existing display probe and default build cache
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EDIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EDIT_SHA"
+          git cat-file -e "$BASE_SHA^{commit}"
+          git switch --detach "$BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          docker run --rm -v "$PWD:/project" -w /project \
+            -e IDF_GIT_SAFE_DIR=/project espressif/idf:v5.5.6 bash -lc '
+              set -euo pipefail
+              cd firmware/esp32_display_probe
+              idf.py --version
+              # Identical project, normal build/ directory, default ON.
+              idf.py build
+              grep -Fx "HW4_C2_CONSOLE:BOOL=ON" build/CMakeCache.txt
+              test -s build/loco_esp32_display_probe.bin
+              test "$(xtensa-esp-elf-nm --defined-only build/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
+            '
+          git switch --detach "$EDIT_SHA"
+          test "$(git rev-parse HEAD)" = "$EDIT_SHA"
+          docker run --rm -v "$PWD:/project" -w /project \
+            -e IDF_GIT_SAFE_DIR=/project -e EXPECTED_HEAD="$EDIT_SHA" \
+            espressif/idf:v5.5.6 bash -lc '
+              set -euo pipefail
+              cd firmware/esp32_display_probe
+              idf.py build
+              grep -Fx "HW4_C2_CONSOLE:BOOL=ON" build/CMakeCache.txt
+              test -s build/loco_esp32_display_probe.bin
+              test "$(xtensa-esp-elf-nm --defined-only build/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
+              echo "PO_STANDARD_PROJECT=firmware/esp32_display_probe"
+              echo "PO_STANDARD_CMD=idf.py build"
+              echo "PO_STANDARD_CACHE=build"
+              echo "PO_STANDARD_SOURCE_SHA=$EXPECTED_HEAD"
+              echo "PO_STANDARD_ON=PASS"
+            '
+          git switch --detach "$EDIT_SHA"
+          test "$(git rev-parse HEAD)" = "$EDIT_SHA"

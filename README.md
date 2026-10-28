@@ -70,6 +70,11 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 
 Les **quatre B1 historiquement UNSUPPORTED** et les **18 LIST/RUN historiques UNVERIFIED** restent documentés comme observations à leur date, sans réécriture rétroactive. Voir [PROJECT_STATUS](docs/PROJECT_STATUS.md), [ROADMAP_GATES](docs/ROADMAP_GATES.md) et le [protocole J1.3-A](docs/J1.3-A-integer-subtraction-oracle.md).
 
+
+## Profils ESP-IDF dans le projet CYD existant (U1-A en revue)
+
+La [mission ARCH-HW4-U1-A #140](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/140) conserve **`firmware/esp32_display_probe/` comme projet VS Code canonique**. Son Build standard (`idf.py build`, répertoire `build/`) sélectionne **`CONSOLE`** sans option. Les diagnostics `HW3` (modes écran) et `BASIC_PROBE` (ABI et limites INTEGER) peuvent être construits à partir de la **même racine** avec `-DLOCO_CYD_PROFILE=HW3` ou `BASIC_PROBE` dans des caches dédiés. L'ancienne option `HW4_C2_CONSOLE=ON/OFF` reste compatible. La sonde `firmware/esp32_probe/` n'est **pas supprimée** (rollback). [Contrat et matrice de tests](docs/ARCH-HW4-U1-A-profiles.md). Cette architecture n'est pas encore fusionnée ; **U1-B non autorisé**.
+
 ## Sonde ESP-IDF J0.25 — exécutée sur CYD physique
 
 La [PR #44](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/44)

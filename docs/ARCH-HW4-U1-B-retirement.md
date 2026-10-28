@@ -14,6 +14,7 @@
 | `firmware/esp32_display_probe/CMakeLists.txt` et `main/CMakeLists.txt` | Dépendance active au descripteur / source de l'ancienne racine | Rediriger vers composant partagé et fichier local déplacé |
 | `.github/workflows/ci-xtensa.yml` | Trois images, dont une ancienne racine autonome, et job U1-A temporaire | Un job permanent 3 profils dans **la racine unique**, sans 4e build |
 | `.github/workflows/ci-arch.yml` | Garde sur l'ancien chemin source | Supprimer ce chemin, conserver les tests d'unicité pilote et d'isolement |
+| `tools/hw4_c3_a_scope_gate.sh` | Ancien argument de chemin dans la garde historique de diff | Retirer l'argument de l'ancienne racine ; `firmware/components/` reste protégé |
 | `README.md` et docs de statut actuels | Instructions pré-U1-B | Décrire la racine conservée et les chemins actifs |
 | Documents historiques (J0.25, HW4, U1-A, anciens jalons) | Provenance de builds et de mesures réels de l'ancienne racine | **Conserver** les liens et noms d'origine, ne pas réécrire les archives |
 

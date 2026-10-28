@@ -232,7 +232,7 @@ static int session_list_and_run(void)
     BSRResult result;
     uint8_t temporary[256],output[256];
     size_t written = 0u;
-    const char *expected = "10 FOR I%=1 TO 2\\n20 NEXT I%\\n";
+    const char *expected = "10 FOR I%=1 TO 2\n20 NEXT I%\n";
     CHECK(init(&f) == 0);
     CHECK(put(&f,10u,"FOR I%=1 TO 2") == 0);
     CHECK(put(&f,20u,"NEXT I%") == 0);

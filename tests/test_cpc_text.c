@@ -102,11 +102,14 @@ static void test_wrap_and_bottom(void)
     assert(cpc_text_write(&text_sink, buffer, 40U * 25U));
     assert(text_sink.row == 24U && text_sink.column == 40U);
     assert(!video.cursor_visible);
-    const uint8_t original = guarded.vram[CPC_VIDEO_BYTES - 1U];
+    static uint8_t before[CPC_VIDEO_BYTES];
+    memcpy(before, guarded.vram, sizeof(before));
     assert(cpc_text_write(&text_sink, buffer, 8U));
-    assert(text_sink.row == 25U && text_sink.bytes_clipped == 8U);
-    assert(guarded.vram[CPC_VIDEO_BYTES - 1U] == original);
-    assert(!video.cursor_visible);
+    assert(text_sink.row == 24U && text_sink.column == 8U);
+    assert(text_sink.scrolls == 1U && text_sink.bytes_clipped == 0U);
+    assert(memcmp(guarded.vram, before + 640U, CPC_VIDEO_BYTES - 640U) != 0);
+    assert(memcmp(guarded.vram, before + 640U, 640U) == 0);
+    assert(video.cursor_visible && video.cursor_row == 24U);
     integrity();
 }
 

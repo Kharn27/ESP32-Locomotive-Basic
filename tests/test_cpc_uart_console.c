@@ -1,4 +1,4 @@
-/* HW4-C2 40x25 pagination, prompt, echo and bounded erase with canaries. */
+/* HW4-C3-B2 40x25 scrolling, prompt, echo and bounded erase with canaries. */
 #include "cpc_uart_console.h"
 #include "uart_line.h"
 #include <assert.h>
@@ -119,13 +119,14 @@ static void saturation(void) {
         assert(cpc_uart_console_end_line(&t));
         assert(t.row<=25U);
     }
-    assert(pages > 0U);
+    assert(pages == 0U);
+    assert(t.scrolls > 0U && t.row < 25U && t.bytes_clipped == 0U);
     assert(cpc_uart_console_clear(&t));
     assert(t.row==0U && t.column==0U);
     guarded();
 }
 int main(void) {
     edits(); wrap_erase(); ansi_screen_sync(); saturation();
-    puts("HW4-C2 visual echo/page canaries PASS");
+    puts("HW4-C3-B2 visual echo/scroll canaries PASS");
     return 0;
 }

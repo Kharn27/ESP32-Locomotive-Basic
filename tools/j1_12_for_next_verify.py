@@ -201,7 +201,7 @@ def verify(base, permanent=False):
             m.get("rom_archived") is False and
             m.get("full_snapshots_archived") is False and
             m.get("printer_is_screen_output") is False and
-            m.get("j1_11_b_authorized") is False and
+            m.get("j1_12_b_authorized") is False and
             m.get("historical_archives_modified") is False and
             m.get("ghcr_image") == GHCR_PIN,
             "MANIFEST_PROVENANCE_CHANGED")

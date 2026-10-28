@@ -1,0 +1,15 @@
+{
+  "commands": [
+    "10 A$=\"ALPHA\"",
+    "20 B$=\"BETA\"",
+    "30 PRINT A$:PRINT B$",
+    "40 PRINT #8,A$",
+    "50 PRINT #8,B$",
+    "60 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "2e2b28b2631e623cdc3a873fbe1530a4e28211abab937c2e9a2b59d90e68d0a8",
+  "list_requested": true
+}

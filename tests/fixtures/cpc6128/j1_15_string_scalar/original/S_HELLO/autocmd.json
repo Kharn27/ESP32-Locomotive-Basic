@@ -1,0 +1,13 @@
+{
+  "commands": [
+    "10 A$=\"BONJOUR\"",
+    "20 PRINT A$",
+    "30 PRINT #8,A$",
+    "40 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "da6a31e34db25222e8b6bc96f3e071aea3f5dcba7098a2bc0c295b794d5f1370",
+  "list_requested": true
+}

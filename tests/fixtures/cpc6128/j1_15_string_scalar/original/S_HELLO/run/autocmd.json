@@ -1,0 +1,22 @@
+{
+  "commands": [
+    "10 A$=\"BONJOUR\"",
+    "20 PRINT A$",
+    "30 PRINT #8,A$",
+    "40 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+    "PRINT #8,ERR",
+    "PRINT #8,ERL",
+    "CAP32_DELAY CAP32_EXIT"
+  ],
+  "program_sha256": "da6a31e34db25222e8b6bc96f3e071aea3f5dcba7098a2bc0c295b794d5f1370",
+  "runtime_printer_in_program": true,
+  "max_printer_bytes": 2048,
+  "post_run_direct_probe": [
+    "ERR",
+    "ERL"
+  ],
+  "screenshot_before_post_run_probes": true,
+  "printer_is_not_screen_output": true
+}

@@ -1,0 +1,13 @@
+{
+  "commands": [
+    "10 a$=\"minuscules\"",
+    "20 print a$",
+    "30 print #8,a$",
+    "40 end",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "47b8bcb74b114cdd074fff7dd680d9c80a3b6a3bff48940d9ba2e81ccc38d5ee",
+  "list_requested": true
+}

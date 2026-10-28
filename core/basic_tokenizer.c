@@ -221,6 +221,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
 {
     size_t index = 0;
     int expecting_statement = 1;
+    int seen_statement = 0;
     BTStatus status;
 
     while (index < length) {
@@ -275,6 +276,10 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
         if (status != BT_OK) {
             return status;
         }
+        if (statement == ST_IF && seen_statement) {
+            return BT_UNSUPPORTED_CONSTRUCT;
+        }
+        seen_statement = 1;
 
         /* DFF0-E1C3: after REM or ', the remainder is opaque source
          * bytes. In particular colons, quotes and keyword spellings

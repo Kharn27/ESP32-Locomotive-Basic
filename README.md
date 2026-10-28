@@ -370,3 +370,5 @@ test physique du HEAD final par le PO.
   relever depuis les exécutions GitHub Actions sur le HEAD C1 exact.
 
 - **J1.15-A** : caractérisation CPC ROM des variables STRING scalaires (sans code natif) — voir [protocole](docs/J1.15-A-string-scalar-cpc-oracle.md).
+
+- **J1.15-B (en revue Pilotage)** : variables STRING scalaires natives C99 à arène bornée fournie par l'appelant, `A$="texte"` et `PRINT A$`, sans raccordement firmware ; [rapport](docs/J1.15-B-string-scalar-native.md).

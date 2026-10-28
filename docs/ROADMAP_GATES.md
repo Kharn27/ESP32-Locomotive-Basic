@@ -533,3 +533,6 @@ Mandat [#138](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/138), bas
 
 ### Barrière J1.15 (28 octobre 2026)
 Le Pilotage autorise **J1.15-A — oracle CPC STRING scalaire uniquement** (issue [#144](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/144)). **J1.15-B interdit** sans nouveau mandat. Aucune extension native dans cette PR.
+
+### Barrière J1.15-B (29 octobre 2026)
+Le Pilotage autorise J1.15-B dans [#147](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/147) : chemin C99 scalaire STRING seulement. Tout raccordement d'arène au firmware, `PRINT #8`, concaténation, moteur de chaînes général et test CYD demandent un mandat distinct. Le développeur ne fusionne pas [PR #148](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/148).

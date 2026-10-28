@@ -669,3 +669,6 @@ Mandat Pilotage [#140](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/
 
 ### J1.15-A — Oracle STRING scalaire (28 octobre 2026)
 Mandat [#144](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/144), base `main@7a471da5088981d64724f43183c87db20a2b16ae`. Étude indépendante ROM et preuves en cours ; aucun support natif `A$` revendiqué. `ON_DEVICE_UNVERIFIED`. [Protocole](J1.15-A-string-scalar-cpc-oracle.md).
+
+### J1.15-B — Variables STRING scalaires C99 (29 octobre 2026)
+Mandat [#147](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/147), base `e019a0cdd67730df21b8737d62e32fb6f1ffe2ea`. Implémentation native bornée proposée dans la [PR #148](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/148), en revue Pilotage, non fusionnée. Aucune arène raccordée à la CYD, `ON_DEVICE_UNVERIFIED`. [Rapport](J1.15-B-string-scalar-native.md).

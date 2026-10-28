@@ -234,6 +234,34 @@ static int imported_and_negative(void)
     CHECK(bt_tokenize(listed, listed_n, retoken, sizeof(retoken),
                       &again_n) == BT_OK);
     CHECK(again_n == n);
+    /* Imported CPC token stream may omit ALL lexical separators.
+     * The two BVR caches must never be treated as spaces or tokens. */
+    {
+        uint8_t compact[80], image[1024];
+        size_t compact_n = 0u, image_n = 0u, k;
+        for (k = 0u; k < n; ++k) {
+            if (k != 1u && k != 11u && k != 13u)
+                compact[compact_n++] = body[k];
+        }
+        CHECK(bl_detokenize(compact, compact_n, listed,
+                            sizeof(listed), &listed_n) == BL_OK);
+        CHECK(listed_n == strlen(source) &&
+              memcmp(listed, source, listed_n) == 0);
+        CHECK(setup(&h) == 0);
+        CHECK(bp_put(&h.program, 10u, compact, compact_n) == BP_OK);
+        CHECK(put(&h, 20u, "END") == 0);
+        CHECK(bp_export(&h.program, image, sizeof(image), &image_n) == BP_OK);
+        CHECK(bp_init(&h.program, h.storage, sizeof(h.storage)) == BP_OK);
+        CHECK(bp_import(&h.program, image, image_n) == BP_OK);
+        CHECK(variable(&h, (uint8_t)'A', 0) == 0);
+        CHECK(variable(&h, (uint8_t)'B', 1) == 0);
+        CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+        CHECK(fails(&h, BE_MISSING_TARGET) == 0);
+        CHECK(variable(&h, (uint8_t)'B', -1) == 0);
+        CHECK(be_step(&h.executor, h.output, 0u, &h.written) == BE_OK);
+        CHECK(bp_find(&h.program, 20u, &target) == BP_OK);
+        CHECK(h.executor.cursor == target.offset);
+    }
     CHECK(setup(&h) == 0);
     CHECK(bp_put(&h.program, 10u, body, n) == BP_OK);
     CHECK(put(&h, 20u, "END") == 0);

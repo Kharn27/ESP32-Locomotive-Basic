@@ -25,6 +25,7 @@ static void guarded(void)
         assert(guard.right[i]==0x5aU);
     }
     assert(guard.line.length<=UART_LINE_CAPACITY);
+    assert(guard.line.cursor_pos<=guard.line.length);
     assert(guard.line.data[guard.line.length]==0U);
 }
 static UartLineEvent feed_string(const char *s)
@@ -69,28 +70,47 @@ static void editing(void)
 }
 static void ansi_delete(void)
 {
-    static const uint8_t del[]={0x1b,'[','3','~'};
     reset();
     assert(feed_string("ABCD")==UART_LINE_APPEND);
-    for(size_t i=0;i<sizeof(del)-1U;++i) {
-        assert(uart_line_feed(&guard.line,del[i])==UART_LINE_IGNORED);
-        assert(guard.line.length==4U);
-        assert(memcmp(guard.line.data,"ABCD",4U)==0);
-    }
-    assert(uart_line_feed(&guard.line,del[3U])==UART_LINE_DELETE);
-    assert(guard.line.length==3U);
-    assert(memcmp(guard.line.data,"ABC",3U)==0);
-    assert(guard.line.ansi_sequences_deleted==1U);
-    assert(uart_line_feed(&guard.line,'E')==UART_LINE_APPEND);
-    assert(uart_line_feed(&guard.line,0x08U)==UART_LINE_DELETE);
-    assert(guard.line.length==3U && memcmp(guard.line.data,"ABC",3U)==0);
-    assert(feed_string("\x1b[3~")==UART_LINE_DELETE);
-    assert(guard.line.length==2U && memcmp(guard.line.data,"AB",2U)==0);
-    assert(feed_string("\x1b[3~")==UART_LINE_DELETE);
-    assert(feed_string("\x1b[3~")==UART_LINE_DELETE);
+    assert(guard.line.cursor_pos==4U);
+    /* Delete at end is a no-op, unlike Backspace. */
     assert(feed_string("\x1b[3~")==UART_LINE_NONE);
-    assert(guard.line.length==0U);
-    assert(guard.line.ansi_sequences_deleted==5U);
+    assert(guard.line.length==4U);
+    assert(feed_string("\x1b[D")==UART_LINE_LEFT);
+    assert(guard.line.cursor_pos==3U);
+    assert(feed_string("\x1b[3~")==UART_LINE_DELETE_FORWARD);
+    assert(guard.line.cursor_pos==3U && guard.line.length==3U);
+    assert(memcmp(guard.line.data,"ABC",4U)==0);
+    assert(feed_string("\x1b[D")==UART_LINE_LEFT);
+    assert(uart_line_feed(&guard.line,0x08U)==UART_LINE_DELETE);
+    assert(guard.line.cursor_pos==1U && guard.line.length==2U);
+    assert(memcmp(guard.line.data,"AC",3U)==0);
+    assert(feed_string("\x1b[C")==UART_LINE_RIGHT);
+    assert(guard.line.cursor_pos==2U);
+    assert(feed_string("\x1b[C")==UART_LINE_NONE);
+    assert(guard.line.ansi_sequences_deleted==2U);
+    guarded();
+}
+static void insert_mid_and_boundaries(void)
+{
+    reset();
+    assert(feed_string("10 PRNT 2")==UART_LINE_APPEND);
+    for(unsigned i=0U;i<4U;++i)
+        assert(feed_string("\x1b[D")==UART_LINE_LEFT);
+    assert(guard.line.cursor_pos==5U);
+    assert(uart_line_feed(&guard.line,'I')==UART_LINE_APPEND);
+    assert(guard.line.length==10U && guard.line.cursor_pos==6U);
+    assert(memcmp(guard.line.data,"10 PRINT 2",11U)==0);
+    for(unsigned i=0U;i<6U;++i)
+        assert(feed_string("\x1b[D")==UART_LINE_LEFT);
+    assert(feed_string("\x1b[D")==UART_LINE_NONE);
+    assert(uart_line_feed(&guard.line,0x7fU)==UART_LINE_NONE);
+    assert(guard.line.cursor_pos==0U && guard.line.length==10U);
+    assert(uart_line_feed(&guard.line,'!')==UART_LINE_APPEND);
+    assert(memcmp(guard.line.data,"!10 PRINT 2",12U)==0);
+    for(unsigned i=0U;i<11U;++i)
+        assert(feed_string("\x1b[C")==UART_LINE_RIGHT);
+    assert(feed_string("\x1b[C")==UART_LINE_NONE);
     guarded();
 }
 static void ansi_ignored(void)
@@ -156,7 +176,7 @@ static void overflow(void)
     assert(guard.line.length==UART_LINE_CAPACITY);
     assert(guard.line.data[UART_LINE_CAPACITY]==0U);
     assert(uart_line_feed(&guard.line,'X')==UART_LINE_OVERFLOW);
-    assert(feed_string("\x1b[3~")==UART_LINE_DELETE);
+    assert(feed_string("\x1b[3~")==UART_LINE_NONE);
     assert(guard.line.poisoned);
     assert(uart_line_feed(&guard.line,'\n')==UART_LINE_REJECTED);
     uart_line_ack(&guard.line);
@@ -176,7 +196,7 @@ static void hundred_lines(void)
 }
 int main(void)
 {
-    basic(); editing(); ansi_delete(); ansi_ignored();
+    basic(); editing(); ansi_delete(); insert_mid_and_boundaries(); ansi_ignored();
     fragmented_and_incomplete(); bounded_malformed(); overflow();
     hundred_lines();
     puts("HW4-C2-C1 UART ANSI CSI line editing PASS");

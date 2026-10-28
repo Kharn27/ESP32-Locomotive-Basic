@@ -21,16 +21,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Profile selector, retired-root and duplicate app_main negative tests
         run: |
           python3 tools/ci/check_loco_cyd_profiles.py --self-test
           python3 tools/ci/check_u1b_retirement.py --self-test
           python3 tools/ci/check_u1b_retirement.py --scan
+          python3 tools/ci/test_u1b_partition.py
       - name: Three canonical profile images in ESP-IDF v5.5.6
         env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -88,7 +89,6 @@ jobs:
               fi
               grep -F "U1-A conflicting selectors" reports/u1-b/conflict.log
               # Legacy standalone project is deliberately absent after migration.
-              test ! -e /project/firmware/esp32_probe
               test "$(grep -Ec '^[A-Za-z_0-9]+=([0-9]+) bytes$' reports/u1-b/basic/xtensa-abi.txt)" -eq 16
               grep -Fx 'LocoProbeStorage=19072 bytes' reports/u1-b/basic/xtensa-abi.txt
               grep -Fx 'core_descriptor_bytes=636' reports/u1-b/basic/xtensa-abi.txt
@@ -106,7 +106,12 @@ jobs:
           if-no-files-found: warn
           path: |
             firmware/esp32_display_probe/reports/u1-b/
-            firmware/esp32_probe/reports/u1-b-legacy-*
+            firmware/esp32_display_probe/build-u1-console/loco_esp32_display_probe.elf
+            firmware/esp32_display_probe/build-u1-console/loco_esp32_display_probe.bin
+            firmware/esp32_display_probe/build-u1-hw3/loco_esp32_display_probe.elf
+            firmware/esp32_display_probe/build-u1-hw3/loco_esp32_display_probe.bin
+            firmware/esp32_display_probe/build-u1-basic/loco_esp32_display_probe.elf
+            firmware/esp32_display_probe/build-u1-basic/loco_esp32_display_probe.bin
 
   # HW4-EDIT-A: reproduce the PO's *existing* ESP-IDF project and standard
   # VS Code "Build" action (idf.py build => default build/ cache).
@@ -119,14 +124,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Branch-switch smoke in existing display probe and default build cache
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          EDIT_SHA: ${{ github.event.pull_request.head.sha }}
+          EDIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EDIT_SHA"

@@ -37,7 +37,7 @@ def self_test():
     assert stale("python " + RETIRED + "/scripts/check_build.py")
     assert not stale("firmware/esp32_display_probe/main/basic_probe.c")
     assert not stale("historic probe source renamed to basic_probe.c")
-    assert re.findall(r"\\bvoid\\s+app_main\\s*\\(\\s*void\\s*\\)", "void app_main(void)")
+    assert re.findall(r"\bvoid\s+app_main\s*\(\s*void\s*\)", "void app_main(void)")
     print("U1-B RETIRED_REFERENCE_FALSIFICATION=PASS")
 
 
@@ -46,7 +46,7 @@ def scan():
         raise AssertionError("U1-B retired ESP-IDF directory still exists")
     for path in ENTRYPOINTS:
         source = path.read_text(encoding="utf-8")
-        if len(re.findall(r"\\bvoid\\s+app_main\\s*\\(\\s*void\\s*\\)", source)) != 1:
+        if len(re.findall(r"\bvoid\s+app_main\s*\(\s*void\s*\)", source)) != 1:
             raise AssertionError("U1-B missing or duplicated source app_main: " + str(path))
     for path in (
         ROOT / "firmware/components/loco_core/CMakeLists.txt",

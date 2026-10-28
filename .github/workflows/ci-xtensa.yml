@@ -213,7 +213,7 @@ jobs:
                 xtensa-esp-elf-readelf -h "$dir/loco_esp32_display_probe.elf" > "$out/elf-header.txt"
                 sha256sum "$dir/loco_esp32_display_probe.bin" > "$out/binary-sha256.txt"
                 python3 /project/firmware/esp32_probe/scripts/check_build.py \
-                  $config" partitions.csv "$dir/loco_esp32_display_probe.bin" > "$out/partitions.txt"
+                  "$config" partitions.csv "$dir/loco_esp32_display_probe.bin" > "$out/partitions.txt"
                 echo "U1-A PROFILE_$profile=PASS"
               done
               # No second ELF entrypoint and the real legacy ABI/probe remains.

@@ -282,6 +282,52 @@ static BTStatus inline_if_assignment(const uint8_t *source, size_t length,
     return status == BT_OK ? emit(out, (uint8_t)number) : status;
 }
 
+/* A STRING assignment is only a quoted scalar literal, never a general
+ * expression.  Locate the explicit suffix without changing the tokenizer's
+ * INTEGER name grammar.  Invalid source still fails in the normal parser. */
+static int string_lhs(const uint8_t *source, size_t length, size_t pos)
+{
+    if (pos == length || !ascii_letter(source[pos])) return 0;
+    ++pos;
+    while (pos < length && (ascii_letter(source[pos]) ||
+           ascii_digit(source[pos]) || source[pos] == (uint8_t)'.')) ++pos;
+    return pos < length && source[pos] == (uint8_t)'$';
+}
+
+static BTStatus scalar_string_assignment(const uint8_t *source, size_t length,
+                                         size_t *pos, BTEmitter *out)
+{
+    BTStatus status;
+    size_t start, end;
+    status = explicit_variable(source, length, pos, out, BVR_TYPE_STRING);
+    if (status == BT_OK) status = spaces(source, length, pos, out);
+    if (status != BT_OK) return status;
+    if (*pos == length || source[(*pos)++] != (uint8_t)'=')
+        return BT_UNSUPPORTED_CONSTRUCT;
+    status = emit(out, 0xefu);
+    if (status == BT_OK) status = spaces(source, length, pos, out);
+    if (status != BT_OK) return status;
+    if (*pos == length || source[*pos] != (uint8_t)'"')
+        return BT_UNSUPPORTED_CONSTRUCT;
+    start = *pos;
+    end = start + 1u;
+    while (end < length && source[end] != (uint8_t)'"') {
+        if (source[end] < 0x20u || source[end] > 0x7eu)
+            return BT_MALFORMED_INPUT;
+        ++end;
+    }
+    if (end == length) return BT_MALFORMED_INPUT;
+    /* No adjacent quote, concatenation or trailing expression. */
+    if (end + 1u < length && source[end + 1u] != (uint8_t)' ')
+        return BT_UNSUPPORTED_CONSTRUCT;
+    while (start <= end) {
+        status = emit(out, source[start++]);
+        if (status != BT_OK) return status;
+    }
+    *pos = end + 1u;
+    return BT_OK;
+}
+
 static BTStatus one_pass(const uint8_t *source, size_t length,
                          BTEmitter *out)
 {
@@ -389,6 +435,9 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 return BT_UNSUPPORTED_CONSTRUCT;
             }
         } else if (statement == ST_ASSIGN) {
+            if (string_lhs(source, length, index)) {
+                status = scalar_string_assignment(source, length, &index, out);
+            } else {
             unsigned int number;
             int reference_rhs = 0;
             int variable_rhs = 0;
@@ -517,6 +566,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                     }
                 }
             }
+            } /* Preserve the existing INTEGER grammar unchanged. */
         } else if (statement == ST_FOR) {
             /* No runtime or loop stack is installed by B1. Preserve lexical
              * spaces and use the shared explicit INTEGER BVR cache convention. */

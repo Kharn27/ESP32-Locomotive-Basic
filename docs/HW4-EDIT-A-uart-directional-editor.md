@@ -68,53 +68,56 @@ au **même HEAD**. Les suites conditionnelles SKIPPED ne sont pas
 des succès. Flash, IRAM et DRAM doivent provenir des sorties du
 workflow final, pas d'estimations.
 
-## Essai physique PO obligatoire
+## Contrat de livrabilité PO — rectificatif Pilotage
 
-Depuis le dépôt/VSCode existant, sur **la branche et le SHA intégral
-de la PR remis après CI** (pas \`main\` si non fusionnée) :
+La [décision Pilotage du 28 octobre 2026](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/127#issuecomment-6475689358)
+remplace les instructions Git et `idf.py -B build-c2` précédemment
+demandées au PO. **Son seul parcours requis** : sélectionner la branche
+`feat/hw4-edit-a-cpc-cursor` dans son **VS Code existant**, puis lancer
+sa commande habituelle de compilation / flash / monitor ESP-IDF pour
+le projet existant `firmware/esp32_display_probe`, variante console
+`HW4_C2_CONSOLE=ON`. **Aucun nouveau workspace, dossier `build-*`,
+reconfiguration manuelle, purge de cache ou commande Git supplémentaire**
+n'est requis du PO.
 
-\`\`\`sh
-git fetch origin
-git switch --track origin/feat/hw4-edit-a-cpc-cursor
-# Si la branche existe déjà : git switch feat/hw4-edit-a-cpc-cursor
-git pull --ff-only
-git rev-parse HEAD
-cd firmware/esp32_display_probe
-idf.py -B build-c2 -DHW4_C2_CONSOLE=ON set-target esp32
-idf.py -B build-c2 -DHW4_C2_CONSOLE=ON build
-idf.py -B build-c2 -p /dev/ttyUSB0 flash monitor
-\`\`\`
+La [CI-XTENSA](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/workflows/ci-xtensa.yml)
+ajoute le job `po-standard-build` : dans **le même** workspace, il compile
+`main` puis bascule sur la branche PR et reconstruit le projet via
+`idf.py build` avec le dossier standard `build/` conservé, sans purge.
+Il vérifie `HW4_C2_CONSOLE=ON`, l'unicité de `app_main`, la présence
+de l'image .bin et son descripteur embarqué `esp_app_desc_t` : le
+champ `version` doit contenir le SHA court du HEAD compilé. Le run
+[40735065920](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40735065920)
+a établi `PO_STANDARD_ON=PASS` sur `7ae04f1`; la première validation
+du descripteur au SHA `4303654` est traçable dans le
+[run 40736077910](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40736077910).
+Les preuves finales doivent être relues sur le **dernier HEAD**.
 
-1. Noter \`START ... version=...\` et le SHA. Saisir \`10 PRNT 2\`,
-   appuyer **4 fois sur ←** pour revenir avant \`N\`, insérer \`I\`,
-   voir \`10 PRINT 2\`, Entrée. Ensuite \`LIST\` doit contenir
-   \`10 PRINT 2\` et \`RUN\` afficher \`2\`.
-2. Saisir \`20 PRIXNT 3\`, appuyer **5 fois sur ←**, puis Suppr
-   (\`ESC[3~\`) pour retirer \`X\`. \`LIST\` doit donner
-   \`20 PRINT 3\` ; \`RUN\` affiche successivement \`2\` puis \`3\`.
-3. Tester Backspace au milieu (retire à gauche en reculant) contre
-   Suppr au milieu (retire sous curseur sans reculer), Suppr en bout
-   (aucune mutation), et ←/→ aux bornes.
-4. Saisir plus de 40 caractères (repli), modifier un caractère avant
-   et après la colonne 40, surveiller les traces visuelles ; parcourir
-   une longue saisie et le bas de l'écran (scroll).
-5. Vérifier \`NEW\`, \`LIST\` vide, \`!CLS\` et le bandeau au redémarrage.
-   Aucune erreur DMA ou reset ne doit apparaître.
+**Limite de provenance :** ceci simule le parcours de build ESP-IDF 5.5.6
+dans GitHub Actions, **pas l'instance VS Code/Debian du PO**. L'échec
+localement rapporté n'est pas reproduit sur cet environnement et sa
+cause reste **indéterminée**. Aucun correctif hypothétique de cache n'est
+appliqué. La branche ne doit pas être annoncée comme livrable au PO sans
+nouvelle décision du Pilotage.
 
-**Précaution terminal :** il doit réellement envoyer les octets
-\`1b 5b 44\`, \`1b 5b 43\` et \`1b 5b 33 7e\` en UART brut.
-L'ESP32 journalise les événements \`HW4-EDIT-A UART_EDIT\` avec le
-\`sequence_hex\`. Un terminal qui intercepte les flèches et ne les
-transmet pas ne permet pas de conclure à un défaut de l'éditeur.
+### Contrôle matériel ciblé, seulement après feu vert Pilotage
 
-Preuves : log \`version\` du HEAD flashé, séquences UART en hexadécimal,
-photo écran avant Entrée / après correction, \`LIST\`, \`RUN\`, \`NEW\`,
-\`!CLS\` et compteurs \`DEVICE_MEMORY\` / DMA. En l'absence de ce test
-sur le nouveau HEAD : \`ON_DEVICE_UNVERIFIED\`.
+Une fois la branche déclarée livrable par le Pilotage, le PO n'a qu'à
+flasher comme d'habitude puis donner son retour visuel explicite :
+- sur une saisie `10 PRINT 2`, déplacer le curseur sur le `2` :
+  le caractère reste lisible en vidéo inverse ;
+- déplacer le curseur à droite : le `2` retrouve son affichage normal
+  et la case vide montre le bloc du curseur ;
+- confirmer absence de reboot, défauts ou timeouts DMA.
 
-**Hors périmètre :** \`core/\`, ROM/fixtures CPC, SPI, DMA,
-orientation, tactile, SD, MODE2, pagination et architecture #112/#117.
-Validation/fusion de la PR réservée au Pilotage.
+Pas de photo obligatoire, ni de collecte technique supplémentaire
+imposée au PO. L'ancienne campagne fonctionnelle `9067e589...`
+reste valable pour ce seul SHA : chaque nouveau HEAD est
+`ON_DEVICE_UNVERIFIED` tant qu'un essai CYD n'est pas rapporté.
+
+**Exclusions inchangées :** aucun changement du cœur `core/`, des
+touches, de la ROM CPC, de LCD/SPI/DMA, du matériel ou d'EDIT-B1.
+L'acceptation technique et la fusion appartiennent au Pilotage.
 
 ## C1 — Curseur vidéo inverse non destructif (28 octobre 2026)
 

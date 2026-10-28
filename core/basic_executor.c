@@ -534,8 +534,13 @@ static BEStatus execute_line(const BasicProgram *program,
                 }
                 flow->action = BE_FLOW_PUSH;
                 if (pos < length) {
-                    /* The delimiter is token 01, not a literal colon. */
-                    size_t continuation = pos + 1u;
+                    /* 01 C0 is an implicit apostrophe comment marker, NOT
+                     * a ':' separator. Resume on its complete 01 C0 pair.
+                     * An explicit colon before apostrophe is 01 01 C0:
+                     * skip only the first 01 and keep the second marker. */
+                    size_t continuation =
+                        (pos + 1u < length && body[pos + 1u] == 0xc0u)
+                        ? pos : pos + 1u;
                     skip_spaces(body, length, &continuation);
                     if (continuation == length ||
                         (body[continuation] == 0x01u &&

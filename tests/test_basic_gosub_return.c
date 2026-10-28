@@ -113,6 +113,70 @@ static int continuation(void) {
     CHECK(failure(&f,BE_END,sizeof(f.out))==0);
     return 0;
 }
+static int apostrophe_continuation(void) {
+    /* Implicit apostrophe is 01 C0, whereas explicit ':' plus apostrophe
+     * is 01 01 C0. They MUST both resume with a complete comment marker. */
+    static const char *sources[] = {
+        "GOSUB 100 ' commentaire", "GOSUB 100:' commentaire"
+    };
+    static const uint8_t implicit_marker[] = {0x01u, 0xc0u};
+    static const uint8_t explicit_marker[] = {0x01u, 0x01u, 0xc0u};
+    size_t case_index;
+    for (case_index = 0u; case_index < 2u; ++case_index) {
+        Fixture f;
+        uint8_t body[160], listed[160], replay[160];
+        size_t n=0u, listed_n=0u, replay_n=0u;
+        size_t i, marker_offset=SIZE_MAX;
+        const uint8_t *marker = case_index == 0u ?
+                                implicit_marker : explicit_marker;
+        size_t marker_len = case_index == 0u ?
+                            sizeof(implicit_marker) : sizeof(explicit_marker);
+        BasicProgramLine call_line, next_line;
+        const char *source = sources[case_index];
+        CHECK(setup(&f)==0);
+        CHECK(bt_tokenize((const uint8_t*)source,strlen(source),
+                          body,sizeof(body),&n)==BT_OK);
+        for (i=0u; i+marker_len<=n; ++i) {
+            if (memcmp(body+i,marker,marker_len)==0) {
+                marker_offset=i;
+                break;
+            }
+        }
+        CHECK(marker_offset!=SIZE_MAX);
+        CHECK(bl_detokenize(body,n,listed,sizeof(listed),&listed_n)==BL_OK);
+        CHECK(listed_n==strlen(source) &&
+              memcmp(listed,source,listed_n)==0);
+        CHECK(bt_tokenize(listed,listed_n,replay,sizeof(replay),&replay_n)==BT_OK);
+        CHECK(replay_n==n && memcmp(replay,body,n)==0);
+        CHECK(bp_put(&f.program,10u,body,n)==BP_OK);
+        CHECK(put(&f,20u,"PRINT 22")==0);
+        CHECK(put(&f,30u,"END")==0);
+        CHECK(put(&f,100u,"RETURN")==0);
+        CHECK(bp_find(&f.program,10u,&call_line)==BP_OK);
+        CHECK(bp_find(&f.program,20u,&next_line)==BP_OK);
+        CHECK(be_init(&f.exec,&f.program)==BE_OK);
+        CHECK(success(&f,"")==0 && f.exec.call_depth==1u);
+        /* The saved continuation starts at the complete 01 C0 marker,
+         * not the naked C0, even for the implicit form. */
+        CHECK(f.exec.call_stack[0].cursor==call_line.offset);
+        CHECK(f.exec.call_stack[0].statement_offset==
+              marker_offset + (case_index==0u ? 0u : 1u));
+        CHECK(f.storage[call_line.body_offset+
+              f.exec.call_stack[0].statement_offset]==0x01u);
+        CHECK(f.storage[call_line.body_offset+
+              f.exec.call_stack[0].statement_offset+1u]==0xc0u);
+        CHECK(success(&f,"")==0 && f.exec.call_depth==0u);
+        CHECK(f.exec.cursor==call_line.offset &&
+              f.exec.statement_offset==marker_offset+
+              (case_index==0u ? 0u : 1u));
+        CHECK(success(&f,"")==0 && f.exec.statement_offset==0u);
+        CHECK(f.exec.cursor==next_line.offset);
+        CHECK(success(&f,"22\n")==0);
+        CHECK(success(&f,"")==0 && f.exec.call_depth==0u);
+        CHECK(failure(&f,BE_END,sizeof(f.out))==0);
+    }
+    return 0;
+}
 static int errors(void) {
     Fixture f; size_t i;
     static const uint8_t trunc[]={0x9fu,0x20u,0x1eu,0x64u};
@@ -197,6 +261,7 @@ int main(void) {
     CHECK(encoding()==0);
     CHECK(nested()==0);
     CHECK(continuation()==0);
+    CHECK(apostrophe_continuation()==0);
     CHECK(errors()==0);
     CHECK(lifecycle()==0);
     puts("PASS J1.11-B control flow, atomic failures, bounded stack and lifecycle");

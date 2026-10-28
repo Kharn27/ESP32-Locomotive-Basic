@@ -502,3 +502,10 @@ Mandat [#110](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/110), bas
 Mandat [#132](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/132), base `main@b91b33adf97aa54a9491b0e05587be02695647ef`, livraison proposée [PR #133](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/133). **PENDING_PILOTAGE, PR NON FUSIONNÉE** ; une réussite CI ne vaut pas acceptation.
 
 Frontière strictement `IF INTEGER% op INTEGER% THEN ligne` autonome ; opérateurs `= <> < <= > >=` représentés par `EF F2 F1 F3 EE F0`. Deux références BVR, caches opaques, syntaxe et LIST réversible, comparaison int16 signée, cible non résolue en faux ; IF mono-variable existant inchangé. Deux nouveaux CTest, 24/24 records IF ligne 30 originaux seuls et 24/24 traces de branche après adaptation mémoire explicite des deux PRINT #8. L'ancien oracle J1.13-A et ses `UNSUPPORTED` ne sont jamais reclassifiés ; aucune preuve de RAM globale, PRINT #8 natif ou vérité booléenne CPC. Attendus : 4×76/76, permanences CPC, CI-ARCH, Xtensa 3/3 et métriques pour le HEAD final. Aucun test physique CYD exigé pour cet incrément : `ON_DEVICE_UNVERIFIED`. [Rapport J1.13-B](J1.13-B-integer-relational-if-native.md). **Jalon suivant non autorisé.**
+
+
+### Porte HW4-EDIT-P1 — E2 MODE1 (mandat du 28 octobre 2026)
+
+**AUTORISÉ à développer, pas encore accepté :** issue [#136](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/136), base `main@ab55ec8e15fcffabb63529c4b063ffb27bfb7833`, livraison proposée dans [PR #137](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/137). La fondation E2 est exclusivement une mémoire vidéo de cellules textuelles MODE1 avec validités explicites ; tests C99, non-régression image/éditeur, mesure DRAM et **PASS physique PO sur le SHA final** sont requis avant décision de fusion par Pilotage. Voir [contrat E2](HW4-EDIT-P1-mode1-semantic-cells.md).
+
+**BARRIÈRE MAINTENUE :** HW4-EDIT-B1/COPY non autorisé (U02/U03/U06/U07/U08 NON_OBSERVÉS). E2 inconnu ne définit aucune sémantique CPC de COPY. Aucune navigation plein écran ni lecture E2 dans E3.

@@ -113,7 +113,8 @@ def adapted(source, label):
     def sub(match):
         return "PRINT " + match.group(1)
     transformed, n = re.subn(r"PRINT #8,([0-9]+)(?![0-9A-Za-z_])", sub, text)
-    check(n > 0, label + " NO_NUMERIC_PRINTER_ADAPTATION")
+    check(n > 0 or "PRINT #8" not in text,
+          label + " UNHANDLED_NUMERIC_PRINTER_ADAPTATION")
     check("PRINT #8" not in transformed, label + " NON_LITERAL_PRINTER_SYNTAX")
     return transformed.encode("ascii")
 

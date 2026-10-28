@@ -602,3 +602,16 @@ if(BUILD_TESTING)
     add_test(NAME hw4_font_a_ascii95_canonical_mode1
              COMMAND test_hw4_font_ascii)
 endif()
+
+# HW4-EDIT-A: real source line -> portable movable UART editor -> MODE1
+# -> native BASIC session, with no LCD/FreeRTOS dependency.
+if(BUILD_TESTING)
+    add_executable(test_hw4_edit_a
+        tests/test_hw4_edit_a.c
+        firmware/esp32_display_probe/main/cpc_font.c)
+    target_include_directories(test_hw4_edit_a PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main)
+    target_link_libraries(test_hw4_edit_a PRIVATE
+        uart_line cpc_uart_console basic_session_runtime basic_variable_binding)
+    add_test(NAME hw4_edit_a_cursor_source_vram COMMAND test_hw4_edit_a)
+endif()

@@ -91,3 +91,19 @@ La PR #115 ajoute `hw4_c3_b2_mode1_scroll_dma_retry` à la fin du `CMakeLists.tx
 La vérification des branch protections GitHub requiert un privilège d'administration non accessible à la connexion actuelle (`403`) ; le endpoint des repository rulesets renvoie `[]`. Pilotage doit vérifier les éventuels required-checks historiques après suppression des anciens noms, avant décision de fusion. Ceci est une réserve explicite, pas une preuve d'absence de protection.
 
 Aucun essai CYD physique, conformément à la nature exclusivement CI de la mission. `ON_DEVICE_UNVERIFIED` demeure.
+
+## 6. CI-OPT1-C1 — Correction du choix de base diff (mandat Pilotage)
+
+**Cause indépendante trouvée par Pilotage** : les deux steps CI-ARCH prenaient `git merge-base origin/main HEAD` ; après un `push: main`, `origin/main == HEAD` et les deux diffs étaient vides. Le succès historique de CI-ARCH ne prouvait donc pas le rejet d'une modification interdite lors de cet événement. Verdict précédent : **CORRECTIONS_REQUISES**, ne pas présenter l'ancien 8/8 comme une acceptation.
+
+**Correction** : `tools/ci/ci_arch_base.sh` calcule une base unique vérifiée, exposée par `steps.diff_base.outputs.base` et consommée par `tools/ci/ci_arch_changes.sh` et le contrôle statique du propriétaire LCD. Checkout explicite du SHA de tête PR ou du SHA du push avec historique complet. Aucun cas ne retombe silencieusement sur `base=HEAD` :
+- `push: main` : utiliser **`github.event.before`**, vérifier 40 caractères hexadécimaux, objet commit local présent, stricte antériorité et ancêtre du HEAD ; fail-closed si nul, manquant, différent de la branche attendue, inaccessible, ou après force-push non fast-forward ;
+- `pull_request` : comparer le HEAD réel de la PR au `git merge-base refs/remotes/origin/main HEAD`, en exigeant une base `main` accessible et distincte du HEAD ;
+- `workflow_dispatch` : sur `main`, contrôler le premier parent `HEAD^1` ; sur une autre branche, utiliser le merge-base avec `origin/main`. Refuser un ref inattendu, un premier commit sans parent, un branchement sans merge-base, un diff nul ;
+- dans tous les cas, valider le SHA du checkout, l'existence locale de la base, sa relation d'ascendance et la non-égalité avec HEAD.
+
+**Preuve contradictoire exécutable** : `bash tools/ci/test_ci_arch.sh` crée des dépôts Git temporaires distincts, avec un bare remote local, les modifie et appelle **les mêmes scripts de sélection et de politique que CI-ARCH**. Il reproduit explicitement `origin/main == HEAD` après un push, contrôle `base == before`, puis exige des exit codes non nuls et diagnostics stables sur les modifications interdites. Cas positifs : documentation seule, nouveau dossier de capture CPC, PR documentation, dispatch sur branche avec modification core seule. Cas négatifs : ancien binaire CPC modifié, nouvel élément dans archive historique, ancien oracle modifié, code core ET HW4 modifiés, base before absente, nulle, non locale, égale à HEAD, non ancêtre, mismatch HEAD, PR mauvaise base, dispatch main corrompu, dispatch tag/non-main invalide, dispatch sans premier parent, branche sans modifications.
+
+**Preuve initiale sur HEAD `1618a626ce16ef2945d48f9d5179f85c5e3e3882`** : [CI-ARCH #40622324920](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40622324920) SUCCESS, logs `CI_ARCH_C1_SELF_TEST_PASS cases=17`, `PUSH_BEFORE_*` rejetés, `EXISTING_CPC_PROOF_CHANGED`, `CORE_AND_HW4_CHANGED_TOGETHER`, `CI_ARCH_BASE_VERIFIED event=pull_request`. Tests élargis dans le dernier commit, résultats du HEAD final à lire sur GitHub avant remise.
+
+Le but de C1 est de restaurer la sûreté des comparaisons, pas de changer les chiffres de référence ni les corpus CPC. Les économies mesurées avant C1 restent informatives ; les nouvelles durées du HEAD final doivent être publiées séparément. Le déclenchement des acquisitions originales reste isolé et leurs runs SKIPPED ne comptent pas comme SUCCESS.

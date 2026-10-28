@@ -29,8 +29,7 @@ case "$event" in
     ;;
   workflow_dispatch)
     if [[ "${CI_ARCH_REF:-}" == refs/heads/main ]]; then
-        base="$(git rev-parse --verify 'HEAD^1') " || fail "DISPATCH_MAIN_NO_PARENT"
-        base="${base% }"
+        base="$(git rev-parse --verify 'HEAD^1')" || fail "DISPATCH_MAIN_NO_PARENT"
     elif [[ "${CI_ARCH_REF:-}" == refs/heads/* ]]; then
         git rev-parse --verify 'refs/remotes/origin/main^{commit}' >/dev/null ||
           fail "DISPATCH_BRANCH_MAIN_UNAVAILABLE"

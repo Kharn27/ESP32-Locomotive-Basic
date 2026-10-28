@@ -67,6 +67,18 @@ expect_reject push_before_missing PUSH_BEFORE_MISSING_OR_INVALID base_for push '
 expect_reject push_before_zero PUSH_BEFORE_ZERO base_for push 0000000000000000000000000000000000000000
 expect_reject push_before_unknown PUSH_BEFORE_NOT_FETCHED base_for push 1111111111111111111111111111111111111111
 expect_reject push_before_head BASE_EQUALS_HEAD base_for push "$new"
+# An existing but unrelated commit must not masquerade as a previous push SHA.
+git -C "$work" checkout -qb unrelated "$old"
+echo 'off-branch' > "$work/docs/unrelated.md"
+git -C "$work" add -A
+git -C "$work" commit -qm unrelated
+unrelated="$(git -C "$work" rev-parse HEAD)"
+git -C "$work" checkout -q main
+expect_reject push_before_nonancestor PUSH_BEFORE_NOT_ANCESTOR base_for push "$unrelated"
+expect_reject push_wrong_checkout WRONG_CHECKOUT \
+    env CI_ARCH_EVENT=push CI_ARCH_REF=refs/heads/main CI_ARCH_BEFORE="$old" \
+        CI_ARCH_EXPECTED_HEAD="$unrelated" bash "$base_script"
+
 # Simultaneous core/HW4 edit is forbidden even if origin/main is the same HEAD.
 setup push_core_hw4; echo 'core2' > "$work/core/basic.c"; echo 'video2' > "$work/video/cpc_text.c"; new_commit
 [[ "$(base_for push "$old")" == "$old" ]] || fail "PUSH_CORE_BASE"
@@ -87,6 +99,14 @@ git -C "$work" add -A; git -C "$work" commit -qm change; new="$(git -C "$work" r
 [[ "$(base_for pull_request unused refs/pull/116/merge main)" == "$old" ]] || fail "PR_MERGE_BASE_WRONG"
 expect_reject pr_historical_archive EXISTING_CPC_PROOF_CHANGED check_changes
 expect_reject pr_missing_main PR_BASE_NOT_MAIN base_for pull_request unused refs/pull/116/merge develop
+setup pr_allowed; echo 'docs PR' > "$work/docs/README.md"
+git -C "$work" add -A; git -C "$work" commit -qm change; new="$(git -C "$work" rev-parse HEAD)"
+[[ "$(base_for pull_request unused refs/pull/116/merge main)" == "$old" ]] || fail "PR_ALLOWED_BASE"
+expect_pass pr_docs_only check_changes
+setup pr_core_hw4; echo 'core PR' > "$work/core/basic.c"; echo 'video PR' > "$work/video/cpc_text.c"
+git -C "$work" add -A; git -C "$work" commit -qm change; new="$(git -C "$work" rev-parse HEAD)"
+expect_reject pr_core_hw4 CORE_AND_HW4_CHANGED_TOGETHER check_changes
+
 # workflow_dispatch: on main inspect HEAD^; on branch inspect merge-base.
 setup dispatch_main; echo 'tamper' > "$work/tests/fixtures/cpc6128/old_archive/program.bin"; new_commit
 [[ "$(base_for workflow_dispatch '' refs/heads/main)" == "$old" ]] || fail "DISPATCH_MAIN_BASE_WRONG"
@@ -95,6 +115,10 @@ setup dispatch_branch; echo 'changed' > "$work/core/basic.c"
 git -C "$work" add -A; git -C "$work" commit -qm change; new="$(git -C "$work" rev-parse HEAD)"
 [[ "$(base_for workflow_dispatch '' refs/heads/feature)" == "$old" ]] || fail "DISPATCH_BRANCH_BASE_WRONG"
 expect_pass dispatch_branch_core_only check_changes
+setup dispatch_branch_synced; new="$old"
+expect_reject dispatch_branch_no_changes BASE_EQUALS_HEAD \
+    base_for workflow_dispatch '' refs/heads/feature
+
 expect_reject dispatch_invalid_ref DISPATCH_UNSUPPORTED_REF base_for workflow_dispatch '' refs/tags/latest
 # No parent or no PR difference must never pass as an empty HEAD-to-HEAD diff.
 setup dispatch_no_parent; new="$old"

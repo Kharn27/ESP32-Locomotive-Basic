@@ -39,9 +39,19 @@ jobs:
         run: |
           set -euo pipefail
           git diff --name-only origin/main...HEAD | tee /tmp/changes.txt
-          if grep -E '^(tests/fixtures/cpc6128/|tests/oracles/inputs/j1_2_a/|tools/j1_2_boundary_verify.py|tests/oracles/j1_2_boundary_oracle.py)' /tmp/changes.txt; then
-            echo "J1.2-B must not rewrite J1.2-A or any earlier history"
-            exit 1
+          # On the explicitly authorized J1.10-A oracle branch only, allow
+          # creation of its NEW archive; preserve every older CPC proof.
+          if test "$GITHUB_HEAD_REF" = "oracle/j1-10-a-if-then-integer"; then
+            if grep -E '^(tests/fixtures/cpc6128/|tests/oracles/inputs/j1_2_a/|tools/j1_2_boundary_verify.py|tests/oracles/j1_2_boundary_oracle.py)' /tmp/changes.txt | grep -v '^tests/fixtures/cpc6128/j1_10_if_then/'; then
+              echo "J1.2-B historical fixture was modified"
+              exit 1
+            fi
+            python3 tools/j1_10_if_then_verify.py --permanent --self-test
+          else
+            if grep -E '^(tests/fixtures/cpc6128/|tests/oracles/inputs/j1_2_a/|tools/j1_2_boundary_verify.py|tests/oracles/j1_2_boundary_oracle.py)' /tmp/changes.txt; then
+              echo "J1.2-B must not rewrite J1.2-A or any earlier history"
+              exit 1
+            fi
           fi
       - name: Configure native C99
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBP_SANITIZERS=${{ matrix.sanitizers }}

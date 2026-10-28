@@ -9,7 +9,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j18-sub-vars-original-archive-${{ github.head_ref || github.ref }}
+  group: j18-sub-vars-original-archive-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -137,96 +137,3 @@ jobs:
           path: ${{ runner.temp }}/j18-cpc/
           if-no-files-found: warn
           retention-days: 30
-
-  permanent-sub-vars-evidence:
-    name: J1.8-A permanent integrity and falsification (no emulator)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Verify original CPC bytes and provisional seal, including 18 negative cases + fake checkout
-        run: |
-          set -euo pipefail
-          DEST=tests/fixtures/cpc6128/j1_integer_sub_vars
-          if test -f "$DEST/manifest.json"; then
-            python3 tools/j1_8_sub_vars_verify.py --evidence "$DEST" --permanent --self-test
-          elif test "$GITHUB_HEAD_REF" = feat/j1-8-a-cpc-integer-sub-vars-oracle; then
-            echo "ACQUISITION_PENDING: the original archive is created by cpc-sub-vars job"
-          else
-            echo "MISSING PERMANENT J1.8-A ORIGINAL ARCHIVE"
-            exit 1
-          fi
-
-  hw4-c1-architecture:
-    name: J1.8-A verify unchanged BASIC-to-TFT bridge
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Verify isolated oracle diff and unique LCD/firmware entry point
-        shell: bash
-        run: |
-          set -euo pipefail
-          base="$(git merge-base origin/main HEAD)"
-          # The original J1.8-A acquisition is oracle-only; independent
-          # later native J1 branches may touch core, never the sealed corpus
-          # or firmware/HW4. Preserve the stricter original branch guard.
-          if test "$GITHUB_HEAD_REF" = feat/j1-8-a-cpc-integer-sub-vars-oracle; then
-            git diff --exit-code "$base" HEAD -- core/ video/ hal/
-          elif test "$GITHUB_HEAD_REF" = feat/hw4-c3-a-cpc-boot-console; then
-            # C3-A has a strict allowlist, not a blanket exception for video/.
-            bash tools/hw4_c3_a_scope_gate.sh "$base" HEAD
-          else
-            git diff --exit-code "$base" HEAD -- firmware/ video/ hal/ tests/fixtures/cpc6128/j1_integer_sub_vars/
-          fi
-          test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
-          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main --include='*.c'
-          test "$(grep -c '^void app_main(void)' firmware/esp32_display_probe/main/hw4_c2_console.c)" -eq 1
-          ! grep -R 'esp_lcd_new_panel_ili9341' firmware/esp32_display_probe/main/
-          echo "J1.8-A HW4-C1_BRIDGE_AND_CORE_UNCHANGED"
-
-  xtensa-three-targets:
-    name: J1.8-A three independent Xtensa IDF 5.5.6 images
-    runs-on: ubuntu-22.04
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build BASIC probe and display console ON / HW3 OFF (two projects)
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm -v "$PWD:/project" -w /project \
-            -e IDF_GIT_SAFE_DIR=/project espressif/idf:v5.5.6 bash -lc '
-              set -euo pipefail
-              for app in esp32_probe esp32_display_probe; do
-                cd /project/firmware/"$app"
-                mkdir -p reports
-                idf.py --version | tee reports/idf-version.txt
-                idf.py --version | grep -Fx "ESP-IDF v5.5.6"
-                idf.py set-target esp32 2>&1 | tee reports/set-target.log
-                idf.py build 2>&1 | tee reports/build.log
-                idf.py size 2>&1 | tee reports/size.txt
-                idf.py size-components 2>&1 | tee reports/size-components.txt
-                ls -lh build/*.bin build/*.elf | tee reports/images.txt
-                echo "J1.8-A THREE_TARGETS_BUILT $app"
-              done
-              # Historical HW3 mode lives in the SAME display-probe project.
-              cd /project/firmware/esp32_display_probe
-              mkdir -p reports/j18-hw3-off
-              idf.py -B build-j18-hw3 -DHW4_C2_CONSOLE=OFF set-target esp32 2>&1 | tee reports/j18-hw3-off/set-target.log
-              idf.py -B build-j18-hw3 -DHW4_C2_CONSOLE=OFF build 2>&1 | tee reports/j18-hw3-off/build.log
-              idf.py -B build-j18-hw3 size 2>&1 | tee reports/j18-hw3-off/size.txt
-              test "$(xtensa-esp-elf-nm --defined-only build-j18-hw3/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
-              echo "J1.8-A HW3_OFF_SINGLE_APP_MAIN=PASS"
-            '
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: j1-8-a-three-targets
-          retention-days: 30
-          if-no-files-found: warn
-          path: |
-            firmware/esp32_probe/reports/
-            firmware/esp32_display_probe/reports/

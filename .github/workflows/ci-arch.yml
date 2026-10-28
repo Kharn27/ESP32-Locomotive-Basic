@@ -1,0 +1,64 @@
+name: CI-ARCH core HW4 CPC isolation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-opt1-arch-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  isolation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Negative and positive event-base isolation regression tests
+        shell: bash
+        run: bash tools/ci/test_ci_arch.sh
+      - name: Resolve event-specific and verified compare base (shared by both guards)
+        id: diff_base
+        shell: bash
+        env:
+          CI_ARCH_EVENT: ${{ github.event_name }}
+          CI_ARCH_BEFORE: ${{ github.event.before }}
+          CI_ARCH_REF: ${{ github.ref }}
+          CI_ARCH_BASE_REF: ${{ github.base_ref }}
+          CI_ARCH_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          base="$(bash tools/ci/ci_arch_base.sh)"
+          printf 'base=%s\n' "$base" >> "$GITHUB_OUTPUT"
+      - name: CPC archive and core/HW4 diff-dependent immutable-history policy
+        shell: bash
+        env:
+          CI_ARCH_BASE: ${{ steps.diff_base.outputs.base }}
+        run: bash tools/ci/ci_arch_changes.sh
+      - name: Shared LCD transport, unique firmware entry point and product/core boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ steps.diff_base.outputs.base }}"
+          test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
+          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main firmware/esp32_probe/main --include='*.c'
+          test "$(grep -c '^void app_main(void)' firmware/esp32_display_probe/main/hw4_c2_console.c)" -eq 1
+          test ! -e firmware/esp32_loco/CMakeLists.txt
+          ! grep -RE 'esp_lcd_new_panel_ili9341' firmware/esp32_display_probe/main/ --include='*.c'
+          ! grep -RE 'malloc[()]|calloc[()]|realloc[()]|free[()]' io/uart_line.c io/cpc_uart_console.c firmware/esp32_display_probe/main/hw4_c2_console.c
+          grep -F 'bsr_submit(' firmware/esp32_display_probe/main/hw4_c2_console.c
+          grep -F 'bsr_step(' firmware/esp32_display_probe/main/hw4_c2_console.c
+          grep -F 'UART_ANSI_CSI' io/uart_line.c
+          grep -F 'cpc_uart_console_backspace' firmware/esp32_display_probe/main/hw4_c2_console.c
+          # Core/HW4 co-mutation rejected by ci_arch_changes.sh using same base.
+          echo "CI_ARCH_SHARED_BASE=$base"
+          echo "CI_ARCH_LCD_OWNER=1 ARCHIVE_EXISTING_IMMUTABLE=PASS"

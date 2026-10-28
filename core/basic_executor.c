@@ -413,6 +413,74 @@ static BEStatus execute_line(const BasicProgram *program,
             if (status != BE_OK) {
                 return status;
             }
+        } else if (token == 0xa1u) { /* IF variable% THEN line */
+            BasicVariableKey key;
+            BasicVariableValue value;
+            BasicProgramLine target;
+            size_t consumed = 0u;
+            uint16_t destination;
+            BVBStatus resolved;
+            BPStatus found;
+            if (preceding_statement || variables == NULL) {
+                return BE_UNSUPPORTED; /* Autonomous IF, store required. */
+            }
+            skip_spaces(body, length, &pos);
+            if (pos == length) {
+                return BE_TRUNCATED;
+            }
+            if (body[pos] != 0x02u) {
+                return BE_BAD_SEQUENCE;
+            }
+            resolved = bvb_read_explicit(body, length, pos, variables,
+                                         &key, &consumed, &value);
+            if (resolved != BVB_OK) {
+                return binding_error(resolved);
+            }
+            if (key.type != (uint8_t)BVT_INTEGER ||
+                value.type != (uint8_t)BVT_INTEGER) {
+                return BE_INVALID_TYPE;
+            }
+            pos += consumed;
+            skip_spaces(body, length, &pos);
+            if (pos == length) {
+                return BE_TRUNCATED;
+            }
+            if (body[pos++] != 0xebu) {
+                return BE_BAD_SEQUENCE;
+            }
+            skip_spaces(body, length, &pos);
+            if (pos == length) {
+                return BE_TRUNCATED;
+            }
+            if (body[pos++] != 0x1eu) {
+                return BE_BAD_SEQUENCE;
+            }
+            if (length - pos < 2u) {
+                return BE_TRUNCATED;
+            }
+            destination = (uint16_t)((uint16_t)body[pos] |
+                          ((uint16_t)body[pos + 1u] << 8));
+            pos += 2u;
+            if (destination == 0u) {
+                return BE_BAD_SEQUENCE;
+            }
+            skip_spaces(body, length, &pos);
+            if (pos != length) {
+                return BE_BAD_SEQUENCE; /* ELSE, colon, or suffix. */
+            }
+            if (value.data.integer == 0) {
+                *next = line->next_offset;
+                return BE_OK; /* Never resolve an untaken target. */
+            }
+            found = bp_find(program, destination, &target);
+            if (found == BP_NOT_FOUND) {
+                return BE_MISSING_TARGET;
+            }
+            if (found != BP_OK) {
+                return BE_BAD_PROGRAM;
+            }
+            *next = target.offset;
+            return BE_OK;
         } else if (token == 0xa0u) { /* GOTO */
             uint16_t destination;
             BasicProgramLine target;

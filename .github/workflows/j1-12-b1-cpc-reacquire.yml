@@ -28,6 +28,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           submodules: recursive
           persist-credentials: false
+          fetch-depth: 0
       - name: Verify exact HEAD, pinned Caprice32 ROM and read-only originals
         shell: bash
         env:

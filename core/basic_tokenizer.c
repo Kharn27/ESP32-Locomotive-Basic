@@ -258,6 +258,30 @@ static BTStatus for_integer(const uint8_t *source, size_t length,
     return status;
 }
 
+/* J1.14-B: only a single CPC INTEGER literal assignment inside IF.
+ * No implicit LET token, no expression grammar, no side effects. */
+static BTStatus inline_if_assignment(const uint8_t *source, size_t length,
+                                      size_t *index, BTEmitter *out)
+{
+    unsigned int number;
+    BTStatus status;
+    if (*index == length || !ascii_letter(source[*index]))
+        return BT_UNSUPPORTED_CONSTRUCT;
+    status = explicit_variable(source, length, index, out, BVR_TYPE_INTEGER);
+    if (status == BT_OK) status = spaces(source, length, index, out);
+    if (status != BT_OK) return status;
+    if (*index == length || source[*index] != (uint8_t)'=')
+        return BT_UNSUPPORTED_CONSTRUCT;
+    ++*index;
+    status = emit(out, 0xefu);
+    if (status == BT_OK) status = spaces(source, length, index, out);
+    if (status == BT_OK) status = decimal(source, length, index, 255u, &number);
+    if (status != BT_OK) return status;
+    if (number < 10u) return emit(out, (uint8_t)(0x0eu + number));
+    status = emit(out, 0x19u);
+    return status == BT_OK ? emit(out, (uint8_t)number) : status;
+}
+
 static BTStatus one_pass(const uint8_t *source, size_t length,
                          BTEmitter *out)
 {
@@ -591,17 +615,33 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (status != BT_OK) {
                 return status;
             }
-            status = decimal(source, length, &index, 65535u, &line);
-            if (status == BT_OK && line == 0u) {
-                status = BT_MALFORMED_INPUT;
-            }
-            if (status == BT_OK) {
-                status = emit(out, 0x1eu);
-                if (status == BT_OK) {
-                    status = emit(out, (uint8_t)(line & 0xffu));
+            if (index < length && ascii_letter(source[index])) {
+                /* IF ... THEN C%=81 [ELSE C%=42]; 01 97 is a CPC
+                 * lexical ELSE separator, not a colon supplied by source. */
+                status = inline_if_assignment(source, length, &index, out);
+                if (status != BT_OK) return status;
+                status = spaces(source, length, &index, out);
+                if (status != BT_OK) return status;
+                if (keyword_matches(source, length, index, "ELSE", &count)) {
+                    index += count;
+                    status = emit(out, 0x01u);
+                    if (status == BT_OK) status = emit(out, 0x97u);
+                    if (status == BT_OK)
+                        status = spaces(source, length, &index, out);
+                    if (status == BT_OK)
+                        status = inline_if_assignment(source, length, &index, out);
                 }
+            } else {
+                /* Historical IF...THEN destination line stays unchanged. */
+                status = decimal(source, length, &index, 65535u, &line);
+                if (status == BT_OK && line == 0u)
+                    status = BT_MALFORMED_INPUT;
                 if (status == BT_OK) {
-                    status = emit(out, (uint8_t)(line >> 8));
+                    status = emit(out, 0x1eu);
+                    if (status == BT_OK)
+                        status = emit(out, (uint8_t)(line & 0xffu));
+                    if (status == BT_OK)
+                        status = emit(out, (uint8_t)(line >> 8));
                 }
             }
         } else if (statement == ST_GOTO || statement == ST_GOSUB) {

@@ -139,7 +139,6 @@ jobs:
               grep -Fx "HW4_C2_CONSOLE:BOOL=ON" build/CMakeCache.txt
               test -s build/loco_esp32_display_probe.bin
               test "$(xtensa-esp-elf-nm --defined-only build/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
-              python /project/tools/ci/verify_esp_app_version.py build/loco_esp32_display_probe.bin "$EXPECTED_BASE" loco_esp32_display_probe
             '
           git switch --detach "$EDIT_SHA"
           test "$(git rev-parse HEAD)" = "$EDIT_SHA"

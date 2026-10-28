@@ -9,7 +9,7 @@ if(HW4_C2_CONSOLE)
             "../../../io/uart_line.c"
         INCLUDE_DIRS "." "../../../video" "../../../io"
         REQUIRES loco_core cyd_ili9341 esp_driver_uart
-                 freertos heap esp_system esp_app_format
+                 freertos heap esp_system esp_app_format esp_timer
     )
 else()
     # Original HW3-C5/HW4 display probe, unchanged source main.c.

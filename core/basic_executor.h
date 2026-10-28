@@ -27,7 +27,11 @@ typedef enum {
     BE_INTEGER_OVERFLOW, /* Internal range error; not a CPC numeric code. */
     BE_DIVISION_BY_ZERO, /* Internal error, separate from CPC ERR=11. */
     BE_RETURN_WITHOUT_GOSUB, /* Host diagnostic, not CPC ERR=3. */
-    BE_CALL_STACK_FULL /* Bounded host stack, not a measured CPC limit. */
+    BE_CALL_STACK_FULL, /* Bounded host stack, not a measured CPC limit. */
+    BE_NEXT_WITHOUT_FOR,
+    BE_NEXT_VARIABLE_MISMATCH,
+    BE_FOR_STACK_FULL,
+    BE_FOR_WITHOUT_NEXT
 } BEStatus;
 
 /* J1.11-B: fixed per-executor call stack, no heap and no C recursion.
@@ -40,12 +44,32 @@ typedef struct {
     size_t statement_offset;
 } BECallFrame;
 
+/* J1.12-B2: bounded FOR/NEXT INTEGER execution, 8 per-executor frames,
+ * separate from GOSUB's 8 frames. Never assume this is a CPC ROM depth.
+ * The NEXT structure is prechecked at FOR, before loop-body output, for the
+ * specific sealed CPC mismatch case. STEP 0 is unsupported. NEXT arithmetic
+ * widens to int32 and fails atomically with BE_INTEGER_OVERFLOW if the new
+ * value leaves int16; this is host policy, not observed CPC semantics.
+ * Cursor/stack/variable/output changes commit only after step prevalidation. */
+#define BE_FOR_STACK_CAPACITY 8u
+typedef struct {
+    BasicVariableKey key;
+    int16_t limit;
+    int16_t step;
+    size_t loop_cursor;
+    size_t loop_statement;
+    size_t after_cursor;
+    size_t after_statement;
+} BEForFrame;
+
 typedef struct {
     const BasicProgram *program; /* Borrowed; immutable through execution. */
     size_t cursor;               /* Offset of next record (or sentinel). */
     size_t statement_offset;     /* Position inside the current line body. */
     size_t call_depth;
     BECallFrame call_stack[BE_GOSUB_STACK_CAPACITY];
+    size_t for_depth;
+    BEForFrame for_stack[BE_FOR_STACK_CAPACITY];
     BasicVariableStore *variables; /* Optional borrowed caller-owned store. */
 } BasicExecutor;
 
@@ -81,6 +105,10 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
  * legacy API still returns BE_UNSUPPORTED. Numeric output is prototype
  * signed decimal + LF, not CPC PRINT formatting.
  *
+ * One line can also contain PRINT:I%...:NEXT I%; successful FOR and NEXT
+ * move the cursor to a continuation (possibly in the same stored line).
+ * A FOR prechecks the matching NEXT before permitting body output, so a
+ * structurally mismatched variable cannot partially print prior iterations.
  * Execute at most ONE numbered line. END commits the reached prefix's output
  * and moves the cursor to the program sentinel; the NEXT be_step returns
  * BE_END. This is the host step protocol, not CPC console timing.

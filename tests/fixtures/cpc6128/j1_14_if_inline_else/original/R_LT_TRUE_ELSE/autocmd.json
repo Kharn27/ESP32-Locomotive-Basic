@@ -1,0 +1,15 @@
+{
+  "commands": [
+    "10 A%=10",
+    "20 B%=11",
+    "25 C%=17",
+    "30 IF A%<B% THEN C%=81 ELSE C%=42",
+    "40 PRINT #8,C%",
+    "50 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "5e11c77fbe10e4a26bd82702d79f52d444d8c15e0911d0e53327ec56e38e734d",
+  "list_requested": true
+}

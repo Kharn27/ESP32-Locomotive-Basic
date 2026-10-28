@@ -71,3 +71,14 @@ jobs:
           else
             echo 'J1.13-A CPC_ARCHIVE_PENDING: no historical oracle PASS claimed'
           fi
+
+      - name: J1.14-A independent IF inline ELSE CPC oracle (fail closed when archived)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_14_if_inline_else_verify.py --check-sources
+          if test -f tests/fixtures/cpc6128/j1_14_if_inline_else/manifest.json; then
+            python3 tools/j1_14_if_inline_else_verify.py --permanent --self-test
+          else
+            echo 'J1.14-A ORIGINAL_ARCHIVE_PENDING: no CPC proof claimed'
+          fi

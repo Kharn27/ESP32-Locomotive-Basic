@@ -645,3 +645,15 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+# J1.14-A is strictly an independent CPC oracle, never native ELSE support.
+if(BUILD_TESTING)
+    add_test(NAME j1_14_a_inline_source_matrix COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_14_if_inline_else_verify.py"
+        --check-sources)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_14_if_inline_else/manifest.json")
+        add_test(NAME j1_14_a_inline_cpc_permanent COMMAND
+            ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_14_if_inline_else_verify.py"
+            --permanent --self-test)
+    endif()
+endif()

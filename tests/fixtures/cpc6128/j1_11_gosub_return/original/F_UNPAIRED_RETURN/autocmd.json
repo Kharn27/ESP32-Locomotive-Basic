@@ -1,0 +1,11 @@
+{
+  "commands": [
+    "10 RETURN",
+    "20 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "3824be7920f9eaae8049dc61ff32f4f51bafce5dff728bf6396143121ffead57",
+  "list_requested": true
+}

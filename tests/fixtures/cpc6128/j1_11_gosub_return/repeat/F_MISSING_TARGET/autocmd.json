@@ -1,0 +1,12 @@
+{
+  "commands": [
+    "10 GOSUB 999",
+    "20 PRINT #8,21",
+    "30 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "9520f7b9a7d879e00d0d2307107faa66a6b3d6e3f81516d97b659b68d5c20074",
+  "list_requested": true
+}

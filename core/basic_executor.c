@@ -328,6 +328,17 @@ static BEStatus for_header(const uint8_t *body, size_t length, size_t *at,
     return BE_OK;
 }
 
+/* J1.12-B2-C1: the implicit apostrophe is 01 C0; an explicit
+ * colon before an apostrophe is 01 01 C0. At a statement boundary
+ * keep the whole comment marker, otherwise skip just the colon.
+ * Caller has already verified pos < length and body[pos] == 01. */
+static size_t for_next_continuation(const uint8_t *body, size_t length,
+                                    size_t pos)
+{
+    return pos + 1u < length && body[pos + 1u] == 0xc0u
+           ? pos : pos + 1u;
+}
+
 /* Locate the matching structural NEXT without executing intervening code.
  * Only statement starts count. Quoted strings, REM, apostrophes, variable
  * cache bytes and numeric token payloads cannot create phantom statements.
@@ -389,7 +400,7 @@ static BEStatus for_match(const BasicProgram *program,
                 if (depth == 0u) {
                     if (pos < n) {
                         *exit_cursor = line.offset;
-                        *exit_statement = pos + 1u;
+                        *exit_statement = for_next_continuation(body, n, pos);
                     } else {
                         *exit_cursor = line.next_offset;
                         *exit_statement = 0u;
@@ -933,7 +944,7 @@ static BEStatus execute_line(const BasicProgram *program,
             if (status != BE_OK) return status;
             if (pos < length) {
                 body_cursor = line->offset;
-                body_statement = pos + 1u;
+                body_statement = for_next_continuation(body, length, pos);
             } else {
                 body_cursor = line->next_offset;
                 body_statement = 0u;
@@ -1004,7 +1015,7 @@ static BEStatus execute_line(const BasicProgram *program,
                 flow->for_action = BE_FOR_POP;
                 if (pos < length) {
                     *next = line->offset;
-                    flow->next_statement = pos + 1u;
+                    flow->next_statement = for_next_continuation(body, length, pos);
                 } else {
                     *next = line->next_offset;
                 }

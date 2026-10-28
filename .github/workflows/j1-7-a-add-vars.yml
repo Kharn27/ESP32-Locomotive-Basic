@@ -9,7 +9,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j17-add-vars-original-archive
+  group: j17-add-vars-original-archive-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:

@@ -17,7 +17,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j15-division-original-archive
+  group: j15-division-original-archive-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:

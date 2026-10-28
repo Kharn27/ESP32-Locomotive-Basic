@@ -9,7 +9,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j18-sub-vars-original-archive-${{ github.head_ref || github.ref }}
+  group: j18-sub-vars-original-archive-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:

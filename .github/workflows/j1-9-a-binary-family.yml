@@ -9,7 +9,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j19-binary-family-original-archive-${{ github.head_ref || github.ref }}
+  group: j19-binary-family-original-archive-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:

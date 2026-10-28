@@ -256,9 +256,158 @@ static int console_runtime(void)
     return 0;
 }
 
+
+/* J1.10-B-C1 regression: imports can omit ANY of the three lexical
+ * separators even though their A1/BVR/EB/1E token stream is executable.
+ * LIST inserts only the missing ones; noncanonical imported bytes need
+ * not equal re-tokenized canonical bytes, but their semantics must agree.
+ */
+static int imported_if_listing_roundtrip(void)
+{
+    unsigned int mask, cache;
+    for (cache = 0u; cache < 2u; ++cache) {
+        for (mask = 0u; mask < 8u; ++mask) {
+            uint8_t body[20], original[20], listed[80], tokens[80];
+            uint8_t full[160], before_full[160], output_snapshot[80];
+            char expected[80], expected_line[96];
+            Harness h;
+            BasicProgramLine dest;
+            BasicProgram saved_program;
+            BasicVariableStore saved_store;
+            BasicVariableEntry saved_entries[6];
+            size_t n = 0u, listed_n = 987u, again_n = 0u;
+            size_t full_n = 777u, expected_n, expected_full_n, i;
+            int fmt, line_fmt;
+            const char *first = (mask & 1u) != 0u ? "  " : " ";
+            const char *second = (mask & 2u) != 0u ? " " : " ";
+            const char *third = (mask & 4u) != 0u ? "   " : " ";
+            /* Vary retained separators so C1 must preserve their actual
+             * counts, not simply force one space everywhere. */
+            fmt = snprintf(expected, sizeof(expected), "IF%sA%%%sTHEN%s60",
+                           first, second, third);
+            CHECK(fmt > 0 && (size_t)fmt < sizeof(expected));
+            expected_n = (size_t)fmt;
+            line_fmt = snprintf(expected_line, sizeof(expected_line),
+                                "20 %s\n", expected);
+            CHECK(line_fmt > 0 && (size_t)line_fmt < sizeof(expected_line));
+            expected_full_n = (size_t)line_fmt;
+
+            body[n++] = 0xa1u;
+            if ((mask & 1u) != 0u) {
+                body[n++] = (uint8_t)' ';
+                body[n++] = (uint8_t)' ';
+            }
+            body[n++] = 0x02u;
+            body[n++] = cache != 0u ? 0x20u : 0x00u;
+            body[n++] = cache != 0u ? 0xefu : 0x00u;
+            body[n++] = 0xc1u;
+            if ((mask & 2u) != 0u) {
+                body[n++] = (uint8_t)' ';
+            }
+            body[n++] = 0xebu;
+            if ((mask & 4u) != 0u) {
+                body[n++] = (uint8_t)' ';
+                body[n++] = (uint8_t)' ';
+                body[n++] = (uint8_t)' ';
+            }
+            body[n++] = 0x1eu;
+            body[n++] = 0x3cu;
+            body[n++] = 0x00u;
+            memcpy(original, body, n);
+
+            /* On failure the entire destination and written are intact. */
+            memset(listed, 0xacu, sizeof(listed));
+            memcpy(output_snapshot, listed, sizeof(listed));
+            CHECK(bl_detokenize(body, n, listed, expected_n - 1u,
+                                &listed_n) == BL_NO_SPACE);
+            CHECK(listed_n == 987u &&
+                  memcmp(listed, output_snapshot, sizeof(listed)) == 0);
+            CHECK(memcmp(original, body, n) == 0);
+            CHECK(bl_detokenize(body, n, listed, 0u,
+                                &listed_n) == BL_NO_SPACE);
+            CHECK(listed_n == 987u &&
+                  memcmp(listed, output_snapshot, sizeof(listed)) == 0);
+
+            CHECK(bl_detokenize(body, n, listed, expected_n,
+                                &listed_n) == BL_OK);
+            CHECK(listed_n == expected_n &&
+                  memcmp(listed, expected, expected_n) == 0);
+            for (i = expected_n; i < sizeof(listed); ++i) {
+                CHECK(listed[i] == 0xacu);
+            }
+            CHECK(memcmp(original, body, n) == 0);
+            CHECK(bt_tokenize(listed, listed_n, tokens,
+                              sizeof(tokens), &again_n) == BT_OK);
+            /* The native canonical representation never loses the target
+             * and is itself LIST-roundtrip safe. */
+            {
+                uint8_t again_listed[80];
+                size_t again_listed_n = 0u;
+                CHECK(bl_detokenize(tokens, again_n, again_listed,
+                                    sizeof(again_listed),
+                                    &again_listed_n) == BL_OK);
+                CHECK(again_listed_n == expected_n &&
+                      memcmp(again_listed, expected, expected_n) == 0);
+            }
+
+            CHECK(setup(&h) == 0);
+            CHECK(bp_put(&h.program, 20u, body, n) == BP_OK);
+            CHECK(put(&h, 30u, "PRINT 31") == 0);
+            CHECK(put(&h, 40u, "END") == 0);
+            CHECK(put(&h, 60u, "PRINT 61") == 0);
+            CHECK(put(&h, 70u, "END") == 0);
+            CHECK(bp_find(&h.program, 60u, &dest) == BP_OK);
+            saved_program = h.program;
+            saved_store = h.store;
+            memcpy(saved_entries, h.entries, sizeof(saved_entries));
+            memcpy(before_full, h.storage, sizeof(before_full));
+            /* A full LIST is also responsible for atomicity and exact
+             * program image preservation, including BVR cache bytes. */
+            memset(full, 0x5cu, sizeof(full));
+            CHECK(bl_list_program(&h.program, full, 0u, &full_n)
+                  == BL_NO_SPACE);
+            CHECK(full_n == 777u);
+            for (i = 0u; i < sizeof(full); ++i) {
+                CHECK(full[i] == 0x5cu);
+            }
+            CHECK(bl_list_program(&h.program, full, sizeof(full),
+                                  &full_n) == BL_OK);
+            CHECK(full_n >= expected_full_n);
+            CHECK(memcmp(full, expected_line, expected_full_n) == 0);
+            CHECK(memcmp(before_full, h.storage, sizeof(before_full)) == 0);
+            CHECK(memcmp(&h.program, &saved_program, sizeof(saved_program)) == 0);
+            CHECK(memcmp(&h.store, &saved_store, sizeof(saved_store)) == 0);
+            CHECK(memcmp(h.entries, saved_entries, sizeof(saved_entries)) == 0);
+
+            CHECK(variable(&h, (uint8_t)'A', 1) == 0);
+            CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+            memset(h.output, 0xbbu, sizeof(h.output));
+            h.written = 912u;
+            CHECK(be_step(&h.executor, h.output, 0u, &h.written) == BE_OK);
+            CHECK(h.written == 0u && h.executor.cursor == dest.offset);
+            for (i = 0u; i < sizeof(h.output); ++i) {
+                CHECK(h.output[i] == 0xbbu);
+            }
+            CHECK(be_step(&h.executor, h.output, sizeof(h.output),
+                          &h.written) == BE_OK);
+            CHECK(h.written == 3u && memcmp(h.output, "61\n", 3u) == 0);
+            CHECK(memcmp(before_full, h.storage, sizeof(before_full)) == 0);
+            CHECK(memcmp(original, body, n) == 0);
+            CHECK(variable(&h, (uint8_t)'A', 0) == 0);
+            CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
+            CHECK(be_step(&h.executor, h.output, 0u, &h.written) == BE_OK);
+            CHECK(be_step(&h.executor, h.output, sizeof(h.output),
+                          &h.written) == BE_OK);
+            CHECK(h.written == 3u && memcmp(h.output, "31\n", 3u) == 0);
+        }
+    }
+    return 0;
+}
+
 int main(void)
 {
     CHECK(token_listing() == 0);
+    CHECK(imported_if_listing_roundtrip() == 0);
     CHECK(branching() == 0);
     CHECK(missing_and_malformed() == 0);
     CHECK(console_runtime() == 0);

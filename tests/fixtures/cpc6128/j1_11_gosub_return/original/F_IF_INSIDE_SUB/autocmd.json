@@ -1,0 +1,17 @@
+{
+  "commands": [
+    "10 A%=1",
+    "20 GOSUB 100",
+    "30 PRINT #8,31",
+    "40 END",
+    "100 IF A% THEN 120",
+    "110 PRINT #8,111",
+    "120 PRINT #8,121",
+    "130 RETURN",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "fbbda2aa89a43807d4e08cdd4aec055b981584f2f75bd9cf265568f219d93a83",
+  "list_requested": true
+}

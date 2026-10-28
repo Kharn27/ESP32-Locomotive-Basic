@@ -1,8 +1,16 @@
-name: C99 BASIC core
+name: CI-C99 portable Linux 4 cells
 on:
   push:
-    branches: [main, 'feat/j0-4-basic-tokenizer']
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-opt1-c99-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   linux-tests:
@@ -32,6 +40,36 @@ jobs:
         run: cmake --build build --parallel
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: Require full 62+ CTest inventory and developer labels
+        run: |
+          set -euo pipefail
+          count="$(ctest --test-dir build -N | awk '/Total Tests:/ {print $3}')"
+          test "$count" -ge 62
+          ctest --test-dir build -N -L INTEGER | grep -F 'integer'
+          ctest --test-dir build -N -L CPC_PERMANENT | grep -F 'cpc'
+          ctest --test-dir build -N -L VIDEO | grep -F 'cpc_video'
+          ctest --test-dir build -N -L UART | grep -F 'hw4_c2'
+          ctest --test-dir build -N -L MEMORY | grep -F 'memory_budget'
+          echo "CI-OPT1_CTEST_TOTAL=$count COMPILER=${{ matrix.compiler }} SANITIZERS=${{ matrix.sanitizers }}"
+      - name: Original J1.2-B independent CPC boundary and native INTEGER16 diagnostics
+        run: |
+          set -euo pipefail
+          python3 tools/j1_2_boundary_verify.py --permanent --self-test
+          python3 tools/j1_2_b_native_verify.py --cli build/loco_basic_cli --image-cli build/basic_program_image_cli --self-test
+      - name: HW4-C3-B1 original stand-alone C99 baseline (GCC OFF/ON)
+        if: matrix.compiler == 'gcc'
+        shell: bash
+        run: |
+          set -euo pipefail
+          flags="-std=c99 -Wall -Wextra -Wpedantic -Wconversion -Werror -g"
+          if test "${{ matrix.sanitizers }}" = ON; then
+            flags="$flags -fsanitize=address,undefined -fno-omit-frame-pointer"
+          fi
+          cc $flags -Ivideo -Iio \
+            tests/test_hw4_c3_b1_baseline.c io/cpc_uart_console.c \
+            video/cpc_text.c video/cpc_video.c video/cpc_palette.c \
+            -o /tmp/hw4-c3-b1-baseline
+          /tmp/hw4-c3-b1-baseline
       # CTest hides stdout of passing tests. Publish the intact-copy proof
       # and all 10+4 cause-specific rejection diagnostics on both CI variants.
       - name: J0.26-C2 audit self-test (visible positive and negative controls)

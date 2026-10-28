@@ -51,10 +51,20 @@ La sortie du scanner `python3 tools/ci/check_u1b_retirement.py --scan` doit êtr
 | HW3 | 82 878 | 67 279 | 31 520 | 208 753 |
 | BASIC_PROBE | 74 990 | 51 807 | 31 020 | 166 477 |
 
-Source : [rapport U1-A](ARCH-HW4-U1-A-profiles.md). Référence ABI U1-A : `LocoProbeStorage=19072`, `core_descriptor_bytes=636`, `owned_buffers_and_entries_bytes=18432` ; les **16 champs** sont extraits du nouvel ELF. **Aucune mesure U1-B ni succès CI ne sont revendiqués avant lecture des journaux.** Écart > 2 048 octets DRAM ou IRAM CONSOLE : STOP, arbitrage Pilotage. Tout écart Flash/appdesc/ABI doit être expliqué.
+Source : [rapport U1-A](ARCH-HW4-U1-A-profiles.md). Référence ABI U1-A : `LocoProbeStorage=19072`, `core_descriptor_bytes=636`, `owned_buffers_and_entries_bytes=18432` ; les **16 champs** sont extraits du nouvel ELF. **Mesures U1-B réelles** — [CI Xtensa #40780780584](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40780780584), commit fonctionnel `7cce9800cf5008fa29b75afb5ad9f067b4ca71ea`, `ESP-IDF v5.5.6` ; **3/3 profils PASS** et `profile-guards` PASS. Le seul delta de répertoire source n'introduit aucune variation des budgets :
+
+| Profil U1-B | Flash Code | IRAM | DRAM | Image | Δ Flash / IRAM / DRAM / image vs U1-A |
+| --- | ---: | ---: | ---: | ---: | --- |
+| CONSOLE | 111 082 | 67 279 | 49 368 | 237 533 | **0 / 0 / 0 / 0 o** |
+| HW3 | 82 878 | 67 279 | 31 520 | 208 753 | **0 / 0 / 0 / 0 o** |
+| BASIC_PROBE | 74 990 | 51 807 | 31 020 | 166 477 | **0 / 0 / 0 / 0 o** |
+
+ABI BASIC_PROBE : 16/16 champs et `LocoProbeStorage=19072`, `core_descriptor_bytes=636`, `owned_buffers_and_entries_bytes=18432` (lecture ELF, pas une mesure matérielle). `app_main=1` vérifié pour chaque image. Appdesc sur les trois images : `7cce980`; la transition standard `main → branche` au même cache `build/` a produit `PO_STANDARD_BOOT_SHA=PASS` sur ce même commit. Tests réels des profils invalides et des sélecteurs contradictoires : refus confirmés. Les validations complémentaires sur ce commit sont [C99 4 cellules #40780780801](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40780780801) (83/83 CTest par cellule), [CI-ARCH #40780780568](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40780780568), [CPC permanent #40780780618](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40780780618), [oracle CPC indépendant #40780780677](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40780780677) et [HW4 scroll #40780780511](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40780780511) : **SUCCESS**. Les anciens workflows conditionnels `SKIPPED` ne sont pas comptés PASS.
+
+**La présente actualisation documentaire produit un nouveau HEAD : toutes les vérifications doivent être répétées sur ce HEAD final avant remise.** La comparaison ci-dessus est une preuve du précédent commit fonctionnel, pas un substitut à cette réexécution. Écart > 2 048 octets DRAM ou IRAM CONSOLE : STOP, arbitrage Pilotage. Tout écart Flash/appdesc/ABI doit être expliqué.
 
 ## Essai obligatoire du PO sur le SHA final
 
 Après succès de la CI et remise du SHA intégral : **ouvrir le projet VS Code existant**, sélectionner la branche de PR, cliquer Build / Flash / Monitor **sans options ajoutées ni nettoyage**. En CLI si besoin : `cd firmware/esp32_display_probe && idf.py build && idf.py flash monitor`. Relever `version=<SHA court du HEAD>` et vérifier l'accueil `BASIC 1.1`, `Ready`, curseur ; saisir `10 PRINT 2`, `20 PRINT 3`, `LIST`, `RUN`, `NEW`, puis un programme témoin `IF A% THEN` déjà connu, éditer avec gauche / Backspace / Suppr, provoquer des scrolls et `!CLS`. Critères : aucune erreur/panic, comportement identique au SHA U1-A validé, `dma_fault=0`, `dma_timeouts=0` ; fournir heap libre, largest et pile HWM observés. Retour PO **PASS/FAIL + extrait UART** ; photo non demandée.
 
-**État du rapport initial :** livrable en cours de qualification ; `ON_DEVICE_UNVERIFIED`. Aucun test matériel ne découle d'une compilation. **La revue, l'acceptation et la fusion de la PR appartiennent au Pilotage. J1.15 et HW4 concurrents restent gelés.**
+**État de qualification :** parité Xtensa confirmée sur le commit fonctionnel et CI du HEAD documentaire final à relire ; `ON_DEVICE_UNVERIFIED`. Aucun test matériel ne découle d'une compilation. **La revue, l'acceptation et la fusion de la PR appartiennent au Pilotage. J1.15 et HW4 concurrents restent gelés.**

@@ -695,3 +695,13 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+# J1.15-A: independent ROM STRING oracle; never native runtime support.
+if(BUILD_TESTING)
+    add_test(NAME j1_15_a_string_source_matrix COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_15_string_scalar_verify.py" --check-sources)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_15_string_scalar/manifest.json")
+        add_test(NAME j1_15_a_string_cpc_permanent COMMAND
+            ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_15_string_scalar_verify.py" --permanent --self-test)
+    endif()
+endif()

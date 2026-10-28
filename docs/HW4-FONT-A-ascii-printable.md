@@ -31,6 +31,19 @@ pixel**, `0x20` (espace) reste volontairement vierge.
 Le glyphe de diagnostic `0x7f` reste identique. Pas d'extension
 aux codes CPC spéciaux ni aux caractères de contrôle.
 
+### Correctif visuel C1 — minuscules g et q (retour PO)
+
+Sur photographies de comparaison CYD / Amstrad, le PO a relevé les
+minuscules `g` et `q` trop hautes. **Correction autorisée directement
+par le PO**, sans élargissement de la mission : leurs huit lignes sont
+décalées d'un pixel vers le bas, avec nouvelle ligne supérieure vierge
+et descendante en ligne 7. Les 93 autres codes ASCII, les 61 motifs
+préexistants et le diagnostic `0x7f` sont inchangés. Un test dédié
+`check_lowercase_descenders()` verrouille les deux nouvelles formes.
+Cette correction **ne prouve pas une identité avec la ROM CPC** :
+vérification visuelle physique à refaire sur le HEAD corrigé.
+
+
 ## Organisation et parité
 
 - `cpc_font.c` constitue la **seule table** bitmap, immutable

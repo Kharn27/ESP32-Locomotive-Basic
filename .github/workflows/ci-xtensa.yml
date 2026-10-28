@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-opt1-xtensa-${{ github.event.pull_request.number || github.ref }
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }
+  group: ci-opt1-xtensa-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   three-variants:

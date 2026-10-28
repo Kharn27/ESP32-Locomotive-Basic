@@ -102,6 +102,25 @@ static void check_cell(unsigned column, unsigned row, uint8_t ch)
         }
     }
 }
+/* PO CPC-side visual feedback: the original g/q bodies started at y=1,
+ * unlike the main lowercase baseline. Shift exactly one raster row down
+ * to keep their descenders on row 7, without touching any other glyph. */
+static void check_lowercase_descenders(void)
+{
+    static const uint8_t expected_g[8] = {
+        0x00,0x00,0x38,0x48,0x48,0x38,0x08,0x30
+    };
+    static const uint8_t expected_q[8] = {
+        0x00,0x00,0x38,0x48,0x48,0x38,0x08,0x08
+    };
+    assert(hw3_glyph_row('a',1U) == 0U);
+    assert(hw3_glyph_row('a',2U) != 0U);
+    for (unsigned y=0U; y<8U; ++y) {
+        assert(hw3_glyph_row('g',y) == expected_g[y]);
+        assert(hw3_glyph_row('q',y) == expected_q[y]);
+    }
+}
+
 static void printable_table_and_actual_video(void)
 {
     uint8_t raw[95], frozen[95];
@@ -216,6 +235,7 @@ static void source_list_pixels_and_clear(void)
 int main(void)
 {
     old_glyphs_identical();
+    check_lowercase_descenders();
     printable_table_and_actual_video();
     source_list_pixels_and_clear();
     puts("HW4-FONT-A: 95/95 mapped, 94 visible + blank space, 61 baseline glyphs / DEL pinned, actual MODE1 UART echo, source/LIST pixels, VRAM canaries PASS");

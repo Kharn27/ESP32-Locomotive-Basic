@@ -670,3 +670,17 @@ if(BUILD_TESTING)
             --permanent --self-test)
     endif()
 endif()
+
+# J1.14-B: native closed inline INTEGER IF/ELSE and sealed CPC post-B differential.
+if(BUILD_TESTING)
+    add_executable(test_basic_if_inline_else tests/test_basic_if_inline_else.c)
+    target_link_libraries(test_basic_if_inline_else PRIVATE
+        basic_session_runtime basic_tokenizer basic_listing basic_variable_binding)
+    add_test(NAME j1_14_b_native_if_inline_else
+        COMMAND test_basic_if_inline_else)
+    add_test(NAME j1_14_b_cpc_record_branch_differential
+        COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_14_b_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

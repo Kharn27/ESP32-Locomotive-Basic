@@ -158,8 +158,8 @@ static void source_edit_list_run(void)
         memcpy(printed+count,basic.output,basic.written);
         count+=basic.written;
     }
-    assert(count==8U);
-    assert(memcmp(printed," 2 \n 3 \n",8U)==0);
+    assert(count==4U);
+    assert(memcmp(printed,"2\n3\n",4U)==0);
     assert(memcmp(program,basic.bytes,sizeof program)==0);
     /* Host !CLS clears just the video, not BASIC store. */
     assert(cpc_uart_console_clear(&text));

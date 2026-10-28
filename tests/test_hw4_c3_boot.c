@@ -43,13 +43,14 @@ static void check(bool cyd)
         "and Locomotive Software Ltd.",
         "BASIC 1.1","Ready"
     };
+    const unsigned input_row=cyd ? 12U : 13U;
     start();
     assert(!cpc_boot_console(NULL,cyd));
     assert(!cpc_boot_line(5U,cyd,NULL));
     assert(cpc_boot_console(&sink,cyd));
     assert(!cpc_boot_console(&sink,cyd)); /* cannot repeat over live editor */
-    assert(sink.row==13U && sink.column==0U);
-    assert(video.cursor_visible && video.cursor_row==13U && video.cursor_column==0U);
+    assert(sink.row==input_row && sink.column==0U);
+    assert(video.cursor_visible && video.cursor_row==input_row && video.cursor_column==0U);
     assert(sink.bytes_received==0U && sink.glyphs_drawn==0U &&
            sink.input_fnv1a==UINT32_C(2166136261));
     for(unsigned i=0U;i<CPC_BOOT_LINES;++i) {
@@ -89,7 +90,8 @@ static void check(bool cyd)
     assert(copyright_line.row==5U);
     assert(credits_line.row==(cyd ? 6U : 7U));
     assert(basic_line.row==(cyd ? 9U : 10U));
-    assert(ready_line.row==12U);
+    assert(ready_line.row==(cyd ? 11U : 12U));
+    assert(ready_line.row+1U==input_row);
     if(cyd) {
         assert(credits_line.row==copyright_line.row+1U);
     } else {
@@ -116,25 +118,25 @@ static void check(bool cyd)
     /* Cursor overlay: framebuffer remains unchanged regardless of visibility. */
     static uint8_t snapshot[CPC_VIDEO_BYTES];
     memcpy(snapshot,g.pixels,sizeof snapshot);
-    assert(cpc_video_render_row(&video,20U+13U*8U,rgb,320U));
+    assert(cpc_video_render_row(&video,20U+input_row*8U,rgb,320U));
     assert(rgb[0]==UINT16_C(0xffe0));
-    assert(cpc_video_cursor(&video,0U,13U,false));
-    assert(cpc_video_render_row(&video,20U+13U*8U,rgb,320U));
+    assert(cpc_video_cursor(&video,0U,input_row,false));
+    assert(cpc_video_render_row(&video,20U+input_row*8U,rgb,320U));
     assert(rgb[0]==UINT16_C(0x0010));
     assert(memcmp(snapshot,g.pixels,sizeof snapshot)==0);
     assert(cpc_video_render_row(&video,0U,rgb,320U));
     for(unsigned x=0U;x<320U;++x) assert(rgb[x]==UINT16_C(0x0010));
-    /* First prompt does NOT clear the banner; edit begins at row 13. */
+    /* First prompt preserves banner; ON input follows Ready at row 12. */
     bool paged=true;
     assert(cpc_uart_console_prompt(&sink,&paged) && !paged);
-    assert(sink.row==13U && sink.column==0U);
+    assert(sink.row==input_row && sink.column==0U);
     assert(cpc_uart_console_append(&sink,(uint8_t)'1'));
     assert(cpc_uart_console_append(&sink,(uint8_t)'0'));
-    assert(sink.column==2U && sink.row==13U);
+    assert(sink.column==2U && sink.row==input_row);
     assert(cpc_uart_console_backspace(&sink));
     assert(sink.column==1U);
     assert(cpc_uart_console_end_line(&sink));
-    assert(sink.row==14U && sink.column==0U);
+    assert(sink.row==input_row+1U && sink.column==0U);
     guarded();
     assert(cpc_uart_console_clear(&sink)); /* !CLS intentionally clears banner */
     assert(sink.row==0U && sink.column==0U);

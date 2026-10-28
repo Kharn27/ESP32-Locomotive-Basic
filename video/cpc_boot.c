@@ -17,9 +17,10 @@ bool cpc_boot_line(unsigned index,bool cyd_heading,CpcBootLine *out)
     size_t n=strlen(s);
     if(n>40U) return false;
     /* PO hardware feedback: ON credits are consecutive (5/6), and
-     * BASIC 1.1 occupies row 9. Preserve the HW3 OFF rows 5/7/10. */
+     * BASIC 1.1 occupies row 9, Ready row 11. Preserve HW3 OFF layout. */
     out->row=(cyd_heading && index==2U) ? 6U
             : (cyd_heading && index==3U) ? 9U
+            : (cyd_heading && index==4U) ? 11U
             : rows[index];
     out->column=index<3U ? (40U-(unsigned)n)/2U : index==3U ? 1U : 0U;
     out->text=s;
@@ -41,7 +42,9 @@ bool cpc_boot_console(CpcText *text,bool cyd_heading)
                 return false;
     }
     /* Startup is not BASIC output: do not mutate counters or input digest. */
-    text->row=CPC_BOOT_INPUT_ROW;
+    const unsigned input_row = cyd_heading ? CPC_BOOT_INPUT_ROW - 1U
+                                           : CPC_BOOT_INPUT_ROW;
+    text->row=input_row;
     text->column=0U;
-    return cpc_video_cursor(text->video,0U,CPC_BOOT_INPUT_ROW,true);
+    return cpc_video_cursor(text->video,0U,input_row,true);
 }

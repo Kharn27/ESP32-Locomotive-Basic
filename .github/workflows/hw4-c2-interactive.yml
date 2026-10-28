@@ -26,7 +26,18 @@ jobs:
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
           ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main/hw4_c2_console.c
           base="$(git merge-base origin/main HEAD)"
-          git diff --exit-code "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
+          # An oracle-only J1.10-A PR may ADD only its own captured files.
+          # No past archive, shared video/driver, firmware or HW4 file changes.
+          if test "$GITHUB_HEAD_REF" = "oracle/j1-10-a-if-then-integer"; then
+            git diff --name-only "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/ > "$RUNNER_TEMP/hw4-j110-diff.txt"
+            if grep -Ev '^(tests/fixtures/cpc6128/j1_10_if_then/|tests/oracles/inputs/j1_10_a/|tests/oracles/j1_10_if_then_oracle.py$)' "$RUNNER_TEMP/hw4-j110-diff.txt"; then
+              echo "FORBIDDEN OLD_ORACLE_OR_HW4_MODIFICATION"
+              exit 1
+            fi
+            python3 tools/j1_10_if_then_verify.py --permanent --self-test
+          else
+            git diff --exit-code "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
+          fi
           # HW4 product changes still forbid core/ changes. A parallel J1
           # core-only PR must instead preserve ALL HW4 firmware and IO files.
           if git diff --name-only "$base" HEAD -- io/uart_line.c io/cpc_uart_console.c firmware/esp32_display_probe/ tests/test_uart_line.c tests/test_cpc_uart_console.c tests/test_hw4_c2_integration.c | grep -q .; then
@@ -62,11 +73,11 @@ jobs:
           # add suites and must not fail because this count increases.
           count="$(ctest --test-dir build -N | awk '/Total Tests:/ {print $3}')"
           test "$count" -ge 55
-          # C3-A-C1 also contains J1.9-B's two newly integrated suites:
-          # 55 C2 baseline + 2 J1.9-B + 1 HW4-C3-A = at least 58.
+          # Includes the immutable J1.10-A oracle plus HW4-C3-A boot test.
           if test "$GITHUB_HEAD_REF" = feat/hw4-c3-a-cpc-boot-console; then
-            test "$count" -ge 58
-            ctest --test-dir build -N | grep 'hw4_c3_boot_screen'
+            test "$count" -ge 59
+            ctest --test-dir build -N | grep -F 'hw4_c3_boot_screen'
+            ctest --test-dir build -N | grep -F 'j1_10_a_if_then_cpc_permanent'
           fi
           echo "HW4-C2 BASELINE_MINIMUM=55 ACTUAL=$count"
       - uses: actions/upload-artifact@v4.6.2

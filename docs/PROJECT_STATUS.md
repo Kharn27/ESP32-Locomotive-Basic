@@ -546,6 +546,14 @@ Preuves **physiques bornées** : sur CYD au SHA `a333767`, journaux de `ESC[3~` 
 **Prochain HW autorisé** : [HW4-C3-A #101](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101), écran de démarrage HW3 / BASIC 1.1 et glyphes U/W ; essais CYD requis au HEAD final. **HW4-C3-B bloqué** jusqu'à revue/fusion C3-A. Backlogs #96 (vraie navigation édition/DELETE CPC), #97 (police ASCII complète), indépendants des jalons BASIC J1.
 
 
+### J1.10-A — preuve ROM IF…THEN (28 octobre 2026)
+
+Après fusion de [J1.9-B #102](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/102) dans `main` au squash `446b0a34e44fe8a744352ca56dde505efcc43959`, l'[issue #104](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/104) a autorisé **J1.10-A uniquement**. Branche `oracle/j1-10-a-if-then-integer`, [PR #105](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/105) non fusionnée. Première acquisition indépendante GHCR [#40602423356](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40602423356) : **14/14 couples de captures CPC RAM et imprimante identiques**, 7 explorations hors première B. `IF=A1`, `THEN=EB`, numéro de ligne `1E`, conditions INTEGER zéro/non-zéro, erreur cible absente `ERR=8 ERL=20` observés. 14/14 C99 pré-implémentation `UNSUPPORTED` conservés ; aucune modification de `core/`, `firmware/`, `video/`, `hal/`, `io/`, HW4 ou archives antérieures. Voir [rapport J1.10-A](J1.10-A-if-then-cpc-oracle.md) et sceau original du manifeste `4439054c55c9422aba315c3e5e4cc4303c38b34c4b1f2f13ba56e60f69661796`. La permanence, la réacquisition CI et les trois images Xtensa sur deux projets doivent être validées au HEAD final avant remise. **J1.10-B non autorisée ; ON_DEVICE_UNVERIFIED.**
+
+
+**Gates J1.10-A (révision de code `54bcd378`)** : [Linux 58/58 OFF et ON #40603448640](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448640), [oracle J1.10-A #40603448801](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448801) 14/14 doubles acquisitions RAM et imprimante exactes, six falsifications + faux HEAD rejetés, [trois images Xtensa J1.8-A #40603448623](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448623), [HW4-C1 #40603448633](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448633), [HW4-C2 #40603448674](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448674) et [CPC historique #40603448614](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448614) verts ; ***vérification du HEAD documentaire ultérieur obligatoire avant remise***. Aucun élargissement à J1.10-B ou HW4, `ON_DEVICE_UNVERIFIED`. [Rapport complet](J1.10-A-if-then-cpc-oracle.md).
+
+
 ## HW4-C3-A — console CYD : bandeau BASIC 1.1 (27 octobre 2026)
 
 Mission [#101](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101),
@@ -606,3 +614,14 @@ avec pixels VRAM et assertion de rangée vacante. Caprice32 figure dans
 `tests/oracles/caprice32` comme sous-module pour les oracles historiques,
 mais le positionnement visuel HW3 n'est pas une référence pixel à pixel
 scellée. Aucun changement au moteur BASIC ni au scrolling non-CPC.
+
+### HW4-C3-A-C1 — nouvelle base J1.10-A, retouches PO du bandeau
+
+Synchronisation de la PR #103 avec `main` `c9ff43bd4a04d88fe3552a9398cefc0804651b83` (oracle J1.10-A) :
+le corpus et les fichiers des oracles ainsi que le cœur BASIC restent
+identiques au nouveau `main`. Sur la console ON, lignes : titre 3,
+copyright 5, Locomotive 6, `BASIC 1.1` 9, `Ready` 11,
+curseur et première frappe **rangée 12**. HW3 OFF conserve les cinq
+rangées d'origine 3/5/7/10/12 et son curseur 13.
+Aucun scrolling CPC, éditeur tactile ou changement HAL ; preuve CYD
+à acquérir sur le nouveau HEAD, indépendamment des anciennes captures.

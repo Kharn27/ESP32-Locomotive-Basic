@@ -12,12 +12,12 @@
 - Le titre ON devient `ESP32 CYD 128K Microcomputer (v3)` à la demande
   du PO, sur la base de sa capture d'écran ; OFF conserve
   `Amstrad 128K Microcomputer (v3)` sans autre changement visuel.
-- Rangées **3, 5, 6, 9 et 12 sur la console ON** : la ligne
+- Rangées **3, 5, 6, 9 et 11 sur la console ON** : la ligne
   « and Locomotive Software Ltd. » suit immédiatement le copyright 1985
   et `BASIC 1.1` remonte d'une rangée après les retours du PO.
   **HW3 OFF conserve les rangées 3, 5, 7, 10, 12**, sans modification
   de sa mire historique. Copyright HW3 `0x7f`, `BASIC 1.1`, `Ready`
-  et curseur en (0,13) sans chevron.
+  et curseur en (0,12) sans chevron pour ON ; (0,13) pour OFF.
 - Le bandeau est dessiné par `cpc_video_put_cell()` dans les
   **16000 octets existants** de VRAM, après initialisation LCD/VRAM
   et avant la première invite UART. La première frappe commence à (0,13).
@@ -123,3 +123,14 @@ tactile, SD, Z80 et HW4-C3-B. Une seule PR, non fusionnée.
   ne pas réutiliser automatiquement l'ancien PASS pour le nouveau binaire.
 - Les résultats CI, l'empreinte de merge et les mémoires cibles sont à
   relever depuis les exécutions GitHub Actions sur le HEAD C1 exact.
+
+## Retouche finale `Ready` et intégration J1.10-A
+
+Après le retour visuel du PO, le bandeau ON place `Ready` à la rangée
+**11** (au lieu de 12), avec le curseur et la première saisie à (0,12).
+La ROM CPC/Caprice32 fournit des repères visuels mais aucune preuve scellée
+d'une position pixel-à-pixel de ce bandeau personnalisé. Les fonctions
+et la disposition historiques HW3 OFF sont inchangées (ligne Ready 12,
+curseur 13). Merge du `main` `c9ff43bd4a04d88fe3552a9398cefc0804651b83` et de l'oracle J1.10-A intact ;
+**59 suites CTest minimum** attendues OFF/ON, 3 images Xtensa,
+rétroéclairage inchangé. Preuve CYD obligatoire sur le HEAD final.

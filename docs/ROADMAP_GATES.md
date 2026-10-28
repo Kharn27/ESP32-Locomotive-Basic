@@ -433,6 +433,14 @@ Jalon développé séparément depuis le main `3e903147012aedca530c9367ce130f4f8
 [**HW4-C3-A #101**](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101) **autorisé** : réemployer le bandeau HW3 dans la console BASIC ON, compléter les U/W nécessaires, conserver variante HW3 OFF, vérifier Linux/CI et tester sur le CYD au SHA final. **HW4-C3-B non autorisé**. Tronc J1.9 reste parallèle et non touché.
 
 
+### J1.10-A — Oracle IF…THEN INTEGER (mandat #104, 28 octobre 2026)
+
+**Autorisé par Pilotage ; PR développeur [#105](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/105) ouverte, non fusionnée et soumise à revue.** Base `main` fusion J1.9-B `446b0a34e44fe8a744352ca56dde505efcc43959`. Première archive GHCR [#40602423356](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40602423356) : **14 cas IF A% THEN ligne**, chacun avec deux captures RAM pré-RUN et imprimante identiques, **7 explorations distinctes** non incluses dans B ; SHA manifeste originel `4439054c55c9422aba315c3e5e4cc4303c38b34c4b1f2f13ba56e60f69661796`. Les cas couvrent zéro/vrai, frontières INTEGER, saut avant/arrière, PRINT sauté, cible absente, END. Tokens observés `IF=A1`, `THEN=EB`, référence cible `1E` ; si cible prise absente `ERR=8 ERL=20`. [Rapport J1.10-A](J1.10-A-if-then-cpc-oracle.md). Scellement externe et réacquisition CI au HEAD final restent obligatoires avant remise ; `J1.10-B` **NON AUTORISÉE** ; HW4-C3 indépendant, aucun test CYD requis pour l'oracle.
+
+
+**Gates J1.10-A (révision de code `54bcd378`)** : [Linux 58/58 OFF et ON #40603448640](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448640), [oracle J1.10-A #40603448801](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448801) 14/14 doubles acquisitions RAM et imprimante exactes, six falsifications + faux HEAD rejetés, [trois images Xtensa J1.8-A #40603448623](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448623), [HW4-C1 #40603448633](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448633), [HW4-C2 #40603448674](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448674) et [CPC historique #40603448614](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448614) verts ; ***vérification du HEAD documentaire ultérieur obligatoire avant remise***. Aucun élargissement à J1.10-B ou HW4, `ON_DEVICE_UNVERIFIED`. [Rapport complet](J1.10-A-if-then-cpc-oracle.md).
+
+
 ## Gate HW4-C3-A — démarrage ESP32 CYD / BASIC 1.1
 
 Autorisation issue [#101](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101),
@@ -467,3 +475,9 @@ HW4-C3-B, éditeur #96 et couverture ASCII #97 restent non autorisés ici.
   ne pas réutiliser automatiquement l'ancien PASS pour le nouveau binaire.
 - Les résultats CI, l'empreinte de merge et les mémoires cibles sont à
   relever depuis les exécutions GitHub Actions sur le HEAD C1 exact.
+
+**Adaptation CYD demandée par le PO (28 octobre 2026)** : retour d'essai
+ciblé, `Ready` en rangée 11 (et curseur en 12), sous `BASIC 1.1`
+en rangée 9, crédits 5/6 ; seul le MODE console ON varie.
+HW3 OFF conserve 3/5/7/10/12. J1.10-A est intégré depuis `main`
+sans altérer son oracle. Nouvel essai PO impératif sur le HEAD final.

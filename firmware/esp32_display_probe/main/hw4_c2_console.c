@@ -322,7 +322,7 @@ void app_main(void)
     if(!cpc_boot_console(&s_text,true)) {
         (void)fail("BOOT_LAYOUT",-1); return;
     }
-    printf("HW4-C3-A BOOT_READY heading=ESP32_CYD input_col=0 input_row=13\n");
+    printf("HW4-C3-A BOOT_READY heading=ESP32_CYD input_col=0 input_row=12\n");
     if(!repaint_full()) return;
     if(bp_init(&s_basic.program,s_basic.bytes,sizeof(s_basic.bytes))!=BP_OK ||
        bvs_init(&s_basic.variables,s_basic.entries,VARIABLES_CAPACITY)!=BVS_OK ||

@@ -507,6 +507,15 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 reference.explicit_type != BVR_TYPE_INTEGER) {
                 return BL_BAD_SEQUENCE;
             }
+            /* Imported IF may omit lexical separators even though the
+             * token stream is executable. The BVR cache bytes at pos+1/2
+             * are opaque and never count as source spaces. */
+            if (pos == space_start) {
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) {
+                    return status;
+                }
+            }
             for (i = 0u; i < reference.name_length; ++i) {
                 status = append_byte(out,
                     (uint8_t)(body[reference.name_offset + i] & 0x7fu));
@@ -519,17 +528,29 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 return status;
             }
             pos = reference.reference_offset + reference.consumed;
+            space_start = pos;
             status = append_spaces(body, length, &pos, out);
             if (status != BL_OK) {
                 return status;
             }
-            if (pos == length || body[pos++] != 0xebu) {
+            if (pos == length || body[pos] != 0xebu) {
+                return BL_BAD_SEQUENCE;
+            }
+            if (pos == space_start) {
+                /* A%THEN would be parsed as an invalid variable suffix. */
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) {
+                    return status;
+                }
+            }
+            ++pos;
                 return BL_BAD_SEQUENCE;
             }
             status = append_word(out, "THEN");
             if (status != BL_OK) {
                 return status;
             }
+            space_start = pos;
             status = append_spaces(body, length, &pos, out);
             if (status != BL_OK) {
                 return status;
@@ -537,7 +558,17 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             if (pos == length) {
                 return BL_TRUNCATED;
             }
-            if (body[pos++] != 0x1eu) {
+            if (body[pos] != 0x1eu) {
+                return BL_BAD_SEQUENCE;
+            }
+            if (pos == space_start) {
+                /* THEN60 is not a retokenisable keyword + line literal. */
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) {
+                    return status;
+                }
+            }
+            ++pos;
                 return BL_BAD_SEQUENCE;
             }
             if (length - pos < 2u) {

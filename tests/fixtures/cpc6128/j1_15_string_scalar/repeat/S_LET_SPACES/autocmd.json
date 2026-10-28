@@ -1,0 +1,13 @@
+{
+  "commands": [
+    "10 LET A$ = \"ESPACES\"",
+    "20 PRINT A$",
+    "30 PRINT #8,A$",
+    "40 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "2a7de2f1b9fd4778a3957fb4b81d63a4f46fa5ad1d264f241e9ad9a8b0c5def6",
+  "list_requested": true
+}

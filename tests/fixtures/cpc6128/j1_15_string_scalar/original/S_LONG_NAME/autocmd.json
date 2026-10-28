@@ -1,0 +1,13 @@
+{
+  "commands": [
+    "10 MESSAGE$=\"NOM LONG\"",
+    "20 PRINT MESSAGE$",
+    "30 PRINT #8,MESSAGE$",
+    "40 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "67293ea295c761bbcb660981d1fc98a0c428384ff3016ac36ccbd3e97a1b14db",
+  "list_requested": true
+}

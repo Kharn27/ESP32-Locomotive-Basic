@@ -368,3 +368,5 @@ test physique du HEAD final par le PO.
   ne pas réutiliser automatiquement l'ancien PASS pour le nouveau binaire.
 - Les résultats CI, l'empreinte de merge et les mémoires cibles sont à
   relever depuis les exécutions GitHub Actions sur le HEAD C1 exact.
+
+- **J1.15-A** : caractérisation CPC ROM des variables STRING scalaires (sans code natif) — voir [protocole](docs/J1.15-A-string-scalar-cpc-oracle.md).

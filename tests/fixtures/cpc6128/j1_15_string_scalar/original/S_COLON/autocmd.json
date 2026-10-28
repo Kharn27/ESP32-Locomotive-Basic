@@ -1,0 +1,13 @@
+{
+  "commands": [
+    "10 A$=\"A:B:C\"",
+    "20 PRINT A$",
+    "30 PRINT #8,A$",
+    "40 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "55d69ebad5d410920fdc0cd18ec832e4329506224f42b524bcfde6fff102cc81",
+  "list_requested": true
+}

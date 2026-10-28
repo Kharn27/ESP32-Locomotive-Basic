@@ -82,3 +82,14 @@ jobs:
           else
             echo 'J1.14-A ORIGINAL_ARCHIVE_PENDING: no CPC proof claimed'
           fi
+
+      - name: J1.15-A independent scalar STRING CPC oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_15_string_scalar_verify.py --check-sources
+          if test -f tests/fixtures/cpc6128/j1_15_string_scalar/manifest.json; then
+            python3 tools/j1_15_string_scalar_verify.py --permanent --self-test
+          else
+            echo 'J1.15-A ORIGINAL_ARCHIVE_PENDING: no ROM proof claimed'
+          fi

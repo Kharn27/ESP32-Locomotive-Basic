@@ -719,6 +719,11 @@ static BEStatus execute_line(const BasicProgram *program,
             assignment->value = value;
             *next = line->next_offset;
             return BE_OK;
+        } else if (token == 0x9eu || token == 0xb0u) {
+            /* J1.12-B1 is token/LIST-only. Reject even after a PRINT
+             * prefix before either pass can commit output, cursor, store or
+             * GOSUB stack. J1.12-B2 owns loop execution semantics. */
+            return BE_UNSUPPORTED;
         } else if (token == 0xa7u || token == 0xb1u || token == 0xcau) {
             return BE_UNSUPPORTED; /* LIST, NEW, RUN in stored programs. */
         } else {

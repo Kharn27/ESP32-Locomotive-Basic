@@ -10,7 +10,7 @@ typedef struct {
 
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
-    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN
+    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT
 } BTStatement;
 
 typedef struct {
@@ -26,6 +26,8 @@ static const BTKeyword keywords[] = {
     {"RUN",   0xcau, ST_RUN},
     {"NEW",   0xb1u, ST_NEW},
     {"GOTO",  0xa0u, ST_GOTO},
+    {"FOR",   0x9eu, ST_FOR},
+    {"NEXT",  0xb0u, ST_NEXT},
     {"GOSUB", 0x9fu, ST_GOSUB},
     {"RETURN",0xc9u, ST_RETURN},
     {"IF",    0xa1u, ST_IF},
@@ -216,6 +218,44 @@ static BTStatus explicit_variable(const uint8_t *source, size_t length,
     }
     *index = end + 1u;
     return BT_OK;
+}
+
+
+/* J1.12-B1: literal INTEGER operands of FOR, TO and STEP only.
+ * The positive magnitude 32768 belongs to the exact CPC REAL5 -32768
+ * path, never to an unsigned host-only 16-bit token. */
+static BTStatus for_integer(const uint8_t *source, size_t length,
+                             size_t *index, BTEmitter *out)
+{
+    unsigned int number;
+    int negative = 0;
+    BTStatus status;
+    if (*index < length && source[*index] == (uint8_t)'-') {
+        negative = 1;
+        ++*index;
+        status = emit(out, 0xf5u);
+        if (status != BT_OK) return status;
+    }
+    status = decimal(source, length, index,
+                     negative ? 32768u : 32767u, &number);
+    if (status != BT_OK) return status;
+    if (number == 32768u) {
+        static const uint8_t real5[] = {0u, 0u, 0u, 0u, 0x90u};
+        size_t i;
+        status = emit(out, 0x1fu);
+        for (i = 0u; status == BT_OK && i < sizeof(real5); ++i)
+            status = emit(out, real5[i]);
+    } else if (number < 10u) {
+        status = emit(out, (uint8_t)(0x0eu + number));
+    } else if (number <= 255u) {
+        status = emit(out, 0x19u);
+        if (status == BT_OK) status = emit(out, (uint8_t)number);
+    } else {
+        status = emit(out, 0x1au);
+        if (status == BT_OK) status = emit(out, (uint8_t)(number & 0xffu));
+        if (status == BT_OK) status = emit(out, (uint8_t)(number >> 8));
+    }
+    return status;
 }
 
 static BTStatus one_pass(const uint8_t *source, size_t length,
@@ -453,6 +493,42 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                     }
                 }
             }
+        } else if (statement == ST_FOR) {
+            /* No runtime or loop stack is installed by B1. Preserve lexical
+             * spaces and use the shared explicit INTEGER BVR cache convention. */
+            if (index == length || !ascii_letter(source[index]))
+                return BT_UNSUPPORTED_CONSTRUCT;
+            status = explicit_variable(source, length, &index, out,
+                                       BVR_TYPE_INTEGER);
+            if (status == BT_OK) status = spaces(source, length, &index, out);
+            if (status != BT_OK) return status;
+            if (index == length || source[index] != (uint8_t)'=')
+                return BT_UNSUPPORTED_CONSTRUCT;
+            ++index;
+            status = emit(out, 0xefu);
+            if (status == BT_OK) status = spaces(source, length, &index, out);
+            if (status == BT_OK) status = for_integer(source, length, &index, out);
+            if (status == BT_OK) status = spaces(source, length, &index, out);
+            if (status != BT_OK) return status;
+            if (!keyword_matches(source, length, index, "TO", &count))
+                return BT_UNSUPPORTED_CONSTRUCT;
+            index += count;
+            status = emit(out, 0xecu);
+            if (status == BT_OK) status = spaces(source, length, &index, out);
+            if (status == BT_OK) status = for_integer(source, length, &index, out);
+            if (status == BT_OK) status = spaces(source, length, &index, out);
+            if (status != BT_OK) return status;
+            if (keyword_matches(source, length, index, "STEP", &count)) {
+                index += count;
+                status = emit(out, 0xe6u);
+                if (status == BT_OK) status = spaces(source, length, &index, out);
+                if (status == BT_OK) status = for_integer(source, length, &index, out);
+            }
+        } else if (statement == ST_NEXT) {
+            /* NEXT without variable is a separate, observed CPC form. */
+            if (index < length && ascii_letter(source[index]))
+                status = explicit_variable(source, length, &index, out,
+                                           BVR_TYPE_INTEGER);
         } else if (statement == ST_IF) {
             unsigned int line;
             if (index == length || !ascii_letter(source[index])) {

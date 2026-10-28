@@ -15,12 +15,16 @@ def main():
     exe, prefix = sys.argv[1:]
     for repeat in range(2):
         subprocess.run([exe, prefix], check=True)
+        observed = []
         for mode, target in enumerate(EXPECTED):
             image = Path(f'{prefix}-mode{mode}.ppm').read_bytes()
             assert image.startswith(b'P6\n320 240\n255\n')
             assert len(image) == len(b'P6\n320 240\n255\n') + 320*240*3
             result = hashlib.sha256(image).hexdigest()
-            assert result == target, (mode, repeat, result, target)
+            observed.append(result)
+        # Fail closed, but report all three real image hashes for deliberate
+        # re-sealing after C1's intended visual cursor inversion.
+        assert tuple(observed) == EXPECTED, (repeat, tuple(observed), EXPECTED)
     print('HW4-A three-mode PPM deterministic sha256 PASS')
 
 if __name__ == '__main__':

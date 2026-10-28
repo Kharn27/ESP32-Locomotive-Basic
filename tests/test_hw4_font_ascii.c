@@ -45,7 +45,9 @@ static void check_canaries(void)
 }
 static void start_video(void)
 {
-    memset(&guard, 0xa5, sizeof guard);
+    memset(&guard, 0, sizeof guard);
+    memset(guard.before, 0xa5, sizeof guard.before);
+    memset(guard.after, 0x5a, sizeof guard.after);
     assert(cpc_video_init(&video,guard.vram,sizeof guard.vram,CPC_MODE_1));
     assert(cpc_video_set_ink(&video,0U,1U));
     assert(cpc_video_set_ink(&video,1U,24U));

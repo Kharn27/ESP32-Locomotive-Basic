@@ -1,7 +1,7 @@
 /*
  * HW4-C2: real user-submitted native Locomotive BASIC via UART0 -> CPC TFT.
  * One app_main owns UART intake, BASIC session, CpcText, video and LCD DMA.
- * Not a CPC boot, scrolling screen, Z80 interpreter or second SPI driver.
+ * Native MODE1 scroll added in HW4-C3-B2; no Z80 or second SPI driver.
  */
 #include "basic_session_runtime.h"
 #include "basic_variable_store.h"
@@ -50,7 +50,7 @@ static CpcVideo s_video;
 static CpcText s_text;
 static UartLine s_line;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
-static unsigned s_screen_pages;
+static size_t s_scroll_reported;
 
 /* Extend the existing ORIGINAL HW3 font for visible serial syntax.
  * Missing glyphs remain an explicitly provisional display limitation. */
@@ -126,13 +126,30 @@ static bool repaint_full(void)
     (void)cpc_video_take_dirty(&s_video);
     return true;
 }
+static bool send_dirty_band(void *context, unsigned row)
+{
+    (void)context;
+    return row<CPC_ROWS &&
+           render_band(CPC_VIDEO_VIEW_TOP+row*LCD_ROWS_PER_BAND);
+}
 static bool repaint_dirty(void)
 {
-    uint32_t mask=cpc_video_take_dirty(&s_video);
-    for(unsigned i=0;i<CPC_ROWS;++i)
-        if((mask & (UINT32_C(1)<<i))!=0U &&
-           !render_band(CPC_VIDEO_VIEW_TOP+i*LCD_ROWS_PER_BAND))
+    if(!cpc_video_flush_dirty(&s_video,send_dirty_band,NULL)) {
+        /* Failed and not-yet-sent bands were restored by CpcVideo.
+         * Exactly one bounded retry, never an infinite loop. */
+        printf("HW4-C3-B2 LCD_DMA_RETRY pending=0x%08x\n",
+               (unsigned)s_video.dirty_bands);
+        if(!cpc_video_flush_dirty(&s_video,send_dirty_band,NULL))
             return false;
+    }
+    if(s_text.scrolls<s_scroll_reported) s_scroll_reported=0U; /* !CLS */
+    if(s_text.scrolls>s_scroll_reported) {
+        printf("HW4-C3-B2 SCREEN_SCROLL rows=%u total=%u "
+               "policy=mode1_vram program_preserved=1\n",
+               (unsigned)(s_text.scrolls-s_scroll_reported),
+               (unsigned)s_text.scrolls);
+        s_scroll_reported=s_text.scrolls;
+    }
     return true;
 }
 static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
@@ -145,8 +162,8 @@ static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
     if(!cpc_text_write(&s_text,data,size))
         return fail("TEXT_ADAPTER",-1);
     if(s_text.bytes_clipped>clipped_before)
-        printf("HW4-C2 SCREEN_FULL_OUTPUT_CLIPPED bytes=%u "
-               "policy=next_prompt_paginates\n",
+        printf("HW4-C3-B2 SCREEN_OUTPUT_CLIPPED bytes=%u "
+               "policy=unexpected_clip\\n",
                (unsigned)(s_text.bytes_clipped-clipped_before));
     return repaint_dirty();
 }
@@ -162,15 +179,10 @@ static bool prompt(void)
     bool cleared=false;
     if(!cpc_uart_console_prompt(&s_text,&cleared))
         return fail("CONSOLE_PROMPT",-1);
-    if(cleared) {
-        ++s_screen_pages;
-        printf("HW4-C2 SCREEN_PAGE_RESET count=%u "
-               "reason=no_room_for_120_byte_input program_preserved=1\n",
-               s_screen_pages);
-    }
+    if(cleared) return fail("UNEXPECTED_AUTO_CLEAR",-1);
     if(!repaint_dirty()) return false;
-    printf("HW4-C2 INPUT_READY capacity=%u screen_row=%u "
-           "policy=auto_page_non_cpc\n",UART_LINE_CAPACITY,s_text.row);
+    printf("HW4-C3-B2 INPUT_READY capacity=%u screen_row=%u "
+           "policy=mode1_scroll\\n",UART_LINE_CAPACITY,s_text.row);
     return true;
 }
 static bool basic_submit(const uint8_t *source,size_t length)
@@ -260,6 +272,7 @@ static bool execute_line(void)
         printf("HW4-C2 DIAGNOSTIC_SCREEN_CLEAR source=!CLS "
                "program_preserved=1\n");
         if(!cpc_uart_console_clear(&s_text) || !repaint_dirty()) return false;
+        s_scroll_reported=0U;
     } else if(is_command(source,length,"!DEMO")) {
         if(!diagnostic_demo()) return false;
     } else {

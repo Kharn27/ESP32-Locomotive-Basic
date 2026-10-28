@@ -542,6 +542,44 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (status != BT_OK) {
                 return status;
             }
+            /* J1.13-B: longest symbols before prefixes, IF-only. */
+            if (index < length &&
+                (source[index] == (uint8_t)'<' ||
+                 source[index] == (uint8_t)'>' ||
+                 source[index] == (uint8_t)'=')) {
+                uint8_t relation;
+                uint8_t first = source[index++];
+                if (first == (uint8_t)'<' && index < length &&
+                    source[index] == (uint8_t)'>') {
+                    relation = 0xf2u; /* <> */
+                    ++index;
+                } else if (first == (uint8_t)'<' && index < length &&
+                           source[index] == (uint8_t)'=') {
+                    relation = 0xf3u; /* <= */
+                    ++index;
+                } else if (first == (uint8_t)'>' && index < length &&
+                           source[index] == (uint8_t)'=') {
+                    relation = 0xf0u; /* >= */
+                    ++index;
+                } else if (first == (uint8_t)'<') {
+                    relation = 0xf1u;
+                } else if (first == (uint8_t)'>') {
+                    relation = 0xeeu;
+                } else {
+                    relation = 0xefu;
+                }
+                status = emit(out, relation);
+                if (status == BT_OK)
+                    status = spaces(source, length, &index, out);
+                if (status != BT_OK) return status;
+                if (index == length || !ascii_letter(source[index]))
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                status = explicit_variable(source, length, &index, out,
+                                           BVR_TYPE_INTEGER);
+                if (status == BT_OK)
+                    status = spaces(source, length, &index, out);
+                if (status != BT_OK) return status;
+            }
             if (!keyword_matches(source, length, index, "THEN", &count)) {
                 return BT_UNSUPPORTED_CONSTRUCT;
             }

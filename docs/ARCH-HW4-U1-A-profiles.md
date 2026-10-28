@@ -37,7 +37,21 @@ Compatibilité historique : `-DHW4_C2_CONSOLE=ON` sélectionne `CONSOLE` ; `OFF`
 | HW3 `HW4_C2_CONSOLE=OFF` | 82 878 | 67 279 | 31 520 | 208 753 |
 | `firmware/esp32_probe` autonome | 74 990 | 51 807 | 31 020 | 166 477 |
 
-Les nouvelles variantes doivent être mesurées **dans la même matrice U1-A**, avec comparaison au témoin ancien sur la même branche et aux chiffres ci-dessus. Un écart de **plus de 2 048 octets DRAM ou IRAM console** bloque la livraison sans nouvel arbitrage Pilotage. Les ELF/BIN ne sont **pas** supposés identiques bit à bit si chemins de liaison et descripteurs diffèrent.
+### Résultats mesurés des trois profils sous la racine unique
+
+[CI U1-A sur le HEAD `77dfd00256750d85ab430bdc31e1ae39a9826932`](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40775283943), job `u1-a-profile-parity` **SUCCESS**, artefact `arch-hw4-u1-a-profile-parity` : ELF/BIN réellement construits en ESP-IDF v5.5.6 avec `LOCO_CYD_PROFILE`. Trois `app_main` uniques (une par ELF) et appdesc SHA `77dfd00` vérifiés. Résultats exacts de `idf.py size` :
+
+| Nouveau profil (un seul projet) | Flash Code | IRAM | DRAM | Image ESP-IDF | Δ DRAM/IRAM vs ancien |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `CONSOLE` | 111 082 | 67 279 | 49 368 | 237 533 | **0 / 0 o** |
+| `HW3` | 82 878 | 67 279 | 31 520 | 208 753 | **0 / 0 o** |
+| `BASIC_PROBE` | 74 990 | 51 807 | 31 020 | 166 477 | **0 / 0 o** |
+
+La taille liée de `libloco_core.a` mesurée dans `size-components` est de **25 077 o** en `CONSOLE` et **25 169 o** en `BASIC_PROBE`, identiques aux témoins historiques de la même base ; le graphe HW3 ne l'inclut pas dans ses composants liés si aucun symbole n'est requis. En `BASIC_PROBE`, `report_abi.py` retrouve les 16 champs de l'ancienne sonde **octet pour octet**, dont `LocoProbeStorage=19072`, `core_descriptor_bytes=636` et `owned_buffers_and_entries_bytes=18432`. Un **quatrième build** du projet historique `firmware/esp32_probe` est passé, avec comparaison ABI `cmp` exacte et vérification de partition.
+
+**Sélection : 15/15 cas positif/négatif PASS**, 0/2 `app_main` synthétiques rejetés, et refus CMake réel d'un profil invalide et d'une collision `HW3/ON`. L'appdesc exact est vérifié pour les trois nouveaux profils ; `po-standard-build` **SUCCESS** dans le cache habituel `build/` pour la transition main → branche, sans `fullclean`. `CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144` demeure strictement inchangé en CONSOLE ; le BASIC autonome historique conserve sa configuration de pile de 4096. Aucune prétention d'identité SHA binaire inter-projets : les faits sont les tailles, ABI, partitions et comportements couverts.
+
+Ces chiffres sont une preuve de build, **pas un test physique** de la console sur le SHA U1-A. Un écart de **plus de 2 048 octets DRAM ou IRAM console** bloque toute fusion sans arbitrage Pilotage ; ici les deux écarts valent **zéro**.
 
 ## Portes de preuve
 

@@ -79,25 +79,32 @@ static void ansi_screen_sync(void) {
     assert(line.length==3U && t.column==3U);
     assert(cpc_video_get(&v,2U*8U,0U,&p) && p==1U); /* C */
     assert(cpc_video_get(&v,3U*8U,0U,&p) && p==0U); /* no prompt glyph */
-    const uint8_t ansi[]={0x1bU,'[','3','~'};
-    for(size_t i=0;i<3U;++i) {
+    /* Move under C and delete forward; unlike legacy tail-delete. */
+    assert(uart_line_feed(&line,0x1bU)==UART_LINE_IGNORED);
+    assert(uart_line_feed(&line,'[')==UART_LINE_IGNORED);
+    assert(uart_line_feed(&line,'D')==UART_LINE_LEFT);
+    CpcUartEditor edit;
+    /* This older test uses tail-only drawing: we position the live view
+     * explicitly at its current end, then check the new editor below. */
+    assert(cpc_uart_console_edit_begin(&t,&edit));
+    /* The editor anchor belongs at column zero, not the tail of ABC. */
+    edit.row=0U; edit.column=0U; edit.painted=3U;
+    assert(cpc_uart_console_edit(&t,&edit,&line,line.length));
+    static const uint8_t ansi[]={0x1bU,'[','3','~'};
+    for(size_t i=0;i<3U;++i)
         assert(uart_line_feed(&line,ansi[i])==UART_LINE_IGNORED);
-        assert(t.column==3U && line.length==3U);
-        assert(cpc_video_get(&v,2U*8U,0U,&p) && p==1U);
-    }
-    assert(uart_line_feed(&line,ansi[3U])==UART_LINE_DELETE);
-    assert(cpc_uart_console_backspace(&t));
+    assert(uart_line_feed(&line,ansi[3U])==UART_LINE_DELETE_FORWARD);
+    assert(cpc_uart_console_edit(&t,&edit,&line,line.cursor_pos));
     assert(t.column==2U && line.length==2U);
     assert(memcmp(line.data,"AB",2U)==0);
-    assert(cpc_video_get(&v,2U*8U,0U,&p) && p==0U); /* C erased */
-    assert(cpc_video_get(&v,1U*8U,0U,&p) && p==1U); /* B retained */
+    assert(cpc_video_get(&v,2U*8U,0U,&p) && p==0U);
     static const uint8_t unknown[]={0x1bU,'[','1',';','2','D'};
     for(size_t i=0;i<sizeof(unknown);++i)
         assert(uart_line_feed(&line,unknown[i])==UART_LINE_IGNORED);
-    assert(line.length==2U && t.column==2U);
-    assert(cpc_video_get(&v,1U*8U,0U,&p) && p==1U);
+    assert(line.length==2U && line.cursor_pos==2U);
+    /* Move back to delete B using Backspace; source/VRAM agree. */
     assert(uart_line_feed(&line,0x08U)==UART_LINE_DELETE);
-    assert(cpc_uart_console_backspace(&t));
+    assert(cpc_uart_console_edit(&t,&edit,&line,line.cursor_pos));
     assert(t.column==1U && line.length==1U && line.data[0]=='A');
     assert(cpc_video_get(&v,1U*8U,0U,&p) && p==0U);
     assert(cpc_video_get(&v,0U,0U,&p) && p==1U);

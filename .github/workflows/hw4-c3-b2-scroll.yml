@@ -9,6 +9,9 @@ on:
       - 'io/cpc_uart_console.c'
       - 'io/cpc_uart_console.h'
       - 'firmware/esp32_display_probe/main/hw4_c2_console.c'
+      # Changing the ESP-IDF main/profile selector can change the linked screen path.
+      - 'firmware/esp32_display_probe/CMakeLists.txt'
+      - 'firmware/esp32_display_probe/main/CMakeLists.txt'
       - 'tests/test_hw4_c3_b2_scroll.c'
       - 'tests/test_hw4_c3_b2_c1_batch.c'
       - 'tests/test_cpc_text.c'

@@ -642,3 +642,8 @@ J1.10-B-C1 accepté/fusionné dans `main` par le Pilotage au squash `d7a29128363
 ### J1.13-B — IF INTEGER relationnel natif, PR en revue (28 octobre 2026)
 
 Mandat strict [#132](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/132), base `main@b91b33adf97aa54a9491b0e05587be02695647ef`. [PR #133](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/133) **ouverte, non fusionnée, en revue Pilotage** : six relations signées dans `IF A% op B% THEN ligne`, deux références INTEGER explicites, tokens, LIST, atomicité et comportement ancien préservés. Deux portes CTest ajoutées, suite native et différentiel 24 archives CPC immuables. Matrice/provenance : [rapport J1.13-B](J1.13-B-integer-relational-if-native.md). Résultats CI et métriques à vérifier sur le dernier SHA de la PR ; les précédentes classifications pré-B `UNSUPPORTED` sont conservées. `ON_DEVICE_UNVERIFIED`. Aucune autorisation de jalon suivant.
+
+
+### HW4-EDIT-P1 — MODE1 E2 sémantique (28 octobre 2026 ; en développement/revue)
+
+Mission autorisée : [#136](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/136) ; base `main@ab55ec8e15fcffabb63529c4b063ffb27bfb7833` ; PR de livraison [#137](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/137). Ajout proposé d'une grille vidéo MODE1 de 1 000 caractères + 125 octets de validité, exclusivement interrogeable sans effets de bord ; dessin, pixels graphiques, scroll et clear synchronisés. Voir [rapport de contrat P1](HW4-EDIT-P1-mode1-semantic-cells.md). **Statut provisoire : CI/XTENSA à constater sur HEAD final, ON_DEVICE_UNVERIFIED, non accepté/non fusionné.** B1/COPY et navigation plein écran restent **NON AUTORISÉS** ; aucune nouvelle observation CPC historique n'est revendiquée.

@@ -12,6 +12,7 @@ typedef enum {
     BL_ST_PRINT,
     BL_ST_GOTO,
     BL_ST_ASSIGN,
+    BL_ST_IF,
     BL_ST_EMPTY
 } BLStatement;
 
@@ -148,6 +149,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0xa5u: statement = BL_ST_ASSIGN; status = append_word(out, "LET"); break;
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
         case 0xa0u: statement = BL_ST_GOTO; status = append_word(out, "GOTO"); break;
+        case 0xa1u: statement = BL_ST_IF; status = append_word(out, "IF"); break;
         case 0x98u: status = append_word(out, "END"); break;
         case 0xa7u: status = append_word(out, "LIST"); break;
         case 0xcau: status = append_word(out, "RUN"); break;
@@ -483,6 +485,69 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             if (status != BL_OK) {
                 return status;
             }
+        } else if (statement == BL_ST_IF) {
+            BasicVariableRef reference;
+            BVRStatus decoded;
+            size_t i;
+            unsigned int line;
+            if (pos == length) {
+                return BL_TRUNCATED;
+            }
+            decoded = bvr_decode(body, length, pos, &reference);
+            if (decoded == BVR_TRUNCATED) {
+                return BL_TRUNCATED;
+            }
+            if (decoded != BVR_OK ||
+                reference.family != BVR_FAMILY_EXPLICIT ||
+                reference.explicit_type != BVR_TYPE_INTEGER) {
+                return BL_BAD_SEQUENCE;
+            }
+            for (i = 0u; i < reference.name_length; ++i) {
+                status = append_byte(out,
+                    (uint8_t)(body[reference.name_offset + i] & 0x7fu));
+                if (status != BL_OK) {
+                    return status;
+                }
+            }
+            status = append_byte(out, (uint8_t)'%');
+            if (status != BL_OK) {
+                return status;
+            }
+            pos = reference.reference_offset + reference.consumed;
+            status = append_spaces(body, length, &pos, out);
+            if (status != BL_OK) {
+                return status;
+            }
+            if (pos == length || body[pos++] != 0xebu) {
+                return BL_BAD_SEQUENCE;
+            }
+            status = append_word(out, "THEN");
+            if (status != BL_OK) {
+                return status;
+            }
+            status = append_spaces(body, length, &pos, out);
+            if (status != BL_OK) {
+                return status;
+            }
+            if (pos == length) {
+                return BL_TRUNCATED;
+            }
+            if (body[pos++] != 0x1eu) {
+                return BL_BAD_SEQUENCE;
+            }
+            if (length - pos < 2u) {
+                return BL_TRUNCATED;
+            }
+            line = (unsigned int)body[pos] |
+                   ((unsigned int)body[pos + 1u] << 8);
+            pos += 2u;
+            if (line == 0u) {
+                return BL_BAD_SEQUENCE;
+            }
+            status = append_decimal(out, line);
+            if (status != BL_OK) {
+                return status;
+            }
         } else if (statement == BL_ST_GOTO) {
             unsigned int line;
             if (pos == length || body[pos] == 0x01u) {
@@ -509,6 +574,9 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         status = append_spaces(body, length, &pos, out);
         if (status != BL_OK || pos == length) {
             return status;
+        }
+        if (statement == BL_ST_IF) {
+            return BL_BAD_SEQUENCE; /* No suffix or colon. */
         }
         if (body[pos] != 0x01u) {
             return body[pos] >= 0x80u || (body[pos] >= 0x0eu && body[pos] <= 0x1fu)

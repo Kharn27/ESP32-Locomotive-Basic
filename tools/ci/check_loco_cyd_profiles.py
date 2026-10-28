@@ -12,7 +12,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SELECTOR = ROOT / "firmware" / "esp32_display_probe" / "profile_select.cmake"
-APP_MAIN = re.compile(r"^\\S+ [TW] app_main$", re.MULTILINE)
+APP_MAIN = re.compile(r"^\S+ [TW] app_main$", re.MULTILINE)
 
 
 def count_app_main(nm_output: str) -> int:
@@ -34,11 +34,11 @@ def cmake_case(label: str, args: list[str], valid: bool, profile: str = "") -> N
     output = completed.stdout
     if valid:
         if completed.returncode or f"LOCO_CYD_SELECTED={profile} " not in output:
-            raise AssertionError(f"{label}: expected {profile}, got:\\n{output}")
+            raise AssertionError(f"{label}: expected {profile}, got:\n{output}")
     elif completed.returncode == 0 or not (
         "U1-A invalid" in output or "U1-A conflicting selectors" in output
     ):
-        raise AssertionError(f"{label}: fail-closed selection missing:\\n{output}")
+        raise AssertionError(f"{label}: fail-closed selection missing:\n{output}")
     print(f"U1-A SELECTOR_{label}=PASS")
 
 
@@ -66,14 +66,14 @@ def self_test() -> None:
         cmake_case(label, args, True, profile)
     for label, args in invalid:
         cmake_case(label, args, False)
-    for nm in ["", "00000000 T app_main\\n00000010 T app_main\\n"]:
+    for nm in ["", "00000000 T app_main\n00000010 T app_main\n"]:
         try:
             check_one_app_main(nm)
         except AssertionError:
             pass
         else:
             raise AssertionError("Duplicate/missing app_main escaped the test")
-    check_one_app_main("00000000 T app_main\\n")
+    check_one_app_main("00000000 T app_main\n")
     print("U1-A DOUBLE_APP_MAIN_REJECTED=PASS")
     print(f"U1-A SELECTOR_MATRIX={len(valid) + len(invalid)}/"
           f"{len(valid) + len(invalid)} PASS")

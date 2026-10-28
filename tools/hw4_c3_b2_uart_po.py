@@ -27,8 +27,21 @@ def main():
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--log", type=Path, help="UART diagnostics captured during run")
     parser.add_argument("--dry-run", action="store_true", help="print commands only")
+    parser.add_argument("--analyze-log", type=Path, help="read existing C1 UART telemetry offline, no serial port")
     args = parser.parse_args()
     plan = commands()
+    if args.analyze_log:
+        # Analysis never opens the CYD. Read telemetry from a previous capture.
+        raw = args.analyze_log.read_bytes().decode("utf-8", errors="replace")
+        rows = [line.strip() for line in raw.splitlines()
+                if "HW4-C3-B2-C1 LCD_METRICS " in line]
+        if not rows:
+            parser.error("no B2-C1 LCD_METRICS in log (wrong firmware or empty capture)")
+        for index in (0, len(rows) - 1):
+            if index == 0 or len(rows) > 1:
+                print(("FIRST: " if index == 0 else "LAST: ") + rows[index])
+        print("These are cumulative device measurements, not a PO visual PASS.")
+        return
     if args.dry_run:
         for source, delay in plan:
             print(f"{source}  # wait {delay:g}s")

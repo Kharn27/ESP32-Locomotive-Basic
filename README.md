@@ -71,14 +71,16 @@ L’écran 320 × 240 de la CYD n’est pas un écran CPC d’origine : les mode
 Les **quatre B1 historiquement UNSUPPORTED** et les **18 LIST/RUN historiques UNVERIFIED** restent documentés comme observations à leur date, sans réécriture rétroactive. Voir [PROJECT_STATUS](docs/PROJECT_STATUS.md), [ROADMAP_GATES](docs/ROADMAP_GATES.md) et le [protocole J1.3-A](docs/J1.3-A-integer-subtraction-oracle.md).
 
 
-## Profils ESP-IDF dans le projet CYD existant (U1-A en revue)
+## Profils ESP-IDF dans le projet CYD existant (U1-B en revue)
 
-La [mission ARCH-HW4-U1-A #140](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/140) conserve **`firmware/esp32_display_probe/` comme projet VS Code canonique**. Son Build standard (`idf.py build`, répertoire `build/`) sélectionne **`CONSOLE`** sans option. Les diagnostics `HW3` (modes écran) et `BASIC_PROBE` (ABI et limites INTEGER) peuvent être construits à partir de la **même racine** avec `-DLOCO_CYD_PROFILE=HW3` ou `BASIC_PROBE` dans des caches dédiés. L'ancienne option `HW4_C2_CONSOLE=ON/OFF` reste compatible. La sonde `firmware/esp32_probe/` n'est **pas supprimée** (rollback). [Contrat et matrice de tests](docs/ARCH-HW4-U1-A-profiles.md). Cette architecture n'est pas encore fusionnée ; **U1-B non autorisé**.
+**Projet VS Code unique et inchangé :** `firmware/esp32_display_probe/` (`project(loco_esp32_display_probe)`). Un `idf.py build` sans option, dans le **même `build/`**, produit la console `CONSOLE` par défaut ; aucun `fullclean`, nouveau workspace ou `-B` n'est demandé au PO. `LOCO_CYD_PROFILE=HW3` ou `BASIC_PROBE` sélectionne les diagnostics dans des caches CI dédiés ; l'alias historique `HW4_C2_CONSOLE=ON/OFF` reste compatible. Les mélanges contradictoires échouent explicitement.
+
+**U1-A [#140](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/140) / [PR #141](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/141) est fusionné.** Le mandat [U1-B #142](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/142) retire la deuxième racine ESP-IDF historique : la sonde d'origine est déplacée sans changement dans `firmware/esp32_display_probe/main/basic_probe.c`, le composant C99 dans `firmware/components/loco_core`, les outils dans `tools/ci`. Le pilote LCD/DMA unique reste `firmware/components/cyd_ili9341`. La PR U1-B demeure **soumise à validation CI et nouveau test physique PO** avant décision de fusion par Pilotage. Voir [rapport U1-B](docs/ARCH-HW4-U1-B-retirement.md) et [archive U1-A](docs/ARCH-HW4-U1-A-profiles.md).
 
 ## Sonde ESP-IDF J0.25 — exécutée sur CYD physique
 
 La [PR #44](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/44)
-a été **acceptée et fusionnée** (squash `865a4cd1`). Elle introduit un projet distinct `firmware/esp32_probe/` pour la **première
+a été **acceptée et fusionnée** (squash `865a4cd1`). Historiquement, elle introduisait le projet désormais retiré `firmware/esp32_probe/` pour la **première
 compilation croisée Xtensa du cœur C99 réel** sur ESP32 classique,
 Flash 4 Mo, sans PSRAM et sans périphériques. Le scénario
 `A%=2; B%=A%+3; PRINT B%; END` utilise les API du cœur, et non une
@@ -93,7 +95,10 @@ Voir [J0.25](docs/J0.25-esp32-xtensa-feasibility.md). **Cette sonde a également
 ```text
 core/                 # Bibliothèques du cœur BASIC, indépendantes du matériel
 host/                 # Console Linux native (outil de développement J0.9)
-firmware/esp32_probe/ # Sonde ESP-IDF Xtensa native (J0.25 acceptée)
+firmware/esp32_display_probe/ # Unique projet ESP-IDF CYD : CONSOLE/HW3/BASIC_PROBE
+firmware/components/loco_core/ # Descripteur ESP-IDF des dix sources C99 core/
+firmware/components/cyd_ili9341/ # Pilote LCD/DMA partagé
+# firmware/esp32_probe/ : ancien chemin retiré par U1-B (archives conservées)
 tests/                # Tests unitaires et d'intégration CTest
 docs/                 # Spécifications, validations, décisions et suivi
 CMakeLists.txt        # Construction C99 et CTest sur Linux

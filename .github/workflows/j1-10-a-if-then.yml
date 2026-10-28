@@ -211,7 +211,8 @@ jobs:
             ctest --test-dir "$RUNNER_TEMP/j111-c99" --output-on-failure
           else
             ctest --test-dir "$RUNNER_TEMP/j111-c99" --output-on-failure \
-              -E '^j1_11_a_gosub_return_cpc_permanent
+              -E '^j1_11_a_gosub_return_cpc_permanent$'
+          fi
           python3 tools/j1_9_binary_family_verify.py --permanent --self-test
           python3 tools/j1_9_b_native_verify.py --cli "$RUNNER_TEMP/j111-c99/loco_basic_cli" \
             --image-cli "$RUNNER_TEMP/j111-c99/basic_program_image_cli" --self-test

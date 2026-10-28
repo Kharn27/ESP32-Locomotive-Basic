@@ -60,7 +60,29 @@ Références API vérifiables : exécutions `40612187487`, `40612187453`, `40612
 - CI-XTENSA : [build des 3 images et contrôles ABI réussis, JOB FAIL](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40618372772). Cause précise : refus de permission `tee` lors de l'écriture d'un rapport supplémentaire dans un dossier créé par Docker root ; correction du rapport déplacée vers la sortie du job et la preuve du SHA vers le checkout explicite. Cette phase ne constitue PAS une CI verte.
 - J1.11-A : anomalie de YAML doublé préexistante restaurée, validité du workflow à confirmer via Actions.
 
-**Mesure finale post-consolidation :** à compléter par le verdict effectif des Actions pour le HEAD final de la PR. Ne pas confondre l'économie projetée (7 jobs de domaine, plus éventuel oracle isolé) avec la baisse mesurée réelle. Avant d'affirmer un gain de 35–40 %, consulter les dates `started_at`/`completed_at` et les runs GitHub du même commit ; comparer au HEAD #107 en distinguant les déclenchements différents (CI-OPT1 YAML-only versus PR C99 qui touche `core/`).
+**Mesure effective post-consolidation (GitHub API, HEAD 9718be1764c25f180445828665330d03515e9a75, 28 octobre 2026 02:07–02:11 UTC) :**
+
+| Mesure | Baseline #107 | CI-OPT1 #116 | Différence |
+|---|---:|---:|---:|
+| Jobs réellement exécutés | 28 | **8** | **-71,4 %** |
+| Minutes-jobs cumulées (`completed_at-started_at`) | 25,53 | **7,05** | **-72,4 %** |
+| Latence jusqu'à la fin des runs (`run_started_at→updated_at`) | 7,07 min | **3,75 min** | **-47,0 %** |
+| Builds C99 complets sur PR comparable | 12 | **4** | **-66,7 %** |
+| Pipelines Xtensa complets redondants | 5 | **1** | **-80 %** |
+| Images Xtensa distinctes demandées | 3 | **3/3 SUCCESS** | **couverture conservée** |
+| Suites CTest distinctes (par configuration) | 62 | **62/62 dans chacune des 4 cellules** | **couverture conservée** |
+
+Les **8/8 jobs** sont SUCCESS sur le HEAD mesuré :
+- [CI-C99 — 4/4, 62 CTest par configuration + test standalone HW4-C3-B1](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40619094744) : 2,15 minutes-jobs.
+- [CI-CPC-PERMANENT](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40619094739) : 0,32 minute-job. Les logs incluent MANIFEST_MISMATCH, FILE_DIGEST_CHANGED et fausses empreintes SHA/HEAD explicitement rejetées, notamment 10 falsifications et faux HEAD J1.11-A.
+- [CI-ARCH](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40619094761) : 0,08 minute-job.
+- [CI-XTENSA](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40619094710) : 3,67 minutes-jobs ; commit PR explicitement vérifié ; 3 variantes physiques compilées, ABI et partition PASS, rapports/ELF/BIN en artefact.
+- [HW4-C3-B1 authentique CPC](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40619094764) : 0,83 minute-job ; cette acquisition était déclenchée par le changement de son YAML, sans réécriture de son corpus.
+
+**Méthode de mesure :** somme des durées des jobs non SKIPPED sur les cinq runs ci-dessus ; borne temporelle des runs de `02:07:42Z` à `02:11:27Z`. Jobs en parallèle, minutes-jobs ≠ wall-time et ≠ facture arrondie de runner. Les workflows d'acquisition déclenchés mais SKIPPED ne sont pas comptés comme des contrôles exécutés. La comparaison avec #107 est informative, mais les chemins modifiés diffèrent (code et oracles auparavant, fichiers CI ici) : les quatre nouveaux gates **sans path filter** assurent leur exécution sur une future PR `core/` également, tandis que `cpc-oracle.yml` continuera à ajouter sa propre exécution lorsque ses paths spécifiques sont touchés. La réduction observée satisfait l'objectif d'au moins 35–40 % dans cet échantillon, sans prétendre prédire la consommation de toute PR.
+
+**Barrière finale :** l'ajout de cette section de mesures constitue un commit documentaire ultérieur ; les quatre gates CI-OPT1 doivent **également** finir SUCCESS sur ce nouveau SHA avant remise finale. Ne jamais reprendre les réussites du SHA précédent comme résultats de HEAD final.
+
 
 ## 5. Intégration avec PR #115 et limites
 

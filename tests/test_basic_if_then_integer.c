@@ -268,8 +268,8 @@ static int imported_if_listing_roundtrip(void)
     for (cache = 0u; cache < 2u; ++cache) {
         for (mask = 0u; mask < 8u; ++mask) {
             uint8_t body[20], original[20], listed[80], tokens[80];
-            uint8_t full[160], before_full[160], output_snapshot[80];
-            char expected[80], expected_line[96];
+            uint8_t full[160], before_full[1024], output_snapshot[80];
+            char expected[80], expected_line[160];
             Harness h;
             BasicProgramLine dest;
             BasicProgram saved_program;
@@ -279,7 +279,7 @@ static int imported_if_listing_roundtrip(void)
             size_t full_n = 777u, expected_n, expected_full_n, i;
             int fmt, line_fmt;
             const char *first = (mask & 1u) != 0u ? "  " : " ";
-            const char *second = (mask & 2u) != 0u ? " " : " ";
+            const char *second = (mask & 2u) != 0u ? "  " : " ";
             const char *third = (mask & 4u) != 0u ? "   " : " ";
             /* Vary retained separators so C1 must preserve their actual
              * counts, not simply force one space everywhere. */
@@ -288,7 +288,8 @@ static int imported_if_listing_roundtrip(void)
             CHECK(fmt > 0 && (size_t)fmt < sizeof(expected));
             expected_n = (size_t)fmt;
             line_fmt = snprintf(expected_line, sizeof(expected_line),
-                                "20 %s\n", expected);
+                                "20 %s\n30 PRINT 31\n40 END\n"
+                                "60 PRINT 61\n70 END\n", expected);
             CHECK(line_fmt > 0 && (size_t)line_fmt < sizeof(expected_line));
             expected_full_n = (size_t)line_fmt;
 
@@ -302,6 +303,7 @@ static int imported_if_listing_roundtrip(void)
             body[n++] = cache != 0u ? 0xefu : 0x00u;
             body[n++] = 0xc1u;
             if ((mask & 2u) != 0u) {
+                body[n++] = (uint8_t)' ';
                 body[n++] = (uint8_t)' ';
             }
             body[n++] = 0xebu;
@@ -370,9 +372,15 @@ static int imported_if_listing_roundtrip(void)
             for (i = 0u; i < sizeof(full); ++i) {
                 CHECK(full[i] == 0x5cu);
             }
-            CHECK(bl_list_program(&h.program, full, sizeof(full),
+            CHECK(bl_list_program(&h.program, full, expected_full_n - 1u,
+                                  &full_n) == BL_NO_SPACE);
+            CHECK(full_n == 777u);
+            for (i = 0u; i < sizeof(full); ++i) {
+                CHECK(full[i] == 0x5cu);
+            }
+            CHECK(bl_list_program(&h.program, full, expected_full_n,
                                   &full_n) == BL_OK);
-            CHECK(full_n >= expected_full_n);
+            CHECK(full_n == expected_full_n);
             CHECK(memcmp(full, expected_line, expected_full_n) == 0);
             CHECK(memcmp(before_full, h.storage, sizeof(before_full)) == 0);
             CHECK(memcmp(&h.program, &saved_program, sizeof(saved_program)) == 0);

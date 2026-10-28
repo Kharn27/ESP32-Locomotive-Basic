@@ -552,3 +552,12 @@ Après fusion de [J1.9-B #102](https://github.com/Kharn27/ESP32-Locomotive-Basic
 
 
 **Gates J1.10-A (révision de code `54bcd378`)** : [Linux 58/58 OFF et ON #40603448640](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448640), [oracle J1.10-A #40603448801](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448801) 14/14 doubles acquisitions RAM et imprimante exactes, six falsifications + faux HEAD rejetés, [trois images Xtensa J1.8-A #40603448623](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448623), [HW4-C1 #40603448633](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448633), [HW4-C2 #40603448674](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448674) et [CPC historique #40603448614](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448614) verts ; ***vérification du HEAD documentaire ultérieur obligatoire avant remise***. Aucun élargissement à J1.10-B ou HW4, `ON_DEVICE_UNVERIFIED`. [Rapport complet](J1.10-A-if-then-cpc-oracle.md).
+
+
+### J1.10-B — implémentation native IF…THEN INTEGER (28 octobre 2026)
+
+Après décision Pilotage dans [issue #106](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/106), J1.10-A est accepté et fusionné sur main au squash c9ff43bd4a04d88fe3552a9398cefc0804651b83. J1.10-B est **autorisé** et traité dans [PR #107](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/107) sur branche feat/j1-10-b-native-if-then-integer, en revue développeur, **non fusionnée**.
+
+Périmètre proposé : IF variable% THEN ligne autonome ; tokenisation A1 / référence 02 avec cache opaque / EB / numéro 1E little-endian, LIST, RUN vrai/faux, cible absente prise BE_MISSING_TARGET sans mutation. Comparaison post-B séparée avec les 14 références CPC J1.10-A, adaptations PRINT #8 vers PRINT bornées aux constantes et aucune prétention d'identité RAM du programme entier. L'ancien statut pré-B 14/14 UNSUPPORTED reste historiquement inchangé. [Rapport technique](J1.10-B-if-then-integer-native.md).
+
+Les premières suites Linux sur la révision 34b14e470c27cb0028aae5572258ade1ac940b19 ont réussi 60/60 OFF et ON ; des contrôles additionnels et vérifications définitives au HEAD final demeurent nécessaires. Trois compilations Xtensa et budgets au HEAD final à confirmer ; pas de test physique CYD demandé, statut ON_DEVICE_UNVERIFIED. Aucune autorisation implicite de J1.10-C ou de nouvelles formes de contrôle de flux. Acceptation et fusion réservées au Pilotage.

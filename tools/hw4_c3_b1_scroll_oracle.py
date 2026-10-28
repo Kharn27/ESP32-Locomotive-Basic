@@ -36,10 +36,12 @@ CASES = {
     "wrap_80": (["10 REM " + "X" * 73], ["CLS", "LIST", END], 1),
     "wrap_120": (["10 REM " + "X" * 113], ["CLS", "LIST", END], 1),
     "input_after_list": (numbered(26), ["CLS", "LIST", DELAY, "PRINT 7", END], 1),
-    "cursor_edges": ([], ["CLS", "LOCATE 1,1", 'PRINT "FIRST";',
-                            "LOCATE 1,25", 'PRINT "LAST";', END], 1),
-    "cr_last_row": ([], ["CLS", "LOCATE 1,25",
-                         'PRINT "ABCDE";CHR$(13);"Z";', END], 1),
+    # Each LOCATE and PRINT must be parsed as ONE BASIC direct statement.
+    # Otherwise the intermediate Ready/scroll invalidates the row-25 probe.
+    "cursor_edges": ([], ["CLS", 'LOCATE 1,1:PRINT "FIRST";',
+                            'LOCATE 1,25:PRINT "LAST";', END], 1),
+    "cr_last_row": ([], ["CLS",
+                         'LOCATE 1,25:PRINT "ABCDE";CHR$(13);"Z";', END], 1),
     "repeat_list_once": (numbered(27), ["CLS", "LIST", END], 1),
     "repeat_list_twice": (numbered(27), ["CLS", "LIST", DELAY, "LIST", DELAY, 'PRINT "AFTER2"', END], 1),
     "new_after_list": (numbered(27), ["CLS", "LIST", DELAY, "NEW", DELAY, "LIST", END], 1),
@@ -73,7 +75,7 @@ def acquire(cap, out):
         "acquired_at_utc": datetime.now(timezone.utc).isoformat(),
         "github_run_id": os.getenv("GITHUB_RUN_ID"),
         "github_sha": os.getenv("GITHUB_SHA"),
-        "repository_baseline": "1e6dc4ae7974b32423a9511fa761d292876784fd",
+        "repository_baseline": "d7a291283630a2b1a21cc145beb3d1d5a9e467a9",
         "oracle": {
             "name": "Caprice32", "version": version.stdout.decode(errors="replace").strip(),
             "commit": PIN, "model": "CPC6128", "ram_kb": 128, "basic": "1.1",

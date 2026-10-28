@@ -1,8 +1,9 @@
 # HW4-C3-B1 — Oracle CPC et contrat de scrolling MODE1
 
 Mission : [issue #108](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/108).
-Base : main 1e6dc4ae7974b32423a9511fa761d292876784fd, après [PR #103](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/103).
-Statut : **B1, sans code runtime ; B2 non autorisé**. Concurrence : J1.10-B [#107](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/107). Liens : moteur [#74](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/74), éditeur [#96](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/96), police [#97](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/97).
+Base B1 initiale : main `1e6dc4ae7974b32423a9511fa761d292876784fd`, après [PR #103](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/103).
+Base intégrée en **HW4-C3-B1-C1** : main `d7a291283630a2b1a21cc145beb3d1d5a9e467a9`, comprenant J1.10-B [PR #107 fusionnée](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/107).
+Statut : **B1-C1, sans code runtime B1 ; B2 non autorisé**. Liens : moteur [#74](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/74), éditeur [#96](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/96), police [#97](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/97).
 
 ## État de preuve et provenance
 
@@ -35,8 +36,8 @@ Script : 'tools/hw4_c3_b1_scroll_oracle.py', un **processus CPC6128 neuf par cas
 | wrap_80 | ligne totale de 80 ; LIST | 2 rangées, wrap et curseur | UNVERIFIED |
 | wrap_120 | ligne totale de 120 ; LIST | 3 rangées, continuation et Ready | UNVERIFIED |
 | input_after_list | 26 lignes ; LIST puis PRINT 7 direct | saisie/sortie après dépassement | UNVERIFIED |
-| cursor_edges | CLS ; LOCATE 1,1/1,25 ; PRINT | haut/bas, dernière rangée | UNVERIFIED |
-| cr_last_row | LOCATE 1,25 ; PRINT avec CHR$(13) | retour chariot sans LF à la limite | UNVERIFIED |
+| cursor_edges | CLS ; `LOCATE 1,1:PRINT "FIRST";` ; `LOCATE 1,25:PRINT "LAST";` (deux commandes atomiques) | haut/bas, dernière rangée avant nouveau Ready | UNVERIFIED avant inspection C1 |
+| cr_last_row | CLS ; `LOCATE 1,25:PRINT "ABCDE";CHR$(13);"Z";` (une commande atomique) | CR sans LF dans la même commande, puis effet du Ready final | UNVERIFIED avant inspection C1 |
 | repeat_list_once | 27 lignes ; LIST ; capture | première sortie, référence du cas répété | UNVERIFIED |
 | repeat_list_twice | 27 lignes ; LIST ; LIST ; capture | comparaison à repeat_list_once, sans capture écrasée | UNVERIFIED |
 | new_after_list | 27 lignes ; LIST ; NEW ; LIST | programme effacé par NEW et écran courant | UNVERIFIED |
@@ -98,10 +99,20 @@ B1 livre uniquement documents, diagnostic de base, sonde C99 hôte et acquisitio
 | wrap_80 | Deux rangées pour 80 caractères de source | OBSERVED_VISUAL |
 | wrap_120 | Trois rangées pour 120 caractères de source | OBSERVED_VISUAL |
 | input_after_list | La sortie de LIST continue avec la commande directe PRINT 7, la valeur 7 puis Ready ; la liste visible remonte à partir de 80 REM L08 | OBSERVED_VISUAL |
-| cr_last_row | Après PRINT "ABCDE";CHR$(13);"Z";, le contenu final lisible montre ZBCDE | OBSERVED_VISUAL (CR repositionne, ne démontre pas toutes les variantes LF) |
+| cr_last_row | Ancienne saisie : `LOCATE 1,25` et `PRINT` étaient deux commandes distinctes ; « ZBCDE » était lisible mais **ne prouvait pas** un CR exécuté en rangée 25 | **UNVERIFIED** pour l'opération à la rangée 25 ; capture invalidée pour cette inférence |
 | new_after_list | NEW et LIST s'affichent avec Ready après le long LIST ; aucune ligne numérotée dans la sortie du LIST suivant | OBSERVED_VISUAL (effet de NEW, non mutation BASIC par scroll) |
 | repeat_list_once / twice | Captures de l'ancien run visuellement identiques : pas de preuve discriminante du nombre d'exécutions malgré les commandes JSON | UNVERIFIED sur ce run ; reprise avec marqueur |
-| cursor_edges, window_default | Captures valides, mais le chemin complet et les limites ne sont pas isolés par l'image finale | UNVERIFIED pour les propriétés étendues |
+| cursor_edges, window_default | Captures valides, mais le `LOCATE` ancien de `cursor_edges` était suivi d'un Ready intermédiaire ; fenêtre et limites non isolées | **UNVERIFIED** pour les propriétés de position au bord, et fenêtre |
 
 Cette qualification **OBSERVED_VISUAL** est bornée aux textes et positions effectivement lisibles dans une image Caprice32 obtenue avec ROM authentique ; pas de preuve d'égalité octet ou pixel, pas de validation de fenêtre personnalisée ni de timing. Les suites C99 du moteur de notre dépôt n'acquièrent aucun statut CPC par ces observations.
 
+
+## HW4-C3-B1-C1 — correction de l'oracle et rattrapage de main
+
+Mandat : [verdict Pilotage C1, PR #109](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/109#issuecomment-6458067208) ; revue P2 [thread](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/109#discussion_r4395862520). Avant C1, les captures `cursor_edges` et `cr_last_row` laissaient `Ready` déplacer le curseur **entre** `LOCATE` et `PRINT`. Ces fichiers restent des archives B1, mais **ne sont pas des oracles de la position de la rangée 25**.
+
+C1 remplace les séquences séparées par les commandes atomiques `LOCATE 1,1:PRINT "FIRST";`, `LOCATE 1,25:PRINT "LAST";` et `LOCATE 1,25:PRINT "ABCDE";CHR$(13);"Z";`. Le `Ready` **final**, après le PRINT direct, peut encore défiler : sa présence rend les effets exacts sur la dernière rangée non inférables sans une inspection spécifique des captures originales. Les deux classes resteront **UNVERIFIED** pour toute propriété qu'une capture terminale ne distingue pas.
+
+Fusion de la base `main` `d7a291283630a2b1a21cc145beb3d1d5a9e467a9` requise en commit à deux parents, sans modification de J1.10-B. Exécutions C1 sur le **nouveau** HEAD à renseigner à partir de GitHub Actions : 12 cas CPC/PNG et empreintes, 2/2 banc B1, au moins 61/61 CTest OFF/ON, autres workflows SUCCESS ou SKIPPED légitime. Pas de nouveau firmware ni test sur CYD.
+
+**Acquisition C1 : EN ATTENTE DE RÉEXÉCUTION ET INSPECTION — aucune valeur CPC ajoutée par anticipation.**

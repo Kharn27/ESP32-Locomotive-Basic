@@ -269,6 +269,7 @@ static int imported_if_listing_roundtrip(void)
         for (mask = 0u; mask < 8u; ++mask) {
             uint8_t body[20], original[20], listed[80], tokens[80];
             uint8_t full[160], before_full[1024], output_snapshot[80];
+            uint8_t image[1024];
             char expected[80], expected_line[160];
             Harness h;
             BasicProgramLine dest;
@@ -276,7 +277,8 @@ static int imported_if_listing_roundtrip(void)
             BasicVariableStore saved_store;
             BasicVariableEntry saved_entries[6];
             size_t n = 0u, listed_n = 987u, again_n = 0u;
-            size_t full_n = 777u, expected_n, expected_full_n, i;
+            size_t full_n = 777u, image_n = 0u;
+            size_t expected_n, expected_full_n, i;
             int fmt, line_fmt;
             const char *first = (mask & 1u) != 0u ? "  " : " ";
             const char *second = (mask & 2u) != 0u ? "  " : " ";
@@ -358,6 +360,14 @@ static int imported_if_listing_roundtrip(void)
             CHECK(put(&h, 40u, "END") == 0);
             CHECK(put(&h, 60u, "PRINT 61") == 0);
             CHECK(put(&h, 70u, "END") == 0);
+            /* Import a complete CPC-shaped image, not only a manufactured
+             * body passed directly to the detokenizer. */
+            CHECK(bp_export(&h.program, image, sizeof(image),
+                            &image_n) == BP_OK);
+            CHECK(bp_init(&h.program, h.storage,
+                          sizeof(h.storage)) == BP_OK);
+            CHECK(bp_import(&h.program, image, image_n) == BP_OK);
+            CHECK(memcmp(h.storage, image, image_n) == 0);
             CHECK(bp_find(&h.program, 60u, &dest) == BP_OK);
             saved_program = h.program;
             saved_store = h.store;
@@ -383,6 +393,7 @@ static int imported_if_listing_roundtrip(void)
             CHECK(full_n == expected_full_n);
             CHECK(memcmp(full, expected_line, expected_full_n) == 0);
             CHECK(memcmp(before_full, h.storage, sizeof(before_full)) == 0);
+            CHECK(memcmp(h.storage, image, image_n) == 0);
             CHECK(memcmp(&h.program, &saved_program, sizeof(saved_program)) == 0);
             CHECK(memcmp(&h.store, &saved_store, sizeof(saved_store)) == 0);
             CHECK(memcmp(h.entries, saved_entries, sizeof(saved_entries)) == 0);

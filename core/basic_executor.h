@@ -44,7 +44,13 @@ typedef struct {
     size_t statement_offset;
 } BECallFrame;
 
-/* J1.12-B2 host-only, per-executor FOR stack (not a CPC depth claim). */
+/* J1.12-B2: bounded FOR/NEXT INTEGER execution, 8 per-executor frames,
+ * separate from GOSUB's 8 frames. Never assume this is a CPC ROM depth.
+ * The NEXT structure is prechecked at FOR, before loop-body output, for the
+ * specific sealed CPC mismatch case. STEP 0 is unsupported. NEXT arithmetic
+ * widens to int32 and fails atomically with BE_INTEGER_OVERFLOW if the new
+ * value leaves int16; this is host policy, not observed CPC semantics.
+ * Cursor/stack/variable/output changes commit only after step prevalidation. */
 #define BE_FOR_STACK_CAPACITY 8u
 typedef struct {
     BasicVariableKey key;
@@ -99,6 +105,10 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
  * legacy API still returns BE_UNSUPPORTED. Numeric output is prototype
  * signed decimal + LF, not CPC PRINT formatting.
  *
+ * One line can also contain PRINT:I%...:NEXT I%; successful FOR and NEXT
+ * move the cursor to a continuation (possibly in the same stored line).
+ * A FOR prechecks the matching NEXT before permitting body output, so a
+ * structurally mismatched variable cannot partially print prior iterations.
  * Execute at most ONE numbered line. END commits the reached prefix's output
  * and moves the cursor to the program sentinel; the NEXT be_step returns
  * BE_END. This is the host step protocol, not CPC console timing.

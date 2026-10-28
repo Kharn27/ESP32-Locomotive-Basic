@@ -562,3 +562,18 @@ if(BUILD_TESTING)
     add_test(NAME hw4_c3_b2_c1_lcd_batch_fail_stop
              COMMAND test_hw4_c3_b2_c1_batch)
 endif()
+
+# HW4-FONT-A: font-only HOST gate, no CPC ROM and no ESP-IDF runtime.
+# Link the actual shared HW3 font, real MODE1 video/console and native BASIC
+# session to test 95/95 ASCII through UART echo, source and LIST pixels.
+if(BUILD_TESTING)
+    add_executable(test_hw4_font_ascii
+        tests/test_hw4_font_ascii.c
+        firmware/esp32_display_probe/main/cpc_font.c)
+    target_include_directories(test_hw4_font_ascii PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main)
+    target_link_libraries(test_hw4_font_ascii PRIVATE
+        cpc_uart_console uart_line basic_session_runtime basic_variable_binding)
+    add_test(NAME hw4_font_a_ascii95_canonical_mode1
+             COMMAND test_hw4_font_ascii)
+endif()

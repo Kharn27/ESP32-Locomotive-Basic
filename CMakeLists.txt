@@ -659,6 +659,17 @@ if(BUILD_TESTING)
     add_test(NAME hw4_edit_a_cursor_source_vram COMMAND test_hw4_edit_a)
 endif()
 
+# J1.14-A is strictly an independent CPC oracle, never native ELSE support.
+if(BUILD_TESTING)
+    add_test(NAME j1_14_a_inline_source_matrix COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_14_if_inline_else_verify.py"
+        --check-sources)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_14_if_inline_else/manifest.json")
+        add_test(NAME j1_14_a_inline_cpc_permanent COMMAND
+            ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_14_if_inline_else_verify.py"
+            --permanent --self-test)
+    endif()
+endif()
 # HW4-EDIT-P1: video-owned MODE1 E2; no COPY or change to BASIC input.
 if(BUILD_TESTING)
     add_executable(test_hw4_edit_p1 tests/test_hw4_edit_p1.c)

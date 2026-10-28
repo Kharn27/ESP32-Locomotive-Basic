@@ -1,0 +1,6 @@
+10 A%=11
+20 B%=12
+25 C%=17
+30 IF A%<>B% THEN C%=81 ELSE C%=42
+40 PRINT #8,C%
+50 END

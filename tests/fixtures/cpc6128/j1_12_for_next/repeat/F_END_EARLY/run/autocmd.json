@@ -1,0 +1,22 @@
+{
+  "commands": [
+    "10 FOR I%=1 TO 3",
+    "20 PRINT #8,I%",
+    "30 END",
+    "40 NEXT I%",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+    "PRINT #8,ERR",
+    "PRINT #8,ERL",
+    "CAP32_DELAY CAP32_EXIT"
+  ],
+  "program_sha256": "812a561e04e2fec6cade9bf45cbff953e02b116b545b67837151d79980c4e108",
+  "runtime_printer_in_program": true,
+  "max_printer_bytes": 2048,
+  "post_run_direct_probe": [
+    "ERR",
+    "ERL"
+  ],
+  "screenshot_before_post_run_probes": true,
+  "printer_is_not_screen_output": true
+}

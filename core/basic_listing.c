@@ -11,6 +11,7 @@ typedef struct {
 typedef enum {
     BL_ST_PRINT,
     BL_ST_GOTO,
+    BL_ST_GOSUB,
     BL_ST_ASSIGN,
     BL_ST_IF,
     BL_ST_EMPTY
@@ -150,6 +151,8 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0xa5u: statement = BL_ST_ASSIGN; status = append_word(out, "LET"); break;
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
         case 0xa0u: statement = BL_ST_GOTO; status = append_word(out, "GOTO"); break;
+        case 0x9fu: statement = BL_ST_GOSUB; status = append_word(out, "GOSUB"); break;
+        case 0xc9u: status = append_word(out, "RETURN"); break;
         case 0xa1u: statement = BL_ST_IF; status = append_word(out, "IF"); break;
         case 0x98u: status = append_word(out, "END"); break;
         case 0xa7u: status = append_word(out, "LIST"); break;
@@ -580,7 +583,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             if (status != BL_OK) {
                 return status;
             }
-        } else if (statement == BL_ST_GOTO) {
+        } else if (statement == BL_ST_GOTO || statement == BL_ST_GOSUB) {
             unsigned int line;
             if (pos == length || body[pos] == 0x01u) {
                 return BL_BAD_SEQUENCE; /* Mandatory reference */

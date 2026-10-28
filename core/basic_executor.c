@@ -237,13 +237,211 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
     return BE_OK;
 }
 
+
+/* FOR/NEXT INTEGER literals are the same strictly bounded CPC encodings
+ * already admitted by the scalar assignment path, not REAL expressions. */
+static BEStatus for_literal(const uint8_t *body, size_t length,
+                            size_t *at, int16_t *result)
+{
+    size_t pos = *at;
+    int negative = 0;
+    int32_t magnitude;
+    uint8_t token;
+    static const uint8_t min_real5[5] = {0,0,0,0,0x90};
+    skip_spaces(body, length, &pos);
+    if (pos == length) return BE_TRUNCATED;
+    token = body[pos++];
+    if (token == 0xf5u) {
+        negative = 1;
+        if (pos == length) return BE_TRUNCATED;
+        token = body[pos++];
+    }
+    if (token >= 0x0eu && token <= 0x17u) {
+        magnitude = (int32_t)(token - 0x0eu);
+    } else if (token == 0x19u) {
+        if (pos == length) return BE_TRUNCATED;
+        magnitude = body[pos++];
+        if (magnitude < 10) return BE_BAD_SEQUENCE;
+    } else if (token == 0x1au) {
+        if (length - pos < 2u) return BE_TRUNCATED;
+        magnitude = (int32_t)((uint32_t)body[pos] |
+                              ((uint32_t)body[pos + 1u] << 8));
+        pos += 2u;
+        if (magnitude < 256) return BE_BAD_SEQUENCE;
+    } else if (token == 0x1fu && negative) {
+        if (length - pos < 5u) return BE_TRUNCATED;
+        if (memcmp(body + pos, min_real5, 5u) != 0) return BE_BAD_SEQUENCE;
+        pos += 5u;
+        magnitude = 32768;
+    } else {
+        return BE_BAD_SEQUENCE;
+    }
+    magnitude = negative ? -magnitude : magnitude;
+    if (magnitude < INT16_MIN || magnitude > INT16_MAX) {
+        return BE_INTEGER_OVERFLOW;
+    }
+    *result = (int16_t)magnitude;
+    *at = pos;
+    return BE_OK;
+}
+
+static int for_same_key(const BasicVariableKey *a, const BasicVariableKey *b)
+{
+    return a->type == b->type && a->name_length == b->name_length &&
+           memcmp(a->name, b->name, BVT_MAX_NAME_LENGTH) == 0;
+}
+
+/* Decode FOR control before inspecting the program or making any assignment.
+ * The name reference's two cache bytes are deliberately never interpreted. */
+static BEStatus for_header(const uint8_t *body, size_t length, size_t *at,
+                           BasicVariableKey *key, int16_t *initial,
+                           int16_t *limit, int16_t *step)
+{
+    size_t pos = *at, consumed = 0u;
+    BEStatus status;
+    BVBStatus resolved;
+    skip_spaces(body, length, &pos);
+    if (pos == length) return BE_TRUNCATED;
+    resolved = bvb_resolve_explicit(body, length, pos, key, &consumed);
+    if (resolved != BVB_OK) return binding_error(resolved);
+    if (key->type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+    pos += consumed;
+    skip_spaces(body, length, &pos);
+    if (pos == length || body[pos++] != 0xefu) return BE_BAD_SEQUENCE;
+    status = for_literal(body, length, &pos, initial);
+    if (status != BE_OK) return status;
+    skip_spaces(body, length, &pos);
+    if (pos == length || body[pos++] != 0xecu) return BE_BAD_SEQUENCE;
+    status = for_literal(body, length, &pos, limit);
+    if (status != BE_OK) return status;
+    skip_spaces(body, length, &pos);
+    *step = 1;
+    if (pos < length && body[pos] == 0xe6u) {
+        ++pos;
+        status = for_literal(body, length, &pos, step);
+        if (status != BE_OK) return status;
+        skip_spaces(body, length, &pos);
+    }
+    if (*step == 0) return BE_UNSUPPORTED; /* STEP 0 not oracle-verified. */
+    if (pos < length && body[pos] != 0x01u) return unexpected(body[pos]);
+    *at = pos;
+    return BE_OK;
+}
+
+/* Locate the matching structural NEXT without executing intervening code.
+ * Only statement starts count. Quoted strings, REM, apostrophes, variable
+ * cache bytes and numeric token payloads cannot create phantom statements.
+ * O(program size), fixed 8-frame local nesting stack, no heap or recursion. */
+static BEStatus for_match(const BasicProgram *program,
+                          const BasicProgramLine *first, size_t start,
+                          const BasicVariableKey *wanted,
+                          size_t *exit_cursor, size_t *exit_statement)
+{
+    BasicProgramLine line;
+    BasicVariableKey nested[BE_FOR_STACK_CAPACITY];
+    size_t depth = 0u, scan = first->offset, pos = start;
+    int first_line = 1;
+    BPStatus bp_status;
+    while ((bp_status = bp_next(program, &scan, &line)) == BP_OK) {
+        const uint8_t *body = program->data + line.body_offset;
+        size_t n = line.body_length;
+        if (!first_line) pos = 0u;
+        first_line = 0;
+        while (pos < n) {
+            size_t skip;
+            uint8_t token;
+            skip_spaces(body, n, &pos);
+            if (pos >= n) break;
+            token = body[pos];
+            if (token == 0x01u) {
+                if (pos + 1u < n && body[pos + 1u] == 0xc0u) break;
+                ++pos;
+                continue;
+            }
+            if (token == 0xc5u) break;
+            ++pos;
+            if (token == 0x9eu) {
+                size_t count = 0u, p = pos;
+                BVBStatus resolved;
+                if (depth == BE_FOR_STACK_CAPACITY) return BE_FOR_STACK_FULL;
+                skip_spaces(body, n, &p);
+                resolved = bvb_resolve_explicit(body, n, p, &nested[depth], &count);
+                if (resolved != BVB_OK) return binding_error(resolved);
+                if (nested[depth].type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+                ++depth;
+            } else if (token == 0xb0u) {
+                BasicVariableKey key;
+                const BasicVariableKey *expected = depth == 0u ?
+                                                   wanted : &nested[depth - 1u];
+                size_t count = 0u;
+                skip_spaces(body, n, &pos);
+                if (pos < n && body[pos] == 0x02u) {
+                    BVBStatus resolved = bvb_resolve_explicit(body, n, pos,
+                                                               &key, &count);
+                    if (resolved != BVB_OK) return binding_error(resolved);
+                    if (key.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+                    if (!for_same_key(&key, expected))
+                        return BE_NEXT_VARIABLE_MISMATCH;
+                    pos += count;
+                }
+                skip_spaces(body, n, &pos);
+                if (pos < n && body[pos] != 0x01u)
+                    return unexpected(body[pos]);
+                if (depth == 0u) {
+                    if (pos < n) {
+                        *exit_cursor = line.offset;
+                        *exit_statement = pos + 1u;
+                    } else {
+                        *exit_cursor = line.next_offset;
+                        *exit_statement = 0u;
+                    }
+                    return BE_OK;
+                }
+                --depth;
+            }
+            /* Seek next real ':' separator, ignoring payload bytes. */
+            {
+                int quoted = 0;
+                while (pos < n) {
+                    uint8_t c = body[pos];
+                    if (c == (uint8_t)'"') {
+                        quoted = !quoted; ++pos; continue;
+                    }
+                    if (!quoted && (c == 0x01u || c == 0xc5u)) break;
+                    if (!quoted && ((c >= 0x02u && c <= 0x04u) ||
+                                    (c >= 0x0bu && c <= 0x0du))) {
+                        BasicVariableRef ref;
+                        if (bvr_decode(body, n, pos, &ref) != BVR_OK)
+                            return BE_BAD_SEQUENCE;
+                        pos += ref.consumed;
+                        continue;
+                    }
+                    if (!quoted && (c == 0x19u || c == 0x1au ||
+                                    c == 0x1du || c == 0x1eu || c == 0x1fu)) {
+                        size_t payload = c == 0x19u ? 1u : (c == 0x1fu ? 5u : 2u);
+                        if (n - pos <= payload) return BE_TRUNCATED;
+                        pos += payload + 1u;
+                        continue;
+                    }
+                    ++pos;
+                }
+            }
+            if (pos < n && body[pos] == 0xc5u) break;
+        }
+    }
+    return bp_status == BP_END ? BE_FOR_WITHOUT_NEXT : BE_BAD_PROGRAM;
+}
+
 /* Pure action description prepared by both executor passes; never mutate
  * the call stack until validation, capacity, output and replay all succeed. */
 typedef enum { BE_FLOW_NONE, BE_FLOW_PUSH, BE_FLOW_POP, BE_FLOW_CLEAR } BEFlowAction;
+typedef enum { BE_FOR_NONE, BE_FOR_PUSH, BE_FOR_POP } BEForAction;
 typedef struct {
     BEFlowAction action;
     BECallFrame frame;
     size_t next_statement;
+    BEForAction for_action;
+    BEForFrame for_frame;
 } BEFlow;
 
 /* A branch or END may skip a suffix. In J0.19, no numbered line

@@ -68,7 +68,61 @@ jobs:
             ctest --test-dir "$RUNNER_TEMP/j112-c99" --output-on-failure
           else
             ctest --test-dir "$RUNNER_TEMP/j112-c99" --output-on-failure \
-              -E '^j1_12_a_gosub_return_cpc_permanent$'
+              -E '^j1_12_a_for_next_cpc_permanent
+          fi
+          python3 tools/j1_9_binary_family_verify.py --permanent --self-test
+          python3 tools/j1_9_b_native_verify.py --cli "$RUNNER_TEMP/j112-c99/loco_basic_cli" \
+            --image-cli "$RUNNER_TEMP/j112-c99/basic_program_image_cli" --self-test
+      - name: Acquire 16 doubled ROM-backed FOR/NEXT programs
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/j1_12_for_next_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --image-cli "$RUNNER_TEMP/j112-c99/basic_program_image_cli" \
+            --native-cli "$RUNNER_TEMP/j112-c99/loco_basic_cli" \
+            --output "$RUNNER_TEMP/j112-cpc"
+          python3 tools/j1_12_for_next_verify.py --evidence "$RUNNER_TEMP/j112-cpc"
+      - name: Publish original evidence once or compare independent new ROM sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST=tests/fixtures/cpc6128/j1_12_for_next
+          if test ! -f "$DEST/manifest.json"; then
+            test ! -e "$DEST"
+            mkdir -p "$DEST"
+            cp -a "$RUNNER_TEMP/j112-cpc/." "$DEST/"
+            python3 tools/j1_12_for_next_verify.py --evidence "$DEST" --write-provisional-seal
+            python3 tools/j1_12_for_next_verify.py --evidence "$DEST"
+            echo "J1.12-A BOT_ARCHIVE_CREATED: independent permanent SHA pins PENDING"
+            ! find "$DEST" -type f \( -name '*.sna' -o -name '*.rom' -o -name '*.dsk' \) | grep .
+            git config user.name "loco-cyd-evidence-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$DEST"
+            git commit -m "evidence(J1.12-A): archive twenty doubled original CPC FOR NEXT sessions"
+            REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/oracle/j1-12-a-for-next-integer | awk '{print $1}')"
+            test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA" || {
+              echo "CONCURRENT_BRANCH_ADVANCE refusing to publish evidence"
+              exit 1
+            }
+            git push origin HEAD:refs/heads/oracle/j1-12-a-for-next-integer
+          else
+            python3 tools/j1_12_for_next_verify.py --evidence "$DEST" --permanent --self-test
+            for name in $(find "$DEST/original" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort); do
+              cmp "$DEST/original/$name/program.bin" "$RUNNER_TEMP/j112-cpc/original/$name/program.bin"
+              cmp "$DEST/original/$name/run/printer.dat" "$RUNNER_TEMP/j112-cpc/original/$name/run/printer.dat"
+              cmp "$DEST/original/$name/program.bin" "$RUNNER_TEMP/j112-cpc/repeat/$name/program.bin"
+              cmp "$DEST/original/$name/run/printer.dat" "$RUNNER_TEMP/j112-cpc/repeat/$name/run/printer.dat"
+              echo "J1.12-A $name INDEPENDENT_REACQUISITION_MATCH_EXACT"
+            done
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: j1-11-a-cpc-for-next-captures
+          path: ${{ runner.temp }}/j112-cpc/
+          if-no-files-found: warn
+          retention-days: 30
+
           fi
           python3 tools/j1_9_binary_family_verify.py --permanent --self-test
           python3 tools/j1_9_b_native_verify.py --cli "$RUNNER_TEMP/j112-c99/loco_basic_cli" \

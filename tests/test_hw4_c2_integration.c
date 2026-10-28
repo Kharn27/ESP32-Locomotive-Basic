@@ -146,6 +146,11 @@ static void long_list_scroll_integration(void)
         assert(text.row==24U && text.bytes_clipped==0U);
         assert(b.program.size==bytes && memcmp(snapshot,b.bytes,sizeof(snapshot))==0);
     }
+    /* Explicit diagnostic !CLS may clear the screen, never the BASIC store. */
+    assert(cpc_uart_console_clear(&text));
+    assert(b.program.size==bytes && memcmp(snapshot,b.bytes,sizeof(snapshot))==0);
+    assert(submit("LIST").status==BSR_OK && b.written>0U);
+    assert(cpc_text_write(&text,b.output,b.written));
     assert(submit("RUN").status==BSR_OK);
     unsigned run_steps=0U;
     for (;;) {

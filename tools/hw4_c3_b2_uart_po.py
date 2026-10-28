@@ -16,7 +16,8 @@ def commands():
     result += [("LIST", 1.1), ("LIST", 1.1)]
     for n in range(27, 33):
         result.append((f"{n*10} PRINT 7", 0.15))
-    result += [("LIST", 1.1), ("LIST", 1.1), ("RUN", 1.4),
+    result += [("LIST", 1.1), ("LIST", 1.1), ("!CLS", 0.4),
+               ("LIST", 1.1), ("RUN", 1.4),
                ("NEW", 0.5), ("LIST", 0.5), ("!CLS", 0.5)]
     return result
 

@@ -35,14 +35,14 @@ CASES = {
     "wrap_40": (["10 REM " + "X" * 33], ["CLS", "LIST", END], 1),
     "wrap_80": (["10 REM " + "X" * 73], ["CLS", "LIST", END], 1),
     "wrap_120": (["10 REM " + "X" * 113], ["CLS", "LIST", END], 1),
-    "input_after_list": (numbered(26), ["CLS", "LIST", "PRINT 7", END], 1),
+    "input_after_list": (numbered(26), ["CLS", "LIST", DELAY, "PRINT 7", END], 1),
     "cursor_edges": ([], ["CLS", "LOCATE 1,1", 'PRINT "FIRST";',
                             "LOCATE 1,25", 'PRINT "LAST";', END], 1),
     "cr_last_row": ([], ["CLS", "LOCATE 1,25",
                          'PRINT "ABCDE";CHR$(13);"Z";', END], 1),
     "repeat_list_once": (numbered(27), ["CLS", "LIST", END], 1),
-    "repeat_list_twice": (numbered(27), ["CLS", "LIST", "LIST", END], 1),
-    "new_after_list": (numbered(27), ["CLS", "LIST", "NEW", "LIST", END], 1),
+    "repeat_list_twice": (numbered(27), ["CLS", "LIST", DELAY, "LIST", END], 1),
+    "new_after_list": (numbered(27), ["CLS", "LIST", DELAY, "NEW", DELAY, "LIST", END], 1),
     "window_default": (numbered(26), ["WINDOW 1,40,1,25", "CLS", "LIST", END], 1),
 }
 

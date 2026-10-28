@@ -14,6 +14,8 @@ typedef enum {
     BL_ST_GOSUB,
     BL_ST_ASSIGN,
     BL_ST_IF,
+    BL_ST_FOR,
+    BL_ST_NEXT,
     BL_ST_EMPTY
 } BLStatement;
 
@@ -113,6 +115,77 @@ static BLStatus append_comment(const uint8_t *body, size_t length,
 
 /* A strict inverse of the representable J0.4 grammar, not a CPC parser.
  * The token bytes are unambiguous only outside quoted strings. */
+
+/* Decode only CPC FOR/TO/STEP INTEGER constants, no generic expression
+ * interpreter. The cache bytes of references are intentionally opaque. */
+static BLStatus for_number(const uint8_t *body, size_t length,
+                           size_t *pos, BLEmitter *out)
+{
+    unsigned int magnitude;
+    int negative = 0;
+    uint8_t token;
+    BLStatus status;
+    if (*pos >= length) return BL_TRUNCATED;
+    token = body[(*pos)++];
+    if (token == 0xf5u) {
+        negative = 1;
+        status = append_byte(out, (uint8_t)'-');
+        if (status != BL_OK) return status;
+        if (*pos >= length) return BL_TRUNCATED;
+        token = body[(*pos)++];
+    }
+    if (token >= 0x0eu && token <= 0x17u) {
+        magnitude = (unsigned int)(token - 0x0eu);
+    } else if (token == 0x19u) {
+        if (*pos == length) return BL_TRUNCATED;
+        magnitude = (unsigned int)body[(*pos)++];
+        if (magnitude < 10u) return BL_BAD_SEQUENCE;
+    } else if (token == 0x1au) {
+        if (length - *pos < 2u) return BL_TRUNCATED;
+        magnitude = (unsigned int)body[*pos] |
+                    ((unsigned int)body[*pos + 1u] << 8);
+        *pos += 2u;
+        if (magnitude < 256u || magnitude > 32767u)
+            return BL_BAD_SEQUENCE;
+    } else if (token == 0x1fu && negative) {
+        static const uint8_t real5[] = {0u, 0u, 0u, 0u, 0x90u};
+        size_t i;
+        if (length - *pos < sizeof(real5)) return BL_TRUNCATED;
+        for (i = 0u; i < sizeof(real5); ++i)
+            if (body[*pos + i] != real5[i]) return BL_BAD_SEQUENCE;
+        *pos += sizeof(real5);
+        magnitude = 32768u;
+    } else {
+        return token >= 0x80u || (token >= 0x0eu && token <= 0x1fu)
+             ? BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
+    }
+    return append_decimal(out, magnitude);
+}
+
+/* Both FOR and NEXT use 02 [opaque cache low/high] variable name; never
+ * treat cache bytes as source whitespace or CPC opcodes. */
+static BLStatus for_reference(const uint8_t *body, size_t length,
+                              size_t *pos, BLEmitter *out)
+{
+    BasicVariableRef ref;
+    BVRStatus decoded;
+    size_t i;
+    BLStatus status;
+    if (*pos >= length) return BL_TRUNCATED;
+    if (body[*pos] != 0x02u) return BL_BAD_SEQUENCE;
+    decoded = bvr_decode(body, length, *pos, &ref);
+    if (decoded == BVR_TRUNCATED) return BL_TRUNCATED;
+    if (decoded != BVR_OK || ref.family != BVR_FAMILY_EXPLICIT ||
+        ref.explicit_type != BVR_TYPE_INTEGER) return BL_BAD_SEQUENCE;
+    for (i = 0u; i < ref.name_length; ++i) {
+        status = append_byte(out, (uint8_t)(body[ref.name_offset + i] & 0x7fu));
+        if (status != BL_OK) return status;
+    }
+    status = append_byte(out, (uint8_t)'%');
+    *pos = ref.reference_offset + ref.consumed;
+    return status;
+}
+
 static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
 {
     size_t pos = 0;
@@ -154,6 +227,8 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0x9fu: statement = BL_ST_GOSUB; status = append_word(out, "GOSUB"); break;
         case 0xc9u: status = append_word(out, "RETURN"); break;
         case 0xa1u: statement = BL_ST_IF; status = append_word(out, "IF"); break;
+        case 0x9eu: statement = BL_ST_FOR; status = append_word(out, "FOR"); break;
+        case 0xb0u: statement = BL_ST_NEXT; status = append_word(out, "NEXT"); break;
         case 0x98u: status = append_word(out, "END"); break;
         case 0xa7u: status = append_word(out, "LIST"); break;
         case 0xcau: status = append_word(out, "RUN"); break;
@@ -492,6 +567,75 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             }
             if (status != BL_OK) {
                 return status;
+            }
+
+        } else if (statement == BL_ST_FOR) {
+            /* B1 grammar: FOR INTEGER%=literal TO literal [STEP literal].
+             * LIST is textual; raw CPC reference caches remain unchanged. */
+            if (pos >= length) return BL_TRUNCATED;
+            if (pos == space_start) {
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) return status;
+            }
+            status = for_reference(body, length, &pos, out);
+            if (status != BL_OK) return status;
+            status = append_spaces(body, length, &pos, out);
+            if (status != BL_OK) return status;
+            if (pos >= length) return BL_TRUNCATED;
+            if (body[pos++] != 0xefu) return BL_BAD_SEQUENCE;
+            status = append_byte(out, (uint8_t)'=');
+            if (status == BL_OK) status = append_spaces(body, length, &pos, out);
+            if (status == BL_OK) status = for_number(body, length, &pos, out);
+            if (status != BL_OK) return status;
+            space_start = pos;
+            status = append_spaces(body, length, &pos, out);
+            if (status != BL_OK) return status;
+            if (pos == length) return BL_TRUNCATED;
+            if (body[pos++] != 0xecu) return BL_BAD_SEQUENCE;
+            if (pos - 1u == space_start) {
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) return status;
+            }
+            status = append_word(out, "TO");
+            if (status != BL_OK) return status;
+            space_start = pos;
+            status = append_spaces(body, length, &pos, out);
+            if (status != BL_OK) return status;
+            if (pos == space_start) {
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) return status;
+            }
+            status = for_number(body, length, &pos, out);
+            if (status != BL_OK) return status;
+            space_start = pos;
+            status = append_spaces(body, length, &pos, out);
+            if (status != BL_OK) return status;
+            if (pos < length && body[pos] == 0xe6u) {
+                if (pos == space_start) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) return status;
+                }
+                ++pos;
+                status = append_word(out, "STEP");
+                if (status != BL_OK) return status;
+                space_start = pos;
+                status = append_spaces(body, length, &pos, out);
+                if (status != BL_OK) return status;
+                if (pos == space_start) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) return status;
+                }
+                status = for_number(body, length, &pos, out);
+                if (status != BL_OK) return status;
+            }
+        } else if (statement == BL_ST_NEXT) {
+            if (pos < length && body[pos] == 0x02u) {
+                if (pos == space_start) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) return status;
+                }
+                status = for_reference(body, length, &pos, out);
+                if (status != BL_OK) return status;
             }
         } else if (statement == BL_ST_IF) {
             BasicVariableRef reference;

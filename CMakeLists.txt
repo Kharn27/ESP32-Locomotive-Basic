@@ -571,3 +571,18 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_12_for_next_verify.py"
         --permanent --self-test)
 endif()
+
+# J1.12-B1: CPC FOR/NEXT INTEGER encoding and LIST only; B2 runtime blocked.
+# Compare *only* sealed FOR/NEXT control records, not PRINT #8 program RAM.
+if(BUILD_TESTING)
+    add_executable(test_basic_for_next_b1 tests/test_basic_for_next_b1.c)
+    target_link_libraries(test_basic_for_next_b1 PRIVATE
+                          basic_session_runtime basic_tokenizer basic_listing
+                          basic_variable_store)
+    add_test(NAME j1_12_b1_for_next_tokens_list
+             COMMAND test_basic_for_next_b1)
+    add_test(NAME j1_12_b1_for_next_cpc_differential COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_12_b1_native_verify.py"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

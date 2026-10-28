@@ -115,6 +115,7 @@ static BLStatus append_comment(const uint8_t *body, size_t length,
 static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
 {
     size_t pos = 0;
+    int seen_statement = 0;
     BLStatus status;
 
     while (pos < length) {
@@ -161,6 +162,10 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         if (status != BL_OK) {
             return status;
         }
+        if (statement == BL_ST_IF && seen_statement) {
+            return BL_BAD_SEQUENCE;
+        }
+        seen_statement = 1;
 
         space_start = pos;
         /* For implicit LET the initial 02 is already consumed. The next

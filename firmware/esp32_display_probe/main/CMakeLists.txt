@@ -1,3 +1,13 @@
+# ESP-IDF's component_get_requirements.cmake evaluates this file in a
+# separate CMake process where ordinary project cache variables may be absent.
+# For that requirements-only scan, CONSOLE supplies the complete dependency
+# superset (UART + video + core + LCD). The real project() configuration gets
+# the validated LOCO_CYD_PROFILE from ../profile_select.cmake and selects the
+# actual single app_main below.
+if(NOT DEFINED LOCO_CYD_PROFILE)
+    set(LOCO_CYD_PROFILE CONSOLE)
+endif()
+
 # ARCH-HW4-U1-A: exactly one app_main per image; all sources are borrowed
 # from their original locations. The old esp32_probe project remains buildable.
 if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")

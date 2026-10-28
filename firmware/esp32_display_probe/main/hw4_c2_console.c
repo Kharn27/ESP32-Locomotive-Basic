@@ -104,32 +104,8 @@ static void lcd_metrics_report(const char *stage)
 }
 
 
-/* Extend the existing ORIGINAL HW3 font for visible serial syntax.
- * Missing glyphs remain an explicitly provisional display limitation. */
-static uint8_t glyph(void *context, uint8_t character, unsigned row)
-{
-    static const uint8_t percent[8]={0x62,0x64,0x08,0x10,0x20,0x4c,0x8c,0};
-    static const uint8_t equal[8]={0,0x7e,0,0x7e,0,0,0,0};
-    static const uint8_t plus[8]={0,0x10,0x10,0x7c,0x10,0x10,0,0};
-    static const uint8_t minus[8]={0,0,0,0x7c,0,0,0,0};
-    static const uint8_t prompt[8]={0x40,0x20,0x10,0x08,0x10,0x20,0x40,0};
-    static const uint8_t quote[8]={0x48,0x48,0x48,0,0,0,0,0};
-    static const uint8_t colon[8]={0,0x30,0x30,0,0x30,0x30,0,0};
-    static const uint8_t slash[8]={0x04,0x08,0x08,0x10,0x20,0x20,0x40,0};
-    (void)context;
-    if (row >= 8U) return 0U;
-    switch(character) {
-    case '%': return percent[row];
-    case '=': return equal[row];
-    case '+': return plus[row];
-    case '-': return minus[row];
-    case '>': return prompt[row];
-    case '"': return quote[row];
-    case ':': return colon[row];
-    case '/': return slash[row];
-    default: return hw3_glyph_row(character, row);
-    }
-}
+/* All ASCII, including the eight legacy console patterns, now uses the
+ * original HW3 shared font; no local glyph copies or visual fallbacks. */
 
 static void memory_report(const char *stage)
 {
@@ -408,7 +384,7 @@ void app_main(void)
        !cpc_video_set_ink(&s_video,1U,24U) ||
        !cpc_video_set_border(&s_video,1U) ||
        !cpc_video_set_text_colors(&s_video,1U,0U) ||
-       !cpc_text_init(&s_text,&s_video,glyph,NULL)) {
+       !cpc_text_init(&s_text,&s_video,hw3_glyph_callback,NULL)) {
         (void)fail("VIDEO_INIT",-1); return;
     }
     printf("HW4-C2 VIDEO_READY mode=1 logical=320x200 "

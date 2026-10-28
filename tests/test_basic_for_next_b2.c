@@ -262,7 +262,7 @@ static int c1_case(Fixture *f, const char *for_line, const char *body,
     if (marker_kind != 0) {
         CHECK(bp_find(&f->program,(uint16_t)(marker_kind > 0 ? 10 : 30),&line)==BP_OK);
         { const uint8_t *p=f->program.data+line.body_offset;
-          const size_t need=marker_kind > 1 ? 3u : 2u;
+          const size_t need=(marker_kind==2 || marker_kind==-2) ? 3u : 2u;
           for(i=0;i+need<=line.body_length;++i) {
               if (p[i]==0x01u && (need==2u ? p[i+1u]==0xc0u :
                   (p[i+1u]==0x01u && p[i+2u]==0xc0u))) found=1;

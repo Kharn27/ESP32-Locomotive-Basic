@@ -91,10 +91,10 @@ jobs:
               fi
               grep -F "U1-A conflicting selectors" reports/u1-b/conflict.log
               # Legacy standalone project is deliberately absent after migration.
-              test "$(grep -Ec '^[A-Za-z_0-9]+=([0-9]+) bytes$' reports/u1-b/basic/xtensa-abi.txt)" -eq 16
-              grep -Fx 'LocoProbeStorage=19072 bytes' reports/u1-b/basic/xtensa-abi.txt
-              grep -Fx 'core_descriptor_bytes=636' reports/u1-b/basic/xtensa-abi.txt
-              grep -Fx 'owned_buffers_and_entries_bytes=18432' reports/u1-b/basic/xtensa-abi.txt
+              test "$(grep -Ec "^[A-Za-z_0-9]+=[0-9]+ bytes$" reports/u1-b/basic/xtensa-abi.txt)" -eq 16
+              grep -Fx "LocoProbeStorage=19072 bytes" reports/u1-b/basic/xtensa-abi.txt
+              grep -Fx "core_descriptor_bytes=636" reports/u1-b/basic/xtensa-abi.txt
+              grep -Fx "owned_buffers_and_entries_bytes=18432" reports/u1-b/basic/xtensa-abi.txt
               if python3 /project/tools/ci/report_abi.py partitions.csv > reports/u1-b/basic/abi-negative.log 2>&1; then
                 echo "U1-B invalid ELF was accepted"; exit 1
               fi

@@ -84,3 +84,24 @@ Viewport y TFT=20..219, les marges 0..19 et 220..239 restent BORDER. Une bande l
 ## Exclusions / frontières
 
 B1 livre uniquement documents, diagnostic de base, sonde C99 hôte et acquisition CPC indépendante. Aucune modification fonctionnelle de 'core/', 'io/', 'video/', 'firmware/', police, HAL, LCD, bandeau, CMake ou fixtures historiques. Pas de MODE/WINDOW/CLS BASIC natif, éditeur #96, police #97, scroll arbitraire ou B2 démarré. La matrice est conditionnelle à des **captures réelles et lisibles** ; en l'absence de telles preuves, le verdict honnête reste 'UNVERIFIED'. La décision d'acceptation B1 et le déblocage B2 appartiennent exclusivement au Pilotage.
+
+
+## Observations indépendantes examinées sur l'acquisition initiale (28 octobre 2026)
+
+**Provenance du relevé :** [Actions #40612563135](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40612563135), HEAD source `84431f2706b30a6e4557cc97a177177e244db4d6`, artifact `12783329305`, archive ZIP SHA-256 `bf97cfe343fcbbe63bb131fc6697a901728a84a2a228956327fad3dee1eb0c8e`. Examen visuel manuel des PNG originaux ; les empreintes par cas sont dans `manifest.json`. La surimpression FPS en haut à gauche appartient à Caprice32, pas au BASIC. L'image du cas répété dans ce run n'était pas discriminante ; le script est modifié ensuite pour afficher `AFTER2` après le second LIST, **sans prédéclarer le résultat de cette nouvelle acquisition**.
+
+| Scénario | Relevé sur PNG original | Classification strictement visuelle |
+| --- | --- | --- |
+| list_26 | Les rangées affichent 40 REM L04 à 260 REM L26, suivies de Ready/curseur ; les trois premières lignes du LIST ne sont plus à l'écran | OBSERVED_VISUAL (scroll à gauche de la zone, aucune page vide) |
+| list_32 | Première ligne encore affichée 100 REM L10, dernière 320 REM L32, Ready/curseur ensuite | OBSERVED_VISUAL (défilement répété, pas de reset page) |
+| wrap_40 | Une rangée avec 40 caractères de source numérotée | OBSERVED_VISUAL |
+| wrap_80 | Deux rangées pour 80 caractères de source | OBSERVED_VISUAL |
+| wrap_120 | Trois rangées pour 120 caractères de source | OBSERVED_VISUAL |
+| input_after_list | La sortie de LIST continue avec la commande directe PRINT 7, la valeur 7 puis Ready ; la liste visible remonte à partir de 80 REM L08 | OBSERVED_VISUAL |
+| cr_last_row | Après PRINT "ABCDE";CHR$(13);"Z";, le contenu final lisible montre ZBCDE | OBSERVED_VISUAL (CR repositionne, ne démontre pas toutes les variantes LF) |
+| new_after_list | NEW et LIST s'affichent avec Ready après le long LIST ; aucune ligne numérotée dans la sortie du LIST suivant | OBSERVED_VISUAL (effet de NEW, non mutation BASIC par scroll) |
+| repeat_list_once / twice | Captures de l'ancien run visuellement identiques : pas de preuve discriminante du nombre d'exécutions malgré les commandes JSON | UNVERIFIED sur ce run ; reprise avec marqueur |
+| cursor_edges, window_default | Captures valides, mais le chemin complet et les limites ne sont pas isolés par l'image finale | UNVERIFIED pour les propriétés étendues |
+
+Cette qualification **OBSERVED_VISUAL** est bornée aux textes et positions effectivement lisibles dans une image Caprice32 obtenue avec ROM authentique ; pas de preuve d'égalité octet ou pixel, pas de validation de fenêtre personnalisée ni de timing. Les suites C99 du moteur de notre dépôt n'acquièrent aucun statut CPC par ces observations.
+

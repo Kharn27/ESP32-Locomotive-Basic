@@ -41,7 +41,7 @@ CASES = {
     "cr_last_row": ([], ["CLS", "LOCATE 1,25",
                          'PRINT "ABCDE";CHR$(13);"Z";', END], 1),
     "repeat_list_once": (numbered(27), ["CLS", "LIST", END], 1),
-    "repeat_list_twice": (numbered(27), ["CLS", "LIST", DELAY, "LIST", END], 1),
+    "repeat_list_twice": (numbered(27), ["CLS", "LIST", DELAY, "LIST", DELAY, 'PRINT "AFTER2"', END], 1),
     "new_after_list": (numbered(27), ["CLS", "LIST", DELAY, "NEW", DELAY, "LIST", END], 1),
     "window_default": (numbered(26), ["WINDOW 1,40,1,25", "CLS", "LIST", END], 1),
 }

@@ -156,7 +156,7 @@ def explore(cap,root,name,raw,numbers):
     observation=run_observation(cap,work,raw,exploratory=True)
     return {"original_source_sha256":oracle.sha(raw),
             "line_numbers":numbers,"run":observation,
-            "scope":"EXPLORATION_ONLY_NEVER_J1_10_B_PROOF"}
+            "scope":"EXPLORATION_ONLY_NEVER_J1_14_B_PROOF"}
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -186,7 +186,7 @@ def main():
                   "basic":"1.1","ram_kb":128,"version_output":version},
         "ghcr_image":GHCR_PIN,
         "rom_archived":False,"full_snapshots_archived":False,
-        "printer_is_screen_output":False,"j1_13_b_authorized":False,
+        "printer_is_screen_output":False,"j1_14_b_authorized":False,
         "historical_archives_modified":False,
         "mandatory_cases":list(MAIN_CASES),
         "exploratory_cases":list(EXPLORATORY),

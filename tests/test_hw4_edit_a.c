@@ -129,6 +129,34 @@ static void source_edit_list_run(void)
     assert(line.cursor_pos==5U);
     assert(key('I')==UART_LINE_APPEND);
     visible("10 PRINT 2");
+    /* C1: real editor cursor over 'N' in PRINT must preserve readable
+     * inverted glyph, then restore its RGB565 pixels when moved off. */
+    {
+        uint16_t screen[320];
+        uint8_t vram_copy[CPC_VIDEO_BYTES];
+        const unsigned x = (unsigned)video.cursor_column * 8U;
+        const unsigned y = CPC_VIDEO_VIEW_TOP + (unsigned)video.cursor_row * 8U + 2U;
+        const uint8_t bits = hw3_glyph_row((uint8_t)'N', 2U);
+        assert(video.cursor_column == 6U && video.cursor_row == 0U);
+        assert(bits != 0U && bits != 0xffU);
+        memcpy(vram_copy, guard.pixels, sizeof vram_copy);
+        assert(cpc_video_render_row(&video, y, screen, 320U));
+        for (unsigned dx = 0U; dx < 8U; ++dx) {
+            const bool ink = (bits & (uint8_t)(0x80U >> dx)) != 0U;
+            assert(screen[x + dx] ==
+                   cpc_video_palette_rgb565(video.ink[ink ? video.paper : video.pen]));
+        }
+        assert(seq("\x1b[D") == UART_LINE_LEFT); /* leave 'N' */
+        assert(cpc_video_render_row(&video, y, screen, 320U));
+        for (unsigned dx = 0U; dx < 8U; ++dx) {
+            const bool ink = (bits & (uint8_t)(0x80U >> dx)) != 0U;
+            assert(screen[x + dx] ==
+                   cpc_video_palette_rgb565(video.ink[ink ? video.pen : video.paper]));
+        }
+        assert(memcmp(vram_copy, guard.pixels, sizeof vram_copy) == 0);
+        assert(seq("\x1b[C") == UART_LINE_RIGHT); /* return to 'N' */
+        assert(memcmp(vram_copy, guard.pixels, sizeof vram_copy) == 0);
+    }
     assert(video.cursor_column==6U && video.cursor_row==0U);
     commit_line();
     assert(seq("20 PRIXNT 3")==UART_LINE_APPEND);

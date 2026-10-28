@@ -115,3 +115,36 @@ sur le nouveau HEAD : \`ON_DEVICE_UNVERIFIED\`.
 **Hors périmètre :** \`core/\`, ROM/fixtures CPC, SPI, DMA,
 orientation, tactile, SD, MODE2, pagination et architecture #112/#117.
 Validation/fusion de la PR réservée au Pilotage.
+
+## C1 — Curseur vidéo inverse non destructif (28 octobre 2026)
+
+Verdict Pilotage : [PR #127, mission HW4-EDIT-A-C1](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/127#issuecomment-6473714211).
+Sur le CYD au SHA `9067e589`, le PO avait validé l'édition et signalé
+qu'un curseur plein recouvrait et **masquait** le glyphe (ex. `Ready`).
+Ce correctif vise la cellule du curseur **au rendu**, pas sa VRAM.
+
+Pour les pixels du curseur, une fois le MODE0 ×2 / MODE2 OR_PAIR,
+EVEN ou VIEWPORT échantillonné, le rendu permute **uniquement**
+les indices logiques `PEN` et `PAPER`. Ainsi une cellule vide (PAPER)
+devient un bloc PEN ; un glyphe de saisie MODE1 en PEN conserve sa forme
+en PAPER sur fond PEN. Les autres indices d'encre sont inchangés :
+pas de généralisation à une inversion arbitraire de pixels graphiques.
+`PEN==PAPER` est non distinguable et ne peut produire un curseur
+visiblement inversé. L'effet ne dépend d'aucun second framebuffer,
+ne modifie pas les 16 000 octets de VRAM et ne crée pas de heap.
+
+`cpc_video_set_text_colors` marque maintenant la bande du curseur comme
+dirty si **PEN ou PAPER** change ; `set_ink` conserve son invalidation totale.
+Les transitions de position restaurent la cellule précédente par simple
+nouvel échantillonnage. Tests : reproduction **RED sur l'ancien overlay**
+(le pixel PEN d'un `R` devenait un bloc PEN et non PAPER), assertions
+RGB565 glyphes/vides, mode 0 ×2, mode 1, mode 2 OR_PAIR/EVEN/VIEWPORT,
+encre tierce préservée, PAPER seul, PEN seul, PEN==PAPER, déplacements,
+restauration visuelle, `dirty_bands`, canaris et invariance bit-à-bit VRAM ;
+intégration éditeur `PRINT` au-dessus du caractère `N`.
+
+Limites : règle CPC physique observée en MODE1 par le PO, sans oracle
+ROM exhaustif ni promesse de fidélité de l'édition plein écran MODE0/2.
+Le SHA de C1 doit être revalidé sur CYD après CI, avec un contrôle visuel
+simple (glyphe sous curseur lisible, restauration au départ, case vide
+opaque, pas de fault DMA), sans photo obligatoire.

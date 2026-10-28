@@ -17,6 +17,8 @@ jobs:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/j1-12-b1-for-next-tokens-list' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 55
+    env:
+      GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     container:
       image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
       credentials:

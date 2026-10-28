@@ -9,6 +9,8 @@ typedef struct {
     int present;
     BasicVariableKey key;
     BasicVariableValue value;
+    const uint8_t *string_bytes; /* Borrowed from immutable BASIC program. */
+    size_t string_length;
 } BEAssignment;
 
 typedef struct {
@@ -123,7 +125,7 @@ static BEStatus store_error(BVSStatus status)
 {
     switch (status) {
         case BVS_OK: return BE_OK;
-        case BVS_FULL: return BE_STORE_FULL;
+        case BVS_FULL: case BVS_NO_STRING_SPACE: return BE_STORE_FULL;
         case BVS_INVALID_KEY: return BE_INVALID_KEY;
         case BVS_INVALID_TYPE: return BE_INVALID_TYPE;
         case BVS_OVERLAPPING_MEMORY: return BE_OVERLAP;
@@ -636,7 +638,7 @@ static BEStatus execute_line(const BasicProgram *program,
                     if (status != BE_OK) {
                         return status;
                     }
-                } else if (token == 0x02u) {
+                } else if (token == 0x02u || token == 0x03u) {
                     BasicVariableKey key;
                     BasicVariableValue value;
                     size_t consumed = 0u;
@@ -652,17 +654,35 @@ static BEStatus execute_line(const BasicProgram *program,
                     if (resolved != BVB_OK) {
                         return binding_error(resolved);
                     }
-                    if (key.type != (uint8_t)BVT_INTEGER ||
-                        value.type != (uint8_t)BVT_INTEGER) {
-                        return BE_INVALID_TYPE;
+                    if (token == 0x03u) {
+                        const uint8_t *bytes;
+                        size_t n, j;
+                        BVSStatus span_status;
+                        if (key.type != (uint8_t)BVT_STRING ||
+                            value.type != (uint8_t)BVT_STRING)
+                            return BE_INVALID_TYPE;
+                        if (body[start + 1u] != 0u || body[start + 2u] != 0u)
+                            return BE_BAD_SEQUENCE;
+                        span_status = bvs_string_span(variables,
+                                                    &value.data.string,
+                                                    &bytes, &n);
+                        if (span_status != BVS_OK)
+                            return store_error(span_status);
+                        pos = start + consumed;
+                        for (j = 0u; j < n; ++j) {
+                            status = emit(out, bytes[j]);
+                            if (status != BE_OK) return status;
+                        }
+                    } else {
+                        if (key.type != (uint8_t)BVT_INTEGER ||
+                            value.type != (uint8_t)BVT_INTEGER)
+                            return BE_INVALID_TYPE;
+                        pos = start + consumed;
+                        status = emit_integer(out, value.data.integer);
+                        if (status != BE_OK) return status;
                     }
-                    pos = start + consumed;
-                    status = emit_integer(out, value.data.integer);
-                    if (status != BE_OK) {
-                        return status;
-                    }
-                } else if (token == 0x03u || token == 0x04u) {
-                    return BE_UNSUPPORTED; /* STRING and REAL5 postponed. */
+                } else if (token == 0x04u) {
+                    return BE_UNSUPPORTED; /* REAL5 postponed. */
                 } else {
                     return unexpected(token);
                 }
@@ -893,7 +913,7 @@ static BEStatus execute_line(const BasicProgram *program,
             *next = program->size - 2u;
             flow->action = BE_FLOW_CLEAR;
             return BE_OK;
-        } else if (token == 0x02u || token == 0xa5u) {
+        } else if (token == 0x02u || token == 0x03u || token == 0xa5u) {
             BasicVariableKey key;
             BasicVariableValue value = {0};
             size_t consumed, start;
@@ -916,7 +936,7 @@ static BEStatus execute_line(const BasicProgram *program,
                 if (pos == length) {
                     return BE_TRUNCATED;
                 }
-                if (body[pos] != 0x02u) {
+                if (body[pos] != 0x02u && body[pos] != 0x03u) {
                     return BE_BAD_SEQUENCE;
                 }
                 start = pos;
@@ -927,20 +947,39 @@ static BEStatus execute_line(const BasicProgram *program,
             if (resolved != BVB_OK) {
                 return binding_error(resolved);
             }
-            if (key.type != (uint8_t)BVT_INTEGER) {
+            if (key.type != (uint8_t)BVT_INTEGER &&
+                key.type != (uint8_t)BVT_STRING)
                 return BE_INVALID_TYPE;
-            }
+            if (key.type == (uint8_t)BVT_STRING &&
+                (body[start + 1u] != 0u || body[start + 2u] != 0u))
+                return BE_BAD_SEQUENCE;
             pos = start + consumed;
             skip_spaces(body, length, &pos);
-            if (pos == length) {
-                return BE_TRUNCATED;
-            }
-            if (body[pos++] != 0xefu) {
-                return BE_BAD_SEQUENCE;
-            }
+            if (pos == length) return BE_TRUNCATED;
+            if (body[pos++] != 0xefu) return BE_BAD_SEQUENCE;
             skip_spaces(body, length, &pos);
-            if (pos == length) {
-                return BE_TRUNCATED;
+            if (pos == length) return BE_TRUNCATED;
+            if (key.type == (uint8_t)BVT_STRING) {
+                size_t beginning, string_length;
+                if (body[pos++] != (uint8_t)'"') return BE_BAD_SEQUENCE;
+                beginning = pos;
+                while (pos < length && body[pos] != (uint8_t)'"') {
+                    if (body[pos] < 0x20u || body[pos] > 0x7eu)
+                        return BE_BAD_SEQUENCE;
+                    ++pos;
+                }
+                if (pos == length) return BE_TRUNCATED;
+                string_length = pos - beginning;
+                ++pos;
+                skip_spaces(body, length, &pos);
+                if (pos != length) return BE_BAD_SEQUENCE;
+                assignment->present = 1;
+                assignment->key = key;
+                assignment->value.type = (uint8_t)BVT_STRING;
+                assignment->string_bytes = body + beginning;
+                assignment->string_length = string_length;
+                *next = line->next_offset;
+                return BE_OK;
             }
             literal = body[pos++];
             if (literal == 0xf5u) {
@@ -1285,12 +1324,20 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
     /* Before the output-writing pass, preflight the only possible store
      * commit failure (full entries). This also protects PRINT:FOR lines. */
     if (assignment.present) {
-        size_t index;
-        BVSStatus lookup = bvs_find(variables, &assignment.key, &index);
-        if (lookup == BVS_NOT_FOUND && variables->count == variables->capacity)
-            return BE_STORE_FULL;
-        if (lookup != BVS_OK && lookup != BVS_NOT_FOUND)
-            return store_error(lookup);
+        if (assignment.value.type == (uint8_t)BVT_STRING) {
+            status = store_error(bvs_can_assign_string(variables,
+                                          &assignment.key,
+                                          assignment.string_bytes,
+                                          assignment.string_length));
+            if (status != BE_OK) return status;
+        } else {
+            size_t index;
+            BVSStatus lookup = bvs_find(variables, &assignment.key, &index);
+            if (lookup == BVS_NOT_FOUND && variables->count == variables->capacity)
+                return BE_STORE_FULL;
+            if (lookup != BVS_OK && lookup != BVS_NOT_FOUND)
+                return store_error(lookup);
+        }
     }
     if (probe.length > output_capacity) {
         return BE_NO_SPACE;
@@ -1319,12 +1366,19 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
          (assignment.key.type != second.key.type ||
           assignment.key.name_length != second.key.name_length ||
           memcmp(assignment.key.name, second.key.name, BVT_MAX_NAME_LENGTH) != 0 ||
-          assignment.value.data.integer != second.value.data.integer))) {
+          (assignment.value.type != second.value.type ||
+           (assignment.value.type == (uint8_t)BVT_STRING ?
+            (assignment.string_length != second.string_length ||
+             assignment.string_bytes != second.string_bytes) :
+            assignment.value.data.integer != second.value.data.integer))))) {
         /* Unreachable while the documented immutable-input contract holds. */
         return BE_BAD_PROGRAM;
     }
     if (assignment.present) {
-        status = store_error(bvs_assign(variables, &assignment.key, &assignment.value));
+        status = store_error(assignment.value.type == (uint8_t)BVT_STRING ?
+                     bvs_assign_string(variables, &assignment.key,
+                                       assignment.string_bytes, assignment.string_length) :
+                     bvs_assign(variables, &assignment.key, &assignment.value));
         if (status != BE_OK) {
             return status;
         }

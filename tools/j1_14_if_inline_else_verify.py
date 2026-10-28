@@ -210,7 +210,7 @@ def verify(base, permanent=False):
             m.get("rom_archived") is False and
             m.get("full_snapshots_archived") is False and
             m.get("printer_is_screen_output") is False and
-            m.get("j1_13_b_authorized") is False and
+            m.get("j1_14_b_authorized") is False and
             m.get("historical_archives_modified") is False and
             m.get("ghcr_image") == GHCR_PIN,
             "MANIFEST_PROVENANCE_CHANGED")
@@ -251,7 +251,7 @@ def verify(base, permanent=False):
         require(read(folder/"original.bas") == source_data and
                 experiment["original_source_sha256"] == sha(source_data) and
                 experiment["line_numbers"] == numbers and
-                experiment["scope"] == "EXPLORATION_ONLY_NEVER_J1_10_B_PROOF",
+                experiment["scope"] == "EXPLORATION_ONLY_NEVER_J1_14_B_PROOF",
                 name+": EXPLORATORY_SOURCE_OR_SCOPE_CHANGED")
         run = experiment["run"]
         require(run["fresh_cpc_run_process"] is True and

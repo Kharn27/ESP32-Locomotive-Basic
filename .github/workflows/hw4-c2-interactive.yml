@@ -35,6 +35,15 @@ jobs:
               exit 1
             fi
             python3 tools/j1_10_if_then_verify.py --permanent --self-test
+          elif test "$GITHUB_HEAD_REF" = "oracle/j1-11-a-gosub-return"; then
+            # J1.11-A may ADD only its dedicated ROM oracle; all earlier
+            # fixtures, sources and HW4 transport must remain byte-identical.
+            git diff --name-only "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/ > "$RUNNER_TEMP/hw4-j111-diff.txt"
+            if grep -Ev '^(tests/fixtures/cpc6128/j1_11_gosub_return/|tests/oracles/inputs/j1_11_a/|tests/oracles/j1_11_gosub_return_oracle.py$)' "$RUNNER_TEMP/hw4-j111-diff.txt"; then
+              echo "J1.11-A OLD_ORACLE_OR_HW4_MODIFICATION_FORBIDDEN"
+              exit 1
+            fi
+            python3 tools/j1_11_gosub_return_verify.py --permanent --self-test
           else
             git diff --exit-code "$base" HEAD -- tests/fixtures/ tests/oracles/ video/cpc_video.c video/cpc_palette.c firmware/components/cyd_ili9341/
           fi

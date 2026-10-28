@@ -1,6 +1,6 @@
 # HW4-C3-B2 — Défilement texte MODE1 natif sur CYD
 
-Mission autorisée : [issue #114](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/114). Base acceptée : `main` `85ad98ec83f6066fd15fe341d2a54594efb795ec`, après B1-C1 [PR #109](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/109). Branche : `feat/hw4-c3-b2-mode1-text-scroll`. **Aucune validation PO physique ou acceptation Pilotage ne découle de cette note.**
+Mission autorisée : [issue #114](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/114). Base acceptée : `main` `85ad98ec83f6066fd15fe341d2a54594efb795ec`, après B1-C1 [PR #109](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/109). Branche : `feat/hw4-c3-b2-mode1-text-scroll`. Base intégrée J1.11-A : `main` `a7f49329d581aa26522ace888f1374ba1e6d8307` ; oracles historiques inchangés. **Aucune validation PO physique ou acceptation Pilotage ne découle de cette note.**
 
 ## Comportement et source de preuve
 

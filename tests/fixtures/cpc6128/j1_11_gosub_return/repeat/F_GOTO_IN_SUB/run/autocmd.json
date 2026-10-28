@@ -1,0 +1,24 @@
+{
+  "commands": [
+    "10 GOSUB 100",
+    "20 PRINT #8,21",
+    "30 END",
+    "100 GOTO 120",
+    "110 PRINT #8,99",
+    "120 PRINT #8,121",
+    "130 RETURN",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+    "PRINT #8,ERR",
+    "PRINT #8,ERL",
+    "CAP32_DELAY CAP32_EXIT"
+  ],
+  "program_sha256": "0e17b1e2953ac7177b8971f9838be817857ad88e47453deca338395292db24c0",
+  "runtime_printer_in_program": true,
+  "post_run_direct_probe": [
+    "ERR",
+    "ERL"
+  ],
+  "screenshot_before_post_run_probes": true,
+  "printer_is_not_screen_output": true
+}

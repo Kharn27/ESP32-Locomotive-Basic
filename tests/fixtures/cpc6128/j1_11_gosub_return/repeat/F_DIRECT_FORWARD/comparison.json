@@ -1,0 +1,10 @@
+{
+  "classification": "UNSUPPORTED",
+  "basis": "raw contiguous RAM records including 0000 sentinel",
+  "first_difference": null,
+  "cpc_size": 48,
+  "c99_size": null,
+  "cpc_sha256": "5b33c77dd8f0b40d3da682ef15487c1c50acd8db1894fd5ac59a3edcf94b45dd",
+  "c99_sha256": null,
+  "c99_rejection": "image-cli: input rejected: BS=8 BT=4 BP=0 BL=0"
+}

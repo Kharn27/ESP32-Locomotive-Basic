@@ -520,6 +520,16 @@ if(BUILD_TESTING)
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
 
+
+# J1.11-A: independent CPC6128 GOSUB/RETURN oracle, strictly pre-native.
+# Missing/unsealed archives fail closed until independent GHCR acquisition.
+if(BUILD_TESTING)
+    add_test(NAME j1_11_a_gosub_return_cpc_permanent COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_11_gosub_return_verify.py"
+        --permanent --self-test)
+endif()
+
 # HW4-C3-B2: MODE1 raster scroll, cursor wrap and injected dirty-band retry.
 # No CPC pixel-equality or physical LCD transfer is claimed by this C99 test.
 if(BUILD_TESTING)

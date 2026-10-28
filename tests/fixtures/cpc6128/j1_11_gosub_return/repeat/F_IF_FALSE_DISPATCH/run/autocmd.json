@@ -1,0 +1,25 @@
+{
+  "commands": [
+    "10 A%=0",
+    "20 IF A% THEN 50",
+    "30 GOSUB 100",
+    "40 END",
+    "50 PRINT #8,51",
+    "60 END",
+    "100 PRINT #8,101",
+    "110 RETURN",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+    "PRINT #8,ERR",
+    "PRINT #8,ERL",
+    "CAP32_DELAY CAP32_EXIT"
+  ],
+  "program_sha256": "738ec1d9dfc4eb3a9cd2e8e4afb6d97c617cda51462dfc97837f7b4c7e3a2926",
+  "runtime_printer_in_program": true,
+  "post_run_direct_probe": [
+    "ERR",
+    "ERL"
+  ],
+  "screenshot_before_post_run_probes": true,
+  "printer_is_not_screen_output": true
+}

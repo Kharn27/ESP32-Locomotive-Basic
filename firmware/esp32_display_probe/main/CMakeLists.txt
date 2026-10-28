@@ -16,7 +16,7 @@ if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
             "hw4_c2_console.c" "cpc_font.c"
             "../../../video/cpc_video.c" "../../../video/cpc_palette.c" "../../../video/cpc_boot.c"
             "../../../video/cpc_text.c" "../../../io/cpc_uart_console.c"
-            "../../../io/uart_line.c"
+            "../../../io/uart_line.c" "../../../io/cpc_screen_nav.c"
         INCLUDE_DIRS "." "../../../video" "../../../io"
         REQUIRES loco_core cyd_ili9341 esp_driver_uart
                  freertos heap esp_system esp_app_format

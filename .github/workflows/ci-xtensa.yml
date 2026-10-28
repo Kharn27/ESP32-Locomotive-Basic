@@ -15,105 +15,112 @@ concurrency:
 
 jobs:
 
-  three-profiles:
+  profile-guards:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4.2.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Profile selector, retired-root and duplicate app_main negative tests
+      - name: Profiles, obsolete-path and partition negative tests
         run: |
+          set -euo pipefail
           python3 tools/ci/check_loco_cyd_profiles.py --self-test
           python3 tools/ci/check_u1b_retirement.py --self-test
           python3 tools/ci/check_u1b_retirement.py --scan
           python3 tools/ci/test_u1b_partition.py
           python3 tools/ci/check_u1b_memory.py --self-test
-      - name: Three canonical profile images in ESP-IDF v5.5.6
+
+  three-profiles:
+    needs: profile-guards
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: CONSOLE
+            tag: console
+          - profile: HW3
+            tag: hw3
+          - profile: BASIC_PROBE
+            tag: basic
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Build and check Xtensa ESP-IDF v5.5.6 profile ${{ matrix.profile }}
+        shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-        shell: bash
+          PROFILE: ${{ matrix.profile }}
+          TAG: ${{ matrix.tag }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           docker run --rm -v "$PWD:/project" -w /project \
             -e IDF_GIT_SAFE_DIR=/project -e EXPECTED_HEAD="$EXPECTED_HEAD" \
-            espressif/idf:v5.5.6 bash -lc '
+            -e PROFILE="$PROFILE" -e TAG="$TAG" espressif/idf:v5.5.6 bash -lc '
               set -euo pipefail
               idf.py --version | grep -Fx "ESP-IDF v5.5.6"
               cd /project/firmware/esp32_display_probe
-              mkdir -p reports/u1-b/console reports/u1-b/hw3 reports/u1-b/basic
-              for profile in CONSOLE HW3 BASIC_PROBE; do
-                case "$profile" in
-                  CONSOLE) tag=console ;;
-                  HW3) tag=hw3 ;;
-                  BASIC_PROBE) tag=basic ;;
-                esac
-                dir="build-u1-$tag"
-                out="reports/u1-b/$tag"
-                # ESP-IDF writes sdkconfig at the project root by default;
-                # isolate it per profile as well as each Ninja build cache.
-                config="$PWD/sdkconfig.u1-$tag"
-                idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$profile" set-target esp32 > "$out/set-target.log" 2>&1
-                idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$profile" build > "$out/build.log" 2>&1
-                idf.py -B "$dir" size > "$out/size.txt" 2>&1
-                python3 /project/tools/ci/check_u1b_memory.py "$profile" "$out/size.txt" | tee "$out/memory-parity.txt"
-                idf.py -B "$dir" size-components > "$out/size-components.txt" 2>&1
-                grep -Fx "LOCO_CYD_PROFILE:STRING=$profile" "$dir/CMakeCache.txt"
-                test -s "$dir/loco_esp32_display_probe.elf"
-                test -s "$dir/loco_esp32_display_probe.bin"
-                xtensa-esp-elf-nm --defined-only "$dir/loco_esp32_display_probe.elf" |
-                  python3 /project/tools/ci/check_loco_cyd_profiles.py --nm
-                python3 /project/tools/ci/verify_esp_app_version.py \
-                  "$dir/loco_esp32_display_probe.bin" "$EXPECTED_HEAD" loco_esp32_display_probe
-                xtensa-esp-elf-readelf -h "$dir/loco_esp32_display_probe.elf" > "$out/elf-header.txt"
-                sha256sum "$dir/loco_esp32_display_probe.bin" > "$out/binary-sha256.txt"
-                python3 /project/tools/ci/check_build.py \
-                  "$config" partitions.csv "$dir/loco_esp32_display_probe.bin" > "$out/partitions.txt"
-                echo "U1-B PROFILE_$profile=PASS"
-              done
-              # No second ELF entrypoint and the real legacy ABI/probe remains.
-              python3 /project/tools/ci/report_abi.py \
-                build-u1-basic/loco_esp32_display_probe.elf > reports/u1-b/basic/xtensa-abi.txt
-              xtensa-esp-elf-nm --defined-only build-u1-basic/loco_esp32_display_probe.elf |
-                grep -F " loco_probe_abi_sizes"
-              grep -Fx "CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144" sdkconfig.u1-console
-              test ! -e /project/firmware/locomotive_cyd
-              if idf.py -B build-u1-invalid -DLOCO_CYD_PROFILE=INVALID reconfigure > reports/u1-b/invalid.log 2>&1; then
-                echo "U1-A invalid profile unexpectedly compiled"
-                exit 1
+              dir="build-u1-$TAG"
+              out="reports/u1-b/$TAG"
+              config="$PWD/sdkconfig.u1-$TAG"
+              mkdir -p "$out"
+              idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$PROFILE" set-target esp32 > "$out/set-target.log" 2>&1
+              idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$PROFILE" build > "$out/build.log" 2>&1
+              idf.py -B "$dir" size > "$out/size.txt" 2>&1
+              python3 /project/tools/ci/check_u1b_memory.py "$PROFILE" "$out/size.txt" | tee "$out/memory-parity.txt"
+              idf.py -B "$dir" size-components > "$out/size-components.txt" 2>&1
+              grep -Fx "LOCO_CYD_PROFILE:STRING=$PROFILE" "$dir/CMakeCache.txt"
+              test -s "$dir/loco_esp32_display_probe.bin"
+              test -s "$dir/loco_esp32_display_probe.elf"
+              xtensa-esp-elf-nm --defined-only "$dir/loco_esp32_display_probe.elf" |
+                python3 /project/tools/ci/check_loco_cyd_profiles.py --nm
+              python3 /project/tools/ci/verify_esp_app_version.py \
+                "$dir/loco_esp32_display_probe.bin" "$EXPECTED_HEAD" loco_esp32_display_probe
+              xtensa-esp-elf-readelf -h "$dir/loco_esp32_display_probe.elf" > "$out/elf-header.txt"
+              xtensa-esp-elf-readelf -S -W "$dir/loco_esp32_display_probe.elf" > "$out/elf-sections.txt"
+              sha256sum "$dir/loco_esp32_display_probe.bin" > "$out/binary-sha256.txt"
+              python3 /project/tools/ci/check_build.py \
+                "$config" partitions.csv "$dir/loco_esp32_display_probe.bin" > "$out/partitions.txt"
+              if test "$PROFILE" = "CONSOLE"; then
+                grep -Fx "CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144" "$config"
+                if idf.py -B build-u1-invalid -DLOCO_CYD_PROFILE=INVALID reconfigure > "$out/invalid.log" 2>&1; then
+                  echo "U1-B invalid profile unexpectedly compiled"; exit 1
+                fi
+                grep -F "U1-A invalid LOCO_CYD_PROFILE" "$out/invalid.log"
+                if idf.py -B build-u1-conflict -DLOCO_CYD_PROFILE=HW3 -DHW4_C2_CONSOLE=ON reconfigure > "$out/conflict.log" 2>&1; then
+                  echo "U1-B conflicting selectors unexpectedly compiled"; exit 1
+                fi
+                grep -F "U1-A conflicting selectors" "$out/conflict.log"
               fi
-              grep -F "U1-A invalid LOCO_CYD_PROFILE" reports/u1-b/invalid.log
-              if idf.py -B build-u1-conflict -DLOCO_CYD_PROFILE=HW3 -DHW4_C2_CONSOLE=ON reconfigure > reports/u1-b/conflict.log 2>&1; then
-                echo "U1-A contradictory profile unexpectedly compiled"
-                exit 1
+              if test "$PROFILE" = "BASIC_PROBE"; then
+                python3 /project/tools/ci/report_abi.py "$dir/loco_esp32_display_probe.elf" > "$out/xtensa-abi.txt"
+                xtensa-esp-elf-nm --defined-only "$dir/loco_esp32_display_probe.elf" | grep -F " loco_probe_abi_sizes"
+                test "$(grep -Ec "^[A-Za-z_0-9]+=[0-9]+ bytes$" "$out/xtensa-abi.txt")" -eq 16
+                grep -Fx "LocoProbeStorage=19072 bytes" "$out/xtensa-abi.txt"
+                grep -Fx "core_descriptor_bytes=636" "$out/xtensa-abi.txt"
+                grep -Fx "owned_buffers_and_entries_bytes=18432" "$out/xtensa-abi.txt"
+                if python3 /project/tools/ci/report_abi.py partitions.csv > "$out/abi-negative.log" 2>&1; then
+                  echo "U1-B invalid ELF was accepted"; exit 1
+                fi
               fi
-              grep -F "U1-A conflicting selectors" reports/u1-b/conflict.log
-              # Legacy standalone project is deliberately absent after migration.
-              test "$(grep -Ec "^[A-Za-z_0-9]+=[0-9]+ bytes$" reports/u1-b/basic/xtensa-abi.txt)" -eq 16
-              grep -Fx "LocoProbeStorage=19072 bytes" reports/u1-b/basic/xtensa-abi.txt
-              grep -Fx "core_descriptor_bytes=636" reports/u1-b/basic/xtensa-abi.txt
-              grep -Fx "owned_buffers_and_entries_bytes=18432" reports/u1-b/basic/xtensa-abi.txt
-              if python3 /project/tools/ci/report_abi.py partitions.csv > reports/u1-b/basic/abi-negative.log 2>&1; then
-                echo "U1-B invalid ELF was accepted"; exit 1
-              fi
-              echo "U1-B THREE_PROFILES_SINGLE_ROOT=PASS"
+              echo "U1-B PROFILE_$PROFILE=PASS"
             '
       - uses: actions/upload-artifact@v4.6.2
         if: always()
         with:
-          name: arch-hw4-u1-b-three-profiles
+          name: arch-hw4-u1-b-${{ matrix.tag }}
           retention-days: 30
           if-no-files-found: warn
           path: |
-            firmware/esp32_display_probe/reports/u1-b/
-            firmware/esp32_display_probe/build-u1-console/loco_esp32_display_probe.elf
-            firmware/esp32_display_probe/build-u1-console/loco_esp32_display_probe.bin
-            firmware/esp32_display_probe/build-u1-hw3/loco_esp32_display_probe.elf
-            firmware/esp32_display_probe/build-u1-hw3/loco_esp32_display_probe.bin
-            firmware/esp32_display_probe/build-u1-basic/loco_esp32_display_probe.elf
-            firmware/esp32_display_probe/build-u1-basic/loco_esp32_display_probe.bin
+            firmware/esp32_display_probe/reports/u1-b/${{ matrix.tag }}/
+            firmware/esp32_display_probe/build-u1-${{ matrix.tag }}/loco_esp32_display_probe.elf
+            firmware/esp32_display_probe/build-u1-${{ matrix.tag }}/loco_esp32_display_probe.bin
 
   # HW4-EDIT-A: reproduce the PO's *existing* ESP-IDF project and standard
   # VS Code "Build" action (idf.py build => default build/ cache).

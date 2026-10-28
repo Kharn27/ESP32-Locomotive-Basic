@@ -28,10 +28,229 @@ BASE = ROOT / "tests/fixtures/cpc6128/j1_13_integer_relations"
 # Transcribed from independent GHCR original run 40615245342
 # acquired at HEAD 9ef54a01f9b8c12eb11c559c3930cd3d37729a2a; seal remains PENDING_PILOTAGE.
 # External anchors intentionally absent until real CPC archival.
-PINNED_MANIFEST_SHA = ""
-PINNED_RAM = {}
-PINNED_PRINTER = {}
-PINNED_OUTCOMES = {}
+PINNED_MANIFEST_SHA = "69ee185aa63fe6db1df8f6092af19df0a15dec70b991d918e8f99d2657a03070"
+PINNED_RAM = {
+    "R_EQ_TRUE": "0f79939f13668678076db8f343f2c2b9bac56bcf0f6d934a1bd487c11da237f7",
+    "R_EQ_FALSE": "08266884653b12837c0cb113eedfdb119e4f1537c306b2b05e1f65cca8f2c796",
+    "R_EQ_EQUAL": "d73c62aee922b85bd4a001e9323c81c457595856e8f6823e3ebf1234d3a2eaca",
+    "R_EQ_SIGNED": "ef6b1f39009b04e6a90c47a357b9bcd786c17b0bee5d6de0fc063675fd4b35b5",
+    "R_NE_TRUE": "5ef010e5eae894f810fa9c7ff77c9fdde05641f6d7e33b7694be8bf6074fa625",
+    "R_NE_FALSE": "84a9e182bff4cda2992b180c88fe9e3e0c0f8b26d2d66ecac4bc8c4f472a0888",
+    "R_NE_EQUAL": "277beddb3e9da52323224396bf68c4cd17858d7528e19982a280e41c000733c1",
+    "R_NE_SIGNED": "c4f11e2205b022a2bcd5fc4064e9dcc3ebff83c9db615cc68b6ace8812d56dd6",
+    "R_LT_TRUE": "2624946da42d3044f2000d6a6f55068fa769699daaed566b0b4b6da085a06c79",
+    "R_LT_FALSE": "271f5f76dfa8e3b06a9c207deb25d99c45ea482f1e420dded5e914744f34ee22",
+    "R_LT_EQUAL": "7a8c27302379cdd16c7b19b64bd87e62c3bc40755250a81d77a04a65302fb60b",
+    "R_LT_SIGNED": "b0507b46077358c0eee7402ea82be3995f427c0222ad3f6be2a63c1e9dfd4eec",
+    "R_LE_TRUE": "f9446b78a5ee44ac11ced5db6d5d948a6e600dd48913a5bfe4136a6201f1468b",
+    "R_LE_FALSE": "fc6599dbc8966b89410e535628c615ae5a9cd0287fca5295921eee586c56b257",
+    "R_LE_EQUAL": "19ec08d25f88769609b070a623514cc2ef741cd7768fd21c13f974fe048a259f",
+    "R_LE_SIGNED": "9ad015ee766ca1894f5660e32f6a9c2356bf1a7ac0ffeeb2317f0502f9f91808",
+    "R_GT_TRUE": "d0ab87b668ad4a1a694ca2af2be6eda9980b9bdc03f4a0d21b2d63bbf9ca23d1",
+    "R_GT_FALSE": "9b8c88df1e78b672db613aa91ac0c8342edfc6e4cb30a9bd817b94d2c065a2e5",
+    "R_GT_EQUAL": "b079ef07487757b5be57208964722e63844e5d20d7e37b34ab0db5660d7a2d7b",
+    "R_GT_SIGNED": "1b03063b2798f9db98b093c3adba1216fdcf1e2cd88d5c945e18abfa2c2a1cbf",
+    "R_GE_TRUE": "da350553e29ffa0f055afedbb38d5cc961d3df0580a8b94c2b6289b5c054dfdd",
+    "R_GE_FALSE": "8da513af468dc6c2dd7590aef297a572aba357ebe8fae1ec0c05d7c569a5d91c",
+    "R_GE_EQUAL": "e2ba53d08236d63c59e9b6fdab2245e2fd2da00cfa8606552f4df89b201bc2bd",
+    "R_GE_SIGNED": "2c900e3bbe4452a880ad1ebdb4da5c9b7b48de7582fc849a63aeadaa4e21d635"
+}
+PINNED_PRINTER = {
+    "R_EQ_TRUE": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_EQ_FALSE": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_EQ_EQUAL": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_EQ_SIGNED": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_NE_TRUE": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_NE_FALSE": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_NE_EQUAL": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_NE_SIGNED": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_LT_TRUE": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_LT_FALSE": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_LT_EQUAL": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_LT_SIGNED": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_LE_TRUE": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_LE_FALSE": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_LE_EQUAL": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_LE_SIGNED": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_GT_TRUE": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_GT_FALSE": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_GT_EQUAL": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_GT_SIGNED": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_GE_TRUE": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_GE_FALSE": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca",
+    "R_GE_EQUAL": "4bb323d31e58432fbaadd114190987cb5d42f654136cf5ab3520a1e6bf8f7ad1",
+    "R_GE_SIGNED": "1cc3739a064ab6cca380953f5c949a5216be05028db6e9846951f5d64bf12fca"
+}
+PINNED_OUTCOMES = {
+    "R_EQ_TRUE": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_EQ_FALSE": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_EQ_EQUAL": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_EQ_SIGNED": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_NE_TRUE": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_NE_FALSE": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_NE_EQUAL": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_NE_SIGNED": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_LT_TRUE": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_LT_FALSE": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_LT_EQUAL": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_LT_SIGNED": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_LE_TRUE": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_LE_FALSE": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_LE_EQUAL": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_LE_SIGNED": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_GT_TRUE": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_GT_FALSE": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_GT_EQUAL": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_GT_SIGNED": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_GE_TRUE": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_GE_FALSE": [
+        [
+            420
+        ],
+        0,
+        0
+    ],
+    "R_GE_EQUAL": [
+        [
+            810
+        ],
+        0,
+        0
+    ],
+    "R_GE_SIGNED": [
+        [
+            420
+        ],
+        0,
+        0
+    ]
+}
 
 class Invalid(ValueError):
     pass
@@ -88,6 +307,16 @@ def if_records(data, lines, records):
                     binary[:2] == len(binary).to_bytes(2, "little") and
                     int.from_bytes(binary[2:4], "little") == rec["line"],
                     "CPC_FLOW_LINE_HEADER_INVALID")
+            # Observed ROM token layout of the IF line: IF=A1, 02 caches,
+            # relation opcode, THEN=EB, direct line number 1E 46 00.
+            opcodes = {b"=":0xef, b"<>":0xf2, b"<":0xf1,
+                       b"<=":0xf3, b">":0xee, b">=":0xf0}
+            match = re.search(rb"IF A%(<>|<=|>=|=|<|>)B% THEN 70", row)
+            require(match is not None and len(binary)==22 and
+                    binary[4]==0xa1 and binary[6]==0x02 and
+                    binary[11]==0x02 and binary[10]==opcodes[match.group(1)] and
+                    binary[16]==0xeb and binary[18:21]==b"\\x1e\\x46\\x00",
+                    "CPC_IF_RELATIONAL_ROM_TOKEN_LAYOUT_CHANGED")
             found.append({"line_number":rec["line"],
                           "record_hex":binary.hex(" ").upper(),
                           "record_length":len(binary)})
@@ -304,6 +533,9 @@ def falsify(base):
             ("RAM",copy/"original"/name/"program.bin"),
             ("IF_OPERATOR_TOKEN",copy/"original"/name/"program.bin"),
             ("INTEGER_CACHE",copy/"original"/name/"program.bin"),
+            ("SECOND_INTEGER_CACHE",copy/"original"/name/"program.bin"),
+            ("THEN_TOKEN",copy/"original"/name/"program.bin"),
+            ("REPEAT_IF_RECORD",copy/"repeat"/name/"program.bin"),
             ("THEN_TARGET",copy/"original"/name/"program.bin"),
             ("PRINTER",copy/"original"/name/"run/printer.dat"),
             ("LIST_PNG",copy/"original"/name/"list.png"),
@@ -321,7 +553,25 @@ def falsify(base):
             raw = read(path)
             require(len(raw) >= 3,label+": SHORT_FALSIFICATION_TARGET")
             corrupt = bytearray(raw)
-            corrupt[2] ^= 1
+            byte_index = 2
+            # Positions obtained from the archived IF records (line 30), not
+            # from a C99-produced token stream: operator 10, cache 7/12,
+            # THEN 16, literal target byte 19.
+            targeted = {
+                "IF_OPERATOR_TOKEN":10, "INTEGER_CACHE":7,
+                "SECOND_INTEGER_CACHE":12, "THEN_TOKEN":16,
+                "THEN_TARGET":19, "REPEAT_IF_RECORD":10
+            }
+            if label in targeted:
+                observed,rows = oracle.records(raw)
+                rec = next(row for row in rows if row["line"] == 30)
+                require(observed == [10,20,30,40,50,70,80],
+                        label+": CANNOT_LOCATE_AUTHENTIC_IF_RECORD")
+                byte_index = rec["offset"] + targeted[label]
+                require(byte_index < len(raw), label+": SHORT_IF_RECORD")
+            elif label == "SOURCE":
+                byte_index = raw.index(b"IF A%") + len(b"IF A%")
+            corrupt[byte_index] ^= 1
             path.write_bytes(corrupt)
             try:
                 verify(copy,permanent=True)
@@ -343,7 +593,7 @@ def falsify(base):
             raise Invalid("FALSE_HEAD_ACCEPTED")
         require(sha(read(base/"manifest.json")) == PINNED_MANIFEST_SHA,
                 "CANONICAL_MANIFEST_CHANGED_BY_NEGATIVES")
-    print("PASS J1.13-A 15 FALSIFICATIONS + FALSE HEAD",flush=True)
+    print("PASS J1.13-A 18 FALSIFICATIONS + FALSE HEAD",flush=True)
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)

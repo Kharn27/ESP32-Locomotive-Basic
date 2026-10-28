@@ -544,8 +544,6 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 }
             }
             ++pos;
-                return BL_BAD_SEQUENCE;
-            }
             status = append_word(out, "THEN");
             if (status != BL_OK) {
                 return status;
@@ -569,8 +567,6 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 }
             }
             ++pos;
-                return BL_BAD_SEQUENCE;
-            }
             if (length - pos < 2u) {
                 return BL_TRUNCATED;
             }

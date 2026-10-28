@@ -38,6 +38,10 @@ target_include_directories(basic_session PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core
 target_link_libraries(basic_session PUBLIC basic_tokenizer basic_listing basic_program)
 
 include(CTest)
+# Labels are scheduled after the complete CMakeLists has registered all tests.
+if(BUILD_TESTING)
+    include(cmake/CTestLabels.cmake)
+endif()
 if(BUILD_TESTING)
     add_executable(test_basic_program tests/test_basic_program.c)
     target_link_libraries(test_basic_program PRIVATE basic_program)
@@ -528,9 +532,4 @@ if(BUILD_TESTING)
         ${Python3_EXECUTABLE}
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_11_gosub_return_verify.py"
         --permanent --self-test)
-endif()
-
-# CI-OPT1: label existing and future CTest suites without changing their commands.
-if(BUILD_TESTING)
-    include(cmake/CTestLabels.cmake)
 endif()

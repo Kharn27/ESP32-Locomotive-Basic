@@ -1,6 +1,7 @@
 #include "basic_session_runtime.h"
 
 #include <stdint.h>
+#include <string.h>
 
 static BSRResult result(BSRStatus status, BSResult session, BEStatus executor)
 {
@@ -253,6 +254,9 @@ BSRResult bsr_submit(BasicSessionRuntime *runtime,
             }
         }
         runtime->state = BSR_IDLE;
+        runtime->executor.call_depth = 0u;
+        runtime->executor.statement_offset = 0u;
+        memset(runtime->executor.call_stack, 0, sizeof(runtime->executor.call_stack));
     }
     return from_session(session_result);
 }
@@ -281,6 +285,9 @@ BSRResult bsr_step(BasicSessionRuntime *runtime,
     if (status == BE_END) {
         BSRResult ended = simple(BSR_END);
         runtime->state = BSR_IDLE;
+        runtime->executor.call_depth = 0u;
+        runtime->executor.statement_offset = 0u;
+        memset(runtime->executor.call_stack, 0, sizeof(runtime->executor.call_stack));
         ended.executor_status = BE_END;
         return ended;
     }
@@ -296,5 +303,8 @@ BSRResult bsr_stop(BasicSessionRuntime *runtime)
         return simple(BSR_INVALID_ARGUMENT);
     }
     runtime->state = BSR_IDLE;
+    runtime->executor.call_depth = 0u;
+    runtime->executor.statement_offset = 0u;
+    memset(runtime->executor.call_stack, 0, sizeof(runtime->executor.call_stack));
     return simple(BSR_OK);
 }

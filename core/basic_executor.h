@@ -25,12 +25,27 @@ typedef enum {
     BE_INVALID_TYPE,
     BE_VARIABLE_NOT_FOUND, /* Internal diagnostic, not a CPC error code. */
     BE_INTEGER_OVERFLOW, /* Internal range error; not a CPC numeric code. */
-    BE_DIVISION_BY_ZERO /* Internal error, separate from CPC ERR=11. */
+    BE_DIVISION_BY_ZERO, /* Internal error, separate from CPC ERR=11. */
+    BE_RETURN_WITHOUT_GOSUB, /* Host diagnostic, not CPC ERR=3. */
+    BE_CALL_STACK_FULL /* Bounded host stack, not a measured CPC limit. */
 } BEStatus;
+
+/* J1.11-B: fixed per-executor call stack, no heap and no C recursion.
+ * Eight nested GOSUB frames are supported; this is NOT a CPC ROM limit.
+ * cursor is a program record offset; statement_offset is a body-relative
+ * continuation after CPC token 01 (colon), or zero at a new line. */
+#define BE_GOSUB_STACK_CAPACITY 8u
+typedef struct {
+    size_t cursor;
+    size_t statement_offset;
+} BECallFrame;
 
 typedef struct {
     const BasicProgram *program; /* Borrowed; immutable through execution. */
     size_t cursor;               /* Offset of next record (or sentinel). */
+    size_t statement_offset;     /* Position inside the current line body. */
+    size_t call_depth;
+    BECallFrame call_stack[BE_GOSUB_STACK_CAPACITY];
     BasicVariableStore *variables; /* Optional borrowed caller-owned store. */
 } BasicExecutor;
 
@@ -69,7 +84,7 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
  * Execute at most ONE numbered line. END commits the reached prefix's output
  * and moves the cursor to the program sentinel; the NEXT be_step returns
  * BE_END. This is the host step protocol, not CPC console timing.
- * BE_OK commits its output and cursor.
+ * BE_OK commits its output, cursor and (when applicable) one stack transition.
  * Output is raw bytes, no NUL, one LF per PRINT. On BE_OK *written is the
  * number of bytes emitted (possibly zero). BE_END and every error preserve
  * the entire output buffer, *written and executor, including the cursor.

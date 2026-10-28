@@ -237,6 +237,15 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
     return BE_OK;
 }
 
+/* Pure action description prepared by both executor passes; never mutate
+ * the call stack until validation, capacity, output and replay all succeed. */
+typedef enum { BE_FLOW_NONE, BE_FLOW_PUSH, BE_FLOW_POP, BE_FLOW_CLEAR } BEFlowAction;
+typedef struct {
+    BEFlowAction action;
+    BECallFrame frame;
+    size_t next_statement;
+} BEFlow;
+
 /* A branch or END may skip a suffix. In J0.19, no numbered line
  * containing an actual subsequent assignment is executable. Locate only
  * statement starts, never CPC cache bytes or quoted payloads. */
@@ -306,14 +315,15 @@ static BEStatus comment_end(const uint8_t *body, size_t length, size_t pos,
  * A successful GOTO returns immediately; the suffix is not inspected.
  * next is written only on success. No output passes occur before validation. */
 static BEStatus execute_line(const BasicProgram *program,
-                             const BasicProgramLine *line,
-                             BEEmitter *out, size_t *next,
+                             const BasicProgramLine *line, size_t start_pos,
+                             const BasicExecutor *executor,
+                             BEEmitter *out, size_t *next, BEFlow *flow,
                              BasicVariableStore *variables,
                              BEAssignment *assignment)
 {
     const uint8_t *body = program->data + line->body_offset;
     size_t length = line->body_length;
-    size_t pos = 0u;
+    size_t pos = start_pos;
     int preceding_statement = 0;
     BEStatus status;
 
@@ -481,7 +491,8 @@ static BEStatus execute_line(const BasicProgram *program,
             }
             *next = target.offset;
             return BE_OK;
-        } else if (token == 0xa0u) { /* GOTO */
+        } else if (token == 0xa0u || token == 0x9fu) { /* GOTO / GOSUB */
+            int is_gosub = token == 0x9fu;
             uint16_t destination;
             BasicProgramLine target;
             BPStatus bp_status;
@@ -517,7 +528,47 @@ static BEStatus execute_line(const BasicProgram *program,
             if (variables != NULL && suffix_assignment(body, length, pos)) {
                 return BE_UNSUPPORTED;
             }
+            if (is_gosub) {
+                if (executor->call_depth >= BE_GOSUB_STACK_CAPACITY) {
+                    return BE_CALL_STACK_FULL;
+                }
+                flow->action = BE_FLOW_PUSH;
+                if (pos < length) {
+                    /* 01 C0 is an implicit apostrophe comment marker, NOT
+                     * a ':' separator. Resume on its complete 01 C0 pair.
+                     * An explicit colon before apostrophe is 01 01 C0:
+                     * skip only the first 01 and keep the second marker. */
+                    size_t continuation =
+                        (pos + 1u < length && body[pos + 1u] == 0xc0u)
+                        ? pos : pos + 1u;
+                    skip_spaces(body, length, &continuation);
+                    if (continuation == length ||
+                        (body[continuation] == 0x01u &&
+                         (continuation + 1u == length ||
+                          body[continuation + 1u] != 0xc0u))) {
+                        return BE_BAD_SEQUENCE;
+                    }
+                    flow->frame.cursor = line->offset;
+                    flow->frame.statement_offset = continuation;
+                } else {
+                    flow->frame.cursor = line->next_offset;
+                    flow->frame.statement_offset = 0u;
+                }
+            }
             *next = target.offset;
+            return BE_OK;
+        } else if (token == 0xc9u) { /* RETURN */
+            skip_spaces(body, length, &pos);
+            if (pos < length && body[pos] != 0x01u) {
+                return unexpected(body[pos]);
+            }
+            if (executor->call_depth == 0u) {
+                return BE_RETURN_WITHOUT_GOSUB;
+            }
+            flow->action = BE_FLOW_POP;
+            *next = executor->call_stack[executor->call_depth - 1u].cursor;
+            flow->next_statement =
+                executor->call_stack[executor->call_depth - 1u].statement_offset;
             return BE_OK;
         } else if (token == 0x98u) { /* END — basic.asm E663, CC31. */
             /* Validate only the reached statement's syntax. As for GOTO,
@@ -532,6 +583,7 @@ static BEStatus execute_line(const BasicProgram *program,
                 return BE_UNSUPPORTED;
             }
             *next = program->size - 2u;
+            flow->action = BE_FLOW_CLEAR;
             return BE_OK;
         } else if (token == 0x02u || token == 0xa5u) {
             BasicVariableKey key;
@@ -730,6 +782,9 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
     }
     executor->program = program;
     executor->cursor = 0u;
+    executor->statement_offset = 0u;
+    executor->call_depth = 0u;
+    memset(executor->call_stack, 0, sizeof(executor->call_stack));
     executor->variables = variables;
     return BE_OK;
 }
@@ -747,6 +802,7 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
     BEEmitter probe = {NULL, 0u};
     BEAssignment assignment = {0};
     BEAssignment second = {0};
+    BEFlow transition = {0}, second_transition = {0};
     BasicVariableStore *variables;
     size_t entry_bytes = 0u;
     BEEmitter writer;
@@ -755,6 +811,7 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
     BPStatus bp_status;
     BEStatus status;
     size_t current;
+    size_t start_pos;
 
     if (executor == NULL || output == NULL || written == NULL) {
         return BE_INVALID_ARGUMENT;
@@ -798,7 +855,11 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
             return BE_OVERLAP;
         }
     }
+    if (executor->call_depth > BE_GOSUB_STACK_CAPACITY) {
+        return BE_BAD_PROGRAM;
+    }
     current = executor->cursor;
+    start_pos = executor->statement_offset;
     bp_status = bp_next(program, &current, &line);
     if (bp_status == BP_END) {
         return BE_END;
@@ -806,7 +867,11 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
     if (bp_status != BP_OK) {
         return BE_BAD_PROGRAM;
     }
-    status = execute_line(program, &line, &probe, &next, variables, &assignment);
+    if (start_pos >= line.body_length && start_pos != 0u) {
+        return BE_BAD_PROGRAM;
+    }
+    status = execute_line(program, &line, start_pos, executor,
+                          &probe, &next, &transition, variables, &assignment);
     if (status != BE_OK) {
         return status;
     }
@@ -815,8 +880,14 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
     }
     writer.data = output;
     writer.length = 0u;
-    status = execute_line(program, &line, &writer, &check_next, variables, &second);
+    status = execute_line(program, &line, start_pos, executor,
+                          &writer, &check_next, &second_transition,
+                          variables, &second);
     if (status != BE_OK || writer.length != probe.length || check_next != next ||
+        transition.action != second_transition.action ||
+        transition.next_statement != second_transition.next_statement ||
+        transition.frame.cursor != second_transition.frame.cursor ||
+        transition.frame.statement_offset != second_transition.frame.statement_offset ||
         assignment.present != second.present ||
         (assignment.present &&
          (assignment.key.type != second.key.type ||
@@ -832,7 +903,19 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
             return status;
         }
     }
+    /* One committed stack action, after both pure passes completed. */
+    if (transition.action == BE_FLOW_PUSH) {
+        executor->call_stack[executor->call_depth++] = transition.frame;
+    } else if (transition.action == BE_FLOW_POP) {
+        --executor->call_depth;
+        memset(&executor->call_stack[executor->call_depth], 0,
+               sizeof(executor->call_stack[0]));
+    } else if (transition.action == BE_FLOW_CLEAR) {
+        executor->call_depth = 0u;
+        memset(executor->call_stack, 0, sizeof(executor->call_stack));
+    }
     *written = writer.length;
+    executor->statement_offset = transition.next_statement;
     executor->cursor = next;
     return BE_OK;
 }

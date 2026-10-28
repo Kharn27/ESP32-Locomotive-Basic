@@ -10,7 +10,7 @@ typedef struct {
 
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
-    ST_ASSIGN, ST_IF
+    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN
 } BTStatement;
 
 typedef struct {
@@ -26,6 +26,8 @@ static const BTKeyword keywords[] = {
     {"RUN",   0xcau, ST_RUN},
     {"NEW",   0xb1u, ST_NEW},
     {"GOTO",  0xa0u, ST_GOTO},
+    {"GOSUB", 0x9fu, ST_GOSUB},
+    {"RETURN",0xc9u, ST_RETURN},
     {"IF",    0xa1u, ST_IF},
     {"END",   0x98u, ST_END},
     {"REM",   0xc5u, ST_REM},
@@ -488,7 +490,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                     status = emit(out, (uint8_t)(line >> 8));
                 }
             }
-        } else if (statement == ST_GOTO) {
+        } else if (statement == ST_GOTO || statement == ST_GOSUB) {
             unsigned int line;
             status = decimal(source, length, &index, 65535u, &line);
             if (status == BT_OK && line == 0u) {

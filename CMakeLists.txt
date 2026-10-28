@@ -547,3 +547,18 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+# HW4-C3-B2: native MODE1 scroll, bounded dirty retention under injected
+# transport errors. The host retry proves transport-conditional resumption only.
+if(BUILD_TESTING)
+    add_executable(test_hw4_c3_b2_scroll tests/test_hw4_c3_b2_scroll.c)
+    target_link_libraries(test_hw4_c3_b2_scroll PRIVATE cpc_uart_console)
+    add_test(NAME hw4_c3_b2_mode1_scroll_dma_retry
+             COMMAND test_hw4_c3_b2_scroll)
+
+    # C1: same 53-byte fixture, frame-by-frame and coalesced screen comparison.
+    add_executable(test_hw4_c3_b2_c1_batch tests/test_hw4_c3_b2_c1_batch.c)
+    target_link_libraries(test_hw4_c3_b2_c1_batch PRIVATE cpc_uart_console)
+    add_test(NAME hw4_c3_b2_c1_lcd_batch_fail_stop
+             COMMAND test_hw4_c3_b2_c1_batch)
+endif()

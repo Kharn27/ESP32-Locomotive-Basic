@@ -165,3 +165,38 @@ uint32_t cpc_video_take_dirty(CpcVideo *v)
     v->dirty_bands = 0U;
     return result;
 }
+
+/* HW4-C3-B2: MODE1 raster layout is linear, not CPC Z80 interleaved VRAM. */
+bool cpc_video_scroll_up(CpcVideo *v, unsigned rows)
+{
+    if (!valid(v) || v->mode != CPC_MODE_1 || v->paper >= 4U ||
+        rows > 25U || v->cursor_row >= 25U || v->cursor_column >= 40U)
+        return false;
+    if (rows == 0U) return true;
+    const size_t shift_bytes = (size_t)rows * 640U;
+    const size_t retained = CPC_VIDEO_BYTES - shift_bytes;
+    const uint8_t paper = (uint8_t)(v->paper * UINT8_C(0x55));
+    if (retained != 0U)
+        memmove(v->pixels, v->pixels + shift_bytes, retained);
+    memset(v->pixels + retained, paper, shift_bytes);
+    v->dirty_bands |= ALL_DIRTY;
+    return true;
+}
+
+bool cpc_video_flush_dirty(CpcVideo *v, CpcVideoBandSender send, void *ctx)
+{
+    if (!valid(v) || send == NULL) return false;
+    uint32_t pending = cpc_video_take_dirty(v);
+    for (unsigned band = 0U; band < 25U; ++band) {
+        const uint32_t bit = UINT32_C(1) << band;
+        if ((pending & bit) == 0U) continue;
+        if (!send(ctx, band)) {
+            /* Includes the failed band, excludes bands actually transferred.
+             * Any new dirties set by the callback remain intact. */
+            v->dirty_bands |= pending;
+            return false;
+        }
+        pending &= ~bit;
+    }
+    return true;
+}

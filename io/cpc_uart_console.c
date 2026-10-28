@@ -1,11 +1,11 @@
-/* HW4-C2 conservative 40x25 CPC-mode-1 UART echo; allocation-free. */
+/* HW4-C3-B2: MODE1 UART echo with native scroll; no auto-page reset. */
 #include "cpc_uart_console.h"
 #include <stddef.h>
 static bool valid(const CpcText *text)
 {
     return text != NULL && text->video != NULL && text->glyph != NULL &&
            text->video->pixels != NULL && text->video->mode == CPC_MODE_1 &&
-           text->row <= 25U && text->column <= 40U;
+           text->row < 25U && text->column <= 40U;
 }
 bool cpc_uart_console_clear(CpcText *text)
 {
@@ -23,36 +23,27 @@ bool cpc_uart_console_prompt(CpcText *text, bool *reset_page)
 {
     if (!valid(text) || reset_page == NULL) return false;
     *reset_page = false;
-    if (text->column != 0U && text->row < 25U) {
+    if (text->column != 0U) {
         const uint8_t lf = (uint8_t)'\n';
         if (!cpc_text_write(text, &lf, 1U)) return false;
-    }
-    /* CPC has no artificial '>' input marker. Keep the cursor at col 0.
-     * 120 editable ASCII bytes still require at most three text rows;
-     * reserve four rows conservatively under the existing page policy. */
-    if (text->row > 20U) {
-        if (!cpc_uart_console_clear(text)) return false;
-        *reset_page = true;
     }
     return cpc_video_cursor(text->video, text->column, text->row, true);
 }
 bool cpc_uart_console_append(CpcText *text, uint8_t ch)
 {
-    if (!valid(text) || ch < 0x20U || ch > 0x7eU ||
-        text->row > 24U || (text->row == 24U && text->column >= 39U))
-        return false;
+    if (!valid(text) || ch < 0x20U || ch > 0x7eU) return false;
     return cpc_text_write(text, &ch, 1U);
 }
 bool cpc_uart_console_backspace(CpcText *text)
 {
-    if (!valid(text) || text->row >= 25U) return false;
+    if (!valid(text)) return false;
     unsigned col = text->column, row = text->row;
     if (col > 0U) {
         --col;
     } else {
         if (row == 0U) return false;
         --row;
-        col = 39U; /* after a wrapped 40-column physical text row */
+        col = 39U;
     }
     if (!cpc_video_put_cell(text->video, col, row, (uint8_t)' ',
                             text->glyph, text->glyph_context)) return false;

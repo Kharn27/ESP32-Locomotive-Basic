@@ -8,10 +8,11 @@ typedef struct {
     CpcGlyphRow glyph;
     void *glyph_context;
     unsigned column;           /* 0..40; 40 means wrap pending */
-    unsigned row;              /* 0..25; 25 means clipped at bottom */
+    unsigned row;              /* 0..24; bottom overflow scrolls MODE1 */
     size_t bytes_received;     /* every input byte, including ignored controls */
     size_t glyphs_drawn;
-    size_t bytes_clipped;
+    size_t bytes_clipped;     /* retained ABI counter; normal MODE1 scroll never clips */
+    size_t scrolls;           /* completed one-cell vertical scroll operations */
     size_t controls_ignored;
     uint32_t input_fnv1a;      /* digest of unmodified incoming BASIC bytes */
 } CpcText;
@@ -26,8 +27,9 @@ bool cpc_text_init(CpcText *sink, CpcVideo *video,
  * and resets column (CRLF therefore advances once). Unknown controls are
  * counted and ignored, printable characters absent from the font draw blank.
  * At 40 columns, wrap is pending until another printable character arrives.
- * No scrolling in C1: after the last row, printable bytes are clipped and
- * counted; cursor is hidden without corrupting video memory.
+ * In B2, a deferred wrap or LF at bottom moves the linear VRAM up
+ * one text row, preserving the scroll counter, digest and non-destructive
+ * cursor. A pending column 40 alone does not scroll until progression.
  * Failure on invalid arguments/overflow occurs before any mutation. */
 bool cpc_text_write(CpcText *sink, const uint8_t *bytes, size_t length);
 #endif

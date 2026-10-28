@@ -1,0 +1,61 @@
+name: HW4-C3-B2 native MODE1 scroll
+on:
+  pull_request:
+    paths:
+      - 'video/cpc_video.c'
+      - 'video/cpc_video.h'
+      - 'video/cpc_text.c'
+      - 'video/cpc_text.h'
+      - 'io/cpc_uart_console.c'
+      - 'io/cpc_uart_console.h'
+      - 'firmware/esp32_display_probe/main/hw4_c2_console.c'
+      - 'tests/test_hw4_c3_b2_scroll.c'
+      - 'tests/test_hw4_c3_b2_c1_batch.c'
+      - 'tests/test_cpc_text.c'
+      - 'tests/test_cpc_uart_console.c'
+      - 'tests/test_hw4_c2_integration.c'
+      - 'tests/test_hw4_c3_boot.c'
+      - 'CMakeLists.txt'
+      - 'tools/hw4_c3_b2_uart_po.py'
+      - '.github/workflows/hw4-c3-b2-scroll.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  portable-b2:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        sanitizers: [OFF, ON]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test MODE1 scroll, native BASIC and injection
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          # Existing host budget and boot glyph sources emit two unrelated
+          # Clang extension warnings, already explicitly suppressed in
+          # basic-program.yml; keep all other -Werror diagnostics enabled.
+          flags=""
+          if test "${{ matrix.compiler }}" = clang; then
+            flags="-Wno-error=gnu-offsetof-extensions -Wno-error=string-concatenation"
+          fi
+          cmake -S . -B /tmp/hw4-c3-b2 -DBP_SANITIZERS=${{ matrix.sanitizers }} "-DCMAKE_C_FLAGS=$flags"
+          cmake --build /tmp/hw4-c3-b2 --parallel 2
+          ctest --test-dir /tmp/hw4-c3-b2 --output-on-failure -R 'hw4_c3_b2|hw4_c1_text_boundaries|hw4_c2_screen_paging|hw4_c2_native_uart_runtime_tft|hw4_c3_boot_screen|cpc_video$'
+          ctest --test-dir /tmp/hw4-c3-b2 -V -R '^hw4_c3_b2_c1_lcd_batch_fail_stop$'
+          # Exactly one flush attempt in the actual firmware; the host
+          # callback recovery test must not be interpreted as DMA recovery.
+          src=firmware/esp32_display_probe/main/hw4_c2_console.c
+          test "$(grep -F -c 'cpc_video_flush_dirty(&s_video,send_dirty_band,&sent)' "$src")" = 1
+          ! grep -F 'LCD_DMA_RETRY' "$src"
+          grep -F 'LCD_FAIL_STOP' "$src"
+          grep -F 'retry=0' "$src"
+          grep -F 'pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : 100U)' "$src"
+          grep -F 'return display_ready() && prompt()' "$src"
+          python3 tools/hw4_c3_b2_uart_po.py --dry-run >/tmp/hw4-c3-b2-uart-commands.txt
+          test "$(grep -c ' PRINT 7' /tmp/hw4-c3-b2-uart-commands.txt)" = 32

@@ -50,6 +50,14 @@ bool cpc_video_mode2_display(CpcVideo *video, CpcMode2Display display, unsigned 
 /* Exactly width=320 colours; y is absolute TFT y in [0,239]. No allocation. */
 bool cpc_video_render_row(const CpcVideo *video, unsigned y,
                           uint16_t *rgb565, size_t pixel_capacity);
+/* MODE1 only: move raster rows up in the linear 16000-byte surface.
+ * 0 rows is a no-op; 1..25 are valid; invalid calls change nothing. */
+bool cpc_video_scroll_up(CpcVideo *video, unsigned rows);
+/* Drain dirty bands in ascending order. On callback failure, restore the
+ * failed band and every not-yet-sent band for a subsequent retry. */
+typedef bool (*CpcVideoBandSender)(void *context, unsigned band);
+bool cpc_video_flush_dirty(CpcVideo *video, CpcVideoBandSender send,
+                           void *context);
 uint32_t cpc_video_take_dirty(CpcVideo *video);
 uint16_t cpc_video_palette_rgb565(unsigned colour); /* 0xffff for invalid */
 void cpc_video_palette_rgb888(unsigned colour, uint8_t rgb[3]);

@@ -57,7 +57,9 @@ static void input(const char *source)
     if(b.written>0U) assert(cpc_text_write(&text,b.output,b.written));
     uart_line_ack(&line);
     assert(uart_line_feed(&line,'\n')==UART_LINE_NONE);
-    assert(cpc_uart_console_prompt(&text,&page));
+    static const uint8_t ready[]="Ready\n";
+    assert(cpc_text_write(&text,ready,sizeof(ready)-1U));
+    assert(cpc_uart_console_prompt(&text,&page) && !page);
 }
 static void real_run(void)
 {
@@ -110,6 +112,63 @@ static void list_new_and_fail_atomic(void)
     r=bsr_step(&b.runtime,b.output,sizeof(b.output),&b.written);
     assert(r.status==BSR_END);
 }
+static void long_list_scroll_integration(void)
+{
+    char numbered[32];
+    bool cleared=false;
+    setup();
+    for(unsigned i=1U;i<=32U;++i) {
+        int n=snprintf(numbered,sizeof(numbered),"%u PRINT 7",i*10U);
+        assert(n>0 && (size_t)n<sizeof(numbered));
+        input(numbered);
+        if(i==26U) {
+            size_t stored=b.program.size;
+            BSRResult first=submit("LIST");
+            assert(first.status==BSR_OK && b.written>0U);
+            assert(cpc_text_write(&text,b.output,b.written));
+            static const uint8_t ready26[]="Ready\n";
+            assert(cpc_text_write(&text,ready26,sizeof(ready26)-1U));
+            assert(cpc_uart_console_prompt(&text,&cleared) && !cleared);
+            assert(b.program.size==stored && text.row==24U);
+        }
+    }
+    assert(b.program.size>0U && text.scrolls>0U);
+    size_t bytes=b.program.size;
+    static uint8_t snapshot[8192];
+    memcpy(snapshot,b.bytes,sizeof(snapshot));
+    for(unsigned pass=0U;pass<2U;++pass) {
+        BSRResult r=submit("LIST");
+        assert(r.status==BSR_OK && b.written>0U);
+        assert(cpc_text_write(&text,b.output,b.written));
+        static const uint8_t ready[]="Ready\n";
+        assert(cpc_text_write(&text,ready,sizeof(ready)-1U));
+        assert(cpc_uart_console_prompt(&text,&cleared) && !cleared);
+        assert(text.row==24U && text.bytes_clipped==0U);
+        assert(b.program.size==bytes && memcmp(snapshot,b.bytes,sizeof(snapshot))==0);
+    }
+    /* Explicit diagnostic !CLS may clear the screen, never the BASIC store. */
+    assert(cpc_uart_console_clear(&text));
+    assert(b.program.size==bytes && memcmp(snapshot,b.bytes,sizeof(snapshot))==0);
+    assert(submit("LIST").status==BSR_OK && b.written>0U);
+    assert(cpc_text_write(&text,b.output,b.written));
+    assert(submit("RUN").status==BSR_OK);
+    unsigned run_steps=0U;
+    for (;;) {
+        BSRResult step=bsr_step(&b.runtime,b.output,sizeof(b.output),&b.written);
+        if(step.status==BSR_END) break;
+        assert(step.status==BSR_OK && step.executor_status==BE_OK);
+        assert(++run_steps<=32U);
+        assert(cpc_text_write(&text,b.output,b.written));
+    }
+    assert(run_steps==32U && text.row==24U && text.bytes_clipped==0U);
+    assert(b.program.size==bytes && memcmp(snapshot,b.bytes,sizeof(snapshot))==0);
+    assert(submit("NEW").status==BSR_OK);
+    assert(submit("LIST").status==BSR_OK && b.written==0U);
+    assert(submit("RUN").status==BSR_OK);
+    BSRResult r=bsr_step(&b.runtime,b.output,sizeof(b.output),&b.written);
+    assert(r.status==BSR_END);
+}
+
 static void rejected_input_does_not_mutate(void)
 {
     size_t n=b.program.size;
@@ -164,7 +223,7 @@ static void ansi_atomic_program_guard(void)
 }
 int main(void)
 {
-    setup(); real_run(); list_new_and_fail_atomic(); rejected_input_does_not_mutate(); ansi_atomic_program_guard();
+    setup(); real_run(); list_new_and_fail_atomic(); rejected_input_does_not_mutate(); ansi_atomic_program_guard(); long_list_scroll_integration();
     puts("HW4-C2 actual interactive bytes -> runtime -> VRAM, LIST NEW PASS");
     return 0;
 }

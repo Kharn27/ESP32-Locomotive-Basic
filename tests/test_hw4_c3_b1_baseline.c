@@ -1,4 +1,4 @@
-/* HW4-C3-B1: baseline and edge-case CHARACTERIZATION, not CPC oracle.
+/* HW4-C3-B1 original probes evolved in B2: scrolling regression, not CPC oracle.
  * Compile directly in the dedicated CI job; no runtime/CMake mutation.
  */
 #include "cpc_uart_console.h"
@@ -75,19 +75,18 @@ static void artificial_reset_at_21(void)
     assert(cpc_text_write(&text, lfs, sizeof(lfs)));
     assert(text.row == 21U && text.column == 0U);
     assert(cpc_uart_console_prompt(&text, &reset));
-    assert(reset);  /* baseline non-CPC: "reserve four lines" */
-    assert(text.row == 0U && text.column == 0U);
-    assert(text.bytes_received == 0U);
-    assert(cpc_video_get(&video, 10U, 0U, &p) && p == 0U);
+    assert(!reset);  /* B2: no arbitrary four-row page reserve */
+    assert(text.row == 21U && text.column == 0U);
+    assert(text.bytes_received == sizeof(lfs));
+    assert(cpc_video_get(&video, 10U, 0U, &p) && p == 1U);
     assert(memcmp(original, existing_program, sizeof(original)) == 0);
-    assert(cpc_video_take_dirty(&video) == UINT32_C(0x01ffffff));
+    assert((cpc_video_take_dirty(&video) & (UINT32_C(1) << 21U)) != 0U);
     guarded();
 }
 static void clipped_after_last_row(void)
 {
     uint8_t lfs[24];
     uint8_t chars[40];
-    uint8_t before[CPC_VIDEO_BYTES];
     bool reset = false;
     memset(lfs, '\n', sizeof(lfs));
     memset(chars, 'X', sizeof(chars));
@@ -97,13 +96,12 @@ static void clipped_after_last_row(void)
     assert(cpc_text_write(&text, chars, sizeof(chars)));
     assert(text.row == 24U && text.column == 40U);
     assert(!video.cursor_visible);
-    assert(!cpc_uart_console_append(&text, (uint8_t)'Q'));
-    memcpy(before, storage.pixels, sizeof(before));
+    assert(cpc_uart_console_append(&text, (uint8_t)'Q'));
+    assert(text.row == 24U && text.column == 1U && text.scrolls == 1U);
     assert(cpc_text_write(&text, chars, 2U));
-    assert(text.row == 25U && text.bytes_clipped == 2U);
-    assert(memcmp(storage.pixels, before, sizeof(before)) == 0);
-    assert(cpc_uart_console_prompt(&text, &reset) && reset);
-    assert(text.row == 0U && text.column == 0U);
+    assert(text.row == 24U && text.column == 3U && text.bytes_clipped == 0U);
+    assert(cpc_uart_console_prompt(&text, &reset) && !reset);
+    assert(text.row == 24U && text.column == 0U && text.scrolls == 2U);
     guarded();
 }
 int main(void)
@@ -111,6 +109,6 @@ int main(void)
     pending_wrap_and_cr();
     artificial_reset_at_21();
     clipped_after_last_row();
-    puts("HW4-C3-B1 HOST_BASELINE_VERIFIED only; NOT CPC scroll proof");
+    puts("HW4-C3-B2 B1 host probes migrated to scrolling; NOT CPC pixel proof");
     return 0;
 }

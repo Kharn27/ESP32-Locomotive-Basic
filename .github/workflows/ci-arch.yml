@@ -20,44 +20,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: CPC archive changes must be additions under NEW directories; old history immutable
+      - name: Negative and positive event-base isolation regression tests
         shell: bash
+        run: bash tools/ci/test_ci_arch.sh
+      - name: Resolve event-specific and verified compare base (shared by both guards)
+        id: diff_base
+        shell: bash
+        env:
+          CI_ARCH_EVENT: ${{ github.event_name }}
+          CI_ARCH_BEFORE: ${{ github.event.before }}
+          CI_ARCH_REF: ${{ github.ref }}
+          CI_ARCH_BASE_REF: ${{ github.base_ref }}
+          CI_ARCH_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          base="$(git merge-base origin/main HEAD)"
-          while IFS=$'\t' read -r status path; do
-            test -n "$status" || continue
-            case "$status" in
-              A) ;;
-              *) echo "CI_ARCH_EXISTING_CPC_PROOF_CHANGED $status $path"; exit 1 ;;
-            esac
-            case "$path" in
-              tests/fixtures/cpc6128/*/*)
-                relative="${path#tests/fixtures/cpc6128/}"
-                folder="${relative%%/*}"
-                folder="tests/fixtures/cpc6128/$folder"
-                if git cat-file -e "$base:$folder" 2>/dev/null; then
-                  echo "CI_ARCH_OLD_ARCHIVE_ADDITION_FORBIDDEN $path"; exit 1
-                fi ;;
-              *) echo "CI_ARCH_UNSCOPED_CPC_ADDITION $path"; exit 1 ;;
-            esac
-          done < <(git diff --name-status "$base" HEAD -- tests/fixtures/cpc6128/)
-          # Existing emulator, original oracle scripts and promotion tools remain sealed.
-          # Addition of a NEW oracle script is permissible; overwriting is not.
-          while IFS=$'\t' read -r status path; do
-            test -n "$status" || continue
-            case "$status" in
-              A) ;;
-              *) echo "CI_ARCH_EXISTING_ORACLE_CHANGED $status $path"; exit 1 ;;
-            esac
-          done < <(git diff --name-status "$base" HEAD -- tests/oracles/)
+          base="$(bash tools/ci/ci_arch_base.sh)"
+          printf 'base=%s\n' "$base" >> "$GITHUB_OUTPUT"
+      - name: CPC archive and core/HW4 diff-dependent immutable-history policy
+        shell: bash
+        env:
+          CI_ARCH_BASE: ${{ steps.diff_base.outputs.base }}
+        run: bash tools/ci/ci_arch_changes.sh
       - name: Shared LCD transport, unique firmware entry point and product/core boundary
         shell: bash
         run: |
           set -euo pipefail
-          base="$(git merge-base origin/main HEAD)"
+          base="${{ steps.diff_base.outputs.base }}"
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
           ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main firmware/esp32_probe/main --include='*.c'
           test "$(grep -c '^void app_main(void)' firmware/esp32_display_probe/main/hw4_c2_console.c)" -eq 1
@@ -68,7 +59,6 @@ jobs:
           grep -F 'bsr_step(' firmware/esp32_display_probe/main/hw4_c2_console.c
           grep -F 'UART_ANSI_CSI' io/uart_line.c
           grep -F 'cpc_uart_console_backspace' firmware/esp32_display_probe/main/hw4_c2_console.c
-          if git diff --name-only "$base" HEAD -- io/ video/ firmware/ tests/test_hw4_c2_integration.c tests/test_hw4_c1_integration.c | grep -q .; then
-            git diff --exit-code "$base" HEAD -- core/
-          fi
+          # Core/HW4 co-mutation rejected by ci_arch_changes.sh using same base.
+          echo "CI_ARCH_SHARED_BASE=$base"
           echo "CI_ARCH_LCD_OWNER=1 ARCHIVE_EXISTING_IMMUTABLE=PASS"

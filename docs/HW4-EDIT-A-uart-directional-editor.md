@@ -148,3 +148,20 @@ ROM exhaustif ni promesse de fidélité de l'édition plein écran MODE0/2.
 Le SHA de C1 doit être revalidé sur CYD après CI, avec un contrôle visuel
 simple (glyphe sous curseur lisible, restauration au départ, case vide
 opaque, pas de fault DMA), sans photo obligatoire.
+
+### Empreintes PPM C1 : re-scellage motivé
+
+La CI C99 au SHA de diagnostic `4b4fc92896aa3c8ee28ee4391830d3c4ad4dd391`
+([run #40721623224](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40721623224))
+a généré les trois PPM complets après C1 : MODE0
+`55e44da158c152d5d835332e4710352778c910355712f96564e69b6bb0b31940`,
+MODE1 `17b8918a5289c2c98c47ab6f4fc7700d69df3f56953521468bbe481ee6b196e9`,
+MODE2 `e3befe375e2454a7aaa6dac1d2b01ffb719f078bab1e70da7b9e055e70d7a439`.
+Les anciens digests MODE0 et MODE1 (`9df98bd1...` et `64e512a5...`)
+sont modifiés **exclusivement par le nouveau rendu de curseur** ;
+le digest MODE2 OR_PAIR est identique à l'antérieur pour cette fixture.
+Le contrôle conserve trois attentes SHA-256 explicites, deux exécutions
+intégrales et la vérification de taille/entête des images ; aucune
+tolérance ou suppression de test. Le test de scrolling [HW4-C3-B2]
+consomme la bande dirty provoquée légitimement par un changement
+de PAPER avant de vérifier que `scroll_up(0)` reste un no-op.

@@ -236,14 +236,18 @@ static void e3_and_ansi(void)
 static void expelled_e3(void)
 {
     reset(0U,0U);
-    assert(seq("10 PRINT 2")==UART_LINE_APPEND);
+    /* Full 120-byte E3 buffer must survive expulsion and repaint. */
+    for(unsigned i=0U;i<120U;++i) assert(feed('A')==UART_LINE_APPEND);
+    assert(line.length==120U && line.cursor_pos==120U);
     assert(cpc_video_cursor(&v,0U,24U,true));
     assert(seq("\x1b[B")==UART_LINE_NAV_DOWN);
     assert(!nav.anchor_valid);
-    assert(memcmp(line.data,"10 PRINT 2",11U)==0);
+    for(unsigned i=0U;i<120U;++i) assert(line.data[i]=='A');
+    assert(line.data[120U]==0U);
     assert(feed('\r')==UART_LINE_RETURN_EDIT);
     assert(nav.anchor_valid&&!line.ready);
-    cell(edit.column,edit.row,true,'1');
+    assert(line.length==120U && line.cursor_pos==120U);
+    cell(edit.column,edit.row,true,'A');
     assert(feed('\r')==UART_LINE_READY);
     uart_line_ack(&line);guards();
 }

@@ -19,6 +19,16 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Confirm exact source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "CI-OPT1 EXACT_SOURCE_HEAD=$actual"
       - name: Real Xtensa 5.5.6 - console ON, historical HW3 OFF, BASIC probe
         shell: bash
         run: |
@@ -76,7 +86,7 @@ jobs:
             done
             echo "CI_OPT1_THREE_IMAGE_ABI=PASS"
           '
-          echo "HEAD_SHA=$GITHUB_SHA" | tee firmware/esp32_display_probe/reports/source-sha.txt
+          echo "SOURCE_SHA=$(git rev-parse HEAD)" | tee firmware/esp32_display_probe/reports/source-sha.txt
       - uses: actions/upload-artifact@v4.6.2
         if: always()
         with:

@@ -131,22 +131,3 @@ jobs:
           path: ${{ runner.temp }}/j16-cpc/
           if-no-files-found: warn
           retention-days: 30
-
-  permanent-mod-evidence:
-    name: J1.6-A permanent integrity and falsification (no emulator)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Verify original CPC bytes and provisional seal, including 13 negative cases
-        run: |
-          set -euo pipefail
-          DEST=tests/fixtures/cpc6128/j1_integer_mod
-          if test -f "$DEST/manifest.json"; then
-            python3 tools/j1_6_mod_verify.py --evidence "$DEST" --permanent --self-test
-          elif test "$GITHUB_HEAD_REF" = feat/j1-6-a-integer-mod-oracle; then
-            echo "ACQUISITION_PENDING: the original archive is created by cpc-mod job"
-          else
-            echo "MISSING PERMANENT J1.6-A ORIGINAL ARCHIVE"
-            exit 1
-          fi

@@ -56,6 +56,20 @@ jobs:
           set -euo pipefail
           python3 tools/j1_2_boundary_verify.py --permanent --self-test
           python3 tools/j1_2_b_native_verify.py --cli build/loco_basic_cli --image-cli build/basic_program_image_cli --self-test
+      - name: HW4-C3-B1 original stand-alone C99 baseline (GCC OFF/ON)
+        if: matrix.compiler == 'gcc'
+        shell: bash
+        run: |
+          set -euo pipefail
+          flags="-std=c99 -Wall -Wextra -Wpedantic -Wconversion -Werror -g"
+          if test "${{ matrix.sanitizers }}" = ON; then
+            flags="$flags -fsanitize=address,undefined -fno-omit-frame-pointer"
+          fi
+          cc $flags -Ivideo -Iio \
+            tests/test_hw4_c3_b1_baseline.c io/cpc_uart_console.c \
+            video/cpc_text.c video/cpc_video.c video/cpc_palette.c \
+            -o /tmp/hw4-c3-b1-baseline
+          /tmp/hw4-c3-b1-baseline
       # CTest hides stdout of passing tests. Publish the intact-copy proof
       # and all 10+4 cause-specific rejection diagnostics on both CI variants.
       - name: J0.26-C2 audit self-test (visible positive and negative controls)

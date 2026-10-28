@@ -10,7 +10,10 @@
 typedef enum {
     UART_LINE_NONE = 0,
     UART_LINE_APPEND,
-    UART_LINE_DELETE,
+    UART_LINE_DELETE, /* Backspace: before cursor (legacy enum) */
+    UART_LINE_DELETE_FORWARD, /* ESC[3~: under cursor */
+    UART_LINE_LEFT,
+    UART_LINE_RIGHT,
     UART_LINE_READY,
     UART_LINE_REJECTED,
     UART_LINE_IGNORED,
@@ -27,6 +30,7 @@ typedef enum {
 typedef struct {
     uint8_t data[UART_LINE_CAPACITY + 1U];
     size_t length;
+    size_t cursor_pos; /* 0..length, next insertion point */
     bool poisoned;
     bool ready;
     bool last_cr;
@@ -43,13 +47,16 @@ typedef struct {
 
 /* C99 byte-oriented source editor, independent of terminal, TFT, BASIC.
  * ASCII 0x20..0x7e accepted; CR/LF/CRLF finalize exactly one line.
- * BS/DEL/ESC[3~ delete exactly one trailing editable byte, if any.
+ * BS/DEL remove preceding byte; ESC[3~ removes byte under cursor.
+ * ESC[D / ESC[C move the cursor without changing source; insertion shifts
+ * the following bytes. At boundaries movement/deletion returns NONE.
  * Other bounded CSI sequences (even if fragmented) are fully consumed;
  * oversized CSI is discarded until its final byte. Escape state consumes
  * no source bytes and is never echoed. Incomplete ESC/CSI followed by
  * CR/LF rejects the ENTIRE line without any BASIC submission.
  * Source overflow similarly poisons and rejects the entire line.
- * UART_LINE_DELETE must be mirrored to the visual editor exactly once.
+ * APPEND/DELETE/DELETE_FORWARD and LEFT/RIGHT must each sync the visual
+ * cursor from data/length/cursor_pos; rejected lines never reach BASIC.
  * Call uart_line_ack() after READY/REJECTED, before next byte. */
 void uart_line_init(UartLine *line);
 UartLineEvent uart_line_feed(UartLine *line, uint8_t ch);

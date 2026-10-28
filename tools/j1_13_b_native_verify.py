@@ -141,6 +141,11 @@ def preflight():
                 name + " CPC_IF_OR_TRACE_CHANGED")
     return captures
 
+def compare_trace(observed, expected, label):
+    require(observed == expected,
+            label + " TRACE_MISMATCH expected=" + repr(expected) +
+            " actual=" + repr(observed))
+
 def one_case(cap, cli, image_cli):
     name = cap["case"]
     operator_group = "_".join(name.split("_")[:2])
@@ -174,9 +179,7 @@ def one_case(cap, cli, image_cli):
     numeric = int(lines[0].strip())
     observed = [420 if numeric == 42 else 810]
     expected = cap["original"]["run"]["program_trace"]
-    require(observed == expected,
-            name + " TRACE_MISMATCH expected=" + repr(expected) +
-            " actual=" + repr(observed))
+    compare_trace(observed, expected, name)
     print("J1.13-B", name, "IF_LINE_30_MATCH_EXACT",
           "BRANCH_MATCH_SEMANTIC", str(observed[0]), flush=True)
 
@@ -201,7 +204,13 @@ def falsifications():
         raise DifferentialFailure("FALSE_HEAD_ACCEPTED")
     require(digest(b"modified") != MANIFEST_SHA,
             "MANIFEST_FALSIFICATION_ACCEPTED")
-    require([810] != [420], "TRACE_FALSIFICATION_ACCEPTED")
+    try:
+        compare_trace([420], [810], "FALSIFICATION")
+    except DifferentialFailure as exc:
+        require("TRACE_MISMATCH" in str(exc),
+                "WRONG_TRACE_FALSIFICATION_REASON")
+    else:
+        raise DifferentialFailure("TRACE_FALSIFICATION_ACCEPTED")
     print("PASS post-B IF BYTE, TRACE, MANIFEST and FALSE_HEAD falsifications")
 
 def main():

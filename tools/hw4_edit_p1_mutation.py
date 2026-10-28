@@ -32,8 +32,15 @@ def run(binary: Path, source: Path):
     cmd = [cc, "-std=c99", "-Wall", "-Wextra", "-Werror", "-I",
            str(ROOT / "video"), "-I", str(ROOT / "io"),
            str(source), *map(str, SOURCES), "-o", str(binary)]
-    subprocess.run(cmd, check=True, cwd=ROOT, stdout=subprocess.PIPE,
-                   stderr=subprocess.PIPE, text=True)
+    # Match the repository's existing Clang exclusions for independent
+    # pre-existing extension warnings; preserve -Werror for all others.
+    if Path(cc).name.startswith("clang"):
+        cmd += ["-Wno-error=gnu-offsetof-extensions",
+                "-Wno-error=string-concatenation"]
+    built = subprocess.run(cmd, cwd=ROOT, stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE, text=True, check=False)
+    if built.returncode:
+        raise RuntimeError("C99 fixture compile failed:\\n" + built.stderr)
     return subprocess.run([str(binary)], cwd=ROOT, stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE, text=True, check=False)
 

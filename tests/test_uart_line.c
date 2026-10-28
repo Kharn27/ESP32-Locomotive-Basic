@@ -108,7 +108,7 @@ static void insert_mid_and_boundaries(void)
     assert(guard.line.cursor_pos==0U && guard.line.length==10U);
     assert(uart_line_feed(&guard.line,'!')==UART_LINE_APPEND);
     assert(memcmp(guard.line.data,"!10 PRINT 2",12U)==0);
-    for(unsigned i=0U;i<11U;++i)
+    for(unsigned i=0U;i<10U;++i)
         assert(feed_string("\x1b[C")==UART_LINE_RIGHT);
     assert(feed_string("\x1b[C")==UART_LINE_NONE);
     guarded();

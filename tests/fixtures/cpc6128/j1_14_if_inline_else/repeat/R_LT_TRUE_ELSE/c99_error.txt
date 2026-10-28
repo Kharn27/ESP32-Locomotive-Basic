@@ -1,0 +1,1 @@
+image-cli: input rejected: BS=8 BT=5 BP=0 BL=0

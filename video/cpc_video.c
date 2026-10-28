@@ -7,6 +7,28 @@ static const uint8_t initial_inks[16] = {
 };
 static unsigned bits(CpcMode mode) { return 4U >> (unsigned)mode; }
 static bool valid(const CpcVideo *v) { return v != NULL && v->pixels != NULL && (unsigned)v->mode <= 2U; }
+/* E2 indexing is always row-major MODE1, independent of CPC raster packing. */
+static size_t cell_index(unsigned col, unsigned row)
+{
+    return (size_t)row * CPC_VIDEO_MODE1_COLUMNS + col;
+}
+static void forget_cell(CpcVideo *v, size_t i)
+{
+    v->cell_valid[i / 8U] &= (uint8_t)~(UINT8_C(1) << (i % 8U));
+}
+bool cpc_video_read_cell(const CpcVideo *v, unsigned col, unsigned row,
+                         uint8_t *character, bool *known)
+{
+    if (!valid(v) || v->mode != CPC_MODE_1 ||
+        col >= CPC_VIDEO_MODE1_COLUMNS || row >= CPC_VIDEO_MODE1_ROWS ||
+        character == NULL || known == NULL)
+        return false;
+    const size_t i = cell_index(col, row);
+    const bool exists = (v->cell_valid[i / 8U] & (UINT8_C(1) << (i % 8U))) != 0U;
+    *known = exists;
+    if (exists) *character = v->cell_char[i];
+    return true;
+}
 unsigned cpc_video_width(const CpcVideo *v) { return valid(v) ? 160U << (unsigned)v->mode : 0U; }
 unsigned cpc_video_columns(const CpcVideo *v) { return cpc_video_width(v) / 8U; }
 unsigned cpc_video_colors(const CpcVideo *v) { return valid(v) ? 1U << bits(v->mode) : 0U; }
@@ -25,6 +47,8 @@ bool cpc_video_set_mode(CpcVideo *v, CpcMode mode)
     v->mode2_scroll_x = 0U;
     memcpy(v->ink, initial_inks, sizeof(v->ink));
     memset(v->pixels, 0, CPC_VIDEO_BYTES);
+    memset(v->cell_char, 0, sizeof(v->cell_char));
+    memset(v->cell_valid, 0, sizeof(v->cell_valid));
     v->dirty_bands = ALL_DIRTY;
     return true;
 }
@@ -61,6 +85,10 @@ bool cpc_video_put(CpcVideo *v, unsigned x, unsigned y, unsigned pen)
     const uint8_t mask = (uint8_t)((cpc_video_colors(v) - 1U) << sh);
     v->pixels[offset] = (uint8_t)((v->pixels[offset] & (uint8_t)~mask) | (uint8_t)(pen << sh));
     v->dirty_bands |= UINT32_C(1) << (y / 8U);
+    /* A graphics pixel can no longer be represented as a known text glyph.
+     * A full glyph write restores its validity only after every pixel. */
+    if (v->mode == CPC_MODE_1)
+        forget_cell(v, cell_index(x / 8U, y / 8U));
     return true;
 }
 bool cpc_video_set_ink(CpcVideo *v, unsigned pen, unsigned colour)
@@ -92,13 +120,20 @@ bool cpc_video_set_text_colors(CpcVideo *v, unsigned pen, unsigned paper)
 bool cpc_video_put_cell(CpcVideo *v, unsigned column, unsigned row,
                         uint8_t ch, CpcGlyphRow glyph, void *context)
 {
-    if (!valid(v) || glyph == NULL || column >= cpc_video_columns(v) || row >= 25U) return false;
+    if (!valid(v) || glyph == NULL || column >= cpc_video_columns(v) ||
+        row >= 25U || v->pen >= cpc_video_colors(v) ||
+        v->paper >= cpc_video_colors(v)) return false;
     for (unsigned dy = 0; dy < 8U; ++dy) {
         const uint8_t image = glyph(context, ch, dy);
         for (unsigned dx = 0; dx < 8U; ++dx) {
             unsigned colour = (image & (uint8_t)(0x80U >> dx)) != 0U ? v->pen : v->paper;
             (void)cpc_video_put(v, 8U * column + dx, 8U * row + dy, colour);
         }
+    }
+    if (v->mode == CPC_MODE_1) {
+        const size_t i = cell_index(column, row);
+        v->cell_char[i] = ch;
+        v->cell_valid[i / 8U] |= (uint8_t)(UINT8_C(1) << (i % 8U));
     }
     return true;
 }
@@ -187,6 +222,18 @@ bool cpc_video_scroll_up(CpcVideo *v, unsigned rows)
     if (retained != 0U)
         memmove(v->pixels, v->pixels + shift_bytes, retained);
     memset(v->pixels + retained, paper, shift_bytes);
+    /* 40 chars and 5 validity bytes per row: shifts are byte aligned.
+     * Raster and E2 shift only after all arguments have been accepted. */
+    const size_t cell_shift = (size_t)rows * CPC_VIDEO_MODE1_COLUMNS;
+    const size_t valid_shift = (size_t)rows * (CPC_VIDEO_MODE1_COLUMNS / 8U);
+    const size_t cell_remain = CPC_VIDEO_MODE1_CELLS - cell_shift;
+    const size_t valid_remain = CPC_VIDEO_MODE1_VALID_BYTES - valid_shift;
+    if (cell_remain != 0U)
+        memmove(v->cell_char, v->cell_char + cell_shift, cell_remain);
+    memset(v->cell_char + cell_remain, 0, cell_shift);
+    if (valid_remain != 0U)
+        memmove(v->cell_valid, v->cell_valid + valid_shift, valid_remain);
+    memset(v->cell_valid + valid_remain, 0, valid_shift);
     v->dirty_bands |= ALL_DIRTY;
     return true;
 }

@@ -157,9 +157,10 @@ static void pages(void)
         for(unsigned i=0U;i<120U;++i)
             assert(cpc_uart_console_append(&sink,(uint8_t)'X'));
         assert(cpc_uart_console_end_line(&sink));
-        assert(sink.row<=25U);
+        assert(sink.row<25U);
     }
-    assert(paged_count>0U);
+    assert(paged_count==0U);
+    assert(sink.scrolls>0U && sink.bytes_clipped==0U);
     guarded();
 }
 int main(void)
@@ -174,6 +175,6 @@ int main(void)
         assert(mask!=0U);
     }
     pages();
-    puts("HW4-C3-A boot/layout/VRAM/font/cursor/paging canaries PASS");
+    puts("HW4-C3-A boot/layout/VRAM/font/cursor/scroll canaries PASS");
     return 0;
 }

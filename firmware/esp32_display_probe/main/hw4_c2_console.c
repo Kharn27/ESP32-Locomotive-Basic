@@ -1,7 +1,7 @@
 /*
  * HW4-C2: real user-submitted native Locomotive BASIC via UART0 -> CPC TFT.
  * One app_main owns UART intake, BASIC session, CpcText, video and LCD DMA.
- * Not a CPC boot, scrolling screen, Z80 interpreter or second SPI driver.
+ * Native MODE1 scroll added in HW4-C3-B2; no Z80 or second SPI driver.
  */
 #include "basic_session_runtime.h"
 #include "basic_variable_store.h"
@@ -16,6 +16,8 @@
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_idf_version.h"
+#include "esp_cpu.h"
+#include "sdkconfig.h"
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -33,7 +35,9 @@ enum {
     LCD_HEIGHT = 240,
     LCD_ROWS_PER_BAND = 8,
     CPC_ROWS = 25,
-    RUN_STEP_BUDGET = 256
+    RUN_STEP_BUDGET = 256,
+    ECHO_IDLE_MS = 20,
+    ECHO_MAX_BYTES = UART_LINE_CAPACITY
 };
 typedef struct {
     BasicProgram program;
@@ -50,7 +54,55 @@ static CpcVideo s_video;
 static CpcText s_text;
 static UartLine s_line;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
-static unsigned s_screen_pages;
+static size_t s_scroll_reported;
+/* B2-C1 instrumentation: bounded histogram, never a second framebuffer. */
+static struct {
+    uint32_t flushes, bands, max_us, histogram[12];
+    uint32_t idle_echo_batches, command_echo_batches, max_echo_batch;
+    uint64_t repaint_us, spi_bytes;
+} s_lcd_metrics;
+static const uint32_t s_latency_bounds_us[12] = {
+    500U, 1000U, 2000U, 4000U, 8000U, 16000U,
+    32000U, 64000U, 128000U, 256000U, 512000U, UINT32_MAX
+};
+static uint32_t latency_quantile_upper(unsigned percent)
+{
+    uint32_t rank=(uint32_t)(((uint64_t)s_lcd_metrics.flushes*percent+99U)/100U);
+    uint32_t seen=0U;
+    if(rank==0U) return 0U;
+    for(unsigned i=0U;i<12U;++i) {
+        seen+=s_lcd_metrics.histogram[i];
+        if(seen>=rank) return s_latency_bounds_us[i];
+    }
+    return UINT32_MAX;
+}
+static void echo_batch_record(unsigned size,bool command)
+{
+    if(size==0U) return;
+    if(size>s_lcd_metrics.max_echo_batch)
+        s_lcd_metrics.max_echo_batch=size;
+    if(command) ++s_lcd_metrics.command_echo_batches;
+    else ++s_lcd_metrics.idle_echo_batches;
+}
+static void lcd_metrics_report(const char *stage)
+{
+    printf("HW4-C3-B2-C1 LCD_METRICS stage=%s flushes=%u bands=%u "
+           "spi_bytes=%llu scrolls=%u repaint_us_total=%llu "
+           "repaint_p50_upper_us=%u repaint_p95_upper_us=%u repaint_max_us=%u "
+           "echo_idle_batches=%u echo_command_batches=%u echo_batch_max=%u "
+           "mode=histogram_upper_bounds\n",
+           stage,(unsigned)s_lcd_metrics.flushes,(unsigned)s_lcd_metrics.bands,
+           (unsigned long long)s_lcd_metrics.spi_bytes,
+           (unsigned)s_text.scrolls,
+           (unsigned long long)s_lcd_metrics.repaint_us,
+           (unsigned)latency_quantile_upper(50U),
+           (unsigned)latency_quantile_upper(95U),
+           (unsigned)s_lcd_metrics.max_us,
+           (unsigned)s_lcd_metrics.idle_echo_batches,
+           (unsigned)s_lcd_metrics.command_echo_batches,
+           (unsigned)s_lcd_metrics.max_echo_batch);
+}
+
 
 /* Extend the existing ORIGINAL HW3 font for visible serial syntax.
  * Missing glyphs remain an explicitly provisional display limitation. */
@@ -126,13 +178,54 @@ static bool repaint_full(void)
     (void)cpc_video_take_dirty(&s_video);
     return true;
 }
+static bool send_dirty_band(void *context, unsigned row)
+{
+    unsigned *sent=(unsigned *)context;
+    if(row>=CPC_ROWS ||
+       !render_band(CPC_VIDEO_VIEW_TOP+row*LCD_ROWS_PER_BAND))
+        return false;
+    ++(*sent);
+    return true;
+}
 static bool repaint_dirty(void)
 {
-    uint32_t mask=cpc_video_take_dirty(&s_video);
-    for(unsigned i=0;i<CPC_ROWS;++i)
-        if((mask & (UINT32_C(1)<<i))!=0U &&
-           !render_band(CPC_VIDEO_VIEW_TOP+i*LCD_ROWS_PER_BAND))
+    if(s_video.dirty_bands!=0U) {
+        unsigned sent=0U;
+        uint32_t start=esp_cpu_get_cycle_count();
+        /* Exactly ONE attempt. Real LCD errors latch s_fault, so preserve
+         * remaining dirty bands and fail-stop. Never retry the driver. */
+        bool ok=cpc_video_flush_dirty(&s_video,send_dirty_band,&sent);
+        /* CPU cycles modulo UINT32 wrap; CYD uses a fixed CPU clock.
+         * Avoid extra timer component and preserve HW3 OFF dependencies. */
+        uint32_t elapsed=esp_cpu_get_cycle_count()-start;
+        uint32_t us=elapsed/CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
+        ++s_lcd_metrics.flushes;
+        s_lcd_metrics.bands+=sent;
+        s_lcd_metrics.spi_bytes+=(uint64_t)sent*CYD_LCD_DMA_BYTES;
+        s_lcd_metrics.repaint_us+=(uint64_t)us;
+        if(us>s_lcd_metrics.max_us) s_lcd_metrics.max_us=us;
+        unsigned bin=0U;
+        while(bin<11U && us>s_latency_bounds_us[bin]) ++bin;
+        ++s_lcd_metrics.histogram[bin];
+        if(!ok) {
+            CydLcdDiagnostics d;
+            bool got=cyd_lcd_diagnostics(&d);
+            printf("HW4-C3-B2-C1 LCD_FAIL_STOP pending=0x%08x "
+                   "sent=%u dma_fault=%u lcd_error=%s retry=0\n",
+                   (unsigned)s_video.dirty_bands,sent,
+                   got ? (unsigned)d.dma_fault : 1U,
+                   got ? esp_err_to_name(d.last_error) : "UNKNOWN");
             return false;
+        }
+    }
+    if(s_text.scrolls<s_scroll_reported) s_scroll_reported=0U; /* !CLS */
+    if(s_text.scrolls>s_scroll_reported) {
+        printf("HW4-C3-B2 SCREEN_SCROLL rows=%u total=%u "
+               "policy=mode1_vram program_preserved=1\n",
+               (unsigned)(s_text.scrolls-s_scroll_reported),
+               (unsigned)s_text.scrolls);
+        s_scroll_reported=s_text.scrolls;
+    }
     return true;
 }
 static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
@@ -145,32 +238,34 @@ static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
     if(!cpc_text_write(&s_text,data,size))
         return fail("TEXT_ADAPTER",-1);
     if(s_text.bytes_clipped>clipped_before)
-        printf("HW4-C2 SCREEN_FULL_OUTPUT_CLIPPED bytes=%u "
-               "policy=next_prompt_paginates\n",
+        printf("HW4-C3-B2 SCREEN_OUTPUT_CLIPPED bytes=%u "
+               "policy=unexpected_clip\n",
                (unsigned)(s_text.bytes_clipped-clipped_before));
-    return repaint_dirty();
+    return true; /* final frame is flushed by prompt */
 }
 static bool display_error(void)
 {
     static const uint8_t notice[]="ERROR\n"; /* host diagnostic, not CPC ERR */
     if(!cpc_text_write(&s_text,notice,sizeof(notice)-1U))
         return fail("ERROR_TEXT",-1);
-    return repaint_dirty();
+    return true;
+}
+static bool display_ready(void)
+{
+    static const uint8_t ready[]="Ready\n";
+    if(!cpc_text_write(&s_text,ready,sizeof(ready)-1U))
+        return fail("READY_TEXT",-1);
+    return true;
 }
 static bool prompt(void)
 {
     bool cleared=false;
     if(!cpc_uart_console_prompt(&s_text,&cleared))
         return fail("CONSOLE_PROMPT",-1);
-    if(cleared) {
-        ++s_screen_pages;
-        printf("HW4-C2 SCREEN_PAGE_RESET count=%u "
-               "reason=no_room_for_120_byte_input program_preserved=1\n",
-               s_screen_pages);
-    }
+    if(cleared) return fail("UNEXPECTED_AUTO_CLEAR",-1);
     if(!repaint_dirty()) return false;
-    printf("HW4-C2 INPUT_READY capacity=%u screen_row=%u "
-           "policy=auto_page_non_cpc\n",UART_LINE_CAPACITY,s_text.row);
+    printf("HW4-C3-B2 INPUT_READY capacity=%u screen_row=%u "
+           "policy=mode1_scroll\n",UART_LINE_CAPACITY,s_text.row);
     return true;
 }
 static bool basic_submit(const uint8_t *source,size_t length)
@@ -254,12 +349,13 @@ static bool execute_line(void)
         printf("%02x",(unsigned)source[i]);
     if(length>32U) printf("...");
     printf("\n");
-    if(!cpc_uart_console_end_line(&s_text) || !repaint_dirty())
+    if(!cpc_uart_console_end_line(&s_text))
         return fail("INPUT_EOL",-1);
     if(is_command(source,length,"!CLS")) {
         printf("HW4-C2 DIAGNOSTIC_SCREEN_CLEAR source=!CLS "
                "program_preserved=1\n");
-        if(!cpc_uart_console_clear(&s_text) || !repaint_dirty()) return false;
+        if(!cpc_uart_console_clear(&s_text)) return false;
+        s_scroll_reported=0U;
     } else if(is_command(source,length,"!DEMO")) {
         if(!diagnostic_demo()) return false;
     } else {
@@ -271,7 +367,7 @@ static bool execute_line(void)
         if(run && s_basic.runtime.state==BSR_RUNNING)
             if(!basic_run()) return false;
     }
-    return prompt();
+    return display_ready() && prompt();
 }
 static bool uart_init(void)
 {
@@ -338,16 +434,30 @@ void app_main(void)
     printf("HW4-C2 HELP submit_4_numbered_lines_then_RUN "
            "LIST_NEW=real_BSR !DEMO=HW4-C1 !CLS=screen_only\n");
     if(!prompt()) return;
+    unsigned echo_pending=0U;
+    printf("HW4-C3-B2-C1 ECHO_POLICY idle_ms=%u batch_max=%u "
+           "command_flush=1 dma_fail_stop=1\n",ECHO_IDLE_MS,ECHO_MAX_BYTES);
     for(;;) {
         uint8_t ch=0U;
-        int got=uart_read_bytes(UART_NUM_0,&ch,1U,pdMS_TO_TICKS(100));
+        int got=uart_read_bytes(UART_NUM_0,&ch,1U,
+                                pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : 100U));
         if(got<0) { (void)fail("UART_READ",got); return; }
-        if(got==0) continue;
+        if(got==0) {
+            /* Echo within one idle interval. Fast paste coalesces into
+             * one repaint at CR or at the bounded 120-event limit. */
+            if(echo_pending) {
+                if(!repaint_dirty()) return;
+                echo_batch_record(echo_pending,false);
+                echo_pending=0U;
+            }
+            continue;
+        }
         UartLineEvent event=uart_line_feed(&s_line,ch);
         if(event==UART_LINE_APPEND) {
-            if(!cpc_uart_console_append(&s_text,ch) || !repaint_dirty()) {
+            if(!cpc_uart_console_append(&s_text,ch)) {
                 (void)fail("ECHO",-1); return;
             }
+            ++echo_pending;
         } else if(event==UART_LINE_DELETE) {
             /* Raw-byte provenance for the PO's keyboard investigation.
              * A lone '~' never triggers DELETE; only decoded ESC[3~ does. */
@@ -357,24 +467,38 @@ void app_main(void)
             else
                 printf("HW4-C2 UART_EDIT key_hex=%02x "
                        "action=backspace\n",(unsigned)ch);
-            if(!cpc_uart_console_backspace(&s_text) || !repaint_dirty()) {
+            if(!cpc_uart_console_backspace(&s_text)) {
                 (void)fail("DELETE",-1); return;
             }
+            ++echo_pending;
         } else if(event==UART_LINE_OVERFLOW) {
             printf("HW4-C2 INPUT_OVERFLOW max_bytes=%u "
                    "policy=reject_entire_line\n",UART_LINE_CAPACITY);
         } else if(event==UART_LINE_READY) {
+            /* Input LF + program output + Ready + prompt are fully
+             * composed BEFORE exactly one repaint_dirty(). */
+            echo_batch_record(echo_pending,true);
+            echo_pending=0U;
             if(!execute_line()) return;
             uart_line_ack(&s_line);
             memory_report("after_line");
+            lcd_metrics_report("after_line");
         } else if(event==UART_LINE_REJECTED) {
+            echo_batch_record(echo_pending,true);
+            echo_pending=0U;
             printf("HW4-C2 UART_LINE_REJECTED reason=%s "
                    "program_preserved=1\n",
                    s_line.rejected_ansi_incomplete ?
                        "incomplete_ansi" : "overflow");
             if(!cpc_uart_console_end_line(&s_text) ||
-               !display_error() || !prompt()) return;
+               !display_error() || !display_ready() || !prompt()) return;
             uart_line_ack(&s_line);
+            lcd_metrics_report("after_rejected");
+        }
+        if(echo_pending>=ECHO_MAX_BYTES) {
+            if(!repaint_dirty()) return;
+            echo_batch_record(echo_pending,false);
+            echo_pending=0U;
         }
         /* NONE/IGNORED: CRLF pair, empty erase, non-ASCII or controls. */
     }

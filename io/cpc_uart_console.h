@@ -4,9 +4,9 @@
 #include "cpc_text.h"
 #include <stdbool.h>
 #include <stdint.h>
-/* No CPC scrolling in C2: start the next editor on a fresh logical page
- * whenever fewer than four lines remain. Existing BASIC store is untouched.
- * reset_page reports a diagnostic pagination event, not a BASIC command.
+/* MODE1 uses native scrolling rather than automatic page clearing.
+ * reset_page is retained for old caller ABI and always set to false;
+ * explicit !CLS is the only screen clear operation.
  */
 bool cpc_uart_console_prompt(CpcText *text, bool *reset_page);
 bool cpc_uart_console_append(CpcText *text, uint8_t ch);

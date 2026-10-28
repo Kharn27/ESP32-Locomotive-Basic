@@ -68,7 +68,7 @@ jobs:
             ctest --test-dir "$RUNNER_TEMP/j115-c99" --output-on-failure
           else
             ctest --test-dir "$RUNNER_TEMP/j115-c99" --output-on-failure \
-              -E '^j1_15_a_inline_cpc_permanent$'
+              -E '^j1_15_a_string_cpc_permanent$'
           fi
           python3 tools/j1_9_binary_family_verify.py --permanent --self-test
           python3 tools/j1_9_b_native_verify.py --cli "$RUNNER_TEMP/j115-c99/loco_basic_cli" \
@@ -120,7 +120,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: j1-14-a-cpc-if-inline-else-captures
+          name: j1-15-a-cpc-string-scalar-captures
           path: ${{ runner.temp }}/j115-cpc/
           if-no-files-found: warn
           retention-days: 30

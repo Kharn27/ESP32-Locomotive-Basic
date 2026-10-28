@@ -155,7 +155,7 @@ def explore(cap,root,name,raw,numbers):
     observation=run_observation(cap,work,raw,exploratory=True)
     return {"original_source_sha256":oracle.sha(raw),
             "line_numbers":numbers,"run":observation,
-            "scope":"EXPLORATION_ONLY_NEVER_J1_14_B_PROOF"}
+            "scope":"EXPLORATION_ONLY_NEVER_J1_15_B_PROOF"}
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -206,8 +206,8 @@ def main():
         printer1=(repeated/name/"run/printer.dat").read_bytes()
         check(ram0==ram1,name+": TWO_CPC_RAM_ACQUISITIONS_DISAGREE")
         check(printer0==printer1,name+": TWO_CPC_PRINTER_ACQUISITIONS_DISAGREE")
-        check(first["run"]["all_printer_lines_numeric"] and
-              second["run"]["all_printer_lines_numeric"],
+        check(first["run"]["numeric_err_erl_probes"] and
+              second["run"]["numeric_err_erl_probes"],
               name+": DIRECT_ERR_ERL_PROBE_NOT_NUMERIC")
         manifest["captures"].append({
             "case":name,"source_path":"tests/oracles/inputs/j1_15_a/"+name.lower()+".bas",

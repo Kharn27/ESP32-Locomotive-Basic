@@ -642,3 +642,7 @@ J1.10-B-C1 accepté/fusionné dans `main` par le Pilotage au squash `d7a29128363
 ### J1.13-B — IF INTEGER relationnel natif, PR en revue (28 octobre 2026)
 
 Mandat strict [#132](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/132), base `main@b91b33adf97aa54a9491b0e05587be02695647ef`. [PR #133](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/133) **ouverte, non fusionnée, en revue Pilotage** : six relations signées dans `IF A% op B% THEN ligne`, deux références INTEGER explicites, tokens, LIST, atomicité et comportement ancien préservés. Deux portes CTest ajoutées, suite native et différentiel 24 archives CPC immuables. Matrice/provenance : [rapport J1.13-B](J1.13-B-integer-relational-if-native.md). Résultats CI et métriques à vérifier sur le dernier SHA de la PR ; les précédentes classifications pré-B `UNSUPPORTED` sont conservées. `ON_DEVICE_UNVERIFIED`. Aucune autorisation de jalon suivant.
+
+### J1.14-A — oracle CPC IF inline / ELSE (mandat #134)
+
+Après fusion Pilotage de J1.13-B (squash `ec56bad2b6cd9d920d6a590ac63c3c6f94a02ffb`), J1.14-A est autorisé **en acquisition exclusivement** : 24 sources avec `IF…THEN C%=81 [ELSE C%=42]` et 6 explorations distinctes. Collecteur ROM Caprice32 authentique, archives doubles, permanence et falsifications à établir. [Dossier J1.14-A](J1.14-A-if-inline-else-cpc-oracle.md). **PENDING_PILOTAGE, NATIVE_UNSUPPORTED_PENDING_MEASUREMENT, ON_DEVICE_UNVERIFIED.** Branche `oracle/j1-14-a-if-inline-else`; aucune modification core/HW4 ni jalon B.

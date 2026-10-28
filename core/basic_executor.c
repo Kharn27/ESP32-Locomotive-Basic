@@ -348,7 +348,6 @@ static BEStatus for_match(const BasicProgram *program,
         if (!first_line) pos = 0u;
         first_line = 0;
         while (pos < n) {
-            size_t skip;
             uint8_t token;
             skip_spaces(body, n, &pos);
             if (pos >= n) break;

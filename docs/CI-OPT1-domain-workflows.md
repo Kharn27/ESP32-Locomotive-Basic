@@ -57,7 +57,7 @@ Références API vérifiables : exécutions `40612187487`, `40612187453`, `40612
 - CI-C99 : [4/4 SUCCESS](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40618372855), inventaire complet de 62 suites.
 - CI-CPC-PERMANENT : [SUCCESS](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40618372872), falsifications `--self-test` et faux HEAD.
 - CI-ARCH : [SUCCESS](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40618372822).
-- CI-XTENSA : [exécution de comparaison](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40618372772), résultat à relever séparément.
+- CI-XTENSA : [build des 3 images et contrôles ABI réussis, JOB FAIL](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40618372772). Cause précise : refus de permission `tee` lors de l'écriture d'un rapport supplémentaire dans un dossier créé par Docker root ; correction du rapport déplacée vers la sortie du job et la preuve du SHA vers le checkout explicite. Cette phase ne constitue PAS une CI verte.
 - J1.11-A : anomalie de YAML doublé préexistante restaurée, validité du workflow à confirmer via Actions.
 
 **Mesure finale post-consolidation :** à compléter par le verdict effectif des Actions pour le HEAD final de la PR. Ne pas confondre l'économie projetée (7 jobs de domaine, plus éventuel oracle isolé) avec la baisse mesurée réelle. Avant d'affirmer un gain de 35–40 %, consulter les dates `started_at`/`completed_at` et les runs GitHub du même commit ; comparer au HEAD #107 en distinguant les déclenchements différents (CI-OPT1 YAML-only versus PR C99 qui touche `core/`).

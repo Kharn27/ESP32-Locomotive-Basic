@@ -86,7 +86,7 @@ jobs:
             done
             echo "CI_OPT1_THREE_IMAGE_ABI=PASS"
           '
-          echo "SOURCE_SHA=$(git rev-parse HEAD)" | tee firmware/esp32_display_probe/reports/source-sha.txt
+          echo "CI-OPT1 SOURCE_SHA=$(git rev-parse HEAD)"
       - uses: actions/upload-artifact@v4.6.2
         if: always()
         with:

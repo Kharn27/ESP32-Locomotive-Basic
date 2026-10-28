@@ -20,7 +20,14 @@ jobs:
           set -euo pipefail
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
           ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main firmware/esp32_probe/main --include='*.c'
-          git diff --exit-code "$(git merge-base origin/main HEAD)" HEAD -- core/ video/ tests/fixtures/
+          base="$(git merge-base origin/main HEAD)"
+          if test "$GITHUB_HEAD_REF" = "feat/hw4-c3-a-cpc-boot-console"; then
+            # C3-A adds only two boot-video files and four display-probe files.
+            # Preserve core, fixture, transport and non-boot video immutability.
+            bash tools/hw4_c3_a_scope_gate.sh "$base" HEAD
+          else
+            git diff --exit-code "$base" HEAD -- core/ video/ tests/fixtures/
+          fi
   linux:
     runs-on: ubuntu-22.04
     strategy:

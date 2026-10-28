@@ -176,6 +176,9 @@ jobs:
           # preserve the original J1.9-A archive and all HW4 boundaries.
           if test "$GITHUB_HEAD_REF" = feat/j1-9-a-cpc-integer-binary-family-oracle; then
             git diff --exit-code "$base" HEAD -- core/ firmware/ video/ hal/
+          elif test "$GITHUB_HEAD_REF" = feat/hw4-c3-a-cpc-boot-console; then
+            # Restrict the graphics diff precisely; seal and oracle checks stay.
+            bash tools/hw4_c3_a_scope_gate.sh "$base" HEAD
           else
             git diff --exit-code "$base" HEAD -- \
               firmware/ video/ hal/ tests/fixtures/cpc6128/j1_integer_binary_family/

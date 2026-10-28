@@ -491,3 +491,16 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_10_if_then_verify.py"
         --permanent --self-test)
 endif()
+
+# HW4-C3-A: shared HW3 boot layout -> native CPC VRAM.
+add_library(cpc_boot STATIC video/cpc_boot.c)
+target_include_directories(cpc_boot PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/video)
+target_link_libraries(cpc_boot PUBLIC cpc_text)
+if(BUILD_TESTING)
+    add_executable(test_hw4_c3_boot tests/test_hw4_c3_boot.c
+                   firmware/esp32_display_probe/main/cpc_font.c)
+    target_include_directories(test_hw4_c3_boot PRIVATE
+              ${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main)
+    target_link_libraries(test_hw4_c3_boot PRIVATE cpc_boot cpc_uart_console)
+    add_test(NAME hw4_c3_boot_screen COMMAND test_hw4_c3_boot)
+endif()

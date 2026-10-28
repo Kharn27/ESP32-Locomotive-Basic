@@ -552,3 +552,76 @@ Après fusion de [J1.9-B #102](https://github.com/Kharn27/ESP32-Locomotive-Basic
 
 
 **Gates J1.10-A (révision de code `54bcd378`)** : [Linux 58/58 OFF et ON #40603448640](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448640), [oracle J1.10-A #40603448801](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448801) 14/14 doubles acquisitions RAM et imprimante exactes, six falsifications + faux HEAD rejetés, [trois images Xtensa J1.8-A #40603448623](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448623), [HW4-C1 #40603448633](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448633), [HW4-C2 #40603448674](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448674) et [CPC historique #40603448614](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448614) verts ; ***vérification du HEAD documentaire ultérieur obligatoire avant remise***. Aucun élargissement à J1.10-B ou HW4, `ON_DEVICE_UNVERIFIED`. [Rapport complet](J1.10-A-if-then-cpc-oracle.md).
+
+
+## HW4-C3-A — console CYD : bandeau BASIC 1.1 (27 octobre 2026)
+
+Mission [#101](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101),
+branche `feat/hw4-c3-a-cpc-boot-console` : **en développement/revue,
+non fusionnée**. Bandeau HW3 partagé en C99 par HW3 OFF et console ON,
+sans second framebuffer : rangées 3/5/7/10/12, curseur non destructif
+(0,13), copyright HW3 0x7f, nouveau titre console ON
+`ESP32 CYD 128K Microcomputer (v3)` et glyphes originaux U/W/Y.
+Banc HW3 OFF : ancien titre Amstrad conservé. Cette personnalisation du
+titre n'est pas une assertion d'identité historique CPC.
+Jalons #96 (édition) et #97 (ASCII intégral) hors périmètre.
+Preuves définitives Linux/ESP32 à attester dans la PR au HEAD final ;
+**ON_DEVICE_UNVERIFIED** avant photo/log physique PO.
+
+
+## HW4-C3-A-C1 — consolidation avec J1.9-B (28 octobre 2026)
+
+- Synchronisation effective avec `main` `446b0a34e44fe8a744352ca56dde505efcc43959` intégrant J1.9-B (#102).
+- Oracle CPC et cœur BASIC repris de `main` **sans édition** ; seule la
+  configuration racine CMake ajoute la suite `hw4_c3_boot_screen` à J1.9-B.
+  **58 tests** au minimum attendus en CTest Linux OFF et ON ASan/UBSan.
+- `tools/hw4_c3_a_scope_gate.sh` énumère explicitement les seules mutations
+  sous `video/` et `firmware/` permises pour cette branche : deux fichiers
+  `video/cpc_boot.*` et quatre fichiers `esp32_display_probe/main`.
+  Toute modification du cœur, des fixtures, oracles, HAL ou transport échoue.
+- Adaptations limitées des jobs *architecture* HW4-B, J1.8-A et J1.9-A :
+  leur garde originelle demeure active pour **toutes les autres branches**,
+  en particulier pour les branches d'acquisition historiques. J1.9-A utilise
+  les deux projets ESP-IDF courants, sans recréer `esp32_loco`.
+- Le rendu et les glyphes C3-A restent identiques à la version physique
+  `c69e4c2`. **Toute nouvelle preuve CYD doit utiliser le HEAD C1 final** ;
+  ne pas réutiliser automatiquement l'ancien PASS pour le nouveau binaire.
+- Les résultats CI, l'empreinte de merge et les mémoires cibles sont à
+  relever depuis les exécutions GitHub Actions sur le HEAD C1 exact.
+
+ 
+### HW4-C3-A-C1 — correction visuelle ciblée après essai PO (`74abb57`)
+ 
+Le PO a flashé le HEAD `74abb574b5c47f19762b9bdba2cee270e93672d6`.
+Bandeau visible, exécution du programme natif `RUN` donnant `5`,
+sans défaut DMA. Retouche *uniquement du bandeau console ON* :
+mettre la ligne « and Locomotive Software Ltd. » en rangée **6**
+directement après le copyright « 1985 Amstrad… » en rangée **5**.
+La variante HW3 OFF reste inchangée (rangée 7). Test C99 des deux
+dispositions et du framebuffer, plus retest CYD sur le nouveau HEAD
+impératif. Le `SCREEN_PAGE_RESET` de LIST est le comportement
+`auto_page_non_cpc` de HW4-C2 et reste hors mandat C1 (scrolling exclu
+par Pilotage). Aucune modification UART, HAL, cœur, oracles ou VRAM.
+
+### HW4-C3-A-C1 — second réglage de position demandé par le PO (28/10/2026)
+
+Après la suppression de la ligne vide entre les crédits, le PO constate
+que `BASIC 1.1` se situe encore une rangée trop bas. La variante
+**console ON** place désormais `BASIC 1.1` en **rangée 9** (au lieu de
+10), `Ready` reste en rangée 12, curseur (0,13). **HW3 OFF**
+conserve les rangées précédentes et le même texte. Test C99 étendu
+avec pixels VRAM et assertion de rangée vacante. Caprice32 figure dans
+`tests/oracles/caprice32` comme sous-module pour les oracles historiques,
+mais le positionnement visuel HW3 n'est pas une référence pixel à pixel
+scellée. Aucun changement au moteur BASIC ni au scrolling non-CPC.
+
+### HW4-C3-A-C1 — nouvelle base J1.10-A, retouches PO du bandeau
+
+Synchronisation de la PR #103 avec `main` `c9ff43bd4a04d88fe3552a9398cefc0804651b83` (oracle J1.10-A) :
+le corpus et les fichiers des oracles ainsi que le cœur BASIC restent
+identiques au nouveau `main`. Sur la console ON, lignes : titre 3,
+copyright 5, Locomotive 6, `BASIC 1.1` 9, `Ready` 11,
+curseur et première frappe **rangée 12**. HW3 OFF conserve les cinq
+rangées d'origine 3/5/7/10/12 et son curseur 13.
+Aucun scrolling CPC, éditeur tactile ou changement HAL ; preuve CYD
+à acquérir sur le nouveau HEAD, indépendamment des anciennes captures.

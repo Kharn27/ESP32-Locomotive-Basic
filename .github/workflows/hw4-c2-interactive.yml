@@ -73,6 +73,12 @@ jobs:
           # add suites and must not fail because this count increases.
           count="$(ctest --test-dir build -N | awk '/Total Tests:/ {print $3}')"
           test "$count" -ge 55
+          # Includes the immutable J1.10-A oracle plus HW4-C3-A boot test.
+          if test "$GITHUB_HEAD_REF" = feat/hw4-c3-a-cpc-boot-console; then
+            test "$count" -ge 59
+            ctest --test-dir build -N | grep -F 'hw4_c3_boot_screen'
+            ctest --test-dir build -N | grep -F 'j1_10_a_if_then_cpc_permanent'
+          fi
           echo "HW4-C2 BASELINE_MINIMUM=55 ACTUAL=$count"
       - uses: actions/upload-artifact@v4.6.2
         if: always()

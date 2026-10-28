@@ -439,3 +439,45 @@ Jalon développé séparément depuis le main `3e903147012aedca530c9367ce130f4f8
 
 
 **Gates J1.10-A (révision de code `54bcd378`)** : [Linux 58/58 OFF et ON #40603448640](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448640), [oracle J1.10-A #40603448801](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448801) 14/14 doubles acquisitions RAM et imprimante exactes, six falsifications + faux HEAD rejetés, [trois images Xtensa J1.8-A #40603448623](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448623), [HW4-C1 #40603448633](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448633), [HW4-C2 #40603448674](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448674) et [CPC historique #40603448614](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448614) verts ; ***vérification du HEAD documentaire ultérieur obligatoire avant remise***. Aucun élargissement à J1.10-B ou HW4, `ON_DEVICE_UNVERIFIED`. [Rapport complet](J1.10-A-if-then-cpc-oracle.md).
+
+
+## Gate HW4-C3-A — démarrage ESP32 CYD / BASIC 1.1
+
+Autorisation issue [#101](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/101),
+après fusion HW4-C2-C1 / #91. Le titre de la console ON est adapté à
+`ESP32 CYD 128K Microcomputer (v3)` sur demande PO ; le mode HW3 OFF
+conserve son titre historique. Exiger : 55+ tests Linux OFF/ON et ASan/UBSan,
+trois variantes ESP-IDF Xtensa, aucune modification core/oracle, rendu des
+cinq lignes (U/W/Y, copyright, Ready), mémoire bornée, saisie
+LIST/RUN/NEW, !CLS et pagination. **Essai physique du PO sur le
+HEAD final obligatoire** avant toute acceptation : photo et logs UART
+incluant identité firmware, heap/pile et DMA. Une CI verte ne prouve pas
+le rendu sur la CYD. Une seule PR non fusionnée, revue Pilotage.
+HW4-C3-B, éditeur #96 et couverture ASCII #97 restent non autorisés ici.
+
+
+## HW4-C3-A-C1 — consolidation avec J1.9-B (28 octobre 2026)
+
+- Synchronisation effective avec `main` `446b0a34e44fe8a744352ca56dde505efcc43959` intégrant J1.9-B (#102).
+- Oracle CPC et cœur BASIC repris de `main` **sans édition** ; seule la
+  configuration racine CMake ajoute la suite `hw4_c3_boot_screen` à J1.9-B.
+  **58 tests** au minimum attendus en CTest Linux OFF et ON ASan/UBSan.
+- `tools/hw4_c3_a_scope_gate.sh` énumère explicitement les seules mutations
+  sous `video/` et `firmware/` permises pour cette branche : deux fichiers
+  `video/cpc_boot.*` et quatre fichiers `esp32_display_probe/main`.
+  Toute modification du cœur, des fixtures, oracles, HAL ou transport échoue.
+- Adaptations limitées des jobs *architecture* HW4-B, J1.8-A et J1.9-A :
+  leur garde originelle demeure active pour **toutes les autres branches**,
+  en particulier pour les branches d'acquisition historiques. J1.9-A utilise
+  les deux projets ESP-IDF courants, sans recréer `esp32_loco`.
+- Le rendu et les glyphes C3-A restent identiques à la version physique
+  `c69e4c2`. **Toute nouvelle preuve CYD doit utiliser le HEAD C1 final** ;
+  ne pas réutiliser automatiquement l'ancien PASS pour le nouveau binaire.
+- Les résultats CI, l'empreinte de merge et les mémoires cibles sont à
+  relever depuis les exécutions GitHub Actions sur le HEAD C1 exact.
+
+**Adaptation CYD demandée par le PO (28 octobre 2026)** : retour d'essai
+ciblé, `Ready` en rangée 11 (et curseur en 12), sous `BASIC 1.1`
+en rangée 9, crédits 5/6 ; seul le MODE console ON varie.
+HW3 OFF conserve 3/5/7/10/12. J1.10-A est intégré depuis `main`
+sans altérer son oracle. Nouvel essai PO impératif sur le HEAD final.

@@ -225,9 +225,55 @@ static int invalid_grammar(void) {
      CHECK(bt_tokenize(badnul,sizeof(badnul),dest,sizeof(dest),&written)!=BT_OK);}
     return 0;
 }
+
+static int forged_cache_and_missing_arena(void) {
+    Fixture f;
+    BasicVariableStore legacy;
+    BasicVariableEntry e[1];
+    uint8_t tok[128], saved[128], scratch[16];
+    size_t n = 0u, listed = 719u;
+    BasicExecutor before;
+    BasicVariableEntry original;
+    BasicProgramLine line;
+    CHECK(bt_tokenize((const uint8_t *)"A$=\"X\"",6u,
+                      tok,sizeof(tok),&n)==BT_OK);
+    CHECK(n==8u && tok[0]==0x03u && tok[1]==0u && tok[2]==0u);
+    memcpy(saved,tok,n);
+    tok[1]=0x12u; /* Cache byte is opaque in ROM, but newly encoded
+                    * standalone assignment must use 00 00. */
+    memset(scratch,0xa5,sizeof(scratch));
+    CHECK(bl_detokenize(tok,n,scratch,sizeof(scratch),&listed)==BL_BAD_SEQUENCE);
+    CHECK(listed==719u && scratch[0]==0xa5u);
+    CHECK(setup(&f,128u)==0);
+    CHECK(bp_put(&f.program,10u,tok,n)==BP_OK);
+    CHECK(bp_put(&f.program,20u,(const uint8_t *)"\x98",1u)==BP_OK);
+    CHECK(be_init_with_store(&f.rt.executor,&f.program,&f.vars)==BE_OK);
+    f.rt.state=BSR_RUNNING;
+    before=f.rt.executor;original=f.entries[0];
+    CHECK(step(&f,sizeof(f.output)).executor_status==BE_BAD_SEQUENCE);
+    CHECK(memcmp(&f.rt.executor,&before,sizeof(before))==0);
+    CHECK(memcmp(&f.entries[0],&original,sizeof(original))==0);
+    CHECK(f.vars.count==0u && memcmp(tok,saved,n)!=0);
+    /* Legacy store remains valid, but cannot allocate a nonempty value. */
+    CHECK(bvs_init(&legacy,e,1u)==BVS_OK);
+    CHECK(bp_put(&f.program,10u,saved,n)==BP_OK);
+    CHECK(be_init_with_store(&f.rt.executor,&f.program,&legacy)==BE_OK);
+    f.rt.executor.cursor=0u;before=f.rt.executor;
+    CHECK(be_step(&f.rt.executor,f.output,sizeof(f.output),&f.written)==BE_STORE_FULL);
+    CHECK(memcmp(&f.rt.executor,&before,sizeof(before))==0 && legacy.count==0u);
+    /* Every input region, not just the live length, must avoid arena alias. */
+    CHECK(bsr_init_with_store(&f.rt,&f.program,&f.vars).status==BSR_OK);
+    CHECK(submit(&f,"RUN").status==BSR_OK);
+    CHECK(bsr_step(&f.rt,f.arena,8u,&f.written).status==BSR_OVERLAP);
+    CHECK(f.vars.count==0u);
+    CHECK(bp_find(&f.program,10u,&line)==BP_OK);
+    return 0;
+}
+
 int main(int argc,char **argv) {
     CHECK(argc==3);
     CHECK(store_boundaries()==0);
+    CHECK(forged_cache_and_missing_arena()==0);
     CHECK(invalid_grammar()==0);
     CHECK(runtime_atomic()==0);
     CHECK(corpus(argv[1],argv[2])==0);

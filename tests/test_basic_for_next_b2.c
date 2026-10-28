@@ -218,10 +218,37 @@ static int faults(void) {
     CHECK(rollback(&f,BE_FOR_STACK_FULL,sizeof(f.output))==0);
     return 0;
 }
+static int isolation_and_calls(void) {
+    Fixture a,b;
+    BasicExecutor before;
+    CHECK(setup(&a)==0 && setup(&b)==0);
+    CHECK(put(&a,10,"FOR I%=1 TO 2")==0);
+    CHECK(put(&a,20,"GOSUB 100")==0);
+    CHECK(put(&a,30,"NEXT I%")==0);
+    CHECK(put(&a,40,"END")==0);
+    CHECK(put(&a,100,"PRINT I%")==0);
+    CHECK(put(&a,110,"RETURN")==0);
+    CHECK(start(&a)==0);
+    CHECK(check_run(&a," 1 \\n 2 \\n")==0);
+    CHECK(put(&b,10,"FOR J%=1 TO 1")==0);
+    CHECK(put(&b,20,"PRINT J%")==0);
+    CHECK(put(&b,30,"NEXT J%")==0);
+    CHECK(put(&b,40,"END")==0);
+    CHECK(start(&b)==0);
+    CHECK(be_step(&b.executor,b.output,sizeof(b.output),&b.written)==BE_OK);
+    CHECK(b.executor.for_depth==1u && a.executor.for_depth==0u);
+    before=b.executor;
+    CHECK(be_step(&b.executor,(uint8_t *)&b.executor,sizeof(b.executor),
+                  &b.written)==BE_OVERLAP);
+    CHECK(memcmp(&before,&b.executor,sizeof(before))==0);
+    CHECK(check_run(&b," 1 \\n")==0);
+    return 0;
+}
 int main(void) {
     CHECK(cases()==0);
     CHECK(nested_and_flow()==0);
     CHECK(faults()==0);
+    CHECK(isolation_and_calls()==0);
     puts("PASS J1.12-B2 native C99 FOR/NEXT regression, rollback, 16-bit boundaries");
     return 0;
 }

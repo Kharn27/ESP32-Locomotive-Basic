@@ -46,3 +46,7 @@ Le SHA affiché par `git rev-parse HEAD` doit correspondre **exactement** au HEA
 Le script `tools/hw4_c3_b2_uart_po.py` fournit une séquence reproductible et une option de journal. **Ne pas ouvrir le port simultanément avec `idf.py monitor`** : arrêter le monitor avant la capture par script, puis relancer le monitor si désiré. Conserver le journal UART complet, les messages `SCREEN_SCROLL`, `INPUT_READY`, `DEVICE_MEMORY`, `dma_timeouts`, `dma_fault`, stack/heap, ainsi que des photos (avant/après LIST long, après NEW et après !CLS si possible). Signaler pour chaque étape PASS/FAIL, corruption, clipping, timeout ou retour au boot, et **SHA exact de la carte**.
 
 **Gate :** sans test PO positif sur ce même SHA, la PR reste en revue, `ON_DEVICE_UNVERIFIED`. Seul Pilotage peut accepter et fusionner. Aucun B3, #96 ou #97 anticipé.
+
+### Ready après chaque commande
+
+Le `Ready` du bandeau C3-A est conservé au démarrage. Une fois une ligne UART traitée, la console ON imprime maintenant `Ready\n` **avant** de positionner le curseur pour l'édition suivante ; le prompt visuel ne contient pas de chevron artificiel. Les chemins d'erreur de saisie et de BASIC affichent aussi un diagnostic puis `Ready`. Le test d'intégration B2 couvre explicitement le LIST sur 26 lignes, son extension à 32 lignes, deux autres LIST, 32 étapes RUN avant NEW et le LIST vide après NEW. Ce READY de la console n'est pas un nouveau token BASIC.

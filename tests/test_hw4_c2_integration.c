@@ -121,6 +121,16 @@ static void long_list_scroll_integration(void)
         int n=snprintf(numbered,sizeof(numbered),"%u PRINT 7",i*10U);
         assert(n>0 && (size_t)n<sizeof(numbered));
         input(numbered);
+        if(i==26U) {
+            size_t stored=b.program.size;
+            BSRResult first=submit("LIST");
+            assert(first.status==BSR_OK && b.written>0U);
+            assert(cpc_text_write(&text,b.output,b.written));
+            static const uint8_t ready26[]="Ready\n";
+            assert(cpc_text_write(&text,ready26,sizeof(ready26)-1U));
+            assert(cpc_uart_console_prompt(&text,&cleared) && !cleared);
+            assert(b.program.size==stored && text.row==24U);
+        }
     }
     assert(b.program.size>0U && text.scrolls>0U);
     size_t bytes=b.program.size;
@@ -136,6 +146,17 @@ static void long_list_scroll_integration(void)
         assert(text.row==24U && text.bytes_clipped==0U);
         assert(b.program.size==bytes && memcmp(snapshot,b.bytes,sizeof(snapshot))==0);
     }
+    assert(submit("RUN").status==BSR_OK);
+    unsigned run_steps=0U;
+    for (;;) {
+        BSRResult step=bsr_step(&b.runtime,b.output,sizeof(b.output),&b.written);
+        if(step.status==BSR_END) break;
+        assert(step.status==BSR_OK && step.executor_status==BE_OK);
+        assert(++run_steps<=32U);
+        assert(cpc_text_write(&text,b.output,b.written));
+    }
+    assert(run_steps==32U && text.row==24U && text.bytes_clipped==0U);
+    assert(b.program.size==bytes && memcmp(snapshot,b.bytes,sizeof(snapshot))==0);
     assert(submit("NEW").status==BSR_OK);
     assert(submit("LIST").status==BSR_OK && b.written==0U);
     assert(submit("RUN").status==BSR_OK);

@@ -176,7 +176,8 @@ bool cpc_video_scroll_up(CpcVideo *v, unsigned rows)
     const size_t shift_bytes = (size_t)rows * 640U;
     const size_t retained = CPC_VIDEO_BYTES - shift_bytes;
     const uint8_t paper = (uint8_t)(v->paper * UINT8_C(0x55));
-    memmove(v->pixels, v->pixels + shift_bytes, retained);
+    if (retained != 0U)
+        memmove(v->pixels, v->pixels + shift_bytes, retained);
     memset(v->pixels + retained, paper, shift_bytes);
     v->dirty_bands |= ALL_DIRTY;
     return true;

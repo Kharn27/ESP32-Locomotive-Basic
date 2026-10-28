@@ -107,8 +107,8 @@ static void test_wrap_and_bottom(void)
     assert(cpc_text_write(&text_sink, buffer, 8U));
     assert(text_sink.row == 24U && text_sink.column == 8U);
     assert(text_sink.scrolls == 1U && text_sink.bytes_clipped == 0U);
-    assert(memcmp(guarded.vram, before + 640U, CPC_VIDEO_BYTES - 640U) != 0);
     assert(memcmp(guarded.vram, before + 640U, 640U) == 0);
+    pixel(0U, 24U*8U, 1U); /* newly printed glyph after scroll */
     assert(video.cursor_visible && video.cursor_row == 24U);
     integrity();
 }

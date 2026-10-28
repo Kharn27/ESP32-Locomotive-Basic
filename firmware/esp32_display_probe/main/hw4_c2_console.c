@@ -163,7 +163,7 @@ static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
         return fail("TEXT_ADAPTER",-1);
     if(s_text.bytes_clipped>clipped_before)
         printf("HW4-C3-B2 SCREEN_OUTPUT_CLIPPED bytes=%u "
-               "policy=unexpected_clip\\n",
+               "policy=unexpected_clip\n",
                (unsigned)(s_text.bytes_clipped-clipped_before));
     return repaint_dirty();
 }
@@ -182,7 +182,7 @@ static bool prompt(void)
     if(cleared) return fail("UNEXPECTED_AUTO_CLEAR",-1);
     if(!repaint_dirty()) return false;
     printf("HW4-C3-B2 INPUT_READY capacity=%u screen_row=%u "
-           "policy=mode1_scroll\\n",UART_LINE_CAPACITY,s_text.row);
+           "policy=mode1_scroll\n",UART_LINE_CAPACITY,s_text.row);
     return true;
 }
 static bool basic_submit(const uint8_t *source,size_t length)

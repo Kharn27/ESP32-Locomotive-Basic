@@ -213,7 +213,9 @@ static void ansi_atomic_program_guard(void)
     static const uint8_t seq[]={0x1bU,'[','3','~'};
     for(size_t i=0;i<3U;++i)
         assert(uart_line_feed(&line,seq[i])==UART_LINE_IGNORED);
-    assert(uart_line_feed(&line,seq[3])==UART_LINE_DELETE);
+    assert(uart_line_feed(&line,seq[3])==UART_LINE_NONE);
+    assert(line.length==1U && line.cursor_pos==1U);
+    assert(uart_line_feed(&line,0x08U)==UART_LINE_DELETE);
     assert(line.length==0U);
     assert(uart_line_feed(&line,'\r')==UART_LINE_READY);
     /* Empty candidate submission is benign, unchanged source. */

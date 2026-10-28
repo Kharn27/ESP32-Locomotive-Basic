@@ -47,6 +47,11 @@ static void scroll_pixels(void)
     for(unsigned paper=0U;paper<4U;++paper) {
         reset();
         assert(cpc_video_set_text_colors(&v,1U,paper));
+        /* C1: PAPER-only changes must repaint the visible inverse cursor.
+         * Drain that legitimate dirty band before proving scroll(0) is inert. */
+        assert(cpc_video_take_dirty(&v)==
+               ((paper != 0U && v.cursor_visible)
+                 ? (UINT32_C(1) << v.cursor_row) : 0U));
         for(unsigned row=0U;row<25U;++row)
             memset(g.pixels+(size_t)row*640U,(int)row,640U);
         memcpy(before,g.pixels,sizeof(before));

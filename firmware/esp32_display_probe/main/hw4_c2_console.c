@@ -53,6 +53,7 @@ static BasicStorage s_basic;
 static CpcVideo s_video;
 static CpcText s_text;
 static UartLine s_line;
+static CpcUartEditor s_edit;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
 static size_t s_scroll_reported;
 /* B2-C1 instrumentation: bounded histogram, never a second framebuffer. */
@@ -239,6 +240,8 @@ static bool prompt(void)
     if(!cpc_uart_console_prompt(&s_text,&cleared))
         return fail("CONSOLE_PROMPT",-1);
     if(cleared) return fail("UNEXPECTED_AUTO_CLEAR",-1);
+    if(!cpc_uart_console_edit_begin(&s_text,&s_edit))
+        return fail("EDIT_BEGIN",-1);
     if(!repaint_dirty()) return false;
     printf("HW4-C3-B2 INPUT_READY capacity=%u screen_row=%u "
            "policy=mode1_scroll\n",UART_LINE_CAPACITY,s_text.row);
@@ -362,7 +365,7 @@ static bool uart_init(void)
         e=ESP_OK;
     if(e!=ESP_OK) return fail("UART_DRIVER",(int)e);
     printf("HW4-C2 UART_READY port=0 baud=115200 input=raw "
-           "CR_LF_CRLF=1 BS_DEL=1\n");
+           "CR_LF_CRLF=1 BS=08_7f LEFT=1b5b44 RIGHT=1b5b43 DELETE=1b5b337e\n");
     return true;
 }
 void app_main(void)
@@ -429,22 +432,31 @@ void app_main(void)
             continue;
         }
         UartLineEvent event=uart_line_feed(&s_line,ch);
-        if(event==UART_LINE_APPEND) {
-            if(!cpc_uart_console_append(&s_text,ch)) {
-                (void)fail("ECHO",-1); return;
-            }
-            ++echo_pending;
-        } else if(event==UART_LINE_DELETE) {
-            /* Raw-byte provenance for the PO's keyboard investigation.
-             * A lone '~' never triggers DELETE; only decoded ESC[3~ does. */
-            if(ch==(uint8_t)'~')
-                printf("HW4-C2 UART_EDIT sequence_hex=1b5b337e "
-                       "key=ANSI_DELETE action=backspace\n");
-            else
-                printf("HW4-C2 UART_EDIT key_hex=%02x "
-                       "action=backspace\n",(unsigned)ch);
-            if(!cpc_uart_console_backspace(&s_text)) {
-                (void)fail("DELETE",-1); return;
+        if(event==UART_LINE_APPEND || event==UART_LINE_DELETE ||
+           event==UART_LINE_DELETE_FORWARD ||
+           event==UART_LINE_LEFT || event==UART_LINE_RIGHT) {
+            const bool inserted=event==UART_LINE_APPEND;
+            const bool erased=event==UART_LINE_DELETE ||
+                              event==UART_LINE_DELETE_FORWARD;
+            const size_t changed=inserted ? s_line.cursor_pos-1U :
+                                 erased ? s_line.cursor_pos : s_line.length;
+            if(event==UART_LINE_DELETE_FORWARD)
+                printf("HW4-EDIT-A UART_EDIT sequence_hex=1b5b337e action=delete_under "
+                       "cursor=%u length=%u\n",
+                       (unsigned)s_line.cursor_pos,(unsigned)s_line.length);
+            else if(event==UART_LINE_DELETE)
+                printf("HW4-EDIT-A UART_EDIT key_hex=%02x action=backspace "
+                       "cursor=%u length=%u\n",
+                       (unsigned)ch,(unsigned)s_line.cursor_pos,
+                       (unsigned)s_line.length);
+            else if(event==UART_LINE_LEFT || event==UART_LINE_RIGHT)
+                printf("HW4-EDIT-A UART_EDIT sequence_hex=%s action=%s "
+                       "cursor=%u length=%u\n",
+                       event==UART_LINE_LEFT ? "1b5b44" : "1b5b43",
+                       event==UART_LINE_LEFT ? "left" : "right",
+                       (unsigned)s_line.cursor_pos,(unsigned)s_line.length);
+            if(!cpc_uart_console_edit(&s_text,&s_edit,&s_line,changed)) {
+                (void)fail("EDIT_SYNC",-1); return;
             }
             ++echo_pending;
         } else if(event==UART_LINE_OVERFLOW) {

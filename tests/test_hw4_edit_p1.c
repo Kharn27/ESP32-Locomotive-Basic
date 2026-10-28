@@ -189,8 +189,6 @@ static void test_text_boot_and_clear(void)
     cell(0U,0U,true,'C');
     cell(1U,0U,true,'B');
     cell(0U,1U,true,'D');
-    const uint8_t row[40]={['A']=0}; /* overwritten before passing to sink */
-    (void)row;
     uint8_t full[40];
     memset(full,'Q',sizeof full);
     fresh();
@@ -201,7 +199,7 @@ static void test_text_boot_and_clear(void)
     cell(0U,1U,true,'R');
     fresh();
     assert(cpc_video_put_cell(v(),0U,1U,'M',glyph,NULL));
-    uint8_t lfs[25];
+    uint8_t lfs[26];
     memset(lfs,'\n',sizeof lfs);
     assert(cpc_text_write(&text,lfs,sizeof lfs));
     cell(0U,0U,false,0U); /* after enough bottom scrolls */

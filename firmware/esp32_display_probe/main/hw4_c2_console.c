@@ -442,16 +442,16 @@ void app_main(void)
                                  erased ? s_line.cursor_pos : s_line.length;
             if(event==UART_LINE_DELETE_FORWARD)
                 printf("HW4-EDIT-A UART_EDIT sequence_hex=1b5b337e action=delete_under "
-                       "cursor=%u length=%u\\n",
+                       "cursor=%u length=%u\n",
                        (unsigned)s_line.cursor_pos,(unsigned)s_line.length);
             else if(event==UART_LINE_DELETE)
                 printf("HW4-EDIT-A UART_EDIT key_hex=%02x action=backspace "
-                       "cursor=%u length=%u\\n",
+                       "cursor=%u length=%u\n",
                        (unsigned)ch,(unsigned)s_line.cursor_pos,
                        (unsigned)s_line.length);
             else if(event==UART_LINE_LEFT || event==UART_LINE_RIGHT)
                 printf("HW4-EDIT-A UART_EDIT sequence_hex=%s action=%s "
-                       "cursor=%u length=%u\\n",
+                       "cursor=%u length=%u\n",
                        event==UART_LINE_LEFT ? "1b5b44" : "1b5b43",
                        event==UART_LINE_LEFT ? "left" : "right",
                        (unsigned)s_line.cursor_pos,(unsigned)s_line.length);

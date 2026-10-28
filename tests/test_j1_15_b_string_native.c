@@ -106,7 +106,6 @@ static int corpus(const char *sources,const char *archives) {
             CHECK(submit(&f,line).status==BSR_OK);
         }
         CHECK(fclose(fp)==0 && ends==1 && prints>=1);
-        CHECK(snprintf(path,sizeof(path),"%s/original/S_%s/program.bin",archives,"")>0);
         /* Case names in original oracle archives are upper-case. */
         CHECK(snprintf(path,sizeof(path),"%s/original/",archives)>0);
         {
@@ -119,6 +118,23 @@ static int corpus(const char *sources,const char *archives) {
             strcpy(path+k,"/program.bin");
         }
         CHECK(partial_records(&f.program,path)==0);
+        /* The CPC printer is a distinct transport. Compare only its
+         * FIRST value line, preserving internal/leading/trailing spaces.
+         * The historical two direct ERR/ERL probes remain untouched. */
+        {
+            uint8_t observed[256];
+            size_t p_len = expected_len + 2u;
+            char *last_slash = strrchr(path,'/');
+            CHECK(last_slash!=NULL && p_len<=sizeof(observed));
+            strcpy(last_slash+1,"run/printer.dat");
+            fp=fopen(path,"rb");
+            CHECK(fp!=NULL);
+            CHECK(fread(observed,1u,p_len,fp)==p_len);
+            CHECK(fclose(fp)==0);
+            CHECK(memcmp(observed,cases[i].expect,expected_len)==0);
+            CHECK(observed[expected_len]==0x0du &&
+                  observed[expected_len+1u]==0x0au);
+        }
         CHECK(submit(&f,"LIST").status==BSR_OK);
         CHECK(roundtrip(&f)==0);
         CHECK(submit(&f,"RUN").status==BSR_OK);

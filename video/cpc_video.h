@@ -6,6 +6,11 @@
 #include <stdint.h>
 
 #define CPC_VIDEO_BYTES 16000U
+/* E2 semantic text cells, MODE1 only; NOT a second raster framebuffer. */
+#define CPC_VIDEO_MODE1_COLUMNS 40U
+#define CPC_VIDEO_MODE1_ROWS 25U
+#define CPC_VIDEO_MODE1_CELLS 1000U
+#define CPC_VIDEO_MODE1_VALID_BYTES 125U
 #define CPC_VIDEO_TFT_WIDTH 320U
 #define CPC_VIDEO_TFT_HEIGHT 240U
 #define CPC_VIDEO_VIEW_TOP 20U
@@ -31,6 +36,10 @@ typedef struct {
     uint8_t cursor_row;
     bool cursor_visible;
     uint32_t dirty_bands; /* bit i = logical raster rows 8*i..8*i+7 */
+    /* Video-owned E2: a space written by put_cell is valid; untouched or
+     * graphically overwritten cells are unknown, never pixel-inferred. */
+    uint8_t cell_char[CPC_VIDEO_MODE1_CELLS];
+    uint8_t cell_valid[CPC_VIDEO_MODE1_VALID_BYTES];
 } CpcVideo;
 
 bool cpc_video_init(CpcVideo *video, uint8_t *pixels, size_t length, CpcMode mode);
@@ -43,6 +52,11 @@ bool cpc_video_get(const CpcVideo *video, unsigned x, unsigned y, uint8_t *pen);
 bool cpc_video_set_ink(CpcVideo *video, unsigned pen, unsigned colour);
 bool cpc_video_set_border(CpcVideo *video, unsigned colour);
 bool cpc_video_set_text_colors(CpcVideo *video, unsigned pen, unsigned paper);
+/* Pure E2 query. Returns false on invalid args or outside MODE1 without
+ * writing outputs. On success *known is set; *character is written ONLY when
+ * known, so an unknown cell cannot be mistaken for an implicit space. */
+bool cpc_video_read_cell(const CpcVideo *video, unsigned column, unsigned row,
+                         uint8_t *character, bool *known);
 bool cpc_video_put_cell(CpcVideo *video, unsigned column, unsigned row,
                         uint8_t character, CpcGlyphRow glyph, void *context);
 bool cpc_video_cursor(CpcVideo *video, unsigned column, unsigned row, bool visible);

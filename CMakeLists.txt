@@ -670,6 +670,17 @@ if(BUILD_TESTING)
             --permanent --self-test)
     endif()
 endif()
+# HW4-EDIT-P1: video-owned MODE1 E2; no COPY or change to BASIC input.
+if(BUILD_TESTING)
+    add_executable(test_hw4_edit_p1 tests/test_hw4_edit_p1.c)
+    target_link_libraries(test_hw4_edit_p1 PRIVATE
+                          cpc_boot cpc_uart_console uart_line)
+    add_test(NAME hw4_edit_p1_mode1_semantic_cells COMMAND test_hw4_edit_p1)
+    add_test(NAME hw4_edit_p1_red_green_mutations COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/hw4_edit_p1_mutation.py" --self-test)
+endif()
+
 
 # J1.14-B: native closed inline INTEGER IF/ELSE and sealed CPC post-B differential.
 if(BUILD_TESTING)

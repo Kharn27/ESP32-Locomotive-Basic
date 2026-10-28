@@ -1,0 +1,48 @@
+name: HW4-EDIT-P1 MODE1 semantic E2
+on:
+  pull_request:
+    paths:
+      - 'video/cpc_video.c'
+      - 'video/cpc_video.h'
+      - 'video/cpc_text.c'
+      - 'video/cpc_text.h'
+      - 'video/cpc_boot.c'
+      - 'io/cpc_uart_console.c'
+      - 'tests/test_hw4_edit_p1.c'
+      - 'tools/hw4_edit_p1_mutation.py'
+      - 'CMakeLists.txt'
+      - '.github/workflows/hw4-edit-p1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  e2-host:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        sanitizers: [OFF, ON]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: C99 host E2, legacy video, editor, scroll, mutations
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "HW4_EDIT_P1_EXACT_HEAD=$actual"
+          flags=""
+          if test "$CC" = clang; then
+            flags="-Wno-error=gnu-offsetof-extensions -Wno-error=string-concatenation"
+          fi
+          cmake -S . -B /tmp/hw4-edit-p1 \
+            -DBP_SANITIZERS=${{ matrix.sanitizers }} "-DCMAKE_C_FLAGS=$flags"
+          cmake --build /tmp/hw4-edit-p1 --parallel 2
+          ctest --test-dir /tmp/hw4-edit-p1 --output-on-failure \
+            -R '^(hw4_edit_p1_|hw4_edit_a_|hw4_c3_b2_|hw4_c3_boot_screen$|hw4_c1_text_boundaries$|hw4_font_a_|cpc_video$|cpc_video_ppm_determinism$)'
+          ctest --test-dir /tmp/hw4-edit-p1 --output-on-failure

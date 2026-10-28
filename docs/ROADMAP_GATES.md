@@ -509,8 +509,16 @@ Mandat [#134](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/134), [PR
 
 [Sur HEAD synchronisé 5e277a9](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40744445832), GCC/Clang OFF/ON 4×79/79, CPC permanent/historique, CI-ARCH et [Xtensa v5.5.6 3/3](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40744445817) sont verts ; après documentation, CI du HEAD documentaire final à confirmer. [Matrice et mémoire](J1.14-A-if-inline-else-cpc-oracle.md). Aucun changement du code de production et de la branche HW4. **PENDING_PILOTAGE**, `ON_DEVICE_UNVERIFIED`, J1.14-B non autorisé.
 
+### Porte HW4-EDIT-P1 — E2 MODE1 (mandat du 28 octobre 2026)
+
+**P1 TECHNIQUEMENT ACCEPTÉ AU HEAD `9bce948`, C1-INT MANDATÉ :** issue [#136](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/136), base `main@ab55ec8e15fcffabb63529c4b063ffb27bfb7833`, livraison proposée dans [PR #137](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/137). La fondation E2 est exclusivement une mémoire vidéo de cellules textuelles MODE1 avec validités explicites ; tests C99, non-régression image/éditeur, mesure DRAM et **PASS physique PO acquis sur `9bce948` ; sur le SHA intégré, conserver le constat `ON_DEVICE_UNVERIFIED` tout en vérifiant les blobs vidéo inchangés** sont requis avant décision de fusion par Pilotage. Voir [contrat E2](HW4-EDIT-P1-mode1-semantic-cells.md).
+
+**BARRIÈRE MAINTENUE :** HW4-EDIT-B1/COPY non autorisé (U02/U03/U06/U07/U08 NON_OBSERVÉS). E2 inconnu ne définit aucune sémantique CPC de COPY. Aucune navigation plein écran ni lecture E2 dans E3.
+
 ### Gate J1.14-B — support C99 limité de IF INTEGER inline / ELSE
 
 Mandat [#138](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/138), base `main@c9c45bd38ffe70f889e71711fa082db6e3b23fc4`. Deux CTests nouveaux : moteur natif + différentiel externe contre les 24 originaux CPC J1.14-A scellés (`MATCH_EXACT_RECORD_30`, `MATCH_SEMANTIC_BRANCH`, LIST/retokenisation). Sceaux, ancien `UNSUPPORTED`, six explorations et code HW4 immuables. **PREUVE ACQUISE HEAD INITIAL :** CI-C99 4×81/81 et 24/24 records IF + branches sémantiques (run 40764303723) ; le HEAD documentaire final nécessite nouvelle CI C99/CPC/Xtensa avant remise. [Rapport](J1.14-B-if-inline-else-native.md). `ON_DEVICE_UNVERIFIED`, aucun travail J1.15 ; arbitrage et fusion exclusivement Pilotage.
 
 **Budget J1.14-B constaté** sur la révision préalable `a8d316536937b503607151dd9b8719671e1b2969` : Xtensa 3/3 et ABI/partitions PASS, Flash Code +1 236 o (ON et sonde), 0 (OFF), DRAM/IRAM invariantes. Preuves GitHub dans [rapport J1.14-B](J1.14-B-if-inline-else-native.md). CI du HEAD documentaire final requise ; acceptation/fusion Pilotage exclusivement.
+
+**Gate C1-INT / #138** : fusion d'intégration non destructive des historiques `main@cc51854c26b19cd48e94e601c7b9c8ad9c2a6ca6` (HW4-EDIT-P1) et J1.14-B ; conservation des quatre nouveaux CTests et du workflow Xtensa de main ; validation finale commune 4×83/83, oracles CPC, HW4 et Xtensa avant revue Pilotage. Aucune autorisation J1.15 ni de test CYD nouveau.

@@ -57,7 +57,9 @@ static void input(const char *source)
     if(b.written>0U) assert(cpc_text_write(&text,b.output,b.written));
     uart_line_ack(&line);
     assert(uart_line_feed(&line,'\n')==UART_LINE_NONE);
-    assert(cpc_uart_console_prompt(&text,&page));
+    static const uint8_t ready[]="Ready\n";
+    assert(cpc_text_write(&text,ready,sizeof(ready)-1U));
+    assert(cpc_uart_console_prompt(&text,&page) && !page);
 }
 static void real_run(void)
 {
@@ -128,6 +130,8 @@ static void long_list_scroll_integration(void)
         BSRResult r=submit("LIST");
         assert(r.status==BSR_OK && b.written>0U);
         assert(cpc_text_write(&text,b.output,b.written));
+        static const uint8_t ready[]="Ready\n";
+        assert(cpc_text_write(&text,ready,sizeof(ready)-1U));
         assert(cpc_uart_console_prompt(&text,&cleared) && !cleared);
         assert(text.row==24U && text.bytes_clipped==0U);
         assert(b.program.size==bytes && memcmp(snapshot,b.bytes,sizeof(snapshot))==0);

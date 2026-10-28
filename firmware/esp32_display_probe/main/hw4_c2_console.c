@@ -174,6 +174,13 @@ static bool display_error(void)
         return fail("ERROR_TEXT",-1);
     return repaint_dirty();
 }
+static bool display_ready(void)
+{
+    static const uint8_t ready[]="Ready\n";
+    if(!cpc_text_write(&s_text,ready,sizeof(ready)-1U))
+        return fail("READY_TEXT",-1);
+    return repaint_dirty();
+}
 static bool prompt(void)
 {
     bool cleared=false;
@@ -284,7 +291,7 @@ static bool execute_line(void)
         if(run && s_basic.runtime.state==BSR_RUNNING)
             if(!basic_run()) return false;
     }
-    return prompt();
+    return display_ready() && prompt();
 }
 static bool uart_init(void)
 {
@@ -386,7 +393,7 @@ void app_main(void)
                    s_line.rejected_ansi_incomplete ?
                        "incomplete_ansi" : "overflow");
             if(!cpc_uart_console_end_line(&s_text) ||
-               !display_error() || !prompt()) return;
+               !display_error() || !display_ready() || !prompt()) return;
             uart_line_ack(&s_line);
         }
         /* NONE/IGNORED: CRLF pair, empty erase, non-ASCII or controls. */

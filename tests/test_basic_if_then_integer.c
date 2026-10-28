@@ -340,6 +340,23 @@ static int imported_if_listing_roundtrip(void)
                 CHECK(listed[i] == 0xacu);
             }
             CHECK(memcmp(original, body, n) == 0);
+            {
+                uint8_t malformed[20], unchanged[80];
+                size_t j, error_written = 947u;
+                memcpy(malformed, original, n);
+                for (j = 0u; j < n && malformed[j] != 0xebu; ++j) {
+                    /* Scan token bytes; the cache can contain 0xEF. */
+                }
+                CHECK(j < n);
+                malformed[j] = 0xa0u; /* Invalid THEN token. */
+                memcpy(unchanged, listed, sizeof(unchanged));
+                CHECK(bl_detokenize(malformed, n, listed,
+                                    sizeof(listed), &error_written)
+                      == BL_BAD_SEQUENCE);
+                CHECK(error_written == 947u &&
+                      memcmp(unchanged, listed, sizeof(unchanged)) == 0);
+                CHECK(memcmp(original, body, n) == 0);
+            }
             CHECK(bt_tokenize(listed, listed_n, tokens,
                               sizeof(tokens), &again_n) == BT_OK);
             /* The native canonical representation never loses the target

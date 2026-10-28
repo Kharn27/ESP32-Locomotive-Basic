@@ -11,10 +11,11 @@ jobs:
       fail-fast: false
       matrix:
         sanitizers: [OFF, ON]
+        compiler: [gcc, clang]
     steps:
       - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBP_SANITIZERS=${{ matrix.sanitizers }} -DCMAKE_C_FLAGS=-fstack-usage
+        run: cmake -S . -B build -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_BUILD_TYPE=Debug -DBP_SANITIZERS=${{ matrix.sanitizers }} -DCMAKE_C_FLAGS=-fstack-usage
       - name: Build
         run: cmake --build build --parallel
       - name: Test

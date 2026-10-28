@@ -315,7 +315,7 @@ def if_records(data, lines, records):
             require(match is not None and len(binary)==22 and
                     binary[4]==0xa1 and binary[6]==0x02 and
                     binary[11]==0x02 and binary[10]==opcodes[match.group(1)] and
-                    binary[16]==0xeb and binary[18:21]==b"\\x1e\\x46\\x00",
+                    binary[16]==0xeb and binary[18:21]==bytes((0x1e,0x46,0)),
                     "CPC_IF_RELATIONAL_ROM_TOKEN_LAYOUT_CHANGED")
             found.append({"line_number":rec["line"],
                           "record_hex":binary.hex(" ").upper(),

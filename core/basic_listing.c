@@ -186,6 +186,37 @@ static BLStatus for_reference(const uint8_t *body, size_t length,
     return status;
 }
 
+/* The one inline IF arm is exactly: INTEGER BVR EF byte literal.
+ * CPC cache words are opaque; never interpret them as lexical text. */
+static BLStatus inline_if_assignment(const uint8_t *body, size_t length,
+                                     size_t *pos, BLEmitter *out)
+{
+    BLStatus status;
+    unsigned int number;
+    uint8_t token;
+    status = for_reference(body, length, pos, out);
+    if (status != BL_OK) return status;
+    status = append_spaces(body, length, pos, out);
+    if (status != BL_OK) return status;
+    if (*pos == length || body[(*pos)++] != 0xefu)
+        return BL_BAD_SEQUENCE;
+    status = append_byte(out, (uint8_t)'=');
+    if (status == BL_OK) status = append_spaces(body, length, pos, out);
+    if (status != BL_OK) return status;
+    if (*pos == length) return BL_TRUNCATED;
+    token = body[(*pos)++];
+    if (token >= 0x0eu && token <= 0x17u) {
+        number = (unsigned int)(token - 0x0eu);
+    } else if (token == 0x19u) {
+        if (*pos == length) return BL_TRUNCATED;
+        number = (unsigned int)body[(*pos)++];
+        if (number < 10u) return BL_BAD_SEQUENCE;
+    } else {
+        return BL_BAD_SEQUENCE;
+    }
+    return append_decimal(out, number);
+}
+
 static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
 {
     size_t pos = 0;
@@ -728,29 +759,54 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             if (pos == length) {
                 return BL_TRUNCATED;
             }
-            if (body[pos] != 0x1eu) {
-                return BL_BAD_SEQUENCE;
-            }
-            if (pos == space_start) {
-                /* THEN60 is not a retokenisable keyword + line literal. */
-                status = append_byte(out, (uint8_t)' ');
-                if (status != BL_OK) {
-                    return status;
+            if (body[pos] == 0x02u) {
+                /* THEN with one INTEGER arm, optionally followed by
+                 * the ROM's 01 97 lexical ELSE (never a source colon). */
+                if (pos == space_start) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) return status;
                 }
-            }
-            ++pos;
-            if (length - pos < 2u) {
-                return BL_TRUNCATED;
-            }
-            line = (unsigned int)body[pos] |
-                   ((unsigned int)body[pos + 1u] << 8);
-            pos += 2u;
-            if (line == 0u) {
+                status = inline_if_assignment(body, length, &pos, out);
+                if (status != BL_OK) return status;
+                space_start = pos;
+                status = append_spaces(body, length, &pos, out);
+                if (status != BL_OK) return status;
+                if (pos < length && body[pos] == 0x01u &&
+                    pos + 1u < length && body[pos + 1u] == 0x97u) {
+                    if (pos == space_start) {
+                        status = append_byte(out, (uint8_t)' ');
+                        if (status != BL_OK) return status;
+                    }
+                    pos += 2u;
+                    status = append_word(out, "ELSE");
+                    if (status != BL_OK) return status;
+                    space_start = pos;
+                    status = append_spaces(body, length, &pos, out);
+                    if (status != BL_OK) return status;
+                    if (pos == length) return BL_TRUNCATED;
+                    if (pos == space_start) {
+                        status = append_byte(out, (uint8_t)' ');
+                        if (status != BL_OK) return status;
+                    }
+                    status = inline_if_assignment(body, length, &pos, out);
+                    if (status != BL_OK) return status;
+                }
+            } else if (body[pos] == 0x1eu) {
+                if (pos == space_start) {
+                    /* THEN60 needs a separator for retokenisation. */
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) return status;
+                }
+                ++pos;
+                if (length - pos < 2u) return BL_TRUNCATED;
+                line = (unsigned int)body[pos] |
+                       ((unsigned int)body[pos + 1u] << 8);
+                pos += 2u;
+                if (line == 0u) return BL_BAD_SEQUENCE;
+                status = append_decimal(out, line);
+                if (status != BL_OK) return status;
+            } else {
                 return BL_BAD_SEQUENCE;
-            }
-            status = append_decimal(out, line);
-            if (status != BL_OK) {
-                return status;
             }
         } else if (statement == BL_ST_GOTO || statement == BL_ST_GOSUB) {
             unsigned int line;

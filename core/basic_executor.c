@@ -1218,7 +1218,10 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
           overlaps(variables, sizeof(*variables), program->data, program->capacity) ||
           overlaps(variables->entries, entry_bytes, executor, sizeof(*executor)) ||
           overlaps(variables->entries, entry_bytes, program, sizeof(*program)) ||
-          overlaps(variables->entries, entry_bytes, program->data, program->capacity)))) {
+          overlaps(variables->entries, entry_bytes, program->data, program->capacity) ||
+          overlaps(variables->string_arena, variables->string_capacity, executor, sizeof(*executor)) ||
+          overlaps(variables->string_arena, variables->string_capacity, program, sizeof(*program)) ||
+          overlaps(variables->string_arena, variables->string_capacity, program->data, program->capacity)))) {
         return BE_OVERLAP;
     }
     executor->program = program;
@@ -1294,7 +1297,12 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
             overlaps(variables->entries, entry_bytes, program, sizeof(*program)) ||
             overlaps(variables->entries, entry_bytes, program->data, program->capacity) ||
             overlaps(variables->entries, entry_bytes, output, output_capacity) ||
-            overlaps(variables->entries, entry_bytes, written, sizeof(*written))) {
+            overlaps(variables->entries, entry_bytes, written, sizeof(*written)) ||
+            overlaps(variables->string_arena, variables->string_capacity, executor, sizeof(*executor)) ||
+            overlaps(variables->string_arena, variables->string_capacity, program, sizeof(*program)) ||
+            overlaps(variables->string_arena, variables->string_capacity, program->data, program->capacity) ||
+            overlaps(variables->string_arena, variables->string_capacity, output, output_capacity) ||
+            overlaps(variables->string_arena, variables->string_capacity, written, sizeof(*written))) {
             return BE_OVERLAP;
         }
     }

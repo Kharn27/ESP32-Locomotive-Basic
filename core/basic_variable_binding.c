@@ -129,7 +129,11 @@ BVBStatus bvb_read_explicit(const uint8_t *source, size_t source_length,
         overlaps(store->entries, entry_bytes, out_key, sizeof(*out_key)) ||
         overlaps(store->entries, entry_bytes,
                  out_consumed, sizeof(*out_consumed)) ||
-        overlaps(store->entries, entry_bytes, out_value, sizeof(*out_value))) {
+        overlaps(store->entries, entry_bytes, out_value, sizeof(*out_value)) ||
+        overlaps(store->string_arena, store->string_capacity, source, source_length) ||
+        overlaps(store->string_arena, store->string_capacity, out_key, sizeof(*out_key)) ||
+        overlaps(store->string_arena, store->string_capacity, out_consumed, sizeof(*out_consumed)) ||
+        overlaps(store->string_arena, store->string_capacity, out_value, sizeof(*out_value))) {
         return BVB_OVERLAPPING_MEMORY;
     }
 

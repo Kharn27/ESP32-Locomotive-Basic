@@ -1,0 +1,4 @@
+10 A$="A""B"
+20 PRINT A$
+30 PRINT #8,A$
+40 END

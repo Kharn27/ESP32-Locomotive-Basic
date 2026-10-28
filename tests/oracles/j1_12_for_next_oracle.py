@@ -186,7 +186,7 @@ def main():
                   "basic":"1.1","ram_kb":128,"version_output":version},
         "ghcr_image":GHCR_PIN,
         "rom_archived":False,"full_snapshots_archived":False,
-        "printer_is_screen_output":False,"j1_11_b_authorized":False,
+        "printer_is_screen_output":False,"j1_12_b_authorized":False,
         "historical_archives_modified":False,
         "mandatory_cases":list(MAIN_CASES),
         "exploratory_cases":list(EXPLORATORY),

@@ -128,6 +128,12 @@ static UartLineEvent feed_impl(UartLine *line, uint8_t ch, bool screen_enabled)
                 line->screen_navigation = false;
                 return UART_LINE_RETURN_EDIT;
             }
+            /* All remaining CSI, especially Delete-under, are inert in
+             * SCREEN focus. Never run an E3 edit from a historic cell. */
+            if (screen_enabled && line->screen_navigation) {
+                ++line->ansi_sequences_ignored;
+                return UART_LINE_IGNORED;
+            }
             if (simple && n == 1U && first == (uint8_t)'3' &&
                 ch == (uint8_t)'~') {
                 ++line->ansi_sequences_deleted;

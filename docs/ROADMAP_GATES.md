@@ -439,3 +439,14 @@ Jalon développé séparément depuis le main `3e903147012aedca530c9367ce130f4f8
 
 
 **Gates J1.10-A (révision de code `54bcd378`)** : [Linux 58/58 OFF et ON #40603448640](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448640), [oracle J1.10-A #40603448801](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448801) 14/14 doubles acquisitions RAM et imprimante exactes, six falsifications + faux HEAD rejetés, [trois images Xtensa J1.8-A #40603448623](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448623), [HW4-C1 #40603448633](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448633), [HW4-C2 #40603448674](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448674) et [CPC historique #40603448614](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40603448614) verts ; ***vérification du HEAD documentaire ultérieur obligatoire avant remise***. Aucun élargissement à J1.10-B ou HW4, `ON_DEVICE_UNVERIFIED`. [Rapport complet](J1.10-A-if-then-cpc-oracle.md).
+
+
+### Gate J1.10-B — IF INTEGER natif (soumis à revue Pilotage)
+
+Mandat strict [#106](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/106), livraison proposée [PR #107](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/107), base main c9ff43bd4a04d88fe3552a9398cefc0804651b83. Gate **PENDING_PILOTAGE** : une PR développeur n'est ni acceptation ni fusion.
+
+Critères : IF variable% THEN ligne autonome encodé A1 / 02 caches opaques / EB / 1E LE16 ; LIST et retokenisation ; branche zéro/non-zéro, saut avant/arrière, cible END ; cible absente prise => BE_MISSING_TARGET atomique et absente non prise => prochaine ligne sans erreur. Cas invalides et atomicité, GCC/Clang OFF/ON ASan+UBSan, suites J0/J1 antérieures et HW4, oracle 14 cas scellés inchangé, 3 images Xtensa/2 projets ESP-IDF au même HEAD, budgets mémoire respectés. Les 14 historiques UNSUPPORTED sont **pré-implémentation** et restent intacts ; seule la colonne post-B indépendante peut établir un support sur les cas concernés.
+
+Le comparateur post-B transforme uniquement PRINT #8,constante en PRINT constante ; aucune preuve RAM intégrale ni support de PRINT #8 ou d'un système ERR/ERL numérique. Limite d'erreur : CPC ERR=8, ERL=20 observés ; hôte BE_MISSING_TARGET sémantiquement analogue. Aucun test physique CYD exigé sur cette tranche purement portable, ON_DEVICE_UNVERIFIED. Sources [J1.10-A](J1.10-A-if-then-cpc-oracle.md) et [rapport J1.10-B](J1.10-B-if-then-integer-native.md).
+
+**Jalon suivant non autorisé.** Aucune fusion par l'agent développeur.

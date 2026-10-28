@@ -1,0 +1,56 @@
+name: CI-CPC-PERMANENT sealed CPC history
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-opt1-permanent-${{ github.event.pull_request.number || github.ref }
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }
+
+jobs:
+  sealed-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: J0 provenance, SHA, printer/RUN/LIST and coordinated falsifications
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/cpc_evidence.py --self-test
+          python3 tools/cpc_token_evidence.py --permanent --self-test
+          python3 tests/oracles/cpc_run_evidence.py --evidence tests/fixtures/cpc6128/run_behavior --permanent --self-test
+          python3 tests/oracles/cpc_list_evidence.py --evidence tests/fixtures/cpc6128/list_printer --permanent --self-test
+          python3 tests/oracles/cpc_screen_evidence.py --evidence tests/fixtures/cpc6128/list_screen --permanent --self-test
+          python3 tests/oracles/signed_print_evidence.py --evidence tests/fixtures/cpc6128/signed_print --permanent --self-test
+          python3 tools/j0_exit_audit.py --self-test
+      - name: J1.2-J1.5 original ROM CPC images, anchors and negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_2_boundary_verify.py --permanent --self-test
+          python3 tools/j1_3_subtraction_verify.py --permanent --self-test
+          python3 tools/j1_4_multiplication_verify.py --permanent --self-test
+          python3 tools/j1_5_division_verify.py --permanent --self-test
+      - name: J1.6-J1.9 immutable ROM captures and fake-HEAD rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_6_mod_verify.py --permanent --self-test
+          python3 tools/j1_7_add_vars_verify.py --permanent --self-test
+          python3 tools/j1_8_sub_vars_verify.py --permanent --self-test
+          python3 tools/j1_9_binary_family_verify.py --permanent --self-test
+      - name: J1.10-J1.11 flow-control historical CPC; fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_10_if_then_verify.py --permanent --self-test
+          python3 tools/j1_11_gosub_return_verify.py --permanent --self-test

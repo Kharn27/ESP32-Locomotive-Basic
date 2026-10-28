@@ -529,3 +529,8 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_11_gosub_return_verify.py"
         --permanent --self-test)
 endif()
+
+# CI-OPT1: label existing and future CTest suites without changing their commands.
+if(BUILD_TESTING)
+    include(cmake/CTestLabels.cmake)
+endif()

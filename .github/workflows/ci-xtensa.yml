@@ -1,0 +1,94 @@
+name: CI-XTENSA one 3-image ESP-IDF v5.5.6 build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-opt1-xtensa-${{ github.event.pull_request.number || github.ref }
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }
+
+jobs:
+  three-variants:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Real Xtensa 5.5.6 - console ON, historical HW3 OFF, BASIC probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD:/project" -w /project \
+            -e IDF_GIT_SAFE_DIR=/project espressif/idf:v5.5.6 bash -lc '
+              set -euo pipefail
+              cd /project/firmware/esp32_display_probe
+              mkdir -p reports/c2-on reports/hw3-off
+              idf.py --version | tee reports/idf-version.txt
+              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
+              # Two *independent* build directories, same source project.
+              idf.py -B build-c2 -DHW4_C2_CONSOLE=ON set-target esp32 2>&1 | tee reports/c2-on/set-target.log
+              idf.py -B build-c2 -DHW4_C2_CONSOLE=ON build 2>&1 | tee reports/c2-on/build.log
+              idf.py -B build-c2 size 2>&1 | tee reports/c2-on/size.txt
+              idf.py -B build-c2 size-components 2>&1 | tee reports/c2-on/size-components.txt
+              test "$(xtensa-esp-elf-nm --defined-only build-c2/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
+              echo "CONSOLE_ON_ONE_APP_MAIN=PASS" | tee reports/c2-on/app-main.txt
+              idf.py -B build-hw3 -DHW4_C2_CONSOLE=OFF set-target esp32 2>&1 | tee reports/hw3-off/set-target.log
+              idf.py -B build-hw3 -DHW4_C2_CONSOLE=OFF build 2>&1 | tee reports/hw3-off/build.log
+              idf.py -B build-hw3 size 2>&1 | tee reports/hw3-off/size.txt
+              idf.py -B build-hw3 size-components 2>&1 | tee reports/hw3-off/size-components.txt
+              test "$(xtensa-esp-elf-nm --defined-only build-hw3/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
+              echo "HISTORIC_HW3_OFF_ONE_APP_MAIN=PASS" | tee reports/hw3-off/app-main.txt
+              # Independent J0.25 BASIC probe, unaffected by HW4.
+              cd /project/firmware/esp32_probe
+              mkdir -p reports
+              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
+              idf.py set-target esp32 2>&1 | tee reports/set-target.log
+              idf.py build 2>&1 | tee reports/build.log
+              idf.py size 2>&1 | tee reports/size.txt
+              idf.py size-components 2>&1 | tee reports/size-components.txt
+            '
+      - name: ABI, partition and exact-HEAD binary evidence for all three variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD:/project" -w /project -e IDF_GIT_SAFE_DIR=/project espressif/idf:v5.5.6 bash -lc '
+            set -euo pipefail
+            cd firmware/esp32_probe
+            python scripts/check_build.py sdkconfig partitions.csv build/loco_esp32_probe.bin | tee reports/partition-check.txt
+            python scripts/report_abi.py build/loco_esp32_probe.elf | tee reports/xtensa-abi.txt
+            xtensa-esp-elf-readelf -h build/loco_esp32_probe.elf | tee reports/elf-header.txt
+            test "$(xtensa-esp-elf-nm --defined-only build/loco_esp32_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
+            cd ../esp32_display_probe
+            for profile in c2 hw3; do
+              if test "$profile" = c2; then dir=build-c2; else dir=build-hw3; fi
+              if test "$profile" = c2; then out=reports/c2-on; else out=reports/hw3-off; fi
+              test -s "$dir/loco_esp32_display_probe.bin"
+              test -s "$dir/loco_esp32_display_probe.elf"
+              xtensa-esp-elf-readelf -h "$dir/loco_esp32_display_probe.elf" | tee "$out/elf-header.txt"
+              xtensa-esp-elf-readelf -S -W "$dir/loco_esp32_display_probe.elf" > "$out/elf-sections.txt"
+              test "$(xtensa-esp-elf-nm --defined-only "$dir/loco_esp32_display_probe.elf" | grep -Ec " [TW] app_main$")" -eq 1
+              sha256sum "$dir/loco_esp32_display_probe.bin" | tee "$out/binary-sha256.txt"
+            done
+            echo "CI_OPT1_THREE_IMAGE_ABI=PASS"
+          '
+          echo "HEAD_SHA=$GITHUB_SHA" | tee firmware/esp32_display_probe/reports/source-sha.txt
+      - uses: actions/upload-artifact@v4.6.2
+        if: always()
+        with:
+          name: ci-opt1-xtensa-three-variants
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            firmware/esp32_display_probe/reports/
+            firmware/esp32_probe/reports/
+            firmware/esp32_display_probe/build-c2/loco_esp32_display_probe.bin
+            firmware/esp32_display_probe/build-c2/loco_esp32_display_probe.elf
+            firmware/esp32_display_probe/build-hw3/loco_esp32_display_probe.bin
+            firmware/esp32_display_probe/build-hw3/loco_esp32_display_probe.elf
+            firmware/esp32_probe/build/loco_esp32_probe.bin
+            firmware/esp32_probe/build/loco_esp32_probe.elf

@@ -562,3 +562,12 @@ if(BUILD_TESTING)
     add_test(NAME hw4_c3_b2_c1_lcd_batch_fail_stop
              COMMAND test_hw4_c3_b2_c1_batch)
 endif()
+
+# J1.12-A: independent CPC6128 FOR/NEXT INTEGER oracle only.
+# Fail closed before authentic acquisition and independent digest sealing.
+if(BUILD_TESTING)
+    add_test(NAME j1_12_a_for_next_cpc_permanent COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_12_for_next_verify.py"
+        --permanent --self-test)
+endif()

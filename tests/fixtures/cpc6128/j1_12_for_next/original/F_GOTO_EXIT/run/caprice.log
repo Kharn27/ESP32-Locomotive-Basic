@@ -1,0 +1,7 @@
+exit code: 0
+Using configuration file: /__w/_temp/j112-cpc/original/F_GOTO_EXIT/run/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j112-cpc/original/F_GOTO_EXIT/run/screenshot_20261028_090118.png
+
+[stderr]

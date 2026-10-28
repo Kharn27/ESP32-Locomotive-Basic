@@ -23,13 +23,10 @@ from signed_print_oracle import parse_integer
 from j1_14_if_inline_else_oracle import MAIN_CASES, EXPLORATORY, GHCR_PIN, checkout_identity
 
 BASE = ROOT / "tests/fixtures/cpc6128/j1_14_if_inline_else"
-# EXTERNAL FIRST-CAPTURE ANCHORS: absent until the original GHCR archive is
-# produced by the GitHub bot. An empty value always fails permanent mode.
-# Transcribed from independent GHCR original run 40615245342
-# acquired at HEAD 9ef54a01f9b8c12eb11c559c3930cd3d37729a2a; seal remains PENDING_PILOTAGE.
-# External anchors intentionally absent until real CPC archival.
-# External immutable anchors are populated only after the first original GHCR
-# acquisition has been archived and independently inspected. Fail closed.
+# J1.14-A ORIGINAL GHCR acquisition: run 40743423595 at
+# HEAD 4bb76f9883cafb453ca275b85c6bd00006f6c57c.
+# Original manifest/records were independently sealed afterward.
+# Keep all anchors and original archives immutable in J1.14-B.
 PINNED_MANIFEST_SHA = "dc1b30dee67d7bd9c9e5ac2db17bdb84730d48d41fec8d64924a1d2d4c6e0ec1"
 PINNED_RAM = {
     "R_EQ_TRUE_ELSE": "1c9443ebb5d88e92c8ae03182c8e3a1a055476139d963fe60bced56f3860bce7",

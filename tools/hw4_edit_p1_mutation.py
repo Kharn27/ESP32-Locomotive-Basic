@@ -23,7 +23,7 @@ MUTATIONS = {
     ),
     "pixel_invalidation": (
         "forget_cell(v, cell_index(x / 8U, y / 8U));",
-        "(void)v; /* RED: deliberately omit graphics invalidation */",
+        "if (0) forget_cell(v, cell_index(x / 8U, y / 8U)); /* RED: skip invalidation */",
     ),
 }
 

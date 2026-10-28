@@ -115,4 +115,26 @@ C1 remplace les séquences séparées par les commandes atomiques `LOCATE 1,1:PR
 
 Fusion de la base `main` `d7a291283630a2b1a21cc145beb3d1d5a9e467a9` requise en commit à deux parents, sans modification de J1.10-B. Exécutions C1 sur le **nouveau** HEAD à renseigner à partir de GitHub Actions : 12 cas CPC/PNG et empreintes, 2/2 banc B1, au moins 61/61 CTest OFF/ON, autres workflows SUCCESS ou SKIPPED légitime. Pas de nouveau firmware ni test sur CYD.
 
-**Acquisition C1 : EN ATTENTE DE RÉEXÉCUTION ET INSPECTION — aucune valeur CPC ajoutée par anticipation.**
+### Acquisition et inspection C1 réellement exécutées
+
+- **Révision de code acquise :** HEAD de merge C1 `faba7c277a65a360335b91fa0a3038e6b4d931ee`, base `main` `d7a291283630a2b1a21cc145beb3d1d5a9e467a9` (incluant J1.10-B).
+- **Acquisition :** [GitHub Actions #40614596044](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40614596044), job `authentic-cpc-screen` SUCCESS ; artifact [#12784168435](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40614596044/artifacts/12784168435), ZIP SHA-256 GitHub `8d9314437774d30d5e06fe0e5601f6c6de58df494496665041863abf4d096bcb`, 12/12 cas capturés. Le `github_sha` du manifeste est le SHA de merge synthétique Actions `c539a414880f89826241b8a6987032f1409af138`, **pas** le HEAD de branche. Provenance : configuration CPC 6128 BASIC 1.1, Caprice32 commit `8c778bf072a06fb7c23b9cccd179041db7f79a52`, ROM `31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562`, AMSDOS `ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d`.
+- **Vérification indépendante de l'archive :** vérification SHA-256 locale des **12 fichiers PNG originaux** par rapport à `manifest.json` : 12/12 MATCH, sans OCR ; chaque cas garde `source.bas`, `commands.json`, `cap32.cfg`, `caprice.log`, `screen_01.png`. Ni ROM ni snapshot n'est archivé.
+- **Commandes atomiques contrôlées dans le manifeste** : `cursor_edges` = `CLS`, `LOCATE 1,1:PRINT "FIRST";`, `LOCATE 1,25:PRINT "LAST";`, capture ; `cr_last_row` = `CLS`, `LOCATE 1,25:PRINT "ABCDE";CHR$(13);"Z";`, capture. Pas de `Ready` **intermédiaire** entre chaque `LOCATE` et son `PRINT`.
+
+| Cas spécifique | SHA-256 du nouveau `screen_01.png` | Observation effectivement lisible après retour au prompt | Qualification bornée |
+| --- | --- | --- | --- |
+| `cursor_edges` | `e08037ded1d4f5475e879d8fbf6ec82aed4a9480f9a54875216c6ed3b570f9ab` | `LOCATE 1,25:PRINT "LAST";` visible dans la zone haute ; `LAST` apparaît dans la zone basse, suivi de `Ready` et du curseur. `FIRST` n'est plus visible sur cette image terminale. | **OBSERVED_VISUAL** pour `LAST` et la séquence affichée ; **UNVERIFIED** pour la persistance de `FIRST`, la coordonnée exacte de LAST *avant* le prompt final et l'effet complet de la fenêtre. |
+| `cr_last_row` | `c1c36d1edaf2eb824bcbe88a3c1393699fe0472b22ed5c4eb73e2972ff6952bc` | `ZBCDE` lisible dans la zone basse, suivi de `Ready`. La commande `LOCATE 1,25:PRINT ...CHR$(13)...` était atomique, à la différence de l'ancienne archive. | **OBSERVED_VISUAL** : `ZBCDE` après la commande atomique. **UNVERIFIED** : position écran exacte en rangée 25 avant le retour au prompt, effet isolé du scroll provoqué par `Ready`, chronologie pixel à pixel. |
+| `repeat_list_twice` | `8e219d2a9f32f0484aa52b4bd83d9e2733a4cd9c7e18059b74b33c861dfabe95` | Fin de LIST visible, puis `PRINT "AFTER2"`, `AFTER2`, `Ready`. `commands.json` archive les deux opérations `LIST` et le délai entre elles. | **OBSERVED_VISUAL** pour le marqueur final après les commandes archivées ; **UNVERIFIED** pour le comptage de deux exécutions sur la **seule** image finale, les listings étant identiques. |
+
+Les neuf autres captures C1 et leurs empreintes sont consignées **sans raccourci** dans le manifeste original du même artefact ; les scénarios de LIST 26/32, wrap 40/80/120, input, NEW, et fenêtre restent des observations limitées aux pixels lisibles, pas des références écran byte-exact. La preuve matérielle CYD reste `ON_DEVICE_UNVERIFIED`.
+
+### CI du HEAD de merge C1 (avant publication de cet ajout documentaire)
+
+- [CI B1 #40614596044](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40614596044) : 3/3 jobs SUCCESS (C99 hôte OFF/ON, acquisition CPC).
+- [CI générale #40614595993](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40614595993) : **61/61 CTest** sur **4/4** combinaisons GCC/Clang × OFF/ON ASan/UBSan, toutes SUCCESS.
+- Les validations déclenchées sur le **HEAD après cet ajout documentaire** doivent être relevées séparément dans la PR et dans la remise Pilotage. Les autres oracles historiques et les fichiers J1.10-B restent intacts ; aucun test physique CYD demandé pour B1.
+
+**Statut probatoire C1 :** acquisition 12/12 vérifiée et images inspectées ; **pas d'oracle de position pixel exacte en rangée 25** revendiqué, pas de preuve de scrolling natif. Attente de la revue contradictoire Pilotage.
+

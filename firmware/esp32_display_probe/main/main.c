@@ -18,6 +18,7 @@
 #include "freertos/task.h"
 
 #include "cpc_font.h"
+#include "cpc_boot.h"
 #include "cpc_video.h"
 #include "cyd_ili9341.h"
 
@@ -83,27 +84,15 @@ static void put_text(int row, int column, const char *text)
     }
 }
 
-static void put_centered(int row, const char *text)
-{
-    size_t len = strlen(text);
-    int column = (len < HW3_COLS) ? (HW3_COLS - (int)len) / 2 : 0;
-    put_text(row, column, text);
-}
-
 static void build_boot_screen(void)
 {
     memset(s_screen, ' ', sizeof(s_screen));
-    /* HW3-C4: on-device photo with case 9 (MV=0, MX=1, MY=0)
-     * confirms readable landscape, but the three 8px credit rows are
-     * visually too close on this TFT. Add one blank text row between each
-     * credit line; the spacing remains an intentional visual approximation
-     * until a real CPC screenshot is available as an independent oracle.
-     */
-    put_centered(3, "Amstrad 128K Microcomputer (v3)");
-    put_centered(5, "\x7f""1985 Amstrad Consumer Electronics plc");
-    put_centered(7, "and Locomotive Software Ltd.");
-    put_text(10, 1, "BASIC 1.1");
-    put_text(12, 0, "Ready");
+    /* Shared HW3 layout, unchanged original title in OFF probe variant. */
+    for (unsigned i=0U;i<CPC_BOOT_LINES;++i) {
+        CpcBootLine line;
+        if (cpc_boot_line(i,false,&line))
+            put_text((int)line.row,(int)line.column,line.text);
+    }
 }
 
 /* One 320x8 band in 16-bit RGB565, in wire byte order (MSB first). */

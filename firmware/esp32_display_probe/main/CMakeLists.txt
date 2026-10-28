@@ -4,7 +4,7 @@ if(HW4_C2_CONSOLE)
     idf_component_register(
         SRCS
             "hw4_c2_console.c" "cpc_font.c"
-            "../../../video/cpc_video.c" "../../../video/cpc_palette.c"
+            "../../../video/cpc_video.c" "../../../video/cpc_palette.c" "../../../video/cpc_boot.c"
             "../../../video/cpc_text.c" "../../../io/cpc_uart_console.c"
             "../../../io/uart_line.c"
         INCLUDE_DIRS "." "../../../video" "../../../io"
@@ -15,7 +15,7 @@ else()
     # Original HW3-C5/HW4 display probe, unchanged source main.c.
     idf_component_register(
         SRCS "main.c" "cpc_font.c"
-             "../../../video/cpc_video.c" "../../../video/cpc_palette.c"
+             "../../../video/cpc_video.c" "../../../video/cpc_palette.c" "../../../video/cpc_boot.c"
         INCLUDE_DIRS "." "../../../video"
         REQUIRES loco_core cyd_ili9341 esp_driver_uart freertos heap esp_system esp_app_format
     )

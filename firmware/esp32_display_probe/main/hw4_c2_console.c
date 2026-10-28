@@ -6,6 +6,7 @@
 #include "basic_session_runtime.h"
 #include "basic_variable_store.h"
 #include "cpc_font.h"
+#include "cpc_boot.h"
 #include "cpc_text.h"
 #include "cpc_uart_console.h"
 #include "cpc_video.h"
@@ -317,6 +318,11 @@ void app_main(void)
     printf("HW4-C2 VIDEO_READY mode=1 logical=320x200 "
            "cols=40 rows=25 vram_bytes=%u ink_fg=24 ink_bg=1\n",
            CPC_VIDEO_BYTES);
+    /* Startup in existing MODE1 VRAM: no second renderer or splash delay. */
+    if(!cpc_boot_console(&s_text,true)) {
+        (void)fail("BOOT_LAYOUT",-1); return;
+    }
+    printf("HW4-C3-A BOOT_READY heading=ESP32_CYD input_col=0 input_row=12\n");
     if(!repaint_full()) return;
     if(bp_init(&s_basic.program,s_basic.bytes,sizeof(s_basic.bytes))!=BP_OK ||
        bvs_init(&s_basic.variables,s_basic.entries,VARIABLES_CAPACITY)!=BVS_OK ||

@@ -6,12 +6,6 @@ option(HW4_C2_CONSOLE "HW4-C2 interactive UART BASIC within display probe" ON)
 set(EXTRA_COMPONENT_DIRS
     "${CMAKE_CURRENT_LIST_DIR}/../components"
     "${CMAKE_CURRENT_LIST_DIR}/../esp32_probe/components/loco_core")
-# B2-C1 adds esp_timer only to the interactive ON instrumentation.
-# Keep the historical HW3 OFF component set untouched.
-if(HW4_C2_CONSOLE)
-    set(COMPONENTS main loco_core cyd_ili9341 esp_timer)
-else()
-    set(COMPONENTS main loco_core cyd_ili9341)
-endif()
+set(COMPONENTS main loco_core cyd_ili9341)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(loco_esp32_display_probe)

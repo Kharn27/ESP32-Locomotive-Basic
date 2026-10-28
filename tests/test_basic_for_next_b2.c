@@ -244,11 +244,78 @@ static int isolation_and_calls(void) {
     CHECK(check_run(&b," 1 \n")==0);
     return 0;
 }
+
+/* J1.12-B2-C1: mandatory actual-tokenized apostrophe regressions. */
+static int c1_case(Fixture *f, const char *for_line, const char *body,
+                   const char *next_line, const char *after,
+                   const char *expected, int marker_kind)
+{
+    BasicProgramLine line;
+    size_t i;
+    int found = 0;
+    CHECK(setup(f)==0);
+    CHECK(put(f,10,for_line)==0);
+    CHECK(put(f,20,body)==0);
+    CHECK(put(f,30,next_line)==0);
+    if (after != NULL) CHECK(put(f,40,after)==0);
+    CHECK(put(f,50,"END")==0);
+    if (marker_kind != 0) {
+        CHECK(bp_find(&f->program,(uint16_t)(marker_kind > 0 ? 10 : 30),&line)==BP_OK);
+        { const uint8_t *p=f->program.data+line.body_offset;
+          const size_t need=marker_kind > 1 ? 3u : 2u;
+          for(i=0;i+need<=line.body_length;++i) {
+              if (p[i]==0x01u && (need==2u ? p[i+1u]==0xc0u :
+                  (p[i+1u]==0x01u && p[i+2u]==0xc0u))) found=1;
+          }
+        }
+        CHECK(found);
+    }
+    CHECK(start(f)==0);
+    CHECK(check_run(f,expected)==0);
+    return 0;
+}
+static int apostrophe_continuations_c1(void)
+{
+    Fixture f;
+    /* Mandatory three independent old-HEAD-red cases. */
+    CHECK(c1_case(&f,"FOR I%=1 TO 2 'counter","PRINT I%",
+                  "NEXT I%","END"," 1 \n 2 \n",1)==0);
+    CHECK(c1_case(&f,"FOR I%=1 TO 2","PRINT I%",
+                  "NEXT I% 'done","PRINT 9"," 1 \n 2 \n9\n",-1)==0);
+    CHECK(c1_case(&f,"FOR I%=3 TO 1","PRINT 77",
+                  "NEXT I% 'skip","PRINT 9","9\n",-1)==0);
+    /* The explicit ':' is 01 01 C0, not 01 C0. */
+    CHECK(c1_case(&f,"FOR I%=1 TO 2:'counter","PRINT I%",
+                  "NEXT I%","END"," 1 \n 2 \n",2)==0);
+    CHECK(c1_case(&f,"FOR I%=1 TO 2","PRINT I%",
+                  "NEXT I%:'done","PRINT 9"," 1 \n 2 \n9\n",-2)==0);
+    CHECK(c1_case(&f,"FOR I%=3 TO 1","PRINT 77",
+                  "NEXT I%:'skip","PRINT 9","9\n",-2)==0);
+    /* Ordinary explicit separators and suffix PRINT remain executable. */
+    CHECK(c1_case(&f,"FOR I%=1 TO 2:PRINT 8","PRINT I%",
+                  "NEXT I%:PRINT 9","END","8\n 1 \n8\n 2 \n9\n",0)==0);
+    /* REM, quotes and comments do not manufacture structural NEXTs. */
+    CHECK(c1_case(&f,"FOR I%=1 TO 2:REM NEXT J%","PRINT I%",
+                  "NEXT I%:REM FOR J%","PRINT 9"," 1 \n 2 \n9\n",0)==0);
+    CHECK(c1_case(&f,"FOR I%=1 TO 2","PRINT \"NEXT J%:FOR K%\"",
+                  "NEXT I%","END","NEXT J%:FOR K%\nNEXT J%:FOR K%\n",0)==0);
+    CHECK(c1_case(&f,"FOR I%=1 TO 2 'NEXT J%","PRINT I%",
+                  "NEXT I%","END"," 1 \n 2 \n",1)==0);
+    /* Preflight rejection must not mutate either stack, store, output, or program. */
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10,"FOR I%=1 TO 2 'ignored NEXT I%")==0);
+    CHECK(put(&f,20,"PRINT I%")==0);
+    CHECK(put(&f,30,"NEXT J%")==0);
+    CHECK(start(&f)==0);
+    CHECK(rollback(&f,BE_NEXT_VARIABLE_MISMATCH,sizeof(f.output))==0);
+    return 0;
+}
 int main(void) {
     CHECK(cases()==0);
     CHECK(nested_and_flow()==0);
     CHECK(faults()==0);
     CHECK(isolation_and_calls()==0);
+    CHECK(apostrophe_continuations_c1()==0);
     puts("PASS J1.12-B2 native C99 FOR/NEXT regression, rollback, 16-bit boundaries");
     return 0;
 }

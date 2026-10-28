@@ -16,7 +16,8 @@
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_idf_version.h"
-#include "esp_timer.h"
+#include "esp_cpu.h"
+#include "sdkconfig.h"
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -187,13 +188,14 @@ static bool repaint_dirty(void)
 {
     if(s_video.dirty_bands!=0U) {
         unsigned sent=0U;
-        int64_t start=esp_timer_get_time();
+        uint32_t start=esp_cpu_get_cycle_count();
         /* Exactly ONE attempt. Real LCD errors latch s_fault, so preserve
          * remaining dirty bands and fail-stop. Never retry the driver. */
         bool ok=cpc_video_flush_dirty(&s_video,send_dirty_band,&sent);
-        int64_t elapsed=esp_timer_get_time()-start;
-        uint32_t us=elapsed<=0 ? 0U :
-            (uint64_t)elapsed>UINT32_MAX ? UINT32_MAX : (uint32_t)elapsed;
+        /* CPU cycles modulo UINT32 wrap; CYD uses a fixed CPU clock.
+         * Avoid extra timer component and preserve HW3 OFF dependencies. */
+        uint32_t elapsed=esp_cpu_get_cycle_count()-start;
+        uint32_t us=elapsed/CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
         ++s_lcd_metrics.flushes;
         s_lcd_metrics.bands+=sent;
         s_lcd_metrics.spi_bytes+=(uint64_t)sent*CYD_LCD_DMA_BYTES;

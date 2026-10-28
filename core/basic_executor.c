@@ -142,6 +142,46 @@ static BEStatus binding_error(BVBStatus status)
     }
 }
 
+/* J1.14-B inline IF arm: parse a complete INTEGER BVR EF immediate,
+ * even if that arm will not be taken. No store lookup or mutation here.
+ * The two-pass caller preflights capacity and commits only the chosen arm. */
+static BEStatus inline_if_arm(const uint8_t *body, size_t length,
+                              size_t *at, BEAssignment *arm)
+{
+    BasicVariableKey key;
+    size_t consumed = 0u;
+    BVBStatus resolved;
+    uint8_t literal;
+    unsigned int number;
+    skip_spaces(body, length, at);
+    if (*at == length) return BE_TRUNCATED;
+    if (body[*at] != 0x02u) return BE_BAD_SEQUENCE;
+    resolved = bvb_resolve_explicit(body, length, *at, &key, &consumed);
+    if (resolved != BVB_OK) return binding_error(resolved);
+    if (key.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+    *at += consumed;
+    skip_spaces(body, length, at);
+    if (*at == length) return BE_TRUNCATED;
+    if (body[(*at)++] != 0xefu) return BE_BAD_SEQUENCE;
+    skip_spaces(body, length, at);
+    if (*at == length) return BE_TRUNCATED;
+    literal = body[(*at)++];
+    if (literal >= 0x0eu && literal <= 0x17u) {
+        number = (unsigned int)(literal - 0x0eu);
+    } else if (literal == 0x19u) {
+        if (*at == length) return BE_TRUNCATED;
+        number = (unsigned int)body[(*at)++];
+        if (number < 10u) return BE_BAD_SEQUENCE;
+    } else {
+        return BE_BAD_SEQUENCE;
+    }
+    arm->present = 1;
+    arm->key = key;
+    arm->value.type = (uint8_t)BVT_INTEGER;
+    arm->value.data.integer = (int16_t)number;
+    return BE_OK;
+}
+
 /* Evaluate one explicit INTEGER source and unsigned-byte operand, or
  * for F4/F5/F6/F9/FB one more explicit INTEGER source reference.
  * One decoder serves both executor passes; only caller-local values change.
@@ -703,6 +743,32 @@ static BEStatus execute_line(const BasicProgram *program,
             skip_spaces(body, length, &pos);
             if (pos == length) {
                 return BE_TRUNCATED;
+            }
+            if (body[pos] == 0x02u) {
+                BEAssignment then_arm = {0};
+                BEAssignment else_arm = {0};
+                int has_else = 0;
+                /* Validate BOTH inline arms before choosing a commit.
+                 * 01 97 is only legal here as a paired lexical ELSE. */
+                status = inline_if_arm(body, length, &pos, &then_arm);
+                if (status != BE_OK) return status;
+                skip_spaces(body, length, &pos);
+                if (pos < length) {
+                    if (length - pos < 2u ||
+                        body[pos] != 0x01u || body[pos + 1u] != 0x97u)
+                        return BE_BAD_SEQUENCE;
+                    pos += 2u;
+                    status = inline_if_arm(body, length, &pos, &else_arm);
+                    if (status != BE_OK) return status;
+                    has_else = 1;
+                    skip_spaces(body, length, &pos);
+                }
+                if (pos != length) return BE_BAD_SEQUENCE;
+                if (take_branch) *assignment = then_arm;
+                else if (has_else) *assignment = else_arm;
+                /* False without ELSE leaves C% and store capacity intact. */
+                *next = line->next_offset;
+                return BE_OK;
             }
             if (body[pos++] != 0x1eu) {
                 return BE_BAD_SEQUENCE;

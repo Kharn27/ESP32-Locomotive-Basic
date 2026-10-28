@@ -519,3 +519,12 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+# HW4-C3-B2: MODE1 raster scroll, cursor wrap and injected dirty-band retry.
+# No CPC pixel-equality or physical LCD transfer is claimed by this C99 test.
+if(BUILD_TESTING)
+    add_executable(test_hw4_c3_b2_scroll tests/test_hw4_c3_b2_scroll.c)
+    target_link_libraries(test_hw4_c3_b2_scroll PRIVATE cpc_uart_console)
+    add_test(NAME hw4_c3_b2_mode1_scroll_dma_retry
+             COMMAND test_hw4_c3_b2_scroll)
+endif()

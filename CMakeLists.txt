@@ -563,6 +563,15 @@ if(BUILD_TESTING)
              COMMAND test_hw4_c3_b2_c1_batch)
 endif()
 
+# J1.12-A: independent CPC6128 FOR/NEXT INTEGER oracle only.
+# Fail closed before authentic acquisition and independent digest sealing.
+if(BUILD_TESTING)
+    add_test(NAME j1_12_a_for_next_cpc_permanent COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_12_for_next_verify.py"
+        --permanent --self-test)
+endif()
+
 # HW4-FONT-A: font-only HOST gate, no CPC ROM and no ESP-IDF runtime.
 # Link the actual shared HW3 font, real MODE1 video/console and native BASIC
 # session to test 95/95 ASCII through UART echo, source and LIST pixels.

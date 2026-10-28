@@ -1,0 +1,4 @@
+10 FOR I%=0 TO 0
+20 PRINT #8,I%
+30 NEXT I%
+40 END

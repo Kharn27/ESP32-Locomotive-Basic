@@ -1,0 +1,8 @@
+exit code: 0
+Using configuration file: /__w/_temp/j112-cpc/repeat/F_NEXT_BARE/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j112-cpc/repeat/F_NEXT_BARE/screenshot_20261028_090057.png
+INFO    src/cap32.cpp:2212 - Dumping machine snapshot to /tmp/loco-c5-sna-3j79qpvy/snapshot_20261028_090057.sna
+
+[stderr]

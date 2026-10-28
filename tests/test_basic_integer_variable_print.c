@@ -273,7 +273,7 @@ static int test_corrupt_references_and_noninteger(void)
     };
     static const BEStatus errors[] = {
         BE_TRUNCATED, BE_TRUNCATED, BE_BAD_SEQUENCE,
-        BE_UNSUPPORTED, BE_UNSUPPORTED
+        BE_VARIABLE_NOT_FOUND, BE_UNSUPPORTED
     };
     size_t i;
     CHECK(setup(&h) == 0);

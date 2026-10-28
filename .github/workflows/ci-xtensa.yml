@@ -1,4 +1,4 @@
-name: CI-XTENSA one 3-image ESP-IDF v5.5.6 build
+name: CI-XTENSA U1-B three profiles one ESP-IDF root
 
 on:
   pull_request:
@@ -14,115 +14,133 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  three-variants:
+
+  profile-guards:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4.2.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Confirm exact source commit
-        shell: bash
+      - name: Profiles, obsolete-path and partition negative tests
         run: |
           set -euo pipefail
-          actual="$(git rev-parse HEAD)"
-          test "$actual" = "${{ github.event.pull_request.head.sha || github.sha }}"
-          echo "CI-OPT1 EXACT_SOURCE_HEAD=$actual"
-      - name: Real Xtensa 5.5.6 - console ON, historical HW3 OFF, BASIC probe
+          python3 tools/ci/check_loco_cyd_profiles.py --self-test
+          python3 tools/ci/check_u1b_retirement.py --self-test
+          python3 tools/ci/check_u1b_retirement.py --scan
+          python3 tools/ci/test_u1b_partition.py
+          python3 tools/ci/check_u1b_memory.py --self-test
+
+  three-profiles:
+    needs: profile-guards
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: CONSOLE
+            tag: console
+          - profile: HW3
+            tag: hw3
+          - profile: BASIC_PROBE
+            tag: basic
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Build and check Xtensa ESP-IDF v5.5.6 profile ${{ matrix.profile }}
         shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          PROFILE: ${{ matrix.profile }}
+          TAG: ${{ matrix.tag }}
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           docker run --rm -v "$PWD:/project" -w /project \
-            -e IDF_GIT_SAFE_DIR=/project espressif/idf:v5.5.6 bash -lc '
+            -e IDF_GIT_SAFE_DIR=/project -e EXPECTED_HEAD="$EXPECTED_HEAD" \
+            -e PROFILE="$PROFILE" -e TAG="$TAG" espressif/idf:v5.5.6 bash -lc '
               set -euo pipefail
+              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
               cd /project/firmware/esp32_display_probe
-              mkdir -p reports/c2-on reports/hw3-off
-              idf.py --version | tee reports/idf-version.txt
-              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
-              # Two *independent* build directories, same source project.
-              idf.py -B build-c2 -DHW4_C2_CONSOLE=ON set-target esp32 2>&1 | tee reports/c2-on/set-target.log
-              idf.py -B build-c2 -DHW4_C2_CONSOLE=ON build 2>&1 | tee reports/c2-on/build.log
-              idf.py -B build-c2 size 2>&1 | tee reports/c2-on/size.txt
-              idf.py -B build-c2 size-components 2>&1 | tee reports/c2-on/size-components.txt
-              test "$(xtensa-esp-elf-nm --defined-only build-c2/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
-              echo "CONSOLE_ON_ONE_APP_MAIN=PASS" | tee reports/c2-on/app-main.txt
-              idf.py -B build-hw3 -DHW4_C2_CONSOLE=OFF set-target esp32 2>&1 | tee reports/hw3-off/set-target.log
-              idf.py -B build-hw3 -DHW4_C2_CONSOLE=OFF build 2>&1 | tee reports/hw3-off/build.log
-              idf.py -B build-hw3 size 2>&1 | tee reports/hw3-off/size.txt
-              idf.py -B build-hw3 size-components 2>&1 | tee reports/hw3-off/size-components.txt
-              test "$(xtensa-esp-elf-nm --defined-only build-hw3/loco_esp32_display_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
-              echo "HISTORIC_HW3_OFF_ONE_APP_MAIN=PASS" | tee reports/hw3-off/app-main.txt
-              # Independent J0.25 BASIC probe, unaffected by HW4.
-              cd /project/firmware/esp32_probe
-              mkdir -p reports
-              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
-              idf.py set-target esp32 2>&1 | tee reports/set-target.log
-              idf.py build 2>&1 | tee reports/build.log
-              idf.py size 2>&1 | tee reports/size.txt
-              idf.py size-components 2>&1 | tee reports/size-components.txt
-            '
-      - name: ABI, partition and exact-HEAD binary evidence for all three variants
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm -v "$PWD:/project" -w /project -e IDF_GIT_SAFE_DIR=/project espressif/idf:v5.5.6 bash -lc '
-            set -euo pipefail
-            cd firmware/esp32_probe
-            python scripts/check_build.py sdkconfig partitions.csv build/loco_esp32_probe.bin | tee reports/partition-check.txt
-            python scripts/report_abi.py build/loco_esp32_probe.elf | tee reports/xtensa-abi.txt
-            xtensa-esp-elf-readelf -h build/loco_esp32_probe.elf | tee reports/elf-header.txt
-            test "$(xtensa-esp-elf-nm --defined-only build/loco_esp32_probe.elf | grep -Ec " [TW] app_main$")" -eq 1
-            cd ../esp32_display_probe
-            for profile in c2 hw3; do
-              if test "$profile" = c2; then dir=build-c2; else dir=build-hw3; fi
-              if test "$profile" = c2; then out=reports/c2-on; else out=reports/hw3-off; fi
+              dir="build-u1-$TAG"
+              out="reports/u1-b/$TAG"
+              config="$PWD/sdkconfig.u1-$TAG"
+              mkdir -p "$out"
+              idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$PROFILE" set-target esp32 > "$out/set-target.log" 2>&1
+              idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$PROFILE" build > "$out/build.log" 2>&1
+              idf.py -B "$dir" size > "$out/size.txt" 2>&1
+              python3 /project/tools/ci/check_u1b_memory.py "$PROFILE" "$out/size.txt" | tee "$out/memory-parity.txt"
+              idf.py -B "$dir" size-components > "$out/size-components.txt" 2>&1
+              grep -Fx "LOCO_CYD_PROFILE:STRING=$PROFILE" "$dir/CMakeCache.txt"
               test -s "$dir/loco_esp32_display_probe.bin"
               test -s "$dir/loco_esp32_display_probe.elf"
-              xtensa-esp-elf-readelf -h "$dir/loco_esp32_display_probe.elf" | tee "$out/elf-header.txt"
+              xtensa-esp-elf-nm --defined-only "$dir/loco_esp32_display_probe.elf" |
+                python3 /project/tools/ci/check_loco_cyd_profiles.py --nm
+              python3 /project/tools/ci/verify_esp_app_version.py \
+                "$dir/loco_esp32_display_probe.bin" "$EXPECTED_HEAD" loco_esp32_display_probe
+              xtensa-esp-elf-readelf -h "$dir/loco_esp32_display_probe.elf" > "$out/elf-header.txt"
               xtensa-esp-elf-readelf -S -W "$dir/loco_esp32_display_probe.elf" > "$out/elf-sections.txt"
-              test "$(xtensa-esp-elf-nm --defined-only "$dir/loco_esp32_display_probe.elf" | grep -Ec " [TW] app_main$")" -eq 1
-              sha256sum "$dir/loco_esp32_display_probe.bin" | tee "$out/binary-sha256.txt"
-            done
-            echo "CI_OPT1_THREE_IMAGE_ABI=PASS"
-          '
-          echo "CI-OPT1 SOURCE_SHA=$(git rev-parse HEAD)"
+              sha256sum "$dir/loco_esp32_display_probe.bin" > "$out/binary-sha256.txt"
+              python3 /project/tools/ci/check_build.py \
+                "$config" partitions.csv "$dir/loco_esp32_display_probe.bin" > "$out/partitions.txt"
+              if test "$PROFILE" = "CONSOLE"; then
+                grep -Fx "CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144" "$config"
+                if idf.py -B build-u1-invalid -DLOCO_CYD_PROFILE=INVALID reconfigure > "$out/invalid.log" 2>&1; then
+                  echo "U1-B invalid profile unexpectedly compiled"; exit 1
+                fi
+                grep -F "U1-A invalid LOCO_CYD_PROFILE" "$out/invalid.log"
+                if idf.py -B build-u1-conflict -DLOCO_CYD_PROFILE=HW3 -DHW4_C2_CONSOLE=ON reconfigure > "$out/conflict.log" 2>&1; then
+                  echo "U1-B conflicting selectors unexpectedly compiled"; exit 1
+                fi
+                grep -F "U1-A conflicting selectors" "$out/conflict.log"
+              fi
+              if test "$PROFILE" = "BASIC_PROBE"; then
+                python3 /project/tools/ci/report_abi.py "$dir/loco_esp32_display_probe.elf" > "$out/xtensa-abi.txt"
+                xtensa-esp-elf-nm --defined-only "$dir/loco_esp32_display_probe.elf" | grep -F " loco_probe_abi_sizes"
+                test "$(grep -Ec "^[A-Za-z_0-9]+=[0-9]+ bytes$" "$out/xtensa-abi.txt")" -eq 16
+                grep -Fx "LocoProbeStorage=19072 bytes" "$out/xtensa-abi.txt"
+                grep -Fx "core_descriptor_bytes=636" "$out/xtensa-abi.txt"
+                grep -Fx "owned_buffers_and_entries_bytes=18432" "$out/xtensa-abi.txt"
+                if python3 /project/tools/ci/report_abi.py partitions.csv > "$out/abi-negative.log" 2>&1; then
+                  echo "U1-B invalid ELF was accepted"; exit 1
+                fi
+              fi
+              echo "U1-B PROFILE_$PROFILE=PASS"
+            '
       - uses: actions/upload-artifact@v4.6.2
         if: always()
         with:
-          name: ci-opt1-xtensa-three-variants
+          name: arch-hw4-u1-b-${{ matrix.tag }}
           retention-days: 30
           if-no-files-found: warn
           path: |
-            firmware/esp32_display_probe/reports/
-            firmware/esp32_probe/reports/
-            firmware/esp32_display_probe/build-c2/loco_esp32_display_probe.bin
-            firmware/esp32_display_probe/build-c2/loco_esp32_display_probe.elf
-            firmware/esp32_display_probe/build-hw3/loco_esp32_display_probe.bin
-            firmware/esp32_display_probe/build-hw3/loco_esp32_display_probe.elf
-            firmware/esp32_probe/build/loco_esp32_probe.bin
-            firmware/esp32_probe/build/loco_esp32_probe.elf
-
+            firmware/esp32_display_probe/reports/u1-b/${{ matrix.tag }}/
+            firmware/esp32_display_probe/build-u1-${{ matrix.tag }}/loco_esp32_display_probe.elf
+            firmware/esp32_display_probe/build-u1-${{ matrix.tag }}/loco_esp32_display_probe.bin
 
   # HW4-EDIT-A: reproduce the PO's *existing* ESP-IDF project and standard
   # VS Code "Build" action (idf.py build => default build/ cache).
   # Run main -> PR in one and the same workspace, with no fullclean, -B,
   # additional project, or custom configuration. A CI-only test: no flash.
   po-standard-build:
-    if: github.event_name == 'pull_request' && (github.head_ref == 'feat/hw4-edit-a-cpc-cursor' || github.head_ref == 'feat/hw4-edit-p1-semantic-cells' || github.head_ref == 'feat/arch-hw4-u1-a-unified-profiles')
+    if: github.event_name == 'pull_request' && (github.head_ref == 'feat/hw4-edit-a-cpc-cursor' || github.head_ref == 'feat/hw4-edit-p1-semantic-cells' || github.head_ref == 'feat/arch-hw4-u1-a-unified-profiles' || github.head_ref == 'feat/arch-hw4-u1-b-retire-legacy-probe')
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4.2.2
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Branch-switch smoke in existing display probe and default build cache
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          EDIT_SHA: ${{ github.event.pull_request.head.sha }}
+          EDIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EDIT_SHA"
@@ -161,98 +179,3 @@ jobs:
           git switch --detach "$EDIT_SHA"
           test "$(git rev-parse HEAD)" = "$EDIT_SHA"
 
-  # ARCH-HW4-U1-A is exercised only on its own PR. Legacy "three-variants"
-  # continues to build console/HW3 and the old BASIC project as witnesses.
-  u1-a-profile-parity:
-    if: github.event_name == 'pull_request' && github.head_ref == 'feat/arch-hw4-u1-a-unified-profiles'
-    runs-on: ubuntu-22.04
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4.2.2
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-      - name: Profile selector and duplicate app_main negative tests
-        run: python3 tools/ci/check_loco_cyd_profiles.py --self-test
-      - name: Three unified images and legacy rollback probe in ESP-IDF v5.5.6
-        env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          docker run --rm -v "$PWD:/project" -w /project \
-            -e IDF_GIT_SAFE_DIR=/project -e EXPECTED_HEAD="$EXPECTED_HEAD" \
-            espressif/idf:v5.5.6 bash -lc '
-              set -euo pipefail
-              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
-              cd /project/firmware/esp32_display_probe
-              mkdir -p reports/u1-a/console reports/u1-a/hw3 reports/u1-a/basic
-              for profile in CONSOLE HW3 BASIC_PROBE; do
-                case "$profile" in
-                  CONSOLE) tag=console ;;
-                  HW3) tag=hw3 ;;
-                  BASIC_PROBE) tag=basic ;;
-                esac
-                dir="build-u1-$tag"
-                out="reports/u1-a/$tag"
-                # ESP-IDF writes sdkconfig at the project root by default;
-                # isolate it per profile as well as each Ninja build cache.
-                config="$PWD/sdkconfig.u1-$tag"
-                idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$profile" set-target esp32 > "$out/set-target.log" 2>&1
-                idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$profile" build > "$out/build.log" 2>&1
-                idf.py -B "$dir" size > "$out/size.txt" 2>&1
-                idf.py -B "$dir" size-components > "$out/size-components.txt" 2>&1
-                grep -Fx "LOCO_CYD_PROFILE:STRING=$profile" "$dir/CMakeCache.txt"
-                test -s "$dir/loco_esp32_display_probe.elf"
-                test -s "$dir/loco_esp32_display_probe.bin"
-                xtensa-esp-elf-nm --defined-only "$dir/loco_esp32_display_probe.elf" |
-                  python3 /project/tools/ci/check_loco_cyd_profiles.py --nm
-                python3 /project/tools/ci/verify_esp_app_version.py \
-                  "$dir/loco_esp32_display_probe.bin" "$EXPECTED_HEAD" loco_esp32_display_probe
-                xtensa-esp-elf-readelf -h "$dir/loco_esp32_display_probe.elf" > "$out/elf-header.txt"
-                sha256sum "$dir/loco_esp32_display_probe.bin" > "$out/binary-sha256.txt"
-                python3 /project/firmware/esp32_probe/scripts/check_build.py \
-                  "$config" partitions.csv "$dir/loco_esp32_display_probe.bin" > "$out/partitions.txt"
-                echo "U1-A PROFILE_$profile=PASS"
-              done
-              # No second ELF entrypoint and the real legacy ABI/probe remains.
-              python3 /project/firmware/esp32_probe/scripts/report_abi.py \
-                build-u1-basic/loco_esp32_display_probe.elf > reports/u1-a/basic/xtensa-abi.txt
-              xtensa-esp-elf-nm --defined-only build-u1-basic/loco_esp32_display_probe.elf |
-                grep -F " loco_probe_abi_sizes"
-              grep -Fx "CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144" sdkconfig.u1-console
-              test ! -e /project/firmware/locomotive_cyd
-              if idf.py -B build-u1-invalid -DLOCO_CYD_PROFILE=INVALID reconfigure > reports/u1-a/invalid.log 2>&1; then
-                echo "U1-A invalid profile unexpectedly compiled"
-                exit 1
-              fi
-              grep -F "U1-A invalid LOCO_CYD_PROFILE" reports/u1-a/invalid.log
-              if idf.py -B build-u1-conflict -DLOCO_CYD_PROFILE=HW3 -DHW4_C2_CONSOLE=ON reconfigure > reports/u1-a/conflict.log 2>&1; then
-                echo "U1-A contradictory profile unexpectedly compiled"
-                exit 1
-              fi
-              grep -F "U1-A conflicting selectors" reports/u1-a/conflict.log
-              cd /project/firmware/esp32_probe
-              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
-              # Standalone J0.25 image remains unchanged and buildable for rollback.
-              mkdir -p reports
-              idf.py build > reports/u1-a-legacy-build.log 2>&1
-              idf.py size > reports/u1-a-legacy-size.txt 2>&1
-              python3 scripts/report_abi.py build/loco_esp32_probe.elf > reports/u1-a-legacy-abi.txt
-              python3 scripts/check_build.py sdkconfig partitions.csv build/loco_esp32_probe.bin > reports/u1-a-legacy-partitions.txt
-              cmp reports/u1-a-legacy-abi.txt ../esp32_display_probe/reports/u1-a/basic/xtensa-abi.txt
-              xtensa-esp-elf-nm --defined-only build/loco_esp32_probe.elf |
-                python3 /project/tools/ci/check_loco_cyd_profiles.py --nm
-              echo "U1-A LEGACY_PROBE_ROLLBACK=PASS"
-              echo "U1-A THREE_PROFILES_PLUS_LEGACY=PASS"
-            '
-      - uses: actions/upload-artifact@v4.6.2
-        if: always()
-        with:
-          name: arch-hw4-u1-a-profile-parity
-          retention-days: 30
-          if-no-files-found: warn
-          path: |
-            firmware/esp32_display_probe/reports/u1-a/
-            firmware/esp32_probe/reports/u1-a-legacy-*

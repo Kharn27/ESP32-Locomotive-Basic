@@ -1,5 +1,5 @@
 # J0.25: the ONE native C99 core; no source copies or host/fixture binaries.
-set(LOCO_CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../core")
+set(LOCO_CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../core")
 idf_component_register(
     SRCS
         "${LOCO_CORE_DIR}/basic_program.c"

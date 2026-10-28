@@ -8,7 +8,7 @@ head="$2"
 # current integration base. No ESP32 probe, HAL, transport or UART mutations.
 git diff --exit-code "$base" "$head" -- \
   core/ hal/ io/ tests/fixtures/ tests/oracles/ \
-  firmware/components/ firmware/esp32_probe/
+  firmware/components/
 # These are the ONLY allowed graphics changes on this specifically named
 # HW4-C3-A PR. The other historical branches retain their strict gates.
 changed="$(git diff --name-only "$base" "$head" -- video/ firmware/)"

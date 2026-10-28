@@ -8,8 +8,8 @@ if(NOT DEFINED LOCO_CYD_PROFILE)
     set(LOCO_CYD_PROFILE CONSOLE)
 endif()
 
-# ARCH-HW4-U1-A: exactly one app_main per image; all sources are borrowed
-# from their original locations. The old esp32_probe project remains buildable.
+# ARCH-HW4-U1-B: exactly one app_main per image; all sources are borrowed
+# from their original locations or the relocated unmodified BASIC probe.
 if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
     idf_component_register(
         SRCS
@@ -29,11 +29,10 @@ elseif(LOCO_CYD_PROFILE STREQUAL "HW3")
         REQUIRES loco_core cyd_ili9341 esp_driver_uart freertos heap esp_system esp_app_format
     )
 elseif(LOCO_CYD_PROFILE STREQUAL "BASIC_PROBE")
-    # Reuse the precise J0.25/J1.2-HW2 implementation, including its ABI table
-    # and NMIN/REAL5 checks; do not copy it into this component.
+    # Relocated J0.25/J1.2-HW2 source, unchanged ABI/NMIN/REAL5 behavior.
     idf_component_register(
-        SRCS "../../esp32_probe/main/main.c"
-        INCLUDE_DIRS "." "../../esp32_probe/main"
+        SRCS "basic_probe.c"
+        INCLUDE_DIRS "."
         REQUIRES loco_core cyd_ili9341 heap freertos esp_system esp_app_format
     )
 else()

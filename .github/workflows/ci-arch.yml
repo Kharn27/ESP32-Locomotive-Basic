@@ -50,7 +50,7 @@ jobs:
           set -euo pipefail
           base="${{ steps.diff_base.outputs.base }}"
           test "$(grep -RlE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]|esp_lcd_new_panel_ili9341[()]' firmware --include='*.c' | wc -l)" -eq 1
-          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main firmware/esp32_probe/main --include='*.c'
+          ! grep -RE 'spi_bus_initialize[()]|esp_lcd_panel_draw_bitmap[()]' firmware/esp32_display_probe/main --include='*.c'
           test "$(grep -c '^void app_main(void)' firmware/esp32_display_probe/main/hw4_c2_console.c)" -eq 1
           test ! -e firmware/esp32_loco/CMakeLists.txt
           ! grep -RE 'esp_lcd_new_panel_ili9341' firmware/esp32_display_probe/main/ --include='*.c'

@@ -617,3 +617,13 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_12_b2_native_verify.py"
         --cli "$<TARGET_FILE:loco_basic_cli>" --self-test)
 endif()
+
+# J1.13-A: only oracle acquisition; C99 evaluator is untouched.
+if(BUILD_TESTING)
+    add_test(NAME j1_13_a_relations_source_matrix COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_13_relational_if_verify.py" --check-sources)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_13_integer_relations/manifest.json")
+        add_test(NAME j1_13_a_relations_cpc_permanent COMMAND
+            ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_13_relational_if_verify.py" --permanent --self-test)
+    endif()
+endif()

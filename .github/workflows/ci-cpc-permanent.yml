@@ -60,3 +60,14 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/j1_12_for_next_verify.py --permanent --self-test
+
+      - name: J1.13-A independent INTEGER relational IF oracle (when sealed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_13_relational_if_verify.py --check-sources
+          if test -f tests/fixtures/cpc6128/j1_13_integer_relations/manifest.json; then
+            python3 tools/j1_13_relational_if_verify.py --permanent --self-test
+          else
+            echo 'J1.13-A CPC_ARCHIVE_PENDING: no historical oracle PASS claimed'
+          fi

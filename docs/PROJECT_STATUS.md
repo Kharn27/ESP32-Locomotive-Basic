@@ -594,3 +594,15 @@ dispositions et du framebuffer, plus retest CYD sur le nouveau HEAD
 impératif. Le `SCREEN_PAGE_RESET` de LIST est le comportement
 `auto_page_non_cpc` de HW4-C2 et reste hors mandat C1 (scrolling exclu
 par Pilotage). Aucune modification UART, HAL, cœur, oracles ou VRAM.
+
+### HW4-C3-A-C1 — second réglage de position demandé par le PO (28/10/2026)
+
+Après la suppression de la ligne vide entre les crédits, le PO constate
+que `BASIC 1.1` se situe encore une rangée trop bas. La variante
+**console ON** place désormais `BASIC 1.1` en **rangée 9** (au lieu de
+10), `Ready` reste en rangée 12, curseur (0,13). **HW3 OFF**
+conserve les rangées précédentes et le même texte. Test C99 étendu
+avec pixels VRAM et assertion de rangée vacante. Caprice32 figure dans
+`tests/oracles/caprice32` comme sous-module pour les oracles historiques,
+mais le positionnement visuel HW3 n'est pas une référence pixel à pixel
+scellée. Aucun changement au moteur BASIC ni au scrolling non-CPC.

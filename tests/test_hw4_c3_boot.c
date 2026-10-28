@@ -57,7 +57,8 @@ static void check(bool cyd)
         const char *expected=i==0U && cyd
           ? "ESP32 CYD 128K Microcomputer (v3)" : lines[i];
         assert(cpc_boot_line(i,cyd,&line));
-        const unsigned expected_row=(cyd && i==2U) ? 6U : rows[i];
+        const unsigned expected_row=(cyd && i==2U) ? 6U
+                                   : (cyd && i==3U) ? 9U : rows[i];
         assert(line.row==expected_row && strcmp(line.text,expected)==0);
         assert(line.column==(i<3U
               ? (40U-(unsigned)strlen(expected))/2U : i==3U ? 1U : 0U));
@@ -80,11 +81,15 @@ static void check(bool cyd)
         }
     }
     /* CYD logo has credits directly below copyright; HW3 OFF unchanged. */
-    CpcBootLine copyright_line, credits_line;
+    CpcBootLine copyright_line, credits_line, basic_line, ready_line;
     assert(cpc_boot_line(1U,cyd,&copyright_line));
     assert(cpc_boot_line(2U,cyd,&credits_line));
+    assert(cpc_boot_line(3U,cyd,&basic_line));
+    assert(cpc_boot_line(4U,cyd,&ready_line));
     assert(copyright_line.row==5U);
     assert(credits_line.row==(cyd ? 6U : 7U));
+    assert(basic_line.row==(cyd ? 9U : 10U));
+    assert(ready_line.row==12U);
     if(cyd) {
         assert(credits_line.row==copyright_line.row+1U);
     } else {
@@ -97,6 +102,15 @@ static void check(bool cyd)
             }
         }
     }
+    /* The old BASIC position is empty in ON; the opposite in HW3 OFF.
+     * No glyph can leak into the adjacent, now-unused row. */
+    const unsigned empty_basic_row=cyd ? 10U : 9U;
+    for(unsigned y=empty_basic_row*8U; y<(empty_basic_row+1U)*8U; ++y)
+        for(unsigned x=0U;x<320U;++x) {
+            uint8_t pen=255U;
+            assert(cpc_video_get(&video,x,y,&pen));
+            assert(pen==0U);
+        }
     CpcBootLine invalid;
     assert(!cpc_boot_line(CPC_BOOT_LINES,cyd,&invalid));
     /* Cursor overlay: framebuffer remains unchanged regardless of visibility. */

@@ -16,9 +16,11 @@ bool cpc_boot_line(unsigned index,bool cyd_heading,CpcBootLine *out)
         ? "ESP32 CYD 128K Microcomputer (v3)" : strings[index];
     size_t n=strlen(s);
     if(n>40U) return false;
-    /* PO hardware feedback: CYD console has consecutive copyright/credits
-     * rows (5/6). Preserve the historical HW3 OFF probe on rows 5/7. */
-    out->row=(cyd_heading && index==2U) ? 6U : rows[index];
+    /* PO hardware feedback: ON credits are consecutive (5/6), and
+     * BASIC 1.1 occupies row 9. Preserve the HW3 OFF rows 5/7/10. */
+    out->row=(cyd_heading && index==2U) ? 6U
+            : (cyd_heading && index==3U) ? 9U
+            : rows[index];
     out->column=index<3U ? (40U-(unsigned)n)/2U : index==3U ? 1U : 0U;
     out->text=s;
     return true;

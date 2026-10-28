@@ -12,9 +12,9 @@
 - Le titre ON devient `ESP32 CYD 128K Microcomputer (v3)` à la demande
   du PO, sur la base de sa capture d'écran ; OFF conserve
   `Amstrad 128K Microcomputer (v3)` sans autre changement visuel.
-- Rangées **3, 5, 6, 10 et 12 sur la console ON** : la ligne
+- Rangées **3, 5, 6, 9 et 12 sur la console ON** : la ligne
   « and Locomotive Software Ltd. » suit immédiatement le copyright 1985
-  à la demande du PO (retour matériel sur `74abb57`).
+  et `BASIC 1.1` remonte d'une rangée après les retours du PO.
   **HW3 OFF conserve les rangées 3, 5, 7, 10, 12**, sans modification
   de sa mire historique. Copyright HW3 `0x7f`, `BASIC 1.1`, `Ready`
   et curseur en (0,13) sans chevron.

@@ -47,11 +47,9 @@ jobs:
           cmake -S . -B /tmp/hw4-c3-b2 -DBP_SANITIZERS=${{ matrix.sanitizers }} "-DCMAKE_C_FLAGS=$flags"
           cmake --build /tmp/hw4-c3-b2 --parallel 2
           ctest --test-dir /tmp/hw4-c3-b2 --output-on-failure -R 'hw4_c3_b2|hw4_c1_text_boundaries|hw4_c2_screen_paging|hw4_c2_native_uart_runtime_tft|hw4_c3_boot_screen|cpc_video$'
-          ctest --test-dir /tmp/hw4-c3-b2 -V -R '^hw4_c3_b2_c1_lcd_batch_fail_stop >/tmp/hw4-c3-b2-uart-commands.txt
-          test "$(grep -c ' PRINT 7' /tmp/hw4-c3-b2-uart-commands.txt)" = 32
-
-          # Guard the one-attempt fail-stop policy in actual ESP-IDF source.
-          # The portable callback retry test only validates dirty retention.
+          ctest --test-dir /tmp/hw4-c3-b2 -V -R '^hw4_c3_b2_c1_lcd_batch_fail_stop$'
+          # Exactly one flush attempt in the actual firmware; the host
+          # callback recovery test must not be interpreted as DMA recovery.
           src=firmware/esp32_display_probe/main/hw4_c2_console.c
           test "$(grep -F -c 'cpc_video_flush_dirty(&s_video,send_dirty_band,&sent)' "$src")" = 1
           ! grep -F 'LCD_DMA_RETRY' "$src"

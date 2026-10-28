@@ -1,0 +1,75 @@
+name: HW4-C3-B1 CPC scroll characterization
+on:
+  pull_request:
+    paths:
+      - 'docs/HW4-C3-B1-text-scroll-contract.md'
+      - 'tests/test_hw4_c3_b1_baseline.c'
+      - 'tools/hw4_c3_b1_scroll_oracle.py'
+      - '.github/workflows/hw4-c3-b1-scroll.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: read
+jobs:
+  baseline-c99:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizers: [OFF, ON]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Strict C99 baseline, not CPC oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS="-std=c99 -Wall -Wextra -Wpedantic -Wconversion -Werror -g"
+          if test "${{ matrix.sanitizers }}" = ON; then
+            FLAGS="$FLAGS -fsanitize=address,undefined -fno-omit-frame-pointer"
+          fi
+          cc $FLAGS -Ivideo -Iio \
+            tests/test_hw4_c3_b1_baseline.c io/cpc_uart_console.c \
+            video/cpc_text.c video/cpc_video.c video/cpc_palette.c \
+            -o /tmp/hw4-c3-b1-baseline
+          /tmp/hw4-c3-b1-baseline
+  authentic-cpc-screen:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Verify pinned Caprice32 and original CPC ROMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
+          test "$(sha256sum tests/oracles/caprice32/rom/amsdos.rom | cut -d ' ' -f 1)" = "ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d"
+      - name: Acquire original CPC visual screenshots (12 cases)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/hw4_c3_b1_scroll_oracle.py \
+            --caprice tests/oracles/caprice32 \
+            --output "$RUNNER_TEMP/hw4-c3-b1-scroll"
+      - name: Upload screenshots, logs, commands and original manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hw4-c3-b1-scroll-cpc
+          path: ${{ runner.temp }}/hw4-c3-b1-scroll/
+          retention-days: 30
+          if-no-files-found: warn

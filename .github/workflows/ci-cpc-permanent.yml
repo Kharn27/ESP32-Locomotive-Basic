@@ -54,3 +54,9 @@ jobs:
           set -euo pipefail
           python3 tools/j1_10_if_then_verify.py --permanent --self-test
           python3 tools/j1_11_gosub_return_verify.py --permanent --self-test
+
+      - name: J1.12-A FOR NEXT sealed CPC ROM captures and falsifications
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_12_for_next_verify.py --permanent --self-test

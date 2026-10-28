@@ -28,10 +28,212 @@ BASE = ROOT / "tests/fixtures/cpc6128/j1_12_for_next"
 # Transcribed from independent GHCR original run 40615245342
 # acquired at HEAD 9ef54a01f9b8c12eb11c559c3930cd3d37729a2a; seal remains PENDING_PILOTAGE.
 # External anchors intentionally absent until real CPC archival.
-PINNED_MANIFEST_SHA = ""
-PINNED_RAM = {}
-PINNED_PRINTER = {}
-PINNED_OUTCOMES = {}
+PINNED_MANIFEST_SHA = "acc43227f6970ffa7ab04a135d04e49f09231f053606d8000fa313c06df42a1b"
+PINNED_RAM = {
+    "F_POS_IMPLICIT_ONE": "2a0721c05ddf8aba3f0e99f683fbb433fc8d959b81b999232be94dae0d776da6",
+    "F_POS_IMPLICIT_THREE": "e6ba8ee63f6d84e6e08bf47cbb3e096ac45e5b6f9bc510556e48c3df9561707e",
+    "F_POS_EXPLICIT_TWO": "bb7bccae8484c2436ac3e0947ea90c099d391c11c399344bb8cc18f01ad61f0c",
+    "F_NEG_STEP_THREE": "19dc2c80dcbcf3b9b80113cece602a65588f2d9916a16e6670314128566340b9",
+    "F_NEG_STEP_TWO": "1a1919c1912fe3c10241f1650e2c204e1b39a2c4045fb02cc18a7d9c6151df7e",
+    "F_REVERSED_POS": "d5eaf951f19cc0c65ab236dd3bb4d4237551116934d7d19cbf02521fc086d53b",
+    "F_REVERSED_NEG": "07778a26cd9a5bad884476169b22576a3ece191b90c5ba88713d34cb7d4d4545",
+    "F_ZERO_BOUND": "ac27a159a3c4184e47888ea86a7bcf2ee2bccf4060d0a6cea8ff264a36831476",
+    "F_NMIN_EQ": "8ec1e85e55674350241f3932765450c3768c2d57f7a5d7b2ead797d092fe6af6",
+    "F_PMAX_NEAR": "d8b77c54ccf1dbd8e6f531d4ade5ad58f94dc5f03ed45d17b012f0e0c1bf720e",
+    "F_NMIN_ASCEND": "809493e7a87c5ddea47aeea9de74b3e5fcb9a457c6a6f58dd93cf47ececb07ff",
+    "F_PMAX_DESCEND": "61f6f6b341dba50ceba995f8754c93eaa0dbfab4517b4b84a4dd5e1751f4b252",
+    "F_NEXT_BARE": "46fd71d58d4ea144b493a7c84315dd9d9eabaf8ee98202c0305fdb296f99baeb",
+    "F_NEXT_NAMED": "29614feb152a17b8647269454d631ba6c83a85755ba354719f6a7906d5169cce",
+    "F_NESTED2": "0eb65e9f165c6f603aa5a03b178dab515eacf23d33d2adf0053e12fca727255c",
+    "F_REPEAT": "ee03ccb56a00000e093a0ff34f804fd4e2fa48eab01fdc3510f0319086be616e",
+    "F_GOTO_EXIT": "8dcc9659c375aee0d618635dff6669b88d66d7d266667c0bd5db281c93d38ebd",
+    "F_END_EARLY": "792edcc282547d0f0f702417040ee842dd6a5c23b7a807aafa7d71ac45c68fb6",
+    "F_NEXT_ORPHAN": "e0f24541a1027ff200e5fb2bf267787921e7976f9e46258f3d402d9478c1270b",
+    "F_NEXT_WRONG_VAR": "457d4e362a29d3ccc62d895734c50cf6068b6984e494841477e802450d8bf5c9"
+}
+PINNED_PRINTER = {
+    "F_POS_IMPLICIT_ONE": "7d86a31a45b2e1f6cbaec323f0cc3c6c42fcc8efe0c7320de54b401f44cbee1b",
+    "F_POS_IMPLICIT_THREE": "6bef7868253a610c6affd6bbf3a2016a07b6617edd0b9323a9e5fb80dd362a22",
+    "F_POS_EXPLICIT_TWO": "c45c7ee6c98eb62a42d0e61e43bad0b48c3e69f58d19ebefcf87ba37cf950a42",
+    "F_NEG_STEP_THREE": "d2a49a9698f66dfcb0279f244481a5f4f74d00ba4550acff6496fc5218db6075",
+    "F_NEG_STEP_TWO": "1143636902e0417f19101ff9b27d84b5fdc57020cf82cb1cc793ac5b24c4f626",
+    "F_REVERSED_POS": "37945bf7b406cce0ad7c77718e3e66d128ac15f3f81d6f389d32c5f6aed664f9",
+    "F_REVERSED_NEG": "37945bf7b406cce0ad7c77718e3e66d128ac15f3f81d6f389d32c5f6aed664f9",
+    "F_ZERO_BOUND": "599e8a6c46a024ba4d2882b33a7f9a631c06fb4bc994129c6a1603f839b2da66",
+    "F_NMIN_EQ": "3e8f0cd7fcbf769487797f0319a2d1bc56759f7380f0117c12cdcb22ab84ae56",
+    "F_PMAX_NEAR": "944af74414daf372179c556e83bd21522e8409db0d1e0ed1f7b5788e2f1d5275",
+    "F_NMIN_ASCEND": "edc4b621af6a04373f2cc5f895f86873e3b79aceef78818a4247451f72330379",
+    "F_PMAX_DESCEND": "86895ada931bcf9594adc5ebf0585dc76a6775cf16f75ed494bffc50befd3d5e",
+    "F_NEXT_BARE": "8b7ae42f59c89f4ca6d46bab5ffcf7458f879e185def62172bf9fd9de12c887c",
+    "F_NEXT_NAMED": "8b7ae42f59c89f4ca6d46bab5ffcf7458f879e185def62172bf9fd9de12c887c",
+    "F_NESTED2": "76b04e6d4f7a1f4abbae29c39ff6a557858ac5e561adecb508c70f5ad032f4cd",
+    "F_REPEAT": "625e94d38cc2eafd248257b3f30cf37408a7556942f4bba4733cc40f885e55f8",
+    "F_GOTO_EXIT": "5e4efb79ac02644dbc815633846e8d3ebdb8ee12227085859ed87595e1f79515",
+    "F_END_EARLY": "7d86a31a45b2e1f6cbaec323f0cc3c6c42fcc8efe0c7320de54b401f44cbee1b",
+    "F_NEXT_ORPHAN": "ea61f6d4a642d22fa4e825d8e6d8979ba3d5fbde47f951090e18d3fc6e1972ba",
+    "F_NEXT_WRONG_VAR": "2bc5b4aa31243696d97a91989d9f187babb7662f5e40759666c1291aa3276f12"
+}
+PINNED_OUTCOMES = {
+    "F_POS_IMPLICIT_ONE": [
+        [
+            1
+        ],
+        0,
+        0
+    ],
+    "F_POS_IMPLICIT_THREE": [
+        [
+            1,
+            2,
+            3
+        ],
+        0,
+        0
+    ],
+    "F_POS_EXPLICIT_TWO": [
+        [
+            1,
+            3,
+            5
+        ],
+        0,
+        0
+    ],
+    "F_NEG_STEP_THREE": [
+        [
+            3,
+            2,
+            1
+        ],
+        0,
+        0
+    ],
+    "F_NEG_STEP_TWO": [
+        [
+            6,
+            4,
+            2
+        ],
+        0,
+        0
+    ],
+    "F_REVERSED_POS": [
+        [],
+        0,
+        0
+    ],
+    "F_REVERSED_NEG": [
+        [],
+        0,
+        0
+    ],
+    "F_ZERO_BOUND": [
+        [
+            0
+        ],
+        0,
+        0
+    ],
+    "F_NMIN_EQ": [
+        [
+            -32768
+        ],
+        0,
+        0
+    ],
+    "F_PMAX_NEAR": [
+        [
+            32766
+        ],
+        0,
+        0
+    ],
+    "F_NMIN_ASCEND": [
+        [
+            -32768,
+            -32767,
+            -32766
+        ],
+        0,
+        0
+    ],
+    "F_PMAX_DESCEND": [
+        [
+            32767,
+            32766,
+            32765
+        ],
+        0,
+        0
+    ],
+    "F_NEXT_BARE": [
+        [
+            1,
+            2
+        ],
+        0,
+        0
+    ],
+    "F_NEXT_NAMED": [
+        [
+            1,
+            2
+        ],
+        0,
+        0
+    ],
+    "F_NESTED2": [
+        [
+            1,
+            3,
+            1,
+            4,
+            2,
+            3,
+            2,
+            4
+        ],
+        0,
+        0
+    ],
+    "F_REPEAT": [
+        [
+            1,
+            2,
+            4,
+            5
+        ],
+        0,
+        0
+    ],
+    "F_GOTO_EXIT": [
+        [
+            1,
+            99
+        ],
+        0,
+        0
+    ],
+    "F_END_EARLY": [
+        [
+            1
+        ],
+        0,
+        0
+    ],
+    "F_NEXT_ORPHAN": [
+        [
+            77
+        ],
+        1,
+        20
+    ],
+    "F_NEXT_WRONG_VAR": [
+        [],
+        1,
+        30
+    ]
+}
 
 class Invalid(ValueError):
     pass

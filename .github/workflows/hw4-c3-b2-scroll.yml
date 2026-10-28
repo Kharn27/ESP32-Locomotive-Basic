@@ -52,14 +52,12 @@ jobs:
 
           # Guard the one-attempt fail-stop policy in actual ESP-IDF source.
           # The portable callback retry test only validates dirty retention.
-          python3 - <<'PY'
-          from pathlib import Path
-          s = Path("firmware/esp32_display_probe/main/hw4_c2_console.c").read_text()
-          assert s.count("cpc_video_flush_dirty(&s_video,send_dirty_band,&sent)") == 1
-          assert "LCD_DMA_RETRY" not in s
-          assert "LCD_FAIL_STOP" in s and "retry=0" in s
-          assert "pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : 100U)" in s
-          assert "return display_ready() && prompt()" in s
-          PY
+          src=firmware/esp32_display_probe/main/hw4_c2_console.c
+          test "$(grep -F -c 'cpc_video_flush_dirty(&s_video,send_dirty_band,&sent)' "$src")" = 1
+          ! grep -F 'LCD_DMA_RETRY' "$src"
+          grep -F 'LCD_FAIL_STOP' "$src"
+          grep -F 'retry=0' "$src"
+          grep -F 'pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : 100U)' "$src"
+          grep -F 'return display_ready() && prompt()' "$src"
           python3 tools/hw4_c3_b2_uart_po.py --dry-run >/tmp/hw4-c3-b2-uart-commands.txt
           test "$(grep -c ' PRINT 7' /tmp/hw4-c3-b2-uart-commands.txt)" = 32

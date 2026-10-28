@@ -80,11 +80,10 @@ bool cpc_video_set_border(CpcVideo *v, unsigned colour)
 bool cpc_video_set_text_colors(CpcVideo *v, unsigned pen, unsigned paper)
 {
     if (!valid(v) || pen >= cpc_video_colors(v) || paper >= cpc_video_colors(v)) return false;
-    /* Cursor pixels are an overlay rendered with the current PEN. A PEN
-     * change must repaint that cell even though VRAM itself is unchanged.
-     * The background PAPER does not affect the existing cursor overlay.
+    /* Reverse-video overlay depends on both current PEN and PAPER, even
+     * though a colour change never rewrites the stored raster.
      */
-    if (v->cursor_visible && v->pen != pen)
+    if (v->cursor_visible && (v->pen != pen || v->paper != paper))
         v->dirty_bands |= UINT32_C(1) << v->cursor_row;
     v->pen = (uint8_t)pen;
     v->paper = (uint8_t)paper;
@@ -137,11 +136,20 @@ static unsigned sampled_pen(const CpcVideo *v, unsigned x, unsigned y)
         p = (uint8_t)(p | p2);
     }
     if (v->cursor_visible && y / 8U == v->cursor_row) {
-        unsigned start = (unsigned)v->cursor_column * 8U;
-        /* Overlay on logical pixels rather than replacing the framebuffer. */
-        if (v->mode == CPC_MODE_2 && v->mode2_display == CPC_MODE2_OR_PAIR) {
-            if (lx < start + 8U && lx + 1U >= start) p = v->pen;
-        } else if (lx >= start && lx < start + 8U) p = v->pen;
+        const unsigned start = (unsigned)v->cursor_column * 8U;
+        /* Overlay AFTER MODE0 scaling / MODE2 compositing, without changing
+         * VRAM. Exchange only current text PEN/PAPER. Other ink indices are
+         * graphics and must not be inverted as if they were text pixels.
+         * Identical PEN/PAPER cannot produce a visible inverse.
+         */
+        const bool over = v->mode == CPC_MODE_2 &&
+                          v->mode2_display == CPC_MODE2_OR_PAIR
+                        ? (lx < start + 8U && lx + 1U >= start)
+                        : (lx >= start && lx < start + 8U);
+        if (over && v->pen != v->paper) {
+            if (p == v->pen) p = v->paper;
+            else if (p == v->paper) p = v->pen;
+        }
     }
     return p;
 }

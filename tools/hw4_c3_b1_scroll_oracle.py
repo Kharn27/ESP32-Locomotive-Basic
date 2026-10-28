@@ -20,7 +20,6 @@ AMSDOS = "ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d"
 PNG = bytes.fromhex("89504e470d0a1a0a")
 DELAY = "CAP32_DELAY CAP32_DELAY"
 END = DELAY + " CAP32_SCRNSHOT CAP32_EXIT"
-SHOT = DELAY + " CAP32_SCRNSHOT"
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
@@ -41,7 +40,8 @@ CASES = {
                             "LOCATE 1,25", 'PRINT "LAST";', END], 1),
     "cr_last_row": ([], ["CLS", "LOCATE 1,25",
                          'PRINT "ABCDE";CHR$(13);"Z";', END], 1),
-    "repeat_list": (numbered(27), ["CLS", "LIST", SHOT, "LIST", END], 2),
+    "repeat_list_once": (numbered(27), ["CLS", "LIST", END], 1),
+    "repeat_list_twice": (numbered(27), ["CLS", "LIST", "LIST", END], 1),
     "new_after_list": (numbered(27), ["CLS", "LIST", "NEW", "LIST", END], 1),
     "window_default": (numbered(26), ["WINDOW 1,40,1,25", "CLS", "LIST", END], 1),
 }

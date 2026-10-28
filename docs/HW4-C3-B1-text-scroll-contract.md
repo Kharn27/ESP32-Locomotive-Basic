@@ -23,7 +23,7 @@ Statut : **B1, sans code runtime ; B2 non autorisé**. Concurrence : J1.10-B [#1
 
 Reproduction sur l'image console ON : saisir les 26 lignes '10 REM L01', ... '260 REM L26', puis LIST ; observer les diagnostics UART et le contenu écran ; refaire avec 32 lignes, puis LIST encore, NEW et LIST. Le résultat varie avec la position initiale du curseur (boot HW4-C3-A). Un effacement vidéo n'est jamais à interpréter comme un NEW implicite. L'état programme BASIC doit être vérifié séparément par LIST après le reset ; les octets de LIST ne sont pas une archive d'écran CPC.
 
-## Matrice reproductible : 11 cas ROM-backed
+## Matrice reproductible : 12 cas ROM-backed
 
 Script : 'tools/hw4_c3_b1_scroll_oracle.py', un **processus CPC6128 neuf par cas**, Caprice32 4.6.0 commit 8c778bf072a06fb7c23b9cccd179041db7f79a52 ; ROM BASIC 1.1 SHA-256 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562 ; AMSDOS SHA-256 ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d. Les instructions numérotées sont envoyées en premier, puis CLS avant le LIST écran, et capture des PNG. Pas de PRINT #8, SNA/ROM archivé ou OCR. La macro capture peut modifier le contexte vidéo (overlay Caprice32), ce qui doit être annoté lors de la lecture.
 
@@ -37,7 +37,8 @@ Script : 'tools/hw4_c3_b1_scroll_oracle.py', un **processus CPC6128 neuf par cas
 | input_after_list | 26 lignes ; LIST puis PRINT 7 direct | saisie/sortie après dépassement | UNVERIFIED |
 | cursor_edges | CLS ; LOCATE 1,1/1,25 ; PRINT | haut/bas, dernière rangée | UNVERIFIED |
 | cr_last_row | LOCATE 1,25 ; PRINT avec CHR$(13) | retour chariot sans LF à la limite | UNVERIFIED |
-| repeat_list | 27 lignes ; LIST ; capture ; LIST ; capture | conservation des rangées sur LIST répété | UNVERIFIED |
+| repeat_list_once | 27 lignes ; LIST ; capture | première sortie, référence du cas répété | UNVERIFIED |
+| repeat_list_twice | 27 lignes ; LIST ; LIST ; capture | comparaison à repeat_list_once, sans capture écrasée | UNVERIFIED |
 | new_after_list | 27 lignes ; LIST ; NEW ; LIST | programme effacé par NEW et écran courant | UNVERIFIED |
 | window_default | WINDOW 1,40,1,25 ; CLS ; LIST | fenêtre par défaut explicitée | UNVERIFIED |
 
@@ -77,7 +78,7 @@ Viewport y TFT=20..219, les marges 0..19 et 220..239 restent BORDER. Une bande l
 - C99 : chaque rangée initialement distincte, vérifier les **15360 octets déplacés pour k=1**, les 640 derniers à PAPER, deux scrolls successifs, motif PAPER 1/2/3, overlay curseur non destructif, caractères partiels et 40e colonne.
 - Canaris : 8 octets avant/après les 16000, masque dirty, palette, curseur et store intacts ; aucun malloc/PSRAM/framebuffer RGB565.
 - Atomique en rejet : pointeur nul, mode non MODE1, rows>25, fenêtre vide/inversée, row25/col40 physiques hors borne, SIZE_MAX/overflow d'indexation, curseur (0,0)/(39,24), pending-wrap col40/row24, LF en bas, et DMA simulé en échec ; vérifier snapshot complet avant/après (sauf erreur de transport où dirty doit être maintenu).
-- Oracle CPC : mettre en correspondance **les 11 cas acquis et inspectés** ; s'interdire de convertir un cas image ambigu en MATCH_EXACT. Dans la CI : OFF/ON ASan/UBSan, oracles permanents inchangés, Xtensa 3/3 pour **B2**.
+- Oracle CPC : mettre en correspondance **les 12 cas acquis et inspectés** ; s'interdire de convertir un cas image ambigu en MATCH_EXACT. Dans la CI : OFF/ON ASan/UBSan, oracles permanents inchangés, Xtensa 3/3 pour **B2**.
 - **Essai PO B2 obligatoire sur CYD** : fournir branche, SHA exact, commandes 'idf.py' build/flash/monitor ; dérouler LIST>25, répéter LIST, 40/80/120 caractères, entrée après LIST, NEW, Ready/curseur, mesurer DEVICE_MEMORY, log DMA/timeouts et photos avant/après. B1 n'exige pas de test matériel CYD.
 
 ## Exclusions / frontières

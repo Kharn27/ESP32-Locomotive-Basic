@@ -58,7 +58,7 @@ jobs:
           cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
           test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
           test "$(sha256sum tests/oracles/caprice32/rom/amsdos.rom | cut -d ' ' -f 1)" = "ea65e0fb44ee93ede4b6c507509b7e5ddf497fb7155023bea91ef229469fa04d"
-      - name: Acquire original CPC visual screenshots (11 cases)
+      - name: Acquire original CPC visual screenshots (12 cases)
         shell: bash
         run: |
           set -euo pipefail

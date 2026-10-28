@@ -491,3 +491,8 @@ Critères : IF variable% THEN ligne autonome encodé A1 / 02 caches opaques / EB
 Le comparateur post-B transforme uniquement PRINT #8,constante en PRINT constante ; aucune preuve RAM intégrale ni support de PRINT #8 ou d'un système ERR/ERL numérique. Limite d'erreur : CPC ERR=8, ERL=20 observés ; hôte BE_MISSING_TARGET sémantiquement analogue. Aucun test physique CYD exigé sur cette tranche purement portable, ON_DEVICE_UNVERIFIED. Sources [J1.10-A](J1.10-A-if-then-cpc-oracle.md) et [rapport J1.10-B](J1.10-B-if-then-integer-native.md).
 
 **Jalon suivant non autorisé.** Aucune fusion par l'agent développeur.
+
+
+### Gate J1.11-A — GOSUB/RETURN oracle CPC, aucune pile native
+
+Mandat [#110](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/110), base minimale squash J1.10-B-C1 `d7a291283630a2b1a21cc145beb3d1d5a9e467a9`. Seize sources CPC 6128 indépendantes, deux acquisitions de RAM pré-RUN et flux imprimante par source, réacquisition exacte, enregistrements GOSUB/RETURN complets et sentinelles, diagnostics ERR/ERL observés, traces LIST/PNG, provenance ROM/Caprice32, SHA-256 scellés non recalculés depuis C99, au moins huit falsifications et faux checkout. `--permanent --self-test` doit échouer tant que les ancrages externes ne sont pas établis. Pré-C99 classifié explicitement ; aucune implémentation GOSUB/RETURN, aucune altération des corpus historiques. Gates : GCC/Clang OFF/ON ASan/UBSan, permanence CPC existante, trois images Xtensa ESP-IDF 5.5.6 au même HEAD, budgets mémoire. Pas de test CYD exigé (`ON_DEVICE_UNVERIFIED`). [Rapport d'acquisition](J1.11-A-gosub-return-cpc-oracle.md). **PENDING_PILOTAGE** ; J1.11-B interdit.

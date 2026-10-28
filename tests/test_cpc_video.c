@@ -66,8 +66,31 @@ static void test_cursor_pen_dirty(CpcMode mode)
     assert(pixels[0] == 0xaa && pixels[CPC_VIDEO_BYTES + 1U] == 0xaa);
 }
 
+
+/* HW4-EDIT-A-C1 negative oracle: under a visible cursor an existing glyph
+ * must remain visible with foreground and background exchanged. The old
+ * opaque overlay painted both pixels with PEN and fails these assertions. */
+static void test_cursor_inverse_red(void)
+{
+    CpcVideo v;
+    static uint8_t saved[CPC_VIDEO_BYTES];
+    memset(pixels, 0xa5, sizeof pixels);
+    assert(cpc_video_init(&v, pixels + 1U, CPC_VIDEO_BYTES, CPC_MODE_1));
+    assert(cpc_video_put_cell(&v, 3U, 4U, 'R', glyph, NULL));
+    memcpy(saved, pixels + 1U, sizeof saved);
+    assert(cpc_video_cursor(&v, 3U, 4U, true));
+    assert(cpc_video_render_row(&v, CPC_VIDEO_VIEW_TOP + 4U * 8U + 1U,
+                                line + 1U, 320U));
+    /* glyph row 1 is 0x81: x=0 is PEN, x=1 is PAPER. */
+    assert(line[1U + 24U] == UINT16_C(0x0010)); /* PEN glyph -> PAPER */
+    assert(line[1U + 25U] == UINT16_C(0xffe0)); /* PAPER -> PEN */
+    assert(memcmp(saved, pixels + 1U, sizeof saved) == 0);
+    assert(pixels[0] == 0xa5U && pixels[CPC_VIDEO_BYTES + 1U] == 0xa5U);
+}
+
 int main(void)
 {
+    test_cursor_inverse_red();
     CpcVideo v;
     assert(!cpc_video_init(&v, pixels, CPC_VIDEO_BYTES - 1U, CPC_MODE_1));
     for (unsigned mode = 0; mode < 3U; ++mode) {

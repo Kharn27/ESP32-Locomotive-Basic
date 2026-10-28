@@ -534,6 +534,20 @@ if(BUILD_TESTING)
         --permanent --self-test)
 endif()
 
+# J1.11-B: native bounded GOSUB/RETURN, independent post-B differential.
+# The 16 J1.11-A archives and pre-B UNSUPPORTED classifications stay immutable.
+if(BUILD_TESTING)
+    add_executable(test_basic_gosub_return tests/test_basic_gosub_return.c)
+    target_link_libraries(test_basic_gosub_return PRIVATE
+                          basic_session_runtime basic_listing basic_tokenizer)
+    add_test(NAME j1_11_b_gosub_return_native COMMAND test_basic_gosub_return)
+    add_test(NAME j1_11_b_gosub_return_cpc_differential COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_11_b_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()
+
 # HW4-C3-B2: native MODE1 scroll, bounded dirty retention under injected
 # transport errors. The host retry proves transport-conditional resumption only.
 if(BUILD_TESTING)

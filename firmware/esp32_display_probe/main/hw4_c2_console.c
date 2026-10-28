@@ -91,13 +91,16 @@ static void lcd_metrics_report(const char *stage)
            "repaint_p50_upper_us=%u repaint_p95_upper_us=%u repaint_max_us=%u "
            "echo_idle_batches=%u echo_command_batches=%u echo_batch_max=%u "
            "mode=histogram_upper_bounds\n",
-           stage,s_lcd_metrics.flushes,s_lcd_metrics.bands,
+           stage,(unsigned)s_lcd_metrics.flushes,(unsigned)s_lcd_metrics.bands,
            (unsigned long long)s_lcd_metrics.spi_bytes,
            (unsigned)s_text.scrolls,
            (unsigned long long)s_lcd_metrics.repaint_us,
-           latency_quantile_upper(50U),latency_quantile_upper(95U),
-           s_lcd_metrics.max_us,s_lcd_metrics.idle_echo_batches,
-           s_lcd_metrics.command_echo_batches,s_lcd_metrics.max_echo_batch);
+           (unsigned)latency_quantile_upper(50U),
+           (unsigned)latency_quantile_upper(95U),
+           (unsigned)s_lcd_metrics.max_us,
+           (unsigned)s_lcd_metrics.idle_echo_batches,
+           (unsigned)s_lcd_metrics.command_echo_batches,
+           (unsigned)s_lcd_metrics.max_echo_batch);
 }
 
 

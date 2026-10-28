@@ -59,6 +59,8 @@ def execute(cli, source, case):
     diag = diagnostic[0].decode("ascii") if diagnostic else ""
     other = r.stderr.count(b"[cli:error]")
     require(other == len(diagnostic), case + " EXTRA_HOST_ERROR")
+    if not diagnostic:
+        require(b"[cli] END" in r.stderr, case + " STEP_BUDGET_EXHAUSTED")
     return trace, diag
 
 def compare(case, expected, got, diag):
@@ -98,7 +100,12 @@ def self_test():
         require(digest(raw) == seal[kind][case] and
                 digest(raw + b"x") != seal[kind][case],
                 kind + " FALSIFICATION_FAILED")
-    print("PASS J1.12-B2 FALSIFICATIONS TRACE ERROR HEAD MANIFEST RAM PRINTER")
+    captures = json.loads(manifest)["captures"]
+    original_source = read(ROOT / captures[0]["source_path"])
+    require(digest(original_source) == captures[0]["source_sha256"] and
+            digest(original_source + b"x") != captures[0]["source_sha256"],
+            "SOURCE_FALSIFICATION_FAILED")
+    print("PASS J1.12-B2 FALSIFICATIONS TRACE ERROR HEAD MANIFEST RAM PRINTER SOURCE")
 
 def main():
     p = argparse.ArgumentParser()

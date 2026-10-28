@@ -229,7 +229,7 @@ static int isolation_and_calls(void) {
     CHECK(put(&a,100,"PRINT I%")==0);
     CHECK(put(&a,110,"RETURN")==0);
     CHECK(start(&a)==0);
-    CHECK(check_run(&a," 1 \\n 2 \\n")==0);
+    CHECK(check_run(&a," 1 \n 2 \n")==0);
     CHECK(put(&b,10,"FOR J%=1 TO 1")==0);
     CHECK(put(&b,20,"PRINT J%")==0);
     CHECK(put(&b,30,"NEXT J%")==0);
@@ -241,7 +241,7 @@ static int isolation_and_calls(void) {
     CHECK(be_step(&b.executor,(uint8_t *)&b.executor,sizeof(b.executor),
                   &b.written)==BE_OVERLAP);
     CHECK(memcmp(&before,&b.executor,sizeof(before))==0);
-    CHECK(check_run(&b," 1 \\n")==0);
+    CHECK(check_run(&b," 1 \n")==0);
     return 0;
 }
 int main(void) {

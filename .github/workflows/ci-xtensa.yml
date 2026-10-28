@@ -196,8 +196,11 @@ jobs:
                 esac
                 dir="build-u1-$tag"
                 out="reports/u1-a/$tag"
-                idf.py -B "$dir" -DLOCO_CYD_PROFILE="$profile" set-target esp32 > "$out/set-target.log" 2>&1
-                idf.py -B "$dir" -DLOCO_CYD_PROFILE="$profile" build > "$out/build.log" 2>&1
+                # ESP-IDF writes sdkconfig at the project root by default;
+                # isolate it per profile as well as each Ninja build cache.
+                config="$PWD/sdkconfig.u1-$tag"
+                idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$profile" set-target esp32 > "$out/set-target.log" 2>&1
+                idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$profile" build > "$out/build.log" 2>&1
                 idf.py -B "$dir" size > "$out/size.txt" 2>&1
                 idf.py -B "$dir" size-components > "$out/size-components.txt" 2>&1
                 grep -Fx "LOCO_CYD_PROFILE:STRING=$profile" "$dir/CMakeCache.txt"
@@ -210,7 +213,7 @@ jobs:
                 xtensa-esp-elf-readelf -h "$dir/loco_esp32_display_probe.elf" > "$out/elf-header.txt"
                 sha256sum "$dir/loco_esp32_display_probe.bin" > "$out/binary-sha256.txt"
                 python3 /project/firmware/esp32_probe/scripts/check_build.py \
-                  "$dir/sdkconfig" partitions.csv "$dir/loco_esp32_display_probe.bin" > "$out/partitions.txt"
+                  $config" partitions.csv "$dir/loco_esp32_display_probe.bin" > "$out/partitions.txt"
                 echo "U1-A PROFILE_$profile=PASS"
               done
               # No second ELF entrypoint and the real legacy ABI/probe remains.
@@ -218,7 +221,7 @@ jobs:
                 build-u1-basic/loco_esp32_display_probe.elf > reports/u1-a/basic/xtensa-abi.txt
               xtensa-esp-elf-nm --defined-only build-u1-basic/loco_esp32_display_probe.elf |
                 grep -F " loco_probe_abi_sizes"
-              grep -Fx "CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144" build-u1-console/sdkconfig
+              grep -Fx "CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144" sdkconfig.u1-console
               test ! -e /project/firmware/locomotive_cyd
               if idf.py -B build-u1-invalid -DLOCO_CYD_PROFILE=INVALID reconfigure > reports/u1-a/invalid.log 2>&1; then
                 echo "U1-A invalid profile unexpectedly compiled"

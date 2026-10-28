@@ -67,6 +67,7 @@ bool cpc_video_render_row(const CpcVideo *video, unsigned y,
 /* MODE1 only: move raster rows up in the linear 16000-byte surface.
  * 0 rows is a no-op; 1..25 are valid; invalid calls change nothing. */
 bool cpc_video_scroll_up(CpcVideo *video, unsigned rows);
+bool cpc_video_scroll_down(CpcVideo *video, unsigned rows);
 /* Drain dirty bands in ascending order. On callback failure, restore the
  * failed band and every not-yet-sent band for a subsequent retry. */
 typedef bool (*CpcVideoBandSender)(void *context, unsigned band);

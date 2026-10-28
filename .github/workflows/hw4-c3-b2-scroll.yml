@@ -10,11 +10,13 @@ on:
       - 'io/cpc_uart_console.h'
       - 'firmware/esp32_display_probe/main/hw4_c2_console.c'
       - 'tests/test_hw4_c3_b2_scroll.c'
+      - 'tests/test_hw4_c3_b2_c1_batch.c'
       - 'tests/test_cpc_text.c'
       - 'tests/test_cpc_uart_console.c'
       - 'tests/test_hw4_c2_integration.c'
       - 'tests/test_hw4_c3_boot.c'
       - 'CMakeLists.txt'
+      - 'tools/hw4_c3_b2_uart_po.py'
       - '.github/workflows/hw4-c3-b2-scroll.yml'
   workflow_dispatch:
 permissions:
@@ -45,5 +47,19 @@ jobs:
           cmake -S . -B /tmp/hw4-c3-b2 -DBP_SANITIZERS=${{ matrix.sanitizers }} "-DCMAKE_C_FLAGS=$flags"
           cmake --build /tmp/hw4-c3-b2 --parallel 2
           ctest --test-dir /tmp/hw4-c3-b2 --output-on-failure -R 'hw4_c3_b2|hw4_c1_text_boundaries|hw4_c2_screen_paging|hw4_c2_native_uart_runtime_tft|hw4_c3_boot_screen|cpc_video$'
+          ctest --test-dir /tmp/hw4-c3-b2 -V -R '^hw4_c3_b2_c1_lcd_batch_fail_stop >/tmp/hw4-c3-b2-uart-commands.txt
+          test "$(grep -c ' PRINT 7' /tmp/hw4-c3-b2-uart-commands.txt)" = 32
+
+          # Guard the one-attempt fail-stop policy in actual ESP-IDF source.
+          # The portable callback retry test only validates dirty retention.
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("firmware/esp32_display_probe/main/hw4_c2_console.c").read_text()
+          assert s.count("cpc_video_flush_dirty(&s_video,send_dirty_band,&sent)") == 1
+          assert "LCD_DMA_RETRY" not in s
+          assert "LCD_FAIL_STOP" in s and "retry=0" in s
+          assert "pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : 100U)" in s
+          assert "return display_ready() && prompt()" in s
+          PY
           python3 tools/hw4_c3_b2_uart_po.py --dry-run >/tmp/hw4-c3-b2-uart-commands.txt
           test "$(grep -c ' PRINT 7' /tmp/hw4-c3-b2-uart-commands.txt)" = 32

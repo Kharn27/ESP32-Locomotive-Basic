@@ -504,3 +504,18 @@ if(BUILD_TESTING)
     target_link_libraries(test_hw4_c3_boot PRIVATE cpc_boot cpc_uart_console)
     add_test(NAME hw4_c3_boot_screen COMMAND test_hw4_c3_boot)
 endif()
+
+# J1.10-B: native autonomous IF INTEGER THEN line. CPC oracle stays read-only.
+if(BUILD_TESTING)
+    add_executable(test_basic_if_then_integer
+                   tests/test_basic_if_then_integer.c)
+    target_link_libraries(test_basic_if_then_integer PRIVATE
+                          basic_session_runtime basic_variable_binding)
+    add_test(NAME j1_10_b_if_then_integer_native
+             COMMAND test_basic_if_then_integer)
+    add_test(NAME j1_10_b_if_then_cpc_differential COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_10_b_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()

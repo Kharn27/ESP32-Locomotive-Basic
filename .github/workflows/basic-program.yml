@@ -11,10 +11,23 @@ jobs:
       fail-fast: false
       matrix:
         sanitizers: [OFF, ON]
+        compiler: [gcc, clang]
     steps:
       - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBP_SANITIZERS=${{ matrix.sanitizers }} -DCMAKE_C_FLAGS=-fstack-usage
+        run: |
+          # Existing J0.23 host budget audit uses an anonymous struct inside
+          # offsetof. Clang diagnoses that extension under -Werror; suppress
+          # ONLY that unrelated diagnostic, keeping all other -Werror checks.
+          flags="-fstack-usage"
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            flags="$flags -Wno-error=gnu-offsetof-extensions"
+            # HW4-C3-A (already accepted in main) deliberately joins the
+            # copyright glyph \x7f with its year in cpc_boot.c; Clang
+            # warns about adjacent string literals under -Werror.
+            flags="$flags -Wno-error=string-concatenation"
+          fi
+          cmake -S . -B build -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_BUILD_TYPE=Debug -DBP_SANITIZERS=${{ matrix.sanitizers }} "-DCMAKE_C_FLAGS=$flags"
       - name: Build
         run: cmake --build build --parallel
       - name: Test

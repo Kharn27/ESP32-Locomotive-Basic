@@ -625,3 +625,11 @@ curseur et première frappe **rangée 12**. HW3 OFF conserve les cinq
 rangées d'origine 3/5/7/10/12 et son curseur 13.
 Aucun scrolling CPC, éditeur tactile ou changement HAL ; preuve CYD
 à acquérir sur le nouveau HEAD, indépendamment des anciennes captures.
+
+### J1.10-B — implémentation native IF…THEN INTEGER (28 octobre 2026)
+
+Après décision Pilotage dans [issue #106](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/106), J1.10-A est accepté et fusionné sur main au squash c9ff43bd4a04d88fe3552a9398cefc0804651b83. J1.10-B est **autorisé** et traité dans [PR #107](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/107) sur branche feat/j1-10-b-native-if-then-integer, en revue développeur, **non fusionnée**.
+
+Périmètre proposé : IF variable% THEN ligne autonome ; tokenisation A1 / référence 02 avec cache opaque / EB / numéro 1E little-endian, LIST, RUN vrai/faux, cible absente prise BE_MISSING_TARGET sans mutation. Comparaison post-B séparée avec les 14 références CPC J1.10-A, adaptations PRINT #8 vers PRINT bornées aux constantes et aucune prétention d'identité RAM du programme entier. L'ancien statut pré-B 14/14 UNSUPPORTED reste historiquement inchangé. [Rapport technique](J1.10-B-if-then-integer-native.md).
+
+Les premières suites Linux sur la révision 34b14e470c27cb0028aae5572258ade1ac940b19 ont réussi 60/60 OFF et ON ; des contrôles additionnels et vérifications définitives au HEAD final demeurent nécessaires. Trois compilations Xtensa et budgets au HEAD final à confirmer ; pas de test physique CYD demandé, statut ON_DEVICE_UNVERIFIED. Aucune autorisation implicite de J1.10-C ou de nouvelles formes de contrôle de flux. Acceptation et fusion réservées au Pilotage.

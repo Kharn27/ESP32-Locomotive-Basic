@@ -10,7 +10,7 @@ typedef struct {
 
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
-    ST_ASSIGN
+    ST_ASSIGN, ST_IF
 } BTStatement;
 
 typedef struct {
@@ -26,6 +26,7 @@ static const BTKeyword keywords[] = {
     {"RUN",   0xcau, ST_RUN},
     {"NEW",   0xb1u, ST_NEW},
     {"GOTO",  0xa0u, ST_GOTO},
+    {"IF",    0xa1u, ST_IF},
     {"END",   0x98u, ST_END},
     {"REM",   0xc5u, ST_REM},
     {"LET",   0xa5u, ST_ASSIGN}
@@ -220,6 +221,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
 {
     size_t index = 0;
     int expecting_statement = 1;
+    int seen_statement = 0;
     BTStatus status;
 
     while (index < length) {
@@ -274,6 +276,10 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
         if (status != BT_OK) {
             return status;
         }
+        if (statement == ST_IF && seen_statement) {
+            return BT_UNSUPPORTED_CONSTRUCT;
+        }
+        seen_statement = 1;
 
         /* DFF0-E1C3: after REM or ', the remainder is opaque source
          * bytes. In particular colons, quotes and keyword spellings
@@ -445,6 +451,43 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                     }
                 }
             }
+        } else if (statement == ST_IF) {
+            unsigned int line;
+            if (index == length || !ascii_letter(source[index])) {
+                return BT_UNSUPPORTED_CONSTRUCT;
+            }
+            status = explicit_variable(source, length, &index, out,
+                                       BVR_TYPE_INTEGER);
+            if (status == BT_OK) {
+                status = spaces(source, length, &index, out);
+            }
+            if (status != BT_OK) {
+                return status;
+            }
+            if (!keyword_matches(source, length, index, "THEN", &count)) {
+                return BT_UNSUPPORTED_CONSTRUCT;
+            }
+            index += count;
+            status = emit(out, 0xebu);
+            if (status == BT_OK) {
+                status = spaces(source, length, &index, out);
+            }
+            if (status != BT_OK) {
+                return status;
+            }
+            status = decimal(source, length, &index, 65535u, &line);
+            if (status == BT_OK && line == 0u) {
+                status = BT_MALFORMED_INPUT;
+            }
+            if (status == BT_OK) {
+                status = emit(out, 0x1eu);
+                if (status == BT_OK) {
+                    status = emit(out, (uint8_t)(line & 0xffu));
+                }
+                if (status == BT_OK) {
+                    status = emit(out, (uint8_t)(line >> 8));
+                }
+            }
         } else if (statement == ST_GOTO) {
             unsigned int line;
             status = decimal(source, length, &index, 65535u, &line);
@@ -473,6 +516,9 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
         }
         if (index == length) {
             return BT_OK;
+        }
+        if (statement == ST_IF) {
+            return BT_UNSUPPORTED_CONSTRUCT; /* Autonomous IF only. */
         }
         /* An apostrophe also carries its own statement separator in
          * the CPC encoding; unlike REM it needs no explicit colon. */

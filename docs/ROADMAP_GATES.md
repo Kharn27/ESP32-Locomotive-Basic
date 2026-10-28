@@ -481,3 +481,13 @@ ciblé, `Ready` en rangée 11 (et curseur en 12), sous `BASIC 1.1`
 en rangée 9, crédits 5/6 ; seul le MODE console ON varie.
 HW3 OFF conserve 3/5/7/10/12. J1.10-A est intégré depuis `main`
 sans altérer son oracle. Nouvel essai PO impératif sur le HEAD final.
+
+### Gate J1.10-B — IF INTEGER natif (soumis à revue Pilotage)
+
+Mandat strict [#106](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/106), livraison proposée [PR #107](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/107), base main c9ff43bd4a04d88fe3552a9398cefc0804651b83. Gate **PENDING_PILOTAGE** : une PR développeur n'est ni acceptation ni fusion.
+
+Critères : IF variable% THEN ligne autonome encodé A1 / 02 caches opaques / EB / 1E LE16 ; LIST et retokenisation ; branche zéro/non-zéro, saut avant/arrière, cible END ; cible absente prise => BE_MISSING_TARGET atomique et absente non prise => prochaine ligne sans erreur. Cas invalides et atomicité, GCC/Clang OFF/ON ASan+UBSan, suites J0/J1 antérieures et HW4, oracle 14 cas scellés inchangé, 3 images Xtensa/2 projets ESP-IDF au même HEAD, budgets mémoire respectés. Les 14 historiques UNSUPPORTED sont **pré-implémentation** et restent intacts ; seule la colonne post-B indépendante peut établir un support sur les cas concernés.
+
+Le comparateur post-B transforme uniquement PRINT #8,constante en PRINT constante ; aucune preuve RAM intégrale ni support de PRINT #8 ou d'un système ERR/ERL numérique. Limite d'erreur : CPC ERR=8, ERL=20 observés ; hôte BE_MISSING_TARGET sémantiquement analogue. Aucun test physique CYD exigé sur cette tranche purement portable, ON_DEVICE_UNVERIFIED. Sources [J1.10-A](J1.10-A-if-then-cpc-oracle.md) et [rapport J1.10-B](J1.10-B-if-then-integer-native.md).
+
+**Jalon suivant non autorisé.** Aucune fusion par l'agent développeur.

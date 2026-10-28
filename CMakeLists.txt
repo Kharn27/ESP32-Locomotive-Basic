@@ -547,3 +547,12 @@ if(BUILD_TESTING)
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
 endif()
+
+# J1.12-A: independent CPC6128 FOR/NEXT INTEGER oracle only.
+# Fail closed before authentic acquisition and independent digest sealing.
+if(BUILD_TESTING)
+    add_test(NAME j1_12_a_for_next_cpc_permanent COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_12_for_next_verify.py"
+        --permanent --self-test)
+endif()

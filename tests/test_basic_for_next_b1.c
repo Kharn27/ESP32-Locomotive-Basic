@@ -152,7 +152,7 @@ static int listing_failures(void)
     }
     return 0;
 }
-static int unsupported(Fixture *f)
+static int rejected(Fixture *f, BEStatus expected)
 {
     BasicExecutor before = f->executor;
     BasicVariableStore store = f->store;
@@ -163,7 +163,7 @@ static int unsupported(Fixture *f)
     memset(f->out,0x6a,sizeof(f->out));
     memcpy(output_before,f->out,sizeof(output_before));
     f->written = 777u;
-    CHECK(be_step(&f->executor,f->out,sizeof(f->out),&f->written) == BE_UNSUPPORTED);
+    CHECK(be_step(&f->executor,f->out,sizeof(f->out),&f->written) == expected);
     CHECK(memcmp(&before,&f->executor,sizeof(before)) == 0);
     CHECK(memcmp(&store,&f->store,sizeof(store)) == 0);
     CHECK(memcmp(entries,f->entries,sizeof(entries)) == 0);
@@ -179,15 +179,21 @@ static int no_loop_runtime(void)
     CHECK(put(&f,10u,"FOR I%=1 TO 2") == 0);
     CHECK(put(&f,20u,"NEXT I%") == 0);
     CHECK(be_init_with_store(&f.executor,&f.program,&f.store) == BE_OK);
-    CHECK(unsupported(&f) == 0);
+    f.written = 9u;
+    CHECK(be_step(&f.executor,f.out,sizeof(f.out),&f.written) == BE_OK);
+    CHECK(f.executor.for_depth == 1u && f.store.count == 1u && f.written == 0u);
+    CHECK(be_step(&f.executor,f.out,sizeof(f.out),&f.written) == BE_OK);
+    CHECK(f.executor.for_depth == 1u);
+    CHECK(be_step(&f.executor,f.out,sizeof(f.out),&f.written) == BE_OK);
+    CHECK(f.executor.for_depth == 0u);
     CHECK(init(&f) == 0);
     CHECK(put(&f,10u,"NEXT") == 0);
     CHECK(be_init_with_store(&f.executor,&f.program,&f.store) == BE_OK);
-    CHECK(unsupported(&f) == 0);
+    CHECK(rejected(&f, BE_NEXT_WITHOUT_FOR) == 0);
     CHECK(init(&f) == 0);
     CHECK(put(&f,10u,"PRINT 1:NEXT I%") == 0);
     CHECK(be_init_with_store(&f.executor,&f.program,&f.store) == BE_OK);
-    CHECK(unsupported(&f) == 0); /* even the PRINT prefix is not committed */
+    CHECK(rejected(&f, BE_NEXT_WITHOUT_FOR) == 0);
     CHECK(init(&f) == 0);
     CHECK(put(&f,10u,"GOSUB 100") == 0);
     CHECK(put(&f,20u,"END") == 0);
@@ -196,7 +202,7 @@ static int no_loop_runtime(void)
     f.written = 0u;
     CHECK(be_step(&f.executor,f.out,sizeof(f.out),&f.written) == BE_OK);
     CHECK(f.executor.call_depth == 1u);
-    CHECK(unsupported(&f) == 0); /* call stack rollback at NEXT target */
+    CHECK(rejected(&f, BE_NEXT_WITHOUT_FOR) == 0);
     return 0;
 }
 static int store_atomicity(void)
@@ -224,11 +230,8 @@ static int session_list_and_run(void)
     Fixture f;
     BasicSessionRuntime runtime;
     BSRResult result;
-    uint8_t temporary[256],output[256],before[256];
+    uint8_t temporary[256],output[256];
     size_t written = 0u;
-    BasicSessionRuntime old;
-    BasicVariableEntry entries[4];
-    BasicVariableStore store;
     const char *expected = "10 FOR I%=1 TO 2\n20 NEXT I%\n";
     CHECK(init(&f) == 0);
     CHECK(put(&f,10u,"FOR I%=1 TO 2") == 0);
@@ -242,17 +245,8 @@ static int session_list_and_run(void)
     result = bsr_submit(&runtime,(const uint8_t *)"RUN",3u,
                         temporary,sizeof(temporary),output,sizeof(output),&written);
     CHECK(result.status == BSR_OK && runtime.state == BSR_RUNNING);
-    old = runtime; store = f.store;
-    memcpy(entries,f.entries,sizeof(entries));
-    memset(output,0x5e,sizeof(output)); memcpy(before,output,sizeof(before));
-    written = 512u;
     result = bsr_step(&runtime,output,sizeof(output),&written);
-    CHECK(result.status == BSR_EXECUTOR_ERROR &&
-          result.executor_status == BE_UNSUPPORTED);
-    CHECK(memcmp(&old,&runtime,sizeof(old)) == 0);
-    CHECK(memcmp(&store,&f.store,sizeof(store)) == 0);
-    CHECK(memcmp(entries,f.entries,sizeof(entries)) == 0);
-    CHECK(memcmp(before,output,sizeof(before)) == 0 && written == 512u);
+    CHECK(result.status == BSR_OK && runtime.executor.for_depth == 1u);
     return 0;
 }
 int main(void)
@@ -263,6 +257,6 @@ int main(void)
     CHECK(no_loop_runtime() == 0);
     CHECK(store_atomicity() == 0);
     CHECK(session_list_and_run() == 0);
-    puts("PASS J1.12-B1 C99 FOR/NEXT tokens LIST, atomic rollback and BE_UNSUPPORTED");
+    puts("PASS J1.12-B1 tokens/LIST + J1.12-B2 runtime regression");
     return 0;
 }

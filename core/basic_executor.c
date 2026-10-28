@@ -237,13 +237,221 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
     return BE_OK;
 }
 
+
+/* FOR/NEXT INTEGER literals are the same strictly bounded CPC encodings
+ * already admitted by the scalar assignment path, not REAL expressions. */
+static BEStatus for_literal(const uint8_t *body, size_t length,
+                            size_t *at, int16_t *result)
+{
+    size_t pos = *at;
+    int negative = 0;
+    int32_t magnitude;
+    uint8_t token;
+    static const uint8_t min_real5[5] = {0,0,0,0,0x90};
+    skip_spaces(body, length, &pos);
+    if (pos == length) return BE_TRUNCATED;
+    token = body[pos++];
+    if (token == 0xf5u) {
+        negative = 1;
+        if (pos == length) return BE_TRUNCATED;
+        token = body[pos++];
+    }
+    if (token >= 0x0eu && token <= 0x17u) {
+        magnitude = (int32_t)(token - 0x0eu);
+    } else if (token == 0x19u) {
+        if (pos == length) return BE_TRUNCATED;
+        magnitude = body[pos++];
+        if (magnitude < 10) return BE_BAD_SEQUENCE;
+    } else if (token == 0x1au) {
+        if (length - pos < 2u) return BE_TRUNCATED;
+        magnitude = (int32_t)((uint32_t)body[pos] |
+                              ((uint32_t)body[pos + 1u] << 8));
+        pos += 2u;
+        if (magnitude < 256) return BE_BAD_SEQUENCE;
+    } else if (token == 0x1fu && negative) {
+        if (length - pos < 5u) return BE_TRUNCATED;
+        if (memcmp(body + pos, min_real5, 5u) != 0) return BE_BAD_SEQUENCE;
+        pos += 5u;
+        magnitude = 32768;
+    } else {
+        return BE_BAD_SEQUENCE;
+    }
+    magnitude = negative ? -magnitude : magnitude;
+    if (magnitude < INT16_MIN || magnitude > INT16_MAX) {
+        return BE_INTEGER_OVERFLOW;
+    }
+    *result = (int16_t)magnitude;
+    *at = pos;
+    return BE_OK;
+}
+
+static int for_same_key(const BasicVariableKey *a, const BasicVariableKey *b)
+{
+    return a->type == b->type && a->name_length == b->name_length &&
+           memcmp(a->name, b->name, BVT_MAX_NAME_LENGTH) == 0;
+}
+
+/* Decode FOR control before inspecting the program or making any assignment.
+ * The name reference's two cache bytes are deliberately never interpreted. */
+static BEStatus for_header(const uint8_t *body, size_t length, size_t *at,
+                           BasicVariableKey *key, int16_t *initial,
+                           int16_t *limit, int16_t *step)
+{
+    size_t pos = *at, consumed = 0u;
+    BEStatus status;
+    BVBStatus resolved;
+    skip_spaces(body, length, &pos);
+    if (pos == length) return BE_TRUNCATED;
+    resolved = bvb_resolve_explicit(body, length, pos, key, &consumed);
+    if (resolved != BVB_OK) return binding_error(resolved);
+    if (key->type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+    pos += consumed;
+    skip_spaces(body, length, &pos);
+    if (pos == length || body[pos++] != 0xefu) return BE_BAD_SEQUENCE;
+    status = for_literal(body, length, &pos, initial);
+    if (status != BE_OK) return status;
+    skip_spaces(body, length, &pos);
+    if (pos == length || body[pos++] != 0xecu) return BE_BAD_SEQUENCE;
+    status = for_literal(body, length, &pos, limit);
+    if (status != BE_OK) return status;
+    skip_spaces(body, length, &pos);
+    *step = 1;
+    if (pos < length && body[pos] == 0xe6u) {
+        ++pos;
+        status = for_literal(body, length, &pos, step);
+        if (status != BE_OK) return status;
+        skip_spaces(body, length, &pos);
+    }
+    if (*step == 0) return BE_UNSUPPORTED; /* STEP 0 not oracle-verified. */
+    if (pos < length && body[pos] != 0x01u) return unexpected(body[pos]);
+    *at = pos;
+    return BE_OK;
+}
+
+/* J1.12-B2-C1: the implicit apostrophe is 01 C0; an explicit
+ * colon before an apostrophe is 01 01 C0. At a statement boundary
+ * keep the whole comment marker, otherwise skip just the colon.
+ * Caller has already verified pos < length and body[pos] == 01. */
+static size_t for_next_continuation(const uint8_t *body, size_t length,
+                                    size_t pos)
+{
+    return pos + 1u < length && body[pos + 1u] == 0xc0u
+           ? pos : pos + 1u;
+}
+
+/* Locate the matching structural NEXT without executing intervening code.
+ * Only statement starts count. Quoted strings, REM, apostrophes, variable
+ * cache bytes and numeric token payloads cannot create phantom statements.
+ * O(program size), fixed 8-frame local nesting stack, no heap or recursion. */
+static BEStatus for_match(const BasicProgram *program,
+                          const BasicProgramLine *first, size_t start,
+                          const BasicVariableKey *wanted,
+                          size_t *exit_cursor, size_t *exit_statement)
+{
+    BasicProgramLine line;
+    BasicVariableKey nested[BE_FOR_STACK_CAPACITY];
+    size_t depth = 0u, scan = first->offset, pos = start;
+    int first_line = 1;
+    BPStatus bp_status;
+    while ((bp_status = bp_next(program, &scan, &line)) == BP_OK) {
+        const uint8_t *body = program->data + line.body_offset;
+        size_t n = line.body_length;
+        if (!first_line) pos = 0u;
+        first_line = 0;
+        while (pos < n) {
+            uint8_t token;
+            skip_spaces(body, n, &pos);
+            if (pos >= n) break;
+            token = body[pos];
+            if (token == 0x01u) {
+                if (pos + 1u < n && body[pos + 1u] == 0xc0u) break;
+                ++pos;
+                continue;
+            }
+            if (token == 0xc5u) break;
+            ++pos;
+            if (token == 0x9eu) {
+                size_t count = 0u, p = pos;
+                BVBStatus resolved;
+                if (depth == BE_FOR_STACK_CAPACITY) return BE_FOR_STACK_FULL;
+                skip_spaces(body, n, &p);
+                resolved = bvb_resolve_explicit(body, n, p, &nested[depth], &count);
+                if (resolved != BVB_OK) return binding_error(resolved);
+                if (nested[depth].type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+                ++depth;
+            } else if (token == 0xb0u) {
+                BasicVariableKey key;
+                const BasicVariableKey *expected = depth == 0u ?
+                                                   wanted : &nested[depth - 1u];
+                size_t count = 0u;
+                skip_spaces(body, n, &pos);
+                if (pos < n && body[pos] == 0x02u) {
+                    BVBStatus resolved = bvb_resolve_explicit(body, n, pos,
+                                                               &key, &count);
+                    if (resolved != BVB_OK) return binding_error(resolved);
+                    if (key.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+                    if (!for_same_key(&key, expected))
+                        return BE_NEXT_VARIABLE_MISMATCH;
+                    pos += count;
+                }
+                skip_spaces(body, n, &pos);
+                if (pos < n && body[pos] != 0x01u)
+                    return unexpected(body[pos]);
+                if (depth == 0u) {
+                    if (pos < n) {
+                        *exit_cursor = line.offset;
+                        *exit_statement = for_next_continuation(body, n, pos);
+                    } else {
+                        *exit_cursor = line.next_offset;
+                        *exit_statement = 0u;
+                    }
+                    return BE_OK;
+                }
+                --depth;
+            }
+            /* Seek next real ':' separator, ignoring payload bytes. */
+            {
+                int quoted = 0;
+                while (pos < n) {
+                    uint8_t c = body[pos];
+                    if (c == (uint8_t)'"') {
+                        quoted = !quoted; ++pos; continue;
+                    }
+                    if (!quoted && (c == 0x01u || c == 0xc5u)) break;
+                    if (!quoted && ((c >= 0x02u && c <= 0x04u) ||
+                                    (c >= 0x0bu && c <= 0x0du))) {
+                        BasicVariableRef ref;
+                        if (bvr_decode(body, n, pos, &ref) != BVR_OK)
+                            return BE_BAD_SEQUENCE;
+                        pos += ref.consumed;
+                        continue;
+                    }
+                    if (!quoted && (c == 0x19u || c == 0x1au ||
+                                    c == 0x1du || c == 0x1eu || c == 0x1fu)) {
+                        size_t payload = c == 0x19u ? 1u : (c == 0x1fu ? 5u : 2u);
+                        if (n - pos <= payload) return BE_TRUNCATED;
+                        pos += payload + 1u;
+                        continue;
+                    }
+                    ++pos;
+                }
+            }
+            if (pos < n && body[pos] == 0xc5u) break;
+        }
+    }
+    return bp_status == BP_END ? BE_FOR_WITHOUT_NEXT : BE_BAD_PROGRAM;
+}
+
 /* Pure action description prepared by both executor passes; never mutate
  * the call stack until validation, capacity, output and replay all succeed. */
 typedef enum { BE_FLOW_NONE, BE_FLOW_PUSH, BE_FLOW_POP, BE_FLOW_CLEAR } BEFlowAction;
+typedef enum { BE_FOR_NONE, BE_FOR_PUSH, BE_FOR_POP } BEForAction;
 typedef struct {
     BEFlowAction action;
     BECallFrame frame;
     size_t next_statement;
+    BEForAction for_action;
+    BEForFrame for_frame;
 } BEFlow;
 
 /* A branch or END may skip a suffix. In J0.19, no numbered line
@@ -719,11 +927,100 @@ static BEStatus execute_line(const BasicProgram *program,
             assignment->value = value;
             *next = line->next_offset;
             return BE_OK;
-        } else if (token == 0x9eu || token == 0xb0u) {
-            /* J1.12-B1 is token/LIST-only. Reject even after a PRINT
-             * prefix before either pass can commit output, cursor, store or
-             * GOSUB stack. J1.12-B2 owns loop execution semantics. */
-            return BE_UNSUPPORTED;
+        } else if (token == 0x9eu) { /* FOR INTEGER */
+            BasicVariableKey key;
+            int16_t initial, limit, step;
+            size_t body_cursor, body_statement, exit_cursor, exit_statement;
+            BasicVariableValue value = {0};
+            if (variables == NULL) return BE_UNSUPPORTED;
+            if (executor->for_depth >= BE_FOR_STACK_CAPACITY)
+                return BE_FOR_STACK_FULL;
+            status = for_header(body, length, &pos, &key, &initial, &limit, &step);
+            if (status != BE_OK) return status;
+            /* Resolve paired NEXT before any PRINT in the loop is reached.
+             * The sealed WRONG_VAR case requires this anticipatory check. */
+            status = for_match(program, line, pos, &key,
+                               &exit_cursor, &exit_statement);
+            if (status != BE_OK) return status;
+            if (pos < length) {
+                body_cursor = line->offset;
+                body_statement = for_next_continuation(body, length, pos);
+            } else {
+                body_cursor = line->next_offset;
+                body_statement = 0u;
+            }
+            assignment->present = 1;
+            assignment->key = key;
+            value.type = (uint8_t)BVT_INTEGER;
+            value.data.integer = initial;
+            assignment->value = value;
+            if ((step > 0 && initial > limit) ||
+                (step < 0 && initial < limit)) {
+                *next = exit_cursor;
+                flow->next_statement = exit_statement;
+                return BE_OK;
+            }
+            flow->for_action = BE_FOR_PUSH;
+            flow->for_frame.key = key;
+            flow->for_frame.limit = limit;
+            flow->for_frame.step = step;
+            flow->for_frame.loop_cursor = body_cursor;
+            flow->for_frame.loop_statement = body_statement;
+            flow->for_frame.after_cursor = exit_cursor;
+            flow->for_frame.after_statement = exit_statement;
+            *next = body_cursor;
+            flow->next_statement = body_statement;
+            return BE_OK;
+        } else if (token == 0xb0u) { /* NEXT [INTEGER] */
+            const BEForFrame *frame;
+            BasicVariableValue value = {0};
+            BasicVariableKey named;
+            int32_t advanced;
+            int keep_loop;
+            size_t consumed = 0u;
+            if (variables == NULL) return BE_UNSUPPORTED;
+            if (executor->for_depth == 0u) return BE_NEXT_WITHOUT_FOR;
+            frame = &executor->for_stack[executor->for_depth - 1u];
+            skip_spaces(body, length, &pos);
+            if (pos < length && body[pos] == 0x02u) {
+                BVBStatus parsed = bvb_resolve_explicit(body, length, pos,
+                                                          &named, &consumed);
+                if (parsed != BVB_OK) return binding_error(parsed);
+                if (named.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+                if (!for_same_key(&named, &frame->key))
+                    return BE_NEXT_VARIABLE_MISMATCH;
+                pos += consumed;
+            }
+            skip_spaces(body, length, &pos);
+            if (pos < length && body[pos] != 0x01u)
+                return unexpected(body[pos]);
+            status = store_error(bvs_get(variables, &frame->key, &value));
+            if (status != BE_OK) return status;
+            if (value.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+            advanced = (int32_t)value.data.integer + (int32_t)frame->step;
+            /* Host policy: fail rather than wrap if NEXT crosses int16.
+             * No CPC equivalence claim for this unmeasured condition. */
+            if (advanced < INT16_MIN || advanced > INT16_MAX)
+                return BE_INTEGER_OVERFLOW;
+            keep_loop = frame->step > 0 ? advanced <= frame->limit
+                                        : advanced >= frame->limit;
+            assignment->present = 1;
+            assignment->key = frame->key;
+            assignment->value.type = (uint8_t)BVT_INTEGER;
+            assignment->value.data.integer = (int16_t)advanced;
+            if (keep_loop) {
+                *next = frame->loop_cursor;
+                flow->next_statement = frame->loop_statement;
+            } else {
+                flow->for_action = BE_FOR_POP;
+                if (pos < length) {
+                    *next = line->offset;
+                    flow->next_statement = for_next_continuation(body, length, pos);
+                } else {
+                    *next = line->next_offset;
+                }
+            }
+            return BE_OK;
         } else if (token == 0xa7u || token == 0xb1u || token == 0xcau) {
             return BE_UNSUPPORTED; /* LIST, NEW, RUN in stored programs. */
         } else {
@@ -790,6 +1087,8 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
     executor->statement_offset = 0u;
     executor->call_depth = 0u;
     memset(executor->call_stack, 0, sizeof(executor->call_stack));
+    executor->for_depth = 0u;
+    memset(executor->for_stack, 0, sizeof(executor->for_stack));
     executor->variables = variables;
     return BE_OK;
 }
@@ -860,6 +1159,9 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
             return BE_OVERLAP;
         }
     }
+    if (executor->for_depth > BE_FOR_STACK_CAPACITY) {
+        return BE_BAD_PROGRAM;
+    }
     if (executor->call_depth > BE_GOSUB_STACK_CAPACITY) {
         return BE_BAD_PROGRAM;
     }
@@ -880,6 +1182,16 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
     if (status != BE_OK) {
         return status;
     }
+    /* Before the output-writing pass, preflight the only possible store
+     * commit failure (full entries). This also protects PRINT:FOR lines. */
+    if (assignment.present) {
+        size_t index;
+        BVSStatus lookup = bvs_find(variables, &assignment.key, &index);
+        if (lookup == BVS_NOT_FOUND && variables->count == variables->capacity)
+            return BE_STORE_FULL;
+        if (lookup != BVS_OK && lookup != BVS_NOT_FOUND)
+            return store_error(lookup);
+    }
     if (probe.length > output_capacity) {
         return BE_NO_SPACE;
     }
@@ -893,6 +1205,15 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
         transition.next_statement != second_transition.next_statement ||
         transition.frame.cursor != second_transition.frame.cursor ||
         transition.frame.statement_offset != second_transition.frame.statement_offset ||
+        transition.for_action != second_transition.for_action ||
+        (transition.for_action == BE_FOR_PUSH &&
+         (!for_same_key(&transition.for_frame.key, &second_transition.for_frame.key) ||
+          transition.for_frame.limit != second_transition.for_frame.limit ||
+          transition.for_frame.step != second_transition.for_frame.step ||
+          transition.for_frame.loop_cursor != second_transition.for_frame.loop_cursor ||
+          transition.for_frame.loop_statement != second_transition.for_frame.loop_statement ||
+          transition.for_frame.after_cursor != second_transition.for_frame.after_cursor ||
+          transition.for_frame.after_statement != second_transition.for_frame.after_statement)) ||
         assignment.present != second.present ||
         (assignment.present &&
          (assignment.key.type != second.key.type ||
@@ -918,6 +1239,17 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
     } else if (transition.action == BE_FLOW_CLEAR) {
         executor->call_depth = 0u;
         memset(executor->call_stack, 0, sizeof(executor->call_stack));
+    }
+    if (transition.for_action == BE_FOR_PUSH) {
+        executor->for_stack[executor->for_depth++] = transition.for_frame;
+    } else if (transition.for_action == BE_FOR_POP) {
+        --executor->for_depth;
+        memset(&executor->for_stack[executor->for_depth], 0,
+               sizeof(executor->for_stack[0]));
+    }
+    if (transition.action == BE_FLOW_CLEAR) {
+        executor->for_depth = 0u;
+        memset(executor->for_stack, 0, sizeof(executor->for_stack));
     }
     *written = writer.length;
     executor->statement_offset = transition.next_statement;

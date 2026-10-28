@@ -603,6 +603,21 @@ if(BUILD_TESTING)
              COMMAND test_hw4_font_ascii)
 endif()
 
+# J1.12-B2: bounded native FOR/NEXT INTEGER execution + sealed CPC traces.
+# B1's token/LIST differential remains independently active.
+if(BUILD_TESTING)
+    add_executable(test_basic_for_next_b2 tests/test_basic_for_next_b2.c)
+    target_link_libraries(test_basic_for_next_b2 PRIVATE
+                          basic_session_runtime basic_tokenizer basic_listing
+                          basic_variable_store)
+    add_test(NAME j1_12_b2_for_next_native
+             COMMAND test_basic_for_next_b2)
+    add_test(NAME j1_12_b2_for_next_cpc_differential COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_12_b2_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>" --self-test)
+endif()
+
 # HW4-EDIT-A: real source line -> portable movable UART editor -> MODE1
 # -> native BASIC session, with no LCD/FreeRTOS dependency.
 if(BUILD_TESTING)

@@ -35,7 +35,14 @@ jobs:
           CC: ${{ matrix.compiler }}
         run: |
           set -euo pipefail
-          cmake -S . -B /tmp/hw4-c3-b2 -DBP_SANITIZERS=${{ matrix.sanitizers }}
+          # Existing host budget and boot glyph sources emit two unrelated
+          # Clang extension warnings, already explicitly suppressed in
+          # basic-program.yml; keep all other -Werror diagnostics enabled.
+          flags=""
+          if test "${{ matrix.compiler }}" = clang; then
+            flags="-Wno-error=gnu-offsetof-extensions -Wno-error=string-concatenation"
+          fi
+          cmake -S . -B /tmp/hw4-c3-b2 -DBP_SANITIZERS=${{ matrix.sanitizers }} "-DCMAKE_C_FLAGS=$flags"
           cmake --build /tmp/hw4-c3-b2 --parallel 2
           ctest --test-dir /tmp/hw4-c3-b2 --output-on-failure -R 'hw4_c3_b2|hw4_c1_text_boundaries|hw4_c2_screen_paging|hw4_c2_native_uart_runtime_tft|hw4_c3_boot_screen|cpc_video$'
           python3 tools/hw4_c3_b2_uart_po.py --dry-run >/tmp/hw4-c3-b2-uart-commands.txt

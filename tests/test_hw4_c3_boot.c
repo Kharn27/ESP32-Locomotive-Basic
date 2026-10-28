@@ -59,7 +59,8 @@ static void check(bool cyd)
           ? "ESP32 CYD 128K Microcomputer (v3)" : lines[i];
         assert(cpc_boot_line(i,cyd,&line));
         const unsigned expected_row=(cyd && i==2U) ? 6U
-                                   : (cyd && i==3U) ? 9U : rows[i];
+                                   : (cyd && i==3U) ? 9U
+                                   : (cyd && i==4U) ? 11U : rows[i];
         assert(line.row==expected_row && strcmp(line.text,expected)==0);
         assert(line.column==(i<3U
               ? (40U-(unsigned)strlen(expected))/2U : i==3U ? 1U : 0U));

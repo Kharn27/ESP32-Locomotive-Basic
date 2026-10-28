@@ -60,6 +60,7 @@ static int partial_records(const BasicProgram *program,const char *source) {
 }
 static int roundtrip(Fixture *f) {
     size_t n=f->written,start=0u,write=0u;
+    uint8_t sink[512];
     CHECK(bp_init(&f->again,f->retokenized,sizeof(f->retokenized))==BP_OK);
     while (start<n) {
         size_t end=start;
@@ -68,7 +69,7 @@ static int roundtrip(Fixture *f) {
         CHECK(end<n && end>start);
         res=bs_process_line(&f->again,f->output+start,end-start,
                             f->temp,sizeof(f->temp),
-                            f->retokenized+1500u,512u,&write);
+                            sink,sizeof(sink),&write);
         CHECK(res.status==BS_OK);
         start=end+1u;
     }

@@ -568,9 +568,8 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (ref_status != BVR_OK || ref.family != BVR_FAMILY_EXPLICIT) {
                     return BL_BAD_SEQUENCE;
                 }
-                if (ref.explicit_type == BVR_TYPE_STRING &&
-                    (ref.cache_low != 0u || ref.cache_high != 0u))
-                    return BL_BAD_SEQUENCE;
+                /* Legacy PRINT references may have CPC-populated opaque
+                 * nonzero caches.  J1.15-B only constrains new assignments. */
                 switch (ref.explicit_type) {
                 case BVR_TYPE_INTEGER: suffix = (uint8_t)'%'; break;
                 case BVR_TYPE_STRING: suffix = (uint8_t)'$'; break;

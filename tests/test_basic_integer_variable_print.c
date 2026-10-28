@@ -247,7 +247,7 @@ static int test_missing_and_multi_statement(void)
     CHECK(fails(&h, BE_UNSUPPORTED, sizeof(h.output)) == 0);
     CHECK(put(&h, 10u, "PRINT A%:PRINT S$") == 0);
     CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);
-    CHECK(fails(&h, BE_UNSUPPORTED, sizeof(h.output)) == 0);
+    CHECK(fails(&h, BE_VARIABLE_NOT_FOUND, sizeof(h.output)) == 0);
     CHECK(assign(&h, "B", -12) == 0);
     CHECK(put(&h, 10u, "PRINT A%:PRINT B%") == 0);
     CHECK(be_init_with_store(&h.executor, &h.program, &h.store) == BE_OK);

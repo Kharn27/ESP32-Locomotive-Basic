@@ -108,6 +108,22 @@ def run_image(exe, source, case):
             repr(result.stderr[-600:]))
     return result.stdout
 
+def run_cli(exe, adapted_source, case):
+    # A LIST line is a standalone host command, not part of the program.
+    # Native stdout contains only BASIC output; diagnostics go to stderr.
+    try:
+        result = subprocess.run([str(exe)],
+                                input=adapted_source + b"LIST\n:quit\n",
+                                capture_output=True, timeout=35, check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise DifferentialFailure(case + " CLI_PROCESS_ERROR " + str(error)) from error
+    require(result.returncode == 0 and b"[cli:error]" not in result.stderr,
+            case + " CLI_ERROR " + repr(result.stderr[-600:]))
+    require(result.stdout == adapted_source,
+            case + " LIST_DIFF EXPECTED=" + repr(adapted_source) +
+            " ACTUAL=" + repr(result.stdout))
+    return result.stdout
+
 def preflight():
     manifest_raw = read(BASE / "manifest.json")
     require(digest(manifest_raw) == MANIFEST_SHA, "J1.12-A MANIFEST_MUTATED")
@@ -149,6 +165,7 @@ def self_test():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--image-cli", type=Path, required=True)
+    parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
     if args.self_test:
@@ -159,15 +176,20 @@ def main():
         cap = captures[case]
         cpc = read(BASE / "original" / case / "program.bin")
         source = read(ROOT / cap["source_path"])
-        native = run_image(args.image_cli, adapt(source, case), case)
+        adapted = adapt(source, case)
+        native = run_image(args.image_cli, adapted, case)
+        listing = run_cli(args.cli, adapted, case)
+        roundtrip = run_image(args.image_cli, listing, case + "_LIST_ROUNDTRIP")
+        require(roundtrip == native, case + " LIST_ROUNDTRIP_DIFF")
         a, b = compare(cpc, native, case)
         full += a
         suffix += b
-    require(suffix == 1 and full >= 20,
+    require(suffix == 1 and full == 42,
             "UNEXPECTED_CPC_CONTROL_COVERAGE full=" + str(full) +
             " suffix=" + str(suffix))
     print("PASS J1.12-B1 20/20 SEALED_CASES CONTROL_RECORDS",
           full, "FULL_MATCH_EXACT", suffix, "COLON_SUFFIX_MATCH_EXACT")
+    print("PASS J1.12-B1 20/20 LIST_EXACT + TOKEN_ROUNDTRIP")
     print("PASS J1.12-B1 HISTORICAL_PRE_B_UNSUPPORTED 20/20 IMMUTABLE")
     print("NOT_A_FULL_PROGRAM_RAM_COMPARISON; PRINT #8 adapted in checker only")
     print("NOT_FOR_NEXT_RUNTIME_SUPPORTED")

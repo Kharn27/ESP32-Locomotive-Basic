@@ -584,5 +584,6 @@ if(BUILD_TESTING)
     add_test(NAME j1_12_b1_for_next_cpc_differential COMMAND
         ${Python3_EXECUTABLE}
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_12_b1_native_verify.py"
-        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>"
+        --cli "$<TARGET_FILE:loco_basic_cli>" --self-test)
 endif()

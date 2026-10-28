@@ -236,6 +236,7 @@ jobs:
               cd /project/firmware/esp32_probe
               idf.py --version | grep -Fx "ESP-IDF v5.5.6"
               # Standalone J0.25 image remains unchanged and buildable for rollback.
+              mkdir -p reports
               idf.py build > reports/u1-a-legacy-build.log 2>&1
               idf.py size > reports/u1-a-legacy-size.txt 2>&1
               python3 scripts/report_abi.py build/loco_esp32_probe.elf > reports/u1-a-legacy-abi.txt

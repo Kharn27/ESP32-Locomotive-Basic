@@ -35,8 +35,8 @@ jobs:
             esac
             case "$path" in
               tests/fixtures/cpc6128/*/*)
-                folder="tests/fixtures/cpc6128/${path#tests/fixtures/cpc6128/}"
-                folder="${folder%%/*}"
+                relative="${path#tests/fixtures/cpc6128/}"
+                folder="${relative%%/*}"
                 folder="tests/fixtures/cpc6128/$folder"
                 if git cat-file -e "$base:$folder" 2>/dev/null; then
                   echo "CI_ARCH_OLD_ARCHIVE_ADDITION_FORBIDDEN $path"; exit 1

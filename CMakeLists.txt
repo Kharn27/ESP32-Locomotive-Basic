@@ -628,6 +628,24 @@ if(BUILD_TESTING)
     endif()
 endif()
 
+
+# J1.13-B: six native signed INTEGER relations in autonomous IF only.
+# A separate post-B CPC differential reads unchanged J1.13-A archives.
+if(BUILD_TESTING)
+    add_executable(test_basic_integer_relational_if
+                   tests/test_basic_integer_relational_if.c)
+    target_link_libraries(test_basic_integer_relational_if PRIVATE
+                          basic_session_runtime basic_tokenizer basic_listing
+                          basic_variable_binding)
+    add_test(NAME j1_13_b_integer_relational_native
+             COMMAND test_basic_integer_relational_if)
+    add_test(NAME j1_13_b_relational_cpc_differential COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_13_b_native_verify.py"
+        --cli "$<TARGET_FILE:loco_basic_cli>"
+        --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()
+
 # HW4-EDIT-A: real source line -> portable movable UART editor -> MODE1
 # -> native BASIC session, with no LCD/FreeRTOS dependency.
 if(BUILD_TESTING)

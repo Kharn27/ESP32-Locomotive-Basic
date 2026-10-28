@@ -631,9 +631,10 @@ static BEStatus execute_line(const BasicProgram *program,
             if (status != BE_OK) {
                 return status;
             }
-        } else if (token == 0xa1u) { /* IF variable% THEN line */
+        } else if (token == 0xa1u) { /* IF integer% [relation integer%] THEN line */
             BasicVariableKey key;
             BasicVariableValue value;
+            int take_branch;
             BasicProgramLine target;
             size_t consumed = 0u;
             uint16_t destination;
@@ -659,9 +660,42 @@ static BEStatus execute_line(const BasicProgram *program,
                 return BE_INVALID_TYPE;
             }
             pos += consumed;
+            take_branch = value.data.integer != 0;
             skip_spaces(body, length, &pos);
             if (pos == length) {
                 return BE_TRUNCATED;
+            }
+            if (body[pos] == 0xefu || body[pos] == 0xf2u ||
+                body[pos] == 0xf1u || body[pos] == 0xf3u ||
+                body[pos] == 0xeeu || body[pos] == 0xf0u) {
+                uint8_t relation = body[pos++];
+                BasicVariableKey right_key;
+                BasicVariableValue right_value;
+                size_t right_consumed = 0u;
+                int16_t lhs = value.data.integer;
+                int16_t rhs;
+                skip_spaces(body, length, &pos);
+                if (pos == length) return BE_TRUNCATED;
+                if (body[pos] != 0x02u) return BE_BAD_SEQUENCE;
+                resolved = bvb_read_explicit(body, length, pos, variables,
+                                             &right_key, &right_consumed,
+                                             &right_value);
+                if (resolved != BVB_OK) return binding_error(resolved);
+                if (right_key.type != (uint8_t)BVT_INTEGER ||
+                    right_value.type != (uint8_t)BVT_INTEGER)
+                    return BE_INVALID_TYPE;
+                rhs = right_value.data.integer;
+                switch (relation) {
+                case 0xefu: take_branch = lhs == rhs; break;
+                case 0xf2u: take_branch = lhs != rhs; break;
+                case 0xf1u: take_branch = lhs < rhs; break;
+                case 0xf3u: take_branch = lhs <= rhs; break;
+                case 0xeeu: take_branch = lhs > rhs; break;
+                default: take_branch = lhs >= rhs; break;
+                }
+                pos += right_consumed;
+                skip_spaces(body, length, &pos);
+                if (pos == length) return BE_TRUNCATED;
             }
             if (body[pos++] != 0xebu) {
                 return BE_BAD_SEQUENCE;
@@ -686,7 +720,7 @@ static BEStatus execute_line(const BasicProgram *program,
             if (pos != length) {
                 return BE_BAD_SEQUENCE; /* ELSE, colon, or suffix. */
             }
-            if (value.data.integer == 0) {
+            if (!take_branch) {
                 *next = line->next_offset;
                 return BE_OK; /* Never resolve an untaken target. */
             }

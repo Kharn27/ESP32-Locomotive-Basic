@@ -680,11 +680,36 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             if (status != BL_OK) {
                 return status;
             }
+            if (pos < length &&
+                (body[pos] == 0xefu || body[pos] == 0xf2u ||
+                 body[pos] == 0xf1u || body[pos] == 0xf3u ||
+                 body[pos] == 0xeeu || body[pos] == 0xf0u)) {
+                const char *spelling;
+                switch (body[pos++]) {
+                case 0xefu: spelling = "="; break;
+                case 0xf2u: spelling = "<>"; break;
+                case 0xf1u: spelling = "<"; break;
+                case 0xf3u: spelling = "<="; break;
+                case 0xeeu: spelling = ">"; break;
+                default: spelling = ">="; break;
+                }
+                status = append_word(out, spelling);
+                if (status != BL_OK) return status;
+                status = append_spaces(body, length, &pos, out);
+                if (status != BL_OK) return status;
+                /* The 02 two-byte cache is opaque even if it contains a
+                 * space or an operator token. */
+                status = for_reference(body, length, &pos, out);
+                if (status != BL_OK) return status;
+                space_start = pos;
+                status = append_spaces(body, length, &pos, out);
+                if (status != BL_OK) return status;
+            }
             if (pos == length || body[pos] != 0xebu) {
                 return BL_BAD_SEQUENCE;
             }
             if (pos == space_start) {
-                /* A%THEN would be parsed as an invalid variable suffix. */
+                /* B%THEN or A%THEN needs a lexical separator to retokenize. */
                 status = append_byte(out, (uint8_t)' ');
                 if (status != BL_OK) {
                     return status;

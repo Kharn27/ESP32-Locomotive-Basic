@@ -15,7 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_BUILD_TYPE=Debug -DBP_SANITIZERS=${{ matrix.sanitizers }} -DCMAKE_C_FLAGS=-fstack-usage
+        run: |
+          # Existing J0.23 host budget audit uses an anonymous struct inside
+          # offsetof. Clang diagnoses that extension under -Werror; suppress
+          # ONLY that unrelated diagnostic, keeping all other -Werror checks.
+          flags="-fstack-usage"
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            flags="$flags -Wno-error=gnu-offsetof-extensions"
+          fi
+          cmake -S . -B build -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_BUILD_TYPE=Debug -DBP_SANITIZERS=${{ matrix.sanitizers }} "-DCMAKE_C_FLAGS=$flags"
       - name: Build
         run: cmake --build build --parallel
       - name: Test

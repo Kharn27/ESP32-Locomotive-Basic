@@ -85,6 +85,29 @@ bool cpc_screen_nav_move(CpcScreenNavigation *nav, CpcText *text,
         adjust_scroll(nav,text,edit,line,image_up);
     return cpc_video_cursor(v,col,row,true);
 }
+/* B1-B-C1: rebase the empty E3 at the actual E1 cursor before painting
+ * the already-consumed first ASCII. The renderer may overwrite an old E2
+ * cell visually, but no old screen text ever becomes source BASIC. */
+bool cpc_screen_nav_start_edit(CpcScreenNavigation *nav, CpcText *text,
+                               CpcUartEditor *edit, const UartLine *line)
+{
+    if (!valid(nav,text,edit,line) || text->glyph == NULL ||
+        line->screen_navigation || line->poisoned || line->ready ||
+        line->length != 1U || line->cursor_pos != 1U ||
+        line->data[0U] < 0x20U || line->data[0U] > 0x7eU)
+        return false;
+    CpcVideo *v = text->video;
+    if (v->cursor_row >= 25U || v->cursor_column >= 40U)
+        return false;
+    text->row = v->cursor_row;
+    text->column = v->cursor_column;
+    nav->anchor_valid = false;
+    if (!cpc_uart_console_edit_begin(text,edit) ||
+        !cpc_uart_console_edit(text,edit,line,0U))
+        return false; /* firmware fail-stops; never submits this input */
+    nav->anchor_valid = true;
+    return true;
+}
 /* C1: ENTER is a CR/LF from the currently visible E1 cursor,
  * NOT a return to the (possibly scrolled-away) CpcText/E3 old anchor.
  * Restore the exact E3 buffer at column zero of the next row.

@@ -736,3 +736,11 @@ if(BUILD_TESTING)
         basic_session_runtime basic_variable_store)
     add_test(NAME j1_15_c_cyd_console_string_arena COMMAND test_j1_15_c_cyd_arena)
 endif()
+
+# HW4-EDIT-B1-B: U04 editor-focus vertical refusal and native BASIC C99 proof.
+if(BUILD_TESTING)
+    add_executable(test_hw4_edit_b1_b tests/test_hw4_edit_b1_b.c)
+    target_link_libraries(test_hw4_edit_b1_b PRIVATE
+        cpc_screen_nav basic_session_runtime basic_variable_binding)
+    add_test(NAME hw4_edit_b1_b_vertical_guard COMMAND test_hw4_edit_b1_b)
+endif()

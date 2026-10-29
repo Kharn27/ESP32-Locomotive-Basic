@@ -1,0 +1,8 @@
+exit code: 0
+Using configuration file: /__w/_temp/j117-pen/original/P16/list/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j117-pen/original/P16/list/screenshot_20261029_211721.png
+INFO    src/cap32.cpp:2212 - Dumping machine snapshot to /tmp/j117-pen-sna-fn09ofcn/P16_original/snapshot_20261029_211721.sna
+
+[stderr]

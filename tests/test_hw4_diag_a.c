@@ -99,6 +99,22 @@ static BSRResult real_submit(const char *command,
     } else if(basic.written) {
         assert(cpc_text_write(&text,basic.output,basic.written));
     }
+    /* The production console emits Ready only AFTER execution finishes. */
+    if(!failure && transition==CPC_READY_RUN_RETURN &&
+       basic.runtime.state==BSR_RUNNING) {
+        bool ended=false;
+        for(unsigned step=0U;step<16U;++step) {
+            basic.written=0U;
+            BSRResult step_result=bsr_step(&basic.runtime,basic.output,
+                                          sizeof basic.output,&basic.written);
+            if(step_result.status==BSR_END) { ended=true; break; }
+            assert(step_result.status==BSR_OK &&
+                   step_result.executor_status==BE_OK);
+            if(basic.written)
+                assert(cpc_text_write(&text,basic.output,basic.written));
+        }
+        assert(ended && basic.runtime.state==BSR_IDLE);
+    }
     bool emitted=false;
     assert(cpc_ready_policy_apply(&text,transition,&emitted));
     assert(emitted==cpc_ready_policy_emit(transition));
@@ -189,21 +205,8 @@ static void string_bonjour_and_run(void)
     (void)real_submit("30 END",CPC_DIAG_HOST_GENERIC,
         CPC_READY_NUMBERED_STORED,false,"");
     (void)real_submit("RUN",CPC_DIAG_HOST_GENERIC,
-        CPC_READY_RUN_RETURN,false,"Ready");
-    /* RUN prepares execution; the native terminal reads successive steps.
-     * This test inspects the emitted STRING bytes, not fabricated CPC output. */
-    assert(basic.runtime.state==BSR_RUNNING);
-    bool bonjour=false,ended=false;
-    for(unsigned step=0U;step<10U;++step) {
-        basic.written=0U;
-        BSRResult r=bsr_step(&basic.runtime,basic.output,
-                             sizeof basic.output,&basic.written);
-        if(r.status==BSR_END) {ended=true;break;}
-        assert(r.status==BSR_OK && r.executor_status==BE_OK);
-        if(basic.written==8U && memcmp(basic.output,"BONJOUR\n",8U)==0)
-            bonjour=true;
-    }
-    assert(bonjour && ended && basic.runtime.state==BSR_IDLE);
+        CPC_READY_RUN_RETURN,false,"BONJOURReady");
+    assert(basic.runtime.state==BSR_IDLE && ready_count==1U);
     canaries();
 }
 static void scroll_diagnostic(void)

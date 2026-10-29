@@ -299,6 +299,24 @@ SEALED = {
     "repeat/IN126/run/screen.png": "c0f800b0f78866ec6e71dee961475838b9ec982d7469ded72c6ce26adfcb05c5",
 }
 SEALED_MANIFEST = "58e8de0bf839d21699ff220aa6d2b0ca325dc6c7586c595b9baf6acb8d373aed"
+ACQUISITION_HEAD = '6e9b17b8d545a57ef3942f217c9b4d3daeae8c38'
+# Entire first CPC line, including its byte length and 00 terminator, taken
+# from the real 26-session Caprice32 Actions logs; never inferred from ROM.
+CASE_RECORDS = {
+    'I00':   '0A 00 0A 00 A2 20 0E 2C 0E 00',
+    'I126':  '0B 00 0A 00 A2 20 0F 2C 19 1A 00',
+    'I106':  '0A 00 0A 00 A2 20 0F 2C 14 00',
+    'I206':  '0A 00 0A 00 A2 20 10 2C 14 00',
+    'I318':  '0B 00 0A 00 A2 20 11 2C 19 12 00',
+    'I1526': '0C 00 0A 00 A2 20 19 0F 2C 19 1A 00',
+    'I127':  '0B 00 0A 00 A2 20 0F 2C 19 1B 00',
+    'I131':  '0B 00 0A 00 A2 20 0F 2C 19 1F 00',
+    'I1266': '0D 00 0A 00 A2 20 0F 2C 19 1A 2C 14 00',
+    'I1626': '0C 00 0A 00 A2 20 19 10 2C 19 1A 00',
+    'IN126': '0C 00 0A 00 A2 20 F5 0F 2C 19 1A 00',
+    'I132':  '0B 00 0A 00 A2 20 0F 2C 19 20 00',
+    'I1N1':  '0B 00 0A 00 A2 20 0F 2C F5 0F 00',
+}
 
 
 
@@ -512,6 +530,7 @@ def verify(out, permanent=False):
     m=json.loads(read(out/'manifest.json'))
     require(m['phase']==PHASE and m['schema_version']==1 and
             bool(re.fullmatch(r'[0-9a-f]{40}',m['acquisition_head'])) and
+            (not permanent or m['acquisition_head']==ACQUISITION_HEAD) and
             m['oracle']['caprice']==cpc.PIN and m['oracle']['rom']==cpc.ROM_SHA and
             m['oracle']['ghcr']==GHCR and m['oracle']['model']=='CPC6128' and
             m['native_changes'] is False and m['full_snapshots_archived'] is False and
@@ -565,6 +584,7 @@ def verify(out, permanent=False):
             require(numbers==LINES and first[4]==0xa2 and
                     d['ink_opcode_observed']==0xa2 and
                     d['ink_record_hex']==first.hex(' ').upper() and
+                    (not permanent or d['ink_record_hex']==CASE_RECORDS[case]) and
                     d['region']['length']==len(files['program']) and
                     d['region']['line_numbers']==LINES,
                     'RAM_TOKEN_OR_VALUE_'+case+session)
@@ -618,7 +638,7 @@ def verify(out, permanent=False):
 
 
 def negatives(out, permanent=False):
-    variants=['token','value','capture','internal_sha','pair','head','missing','png_roi']
+    variants=['token','value','capture','internal_sha','pair','head','missing','png_roi','manifest_sha']
     if permanent:variants.append('coordinated')
     untouched={str(p.relative_to(out)):sha(read(p)) for p in out.rglob('*') if p.is_file()}
     for variant in variants:
@@ -650,6 +670,10 @@ def negatives(out, permanent=False):
                 other.write_bytes(read(rec_path))
                 man=json.loads(read(clone/'manifest.json'))
                 man['cases']['I126']['repeat']=sha(read(other))
+                (clone/'manifest.json').write_bytes(encoded(man))
+            elif variant=='manifest_sha':
+                man=json.loads(read(clone/'manifest.json'))
+                man['temporal_classification']='FORGED_CPC_TEMPORAL'
                 (clone/'manifest.json').write_bytes(encoded(man))
             elif variant=='head':
                 man=json.loads(read(clone/'manifest.json'))

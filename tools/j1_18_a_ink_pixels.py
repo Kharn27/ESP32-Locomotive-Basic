@@ -103,6 +103,25 @@ def glyph_mask(path, baseline=(0,0,0)):
     return {(x,y) for y in range(y0,y1) for x in range(x0,x1)
             if tuple(rows[y][x*3:x*3+3])!=baseline}
 
+# Pinned single-frame CPC screenshot RGB counts for the exact 768x540
+# Caprice32 MODE1 ROI; not a general 32-color mapping or blink proof.
+BLACK='0,0,0'
+WHITE='255,255,255'
+RED='255,0,0'
+EXPECTED_RUN={
+    'I00': {BLACK:1320,WHITE:696},
+    'I126':{BLACK:1320,WHITE:696},
+    'I106':{BLACK:1320,RED:696},
+    'I206':{BLACK:1320,WHITE:696},
+    'I318':{BLACK:1320,WHITE:696},
+    'I1526':{BLACK:1320,WHITE:696},
+    'I127':{BLACK:1320,'127,127,127':696},
+    'I131':{BLACK:1320,'0,255,127':696},
+    'I1266':{BLACK:1320,RED:696},
+    'I1626':{BLACK:2016},'IN126':{BLACK:2016},
+    'I132':{BLACK:2016},'I1N1':{BLACK:2016}
+}
+
 def inspect(root):
     report={'phase':'J1.18-A','roi':list(ROI),'cases':{},'chronology':{}}
     for case in CASES:
@@ -111,6 +130,10 @@ def inspect(root):
             item=root/sess/case
             baseline=histogram(item/'baseline/screen.png')
             run=histogram(item/'run/screen.png')
+            need(baseline['pixels']==({RED:1534,WHITE:482} if case=='I00'
+                    else {BLACK:1534,WHITE:482}), 'BASELINE_CALIBRATION_'+case+sess)
+            if case != 'I1266':  # flashing is deliberately TEMPORAL_UNVERIFIED
+                need(run['pixels']==EXPECTED_RUN[case], 'RUN_RGB_PIN_'+case+sess)
             sessions[sess]={'baseline':baseline,'run':run}
             print('J1.18-A PIXEL',case,sess,
                   'BASE',baseline['pixels'],'RUN',run['pixels'],flush=True)
@@ -136,8 +159,22 @@ def inspect(root):
     b=report['chronology']['repeat']
     same=a['before']['pixels']==b['before']['pixels'] and a['after']['pixels']==b['after']['pixels']
     altered=a['before']['pixels']!=a['after']['pixels']
+    masks=[]
+    for sess in SESSIONS:
+        dest=root/sess/'chronology'
+        before_mask=glyph_mask(dest/'screen_0.png')
+        after_mask=glyph_mask(dest/'screen_1.png')
+        masks.append(before_mask==after_mask and len(before_mask)==482)
+    calibrated=all(masks) and all(
+        report['chronology'][session]['before']['pixels']=={BLACK:1534,RED:482}
+        and report['chronology'][session]['after']['pixels']=={BLACK:1534,WHITE:482}
+        for session in SESSIONS)
+    report['same_glyph_pixel_mask']=masks
     report['chronology_classification']=(
-        'TWO_FRAME_RGB_CHANGE_OBSERVED' if same and altered else 'VISUAL_UNVERIFIED')
+        'RECOLOR_EXISTING_GLYPHS_RGB_OBSERVED' if same and altered and calibrated
+        else 'VISUAL_UNVERIFIED')
+    need(report['chronology_classification']=='RECOLOR_EXISTING_GLYPHS_RGB_OBSERVED',
+         'CHRONOLOGY_RGB_RECOLOR_NOT_PROVED')
     print('J1.18-A TWO_FRAME_CHRONOLOGY',report['chronology_classification'],
           'BOTH_SESSIONS_CONCORDANT',same,'CHANGED',altered,flush=True)
     return report
@@ -157,6 +194,12 @@ def negatives(root):
         except (Invalid,IndexError) as e:
             print('J1.18-A ROI_FALSIFICATION_REJECTED',str(e),flush=True)
         else: raise Invalid('FORGED_ROI_ACCEPTED')
+    # Deliberately apply a *wrong* expected RGB from a different INK case.
+    wrong=histogram(root/'original/I126/run/screen.png')['pixels']
+    actual=histogram(src)['pixels']
+    need(wrong!=actual and actual==EXPECTED_RUN['I106'],
+         'WRONG_RGB_CONTROL_NOT_REJECTED')
+    print('J1.18-A FALSE_RGB_CONTROL_REJECTED',flush=True)
     need(src.read_bytes()==data,'ORIGINAL_PNG_CHANGED')
 
 if __name__=='__main__':

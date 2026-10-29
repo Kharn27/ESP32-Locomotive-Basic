@@ -77,6 +77,12 @@ def old_oracle(case):
           "HISTORICAL_RECORD_" + case)
     return program
 
+def same_except_opaque_cache(observed, original, positions):
+    if len(observed) != len(original):
+        return False
+    return all(a == b for i,(a,b) in enumerate(zip(observed, original))
+               if i not in positions)
+
 def stopped_source(case):
     raw = case_source(case)
     # Same R_HALF / R_NEG_HALF witnesses, only a STOP boundary inserted.
@@ -101,7 +107,8 @@ def inspect_snapshot(snap, case):
     nums, recs = cpc.records(prog)
     check(nums == [10, 15, 20, 30, 40], "STOP_LINE_OR_ORDER_MISSING")
     token = [prog[k["offset"]:k["offset"]+k["length"]] for k in recs]
-    check(token[0] == L10[case] and token[2] == L20,
+    check(same_except_opaque_cache(token[0], L10[case], (5,6)) and
+          same_except_opaque_cache(token[2], L20, (7,8)),
           "ROM_RECORD_L10_L20_DIVERGENCE")
     check(token[1][2:4] == b"\x0f\x00" and len(token[1]) <= 20 and
           token[1][-1] == 0, "STOP_RECORD_MISSING")
@@ -114,6 +121,8 @@ def inspect_snapshot(snap, case):
         "pointers": pointers,
         "instrumented_program_hex": prog.hex(" ").upper(),
         "stop_line_hex": token[1].hex(" ").upper(),
+        "post_run_l10_hex": token[0].hex(" ").upper(),
+        "post_run_l20_hex": token[2].hex(" ").upper(),
         "instrumented_program_sha256": digest(prog),
         "snapshot_sha256": digest(snap),
         "snapshot_header_first_16_hex": snap[:16].hex(" ").upper(),
@@ -287,9 +296,13 @@ def verify(root):
                   "STOP_PROGRAM_SHA_"+case)
             nums,rows=cpc.records(bytes.fromhex(item["instrumented_program_hex"]))
             token=bytes.fromhex(item["instrumented_program_hex"])
+            l10=token[:rows[0]["length"]]
+            l20=token[rows[2]["offset"]:rows[2]["offset"]+rows[2]["length"]]
             check(nums==[10,15,20,30,40] and
-                  token[:len(L10[case])]==L10[case] and
-                  token[rows[2]["offset"]:rows[2]["offset"]+rows[2]["length"]]==L20 and
+                  same_except_opaque_cache(l10,L10[case],(5,6)) and
+                  same_except_opaque_cache(l20,L20,(7,8)) and
+                  l10.hex(" ").upper()==item["post_run_l10_hex"] and
+                  l20.hex(" ").upper()==item["post_run_l20_hex"] and
                   token[rows[1]["offset"]:rows[1]["offset"]+rows[1]["length"]].hex(" ").upper()
                   ==item["stop_line_hex"],"TOKEN_OR_STOP_CHRONOLOGY_"+case)
             check(digest(read(d/"stop.png"))==item["stop_png_sha256"] and

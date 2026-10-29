@@ -1,0 +1,80 @@
+name: HW4-SCROLL-A0 exact-base Xtensa memory delta
+on:
+  pull_request:
+    paths:
+      - 'video/hw4_scroll_metrics.*'
+      - 'firmware/esp32_display_probe/main/hw4_c2_console.c'
+      - 'firmware/esp32_display_probe/main/CMakeLists.txt'
+      - 'tools/ci/hw4_a0_compare_memory.py'
+      - '.github/workflows/hw4-scroll-opt-a0-memory.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  base-vs-head:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [CONSOLE, HW3, BASIC_PROBE]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: head
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 319e8872c88842840e0992f305ec047fe516cb38
+          path: base
+          persist-credentials: false
+      - name: Compare actual Xtensa sections and binaries at exact base/HEAD
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          set -euo pipefail
+          test "$(git -C base rev-parse HEAD)" = 319e8872c88842840e0992f305ec047fe516cb38
+          test "$(git -C head rev-parse HEAD)" = "$EXPECTED_HEAD"
+          docker run --rm -v "$PWD:/workspace" -w /workspace \
+            -e IDF_GIT_SAFE_DIR=/workspace -e PROFILE="$PROFILE" \
+            espressif/idf:v5.5.6 bash -lc '
+              set -euo pipefail
+              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
+              for label in base head; do
+                cd "/workspace/$label/firmware/esp32_display_probe"
+                cfg="sdkconfig.hw4-a0-$PROFILE"
+                build="build-hw4-a0-$PROFILE"
+                idf.py -B "$build" -DSDKCONFIG="$PWD/$cfg" \
+                  -DLOCO_CYD_PROFILE="$PROFILE" set-target esp32 >/dev/null
+                idf.py -B "$build" -DSDKCONFIG="$PWD/$cfg" \
+                  -DLOCO_CYD_PROFILE="$PROFILE" build >/dev/null
+                xtensa-esp-elf-size -A "$build/loco_esp32_display_probe.elf" \
+                  > "/workspace/$label/a0-$PROFILE-sections.txt"
+                idf.py -B "$build" size > "/workspace/$label/a0-$PROFILE-size.txt"
+                cp "$build/loco_esp32_display_probe.bin" \
+                  "/workspace/$label/a0-$PROFILE.bin"
+              done
+            '
+          python3 head/tools/ci/hw4_a0_compare_memory.py \
+            --profile "$PROFILE" \
+            --base-size "base/a0-$PROFILE-sections.txt" \
+            --head-size "head/a0-$PROFILE-sections.txt" \
+            --base-bin "base/a0-$PROFILE.bin" \
+            --head-bin "head/a0-$PROFILE.bin" | tee "head/hw4-a0-$PROFILE-delta.md"
+          cat "head/hw4-a0-$PROFILE-delta.md" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hw4-a0-memory-${{ matrix.profile }}
+          retention-days: 30
+          path: |
+            base/a0-${{ matrix.profile }}-sections.txt
+            base/a0-${{ matrix.profile }}-size.txt
+            head/a0-${{ matrix.profile }}-sections.txt
+            head/a0-${{ matrix.profile }}-size.txt
+            head/hw4-a0-${{ matrix.profile }}-delta.md

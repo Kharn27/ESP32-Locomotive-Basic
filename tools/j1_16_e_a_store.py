@@ -88,16 +88,26 @@ def case_source(case):
 def old_oracle(case):
     check(digest(read(HISTORY / "manifest.json")) == PINNED_MANIFEST,
           "ORIGINAL_MANIFEST_CHANGED")
-    program = read(HISTORY / "original" / case / "program.bin")
-    printer = read(HISTORY / "original" / case / "run/printer.dat")
-    check(digest(program) == ORIGINAL_SHA[case], "ORIGINAL_PROGRAM_SHA_" + case)
-    check(digest(printer) == PRINTER_SHA[case], "ORIGINAL_PRINTER_SHA_" + case)
-    nums, rows = cpc.records(program)
-    check(nums == [10, 20, 30, 40], "HISTORICAL_LINES_" + case)
-    check(program[:len(L10[case])] == L10[case] and
-          program[rows[1]["offset"]:rows[1]["offset"] + rows[1]["length"]] == L20,
-          "HISTORICAL_RECORD_" + case)
-    return program
+    # Both original and repeat historical ROM captures are immutable,
+    # not just the source or the original-only record comparison.
+    programs=[]
+    for session in ("original","repeat"):
+        program=read(HISTORY / session / case / "program.bin")
+        printer=read(HISTORY / session / case / "run/printer.dat")
+        check(digest(program)==ORIGINAL_SHA[case],
+              "HISTORICAL_PROGRAM_SHA_"+case+"_"+session)
+        check(digest(printer)==PRINTER_SHA[case],
+              "HISTORICAL_PRINTER_SHA_"+case+"_"+session)
+        nums,rows=cpc.records(program)
+        check(nums==[10,20,30,40],
+              "HISTORICAL_LINES_"+case+"_"+session)
+        check(program[:len(L10[case])]==L10[case] and
+              program[rows[1]["offset"]:rows[1]["offset"]+rows[1]["length"]]==L20,
+              "HISTORICAL_RECORD_"+case+"_"+session)
+        programs.append(program)
+    check(programs[0]==programs[1],
+          "HISTORICAL_REPEATED_PROGRAM_MISMATCH_"+case)
+    return programs[0]
 
 def same_except_opaque_cache(observed, original, positions):
     if len(observed) != len(original):

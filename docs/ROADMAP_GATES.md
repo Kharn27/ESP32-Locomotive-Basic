@@ -579,3 +579,7 @@ Mission strictement **preuve CPC** : `PEN 0/1/2/3/4/15/16/-1`, deux sessions Cap
 ### Gate J1.17-B — commande PEN logique et événements portable (Pilotage #185)
 
 Ouvert par le Pilotage seulement après succès des cinq CI de `main@6a3470ea3e7dc595c0470f4a5dcb00ab93d50292`. C99 natif `PEN 0,1,2,3,4,15` : un `SET_TEXT_PEN(n)` typé, sans octets PRINT, sans rendu et avec consommation atomique ; `PEN 16,-1` rejetés par diagnostic hôte, `PEN 5..14` non vérifiés par l'oracle A. Prouver les huit tokens/listings, tests de capacité/overlap/rejeu et 31 workflows/five-family CI-OPT3 fail-closed, C99 OFF/ON, Xtensa trois profils. [Dossier](J1.17-B-pen-native.md). Gate d'acceptation et fusion réservés au Pilotage ; aucun jalon matériel CYD, INK, MODE ou PAPER engagé.
+
+### HW4-PEN-A — Gate matérielle PEN natif MODE1 (#188)
+
+Base prescrite `main@e857ce66fb28583361ab06cd0d6a642f7fc97a95`, cinq CI post-fusion J1.17-B SUCCESS. Contrôle C99 4 matrices + pont typé dans `CONSOLE` et 3 profils ESP-IDF 5.5.6, budgets mémoire/ABI et oracles scellés immuables. Projet CYD : alternance UART `PEN 2/1/3`, `PRINT` rouge/jaune/vert, curseur, scroll, `PEN 16` rejet hôte, photos/logs/mémoire PO, SHA flashé. Ordre obligatoire : **PR préliminaire Pilotage → autorisation test PO → essai CYD sur SHA exact → revue finale Pilotage → fusion par Pilotage uniquement**. [Protocole](HW4-PEN-A-native-pen-mode1.md). PR #184 rotation/GPIO36/reset : chemin parallèle avec fichiers communs à surveiller ; aucun pré-merge.

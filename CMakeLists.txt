@@ -437,6 +437,16 @@ if(BUILD_TESTING)
     add_test(NAME hw4_c1_native_runtime_tft_bytes COMMAND test_hw4_c1_integration)
 endif()
 
+# HW4-PEN-A: integration is downstream of CORE and VIDEO, never reverse.
+add_library(hw4_pen_bridge STATIC integration/hw4_pen_bridge.c)
+target_include_directories(hw4_pen_bridge PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/integration)
+target_link_libraries(hw4_pen_bridge PUBLIC basic_session_runtime cpc_text)
+if(BUILD_TESTING)
+    add_executable(test_hw4_pen_a tests/test_hw4_pen_a.c)
+    target_link_libraries(test_hw4_pen_a PRIVATE hw4_pen_bridge)
+    add_test(NAME hw4_pen_a_typed_events_mode1 COMMAND test_hw4_pen_a)
+endif()
+
 # J1.7-B: F4 explicit INTEGER+INTEGER. Original J1.7-A captures are READ ONLY.
 # Two portable suites added to 48 main suites, including HW4-C1.
 if(BUILD_TESTING)

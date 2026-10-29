@@ -13,6 +13,10 @@ on:
       - 'CMakeLists.txt'
       - '.github/workflows/hw4-edit-p1.yml'
   workflow_dispatch:
+concurrency:
+  group: ci-opt2-hw4-edit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 jobs:
@@ -45,4 +49,4 @@ jobs:
           cmake --build /tmp/hw4-edit-p1 --parallel 2
           ctest --test-dir /tmp/hw4-edit-p1 --output-on-failure \
             -R '^(hw4_edit_p1_|hw4_edit_a_|hw4_c3_b2_|hw4_c3_boot_screen$|hw4_c1_text_boundaries$|hw4_font_a_|cpc_video$|cpc_video_ppm_determinism$)'
-          ctest --test-dir /tmp/hw4-edit-p1 --output-on-failure
+          # Complete 4-cell regression belongs to CI-C99; only HW4 E2 regressions here.

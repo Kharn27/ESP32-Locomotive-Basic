@@ -1,7 +1,14 @@
 name: J1.16-A CPC6128 independent scalar REAL5 oracle
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-16-a-real5-scalar.yml'
+      - 'tools/j1_16_real5_scalar_verify.py'
+      - 'tests/oracles/j1_16_real5_scalar_oracle.py'
+      - 'tests/oracles/inputs/j1_16_a/**'
+      - 'tests/fixtures/cpc6128/j1_16_real5_scalar/**'
+      - 'docs/J1.16-A-real5-scalar-oracle.md'
   workflow_dispatch:
 
 permissions:
@@ -9,8 +16,8 @@ permissions:
   packages: read
 
 concurrency:
-  group: j116-real5-scalar-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
-  cancel-in-progress: false
+  group: j116-real5-scalar-cpc-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   original-cpc-acquisition:

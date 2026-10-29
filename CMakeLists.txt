@@ -773,3 +773,13 @@ if(BUILD_TESTING)
             ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_16_real5_scalar_verify.py" --permanent --self-test)
     endif()
 endif()
+
+# J1.16-C: immutable CPC R_QUARTER and both bounded REAL5 witnesses.
+if(BUILD_TESTING)
+    add_executable(test_j1_16_c_real5_quarter tests/test_j1_16_c_real5_quarter.c)
+    target_link_libraries(test_j1_16_c_real5_quarter PRIVATE
+        basic_session_runtime basic_variable_store)
+    add_test(NAME j1_16_c_native_real5_quarter_cpc_partial
+        COMMAND test_j1_16_c_real5_quarter
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_real5_scalar")
+endif()

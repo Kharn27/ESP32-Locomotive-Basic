@@ -685,3 +685,7 @@ Mandat [#157](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/157), bas
 ### J1.16-B — première affectation REAL5 0.5 C99 (mandat 29 octobre 2026)
 
 **Décision nouvelle du Pilotage, postérieure à l'instantané J1.16-A ci-dessus :** PR #158 J1.16-A acceptée et fusionnée à `main@399cdf412b019dcba2ae0c6c0b8c699ebf01812f`. [Issue #160](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/160) autorise exclusivement `10 A=0.5 / 20 PRINT A / 30 END / RUN` en C99. Proposition [PR #162](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/162), non fusionnée, résultats CI et métriques sur SHA final à vérifier. [Rapport](J1.16-B-real5-half-native.md). `ON_DEVICE_UNVERIFIED`; aucun changement HW/firmware/oracle. Aucun jalon ultérieur autorisé.
+
+### J1.16-C — second scalaire REAL5 natif 1.25 (mandat 29 octobre 2026)
+
+**Décision Pilotage nouvelle et postérieure à la section B ci-dessus :** J1.16-B/C1 accepté et fusionné [PR #162](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/162), base `main@4f09cf4f4a142a235415634ffc1e6d6bbaec574f`. [Issue #164](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/164) autorise exclusivement R_QUARTER `A=1.25 / PRINT A / END` en complément du témoin R_HALF, sans flottants génériques. Branche dédiée `feat/j1-16-c-native-real5-quarter`, PR/résultats soumis à la revue du Pilotage. [Rapport](J1.16-C-real5-quarter-native.md). `ON_DEVICE_UNVERIFIED`, aucune modification firmware/HW/oracle ; pas de jalon suivant autorisé.

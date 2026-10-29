@@ -10,6 +10,7 @@
 #include "cpc_boot.h"
 #include "cpc_text.h"
 #include "cpc_uart_console.h"
+#include "cpc_ready_policy.h"
 #include "cpc_screen_nav.h"
 #include "cpc_video.h"
 #include "cyd_ili9341.h"
@@ -236,11 +237,15 @@ static bool display_error(void)
         return fail("ERROR_TEXT",-1);
     return true;
 }
-static bool display_ready(void)
+static bool apply_ready_policy(CpcReadyTransition transition)
 {
-    static const uint8_t ready[]="Ready\n";
-    if(!cpc_text_write(&s_text,ready,sizeof(ready)-1U))
+    bool emitted=false;
+    if(!cpc_ready_policy_apply(&s_text,transition,&emitted))
         return fail("READY_TEXT",-1);
+    printf("HW4-READY-A READY_POLICY transition=%s emitted=%u "
+           "row=%u col=%u source=CONSOLE\n",
+           cpc_ready_transition_name(transition),(unsigned)emitted,
+           (unsigned)s_text.row,(unsigned)s_text.column);
     return true;
 }
 static bool prompt(void)
@@ -257,7 +262,8 @@ static bool prompt(void)
            "policy=mode1_scroll\n",UART_LINE_CAPACITY,s_text.row);
     return true;
 }
-static bool basic_submit(const uint8_t *source,size_t length)
+static bool basic_submit(const uint8_t *source,size_t length,
+                         bool *had_diagnostic)
 {
     s_basic.written=0U;
     BSRResult r=bsr_submit(&s_basic.runtime,source,length,
@@ -270,6 +276,7 @@ static bool basic_submit(const uint8_t *source,size_t length)
            (int)r.session.program_status,(int)r.session.listing_status,
            (unsigned)length,(unsigned)s_basic.written,
            (unsigned)s_basic.runtime.state);
+    if(had_diagnostic!=NULL) *had_diagnostic=(r.status!=BSR_OK);
     if(r.status!=BSR_OK) {
         printf("HW4-C2 BASIC_SUBMIT_FAIL status=%d (no program mutation)\n",
                (int)r.status);
@@ -324,7 +331,7 @@ static bool diagnostic_demo(void)
     };
     printf("HW4-C2 DEMO_START scenario=HW4-C1 via_actual_bsr\n");
     for(size_t i=0U;i<sizeof(source)/sizeof(source[0]);++i) {
-        if(!basic_submit((const uint8_t *)source[i],strlen(source[i])))
+        if(!basic_submit((const uint8_t *)source[i],strlen(source[i]),NULL))
             return false;
     }
     return basic_run();
@@ -340,23 +347,42 @@ static bool execute_line(void)
     printf("\n");
     if(!cpc_uart_console_end_line(&s_text))
         return fail("INPUT_EOL",-1);
+    CpcReadyTransition transition=CPC_READY_UNCHARACTERIZED_DIRECT;
     if(is_command(source,length,"!CLS")) {
         printf("HW4-C2 DIAGNOSTIC_SCREEN_CLEAR source=!CLS "
                "program_preserved=1\n");
         if(!cpc_uart_console_clear(&s_text)) return false;
         s_scroll_reported=0U;
+        transition=CPC_READY_HOST_CLS; /* screen-only, no CPC equivalent */
     } else if(is_command(source,length,"!DEMO")) {
         if(!diagnostic_demo()) return false;
+        transition=CPC_READY_HOST_DEMO; /* retain existing host behavior */
     } else {
         size_t a=0U,b=length;
         while(a<b && source[a]==' ') ++a;
         while(b>a && source[b-1U]==' ') --b;
         const bool run=is_command(source+a,b-a,"RUN");
-        if(!basic_submit(source,length)) return false;
-        if(run && s_basic.runtime.state==BSR_RUNNING)
-            if(!basic_run()) return false;
+        const bool list=is_command(source+a,b-a,"LIST");
+        const bool new_program=is_command(source+a,b-a,"NEW");
+        const bool numbered=(a<b && source[a]>='0' && source[a]<='9');
+        bool had_diagnostic=false;
+        if(!basic_submit(source,length,&had_diagnostic)) return false;
+        if(had_diagnostic) {
+            transition=CPC_READY_BASIC_DIAGNOSTIC;
+        } else {
+            if(run && s_basic.runtime.state==BSR_RUNNING)
+                if(!basic_run()) return false;
+            transition=run ? CPC_READY_RUN_RETURN :
+                       list ? CPC_READY_LIST_RETURN :
+                       new_program ? CPC_READY_NEW_RETURN :
+                       a==b ? CPC_READY_EMPTY_ENTER :
+                       numbered ? CPC_READY_NUMBERED_STORED :
+                       CPC_READY_UNCHARACTERIZED_DIRECT;
+        }
     }
-    return display_ready() && prompt();
+    /* A prompt is always available, but Ready depends on the transition.
+     * Boot Ready remains painted solely by cpc_boot_console(). */
+    return apply_ready_policy(transition) && prompt();
 }
 static bool uart_init(void)
 {
@@ -536,7 +562,7 @@ void app_main(void)
             printf("HW4-C2 INPUT_OVERFLOW max_bytes=%u "
                    "policy=reject_entire_line\n",UART_LINE_CAPACITY);
         } else if(event==UART_LINE_READY) {
-            /* Input LF + program output + Ready + prompt are fully
+            /* Input LF + program output + optional Ready + prompt are fully
              * composed BEFORE exactly one repaint_dirty(). */
             echo_batch_record(echo_pending,true);
             echo_pending=0U;
@@ -552,7 +578,8 @@ void app_main(void)
                    s_line.rejected_ansi_incomplete ?
                        "incomplete_ansi" : "overflow");
             if(!cpc_uart_console_end_line(&s_text) ||
-               !display_error() || !display_ready() || !prompt()) return;
+               !display_error() || !apply_ready_policy(CPC_READY_HOST_REJECTED) ||
+               !prompt()) return;
             uart_line_ack(&s_line);
             lcd_metrics_report("after_rejected");
         }

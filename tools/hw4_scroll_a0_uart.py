@@ -92,7 +92,8 @@ def analyze(log, *, sha, idf, profile, spi_hz, cpu_mhz, orientation=9,
     require("HW4-C2 START " in log and "HW4-C2 ORIENTATION_PASS case=9" in log,
             "boot/orientation evidence missing")
     start = next(line for line in log.splitlines() if "HW4-C2 START " in line)
-    boot = fields(start, "HW4-C2 START ")
+    boot = fields(start.split(" ON_DEVICE_UNVERIFIED", 1)[0],
+                  "HW4-C2 START ")
     require(boot.get("idf") == idf, "ESP-IDF manifest differs from device")
     version = boot.get("version", "")
     require(version and (not re.fullmatch(r"[0-9a-f]{7,40}", version)

@@ -447,7 +447,19 @@ void app_main(void)
             continue;
         }
         UartLineEvent event=uart_line_feed_screen(&s_line,ch);
-        if(event==UART_LINE_APPEND || event==UART_LINE_DELETE ||
+        if(event==UART_LINE_E1_START_EDIT) {
+            /* The router already inserted ch into empty E3. Rebase to the
+             * physical E1 cursor BEFORE rendering; never feed ch again. */
+            const unsigned row=s_video.cursor_row, col=s_video.cursor_column;
+            if(!cpc_screen_nav_start_edit(&s_nav,&s_text,&s_edit,&s_line)) {
+                (void)fail("SCREEN_NAV_START_EDIT",-1); return;
+            }
+            printf("HW4-EDIT-B1-B-C1 E1_START_EDIT row=%u col=%u "
+                   "source_bytes=%u first_hex=%02x source=NEW_E3 "
+                   "e2_copied=0\n",
+                   row,col,(unsigned)s_line.length,(unsigned)ch);
+            ++echo_pending;
+        } else if(event==UART_LINE_APPEND || event==UART_LINE_DELETE ||
            event==UART_LINE_DELETE_FORWARD ||
            event==UART_LINE_LEFT || event==UART_LINE_RIGHT) {
             const bool inserted=event==UART_LINE_APPEND;
@@ -474,6 +486,18 @@ void app_main(void)
                 (void)fail("EDIT_SYNC",-1); return;
             }
             ++echo_pending;
+        } else if(event==UART_LINE_NAV_BLOCKED) {
+            /* The consumed final CSI byte identifies the direction. No E1
+             * movement, screen write, E3 edit, BASIC submit or repaint. */
+            printf("HW4-EDIT-B1-B NAV_BLOCKED direction=%s "
+                   "reason=E3_NONEMPTY source_bytes=%u\n",
+                   ch==(uint8_t)'A' ? "UP" : "DOWN",
+                   (unsigned)s_line.length);
+            /* Optional terminal bell only: one UART0 BEL per refusal, not
+             * a claim that this CYD has a working physical sound device. */
+            const char bell='\a';
+            if(uart_write_bytes(UART_NUM_0,&bell,1U)!=1)
+                printf("HW4-EDIT-B1-B BEL_UNAVAILABLE transport=UART0\n");
         } else if(event==UART_LINE_NAV_LEFT || event==UART_LINE_NAV_RIGHT ||
                   event==UART_LINE_NAV_UP || event==UART_LINE_NAV_DOWN) {
             const char *direction=event==UART_LINE_NAV_LEFT ? "LEFT" :

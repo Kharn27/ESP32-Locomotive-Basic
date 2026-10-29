@@ -233,8 +233,11 @@ static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
 }
 static bool display_error(void)
 {
-    static const uint8_t notice[]="ERROR\n"; /* host diagnostic, not CPC ERR */
-    if(!cpc_text_write(&s_text,notice,sizeof(notice)-1U))
+    /* The UART reject, RUN step and budget errors are host-only; no ROM
+     * diagnosis can be inferred from their internal numeric statuses. */
+    printf("HW4-DIAG-A DIAG_POLICY origin=runtime_or_uart "
+           "category=HOST_GENERIC message=ERROR\n");
+    if(!cpc_diag_policy_write(&s_text,CPC_DIAG_HOST_GENERIC))
         return fail("ERROR_TEXT",-1);
     return true;
 }

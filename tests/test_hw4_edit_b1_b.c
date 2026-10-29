@@ -74,7 +74,9 @@ static void reset(unsigned row,unsigned col)
 static UartLineEvent key(uint8_t ch)
 {
     UartLineEvent event=uart_line_feed_screen(&line,ch);
-    if(event==UART_LINE_NAV_LEFT || event==UART_LINE_NAV_RIGHT ||
+    if(event==UART_LINE_E1_START_EDIT)
+        assert(cpc_screen_nav_start_edit(&nav,&text,&edit,&line));
+    else if(event==UART_LINE_NAV_LEFT || event==UART_LINE_NAV_RIGHT ||
        event==UART_LINE_NAV_UP || event==UART_LINE_NAV_DOWN)
         assert(cpc_screen_nav_move(&nav,&text,&edit,&line,event));
     else if(event==UART_LINE_RETURN_EDIT)
@@ -259,13 +261,177 @@ static void c1_and_native_basic(void)
     assert(key('\n')==UART_LINE_NONE);
     assert(key('\r')==UART_LINE_READY);
 }
+
+/* Exact PO failure path: E3 empty -> freely navigate on existing E2 ->
+ * type '1' without any preliminary Enter -> one Enter submits BASIC. */
+static void c1_po_route(void)
+{
+    reset(12U,0U);
+    const char *old="OLD PREVIOUS";
+    for(unsigned i=0U;old[i]!='\0';++i)
+        assert(cpc_video_put_cell(&video,i,12U,(uint8_t)old[i],glyph,NULL));
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(seq("\x1b[B")==UART_LINE_NAV_DOWN);
+    assert(seq("\x1b[B")==UART_LINE_NAV_DOWN);
+    assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
+    assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
+    assert(seq("\x1b[D")==UART_LINE_NAV_LEFT);
+    assert(seq("\x1b[D")==UART_LINE_NAV_LEFT);
+    assert(video.cursor_row==12U && video.cursor_column==0U);
+    assert(line.screen_navigation && line.length==0U);
+    assert(key('1')==UART_LINE_E1_START_EDIT);
+    assert(!line.screen_navigation && !line.ready);
+    assert(edit.row==12U && edit.column==0U && edit.painted==1U);
+    assert(text.row==12U && text.column==1U);
+    assert(video.cursor_row==12U && video.cursor_column==1U);
+    assert(line.length==1U && line.cursor_pos==1U);
+    assert(memcmp(line.data,"1",2U)==0);
+    uint8_t c=0U; bool known=false;
+    assert(cpc_video_read_cell(&video,0U,12U,&c,&known));
+    assert(known && c=='1');
+    assert(cpc_video_read_cell(&video,1U,12U,&c,&known));
+    assert(known && c=='L'); /* old E2 remains visible, not in E3 */
+    assert(seq("0 PRINT 2")==UART_LINE_APPEND);
+    assert(line.length==10U && memcmp(line.data,"10 PRINT 2",11U)==0);
+    capture();
+    blocked('A'); blocked('B'); /* U04 still blocks a pending E3 edit */
+    assert(!line.ready && memcmp(program_canary,before.program,32U)==0);
+    assert(key('\r')==UART_LINE_READY); /* ONE Enter, no refocus Enter */
+    assert(bp_init(&basic.program,basic.bytes,sizeof basic.bytes)==BP_OK);
+    assert(bvs_init(&basic.variables,basic.entries,64U)==BVS_OK);
+    assert(bsr_init_with_store(&basic.runtime,&basic.program,
+                               &basic.variables).status==BSR_OK);
+    BSRResult r=bsr_submit(&basic.runtime,line.data,line.length,
+                           basic.temporary,sizeof basic.temporary,
+                           basic.output,sizeof basic.output,&basic.written);
+    assert(r.status==BSR_OK);
+    uart_line_ack(&line);
+    assert(key('\n')==UART_LINE_NONE);
+    const uint8_t listing[]="LIST", running[]="RUN", clearing[]="NEW";
+    r=bsr_submit(&basic.runtime,listing,sizeof listing-1U,
+                 basic.temporary,sizeof basic.temporary,
+                 basic.output,sizeof basic.output,&basic.written);
+    assert(r.status==BSR_OK && basic.written==11U);
+    assert(memcmp(basic.output,"10 PRINT 2\n",11U)==0);
+    r=bsr_submit(&basic.runtime,running,sizeof running-1U,
+                 basic.temporary,sizeof basic.temporary,
+                 basic.output,sizeof basic.output,&basic.written);
+    assert(r.status==BSR_OK);
+    r=bsr_step(&basic.runtime,basic.output,sizeof basic.output,&basic.written);
+    assert(r.status==BSR_OK && r.executor_status==BE_OK);
+    assert(basic.written==2U && memcmp(basic.output,"2\n",2U)==0);
+    r=bsr_step(&basic.runtime,basic.output,sizeof basic.output,&basic.written);
+    assert(r.status==BSR_END);
+    r=bsr_submit(&basic.runtime,clearing,sizeof clearing-1U,
+                 basic.temporary,sizeof basic.temporary,
+                 basic.output,sizeof basic.output,&basic.written);
+    assert(r.status==BSR_OK);
+    r=bsr_submit(&basic.runtime,listing,sizeof listing-1U,
+                 basic.temporary,sizeof basic.temporary,
+                 basic.output,sizeof basic.output,&basic.written);
+    assert(r.status==BSR_OK && basic.written==0U);
+    check_guards();
+}
+static void c1_first_key_filters(void)
+{
+    reset(7U,10U);
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(line.screen_navigation && line.length==0U);
+    capture();
+    assert(key(0x07U)==UART_LINE_IGNORED);
+    assert(key(0x08U)==UART_LINE_IGNORED);
+    assert(key(0x7fU)==UART_LINE_IGNORED);
+    assert(seq("\x1b[3~")==UART_LINE_IGNORED);
+    assert(seq("\x1b[1;2A")==UART_LINE_IGNORED);
+    assert(seq("\x1b[?25l")==UART_LINE_IGNORED);
+    unchanged_visual_source();
+    assert(key(0x1bU)==UART_LINE_IGNORED);
+    assert(key('[')==UART_LINE_IGNORED);
+    assert(key('1')==UART_LINE_IGNORED); /* CSI parameter, NOT first byte */
+    assert(key('~')==UART_LINE_IGNORED);
+    assert(line.length==0U && line.screen_navigation);
+    assert(key(' ')==UART_LINE_E1_START_EDIT); /* ASCII 0x20 is printable */
+    assert(line.length==1U && line.data[0U]==' ');
+    assert(seq("\x1b[A")==UART_LINE_NAV_BLOCKED);
+    assert(key(0x08U)==UART_LINE_DELETE);
+    assert(line.length==0U);
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(seq("\x1b[H")==UART_LINE_RETURN_HOME);
+    assert(!line.ready && !line.screen_navigation);
+    /* E1 with nonempty E3 retains fail-closed policy */
+    assert(seq("10")==UART_LINE_APPEND);
+    assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
+    assert(line.screen_navigation && line.length==2U);
+    assert(key('Z')==UART_LINE_IGNORED && line.length==2U);
+    assert(seq("\x1b[3~")==UART_LINE_IGNORED);
+    assert(seq("\x1b[H")==UART_LINE_RETURN_HOME);
+    assert(key('X')==UART_LINE_APPEND && line.length==3U);
+    assert(key('\r')==UART_LINE_READY);
+    check_guards();
+
+    reset(5U,3U);
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(key('\r')==UART_LINE_RETURN_EDIT); /* still row+1 only */
+    assert(!line.ready && edit.row==5U && edit.column==0U);
+    assert(key('1')==UART_LINE_APPEND);
+    assert(key('\r')==UART_LINE_READY);
+}
+static void c1_edges(void)
+{
+    reset(0U,0U);
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP); /* top screen scroll */
+    assert(video.cursor_row==0U && video.cursor_column==0U);
+    assert(key('A')==UART_LINE_E1_START_EDIT);
+    assert(edit.row==0U && edit.column==0U);
+    check_guards();
+
+    reset(24U,39U);
+    assert(seq("\x1b[B")==UART_LINE_NAV_DOWN); /* bottom scroll */
+    assert(video.cursor_row==24U && video.cursor_column==39U);
+    assert(key('A')==UART_LINE_E1_START_EDIT);
+    assert(edit.row==24U && edit.column==39U);
+    assert(text.row==24U && text.column==40U); /* deferred wrap */
+    assert(key('B')==UART_LINE_APPEND); /* scroll only for next cell */
+    assert(edit.row==23U && edit.column==39U);
+    uint8_t c=0U;bool known=false;
+    assert(cpc_video_read_cell(&video,39U,23U,&c,&known));
+    assert(known && c=='A');
+    assert(cpc_video_read_cell(&video,0U,24U,&c,&known));
+    assert(known && c=='B');
+    assert(line.length==2U && memcmp(line.data,"AB",3U)==0);
+    check_guards();
+
+    reset(20U,39U);
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(key('A')==UART_LINE_E1_START_EDIT);
+    assert(text.column==40U);
+    assert(key('B')==UART_LINE_APPEND);
+    assert(edit.row==19U && edit.column==39U);
+    assert(video.cursor_row==20U && video.cursor_column==1U);
+
+    reset(0U,0U);
+    assert(seq("\x1b[D")==UART_LINE_NAV_LEFT); /* physical corner */
+    assert(key('A')==UART_LINE_E1_START_EDIT);
+    for(unsigned i=1U;i<120U;++i) assert(key('X')==UART_LINE_APPEND);
+    assert(line.length==120U && line.data[120U]==0U);
+    assert(key('Y')==UART_LINE_OVERFLOW);
+    assert(line.poisoned && !line.screen_navigation);
+    assert(key('\r')==UART_LINE_REJECTED);
+    uart_line_ack(&line);
+    check_guards();
+}
+
 int main(void)
 {
+    c1_po_route();
+    c1_first_key_filters();
+    c1_edges();
     blocked_case("10",2U);
     blocked_case("10 PRINT 2",5U);
     hundred_and_twenty();
     empty_and_e1();
     c1_and_native_basic();
-    puts("HW4-EDIT-B1-B U04 nonempty blocked / E1-E2-E3 / LIST RUN PASS");
+    puts("HW4-EDIT-B1-B-C1 E1 first printable / U04 / E2 isolation / LIST RUN NEW PASS");
     return 0;
 }

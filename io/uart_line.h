@@ -19,6 +19,7 @@ typedef enum {
     UART_LINE_NAV_UP,
     UART_LINE_NAV_DOWN,
     UART_LINE_NAV_BLOCKED, /* E3 focus + nonempty: request historical error BIP */
+    UART_LINE_E1_START_EDIT, /* E1 empty: first ASCII opens new E3, already inserted */
     UART_LINE_RETURN_EDIT, /* E1 ENTER: CR to next visible row, no submit */
     UART_LINE_RETURN_HOME, /* E1 CSI Home: restore E3 anchor, no CR */
     UART_LINE_READY,
@@ -68,7 +69,10 @@ typedef struct {
  * Call uart_line_ack() after READY/REJECTED, before next byte. */
 void uart_line_init(UartLine *line);
 UartLineEvent uart_line_feed(UartLine *line, uint8_t ch);
-/* Console-only routing; original uart_line_feed keeps HW4-EDIT-A semantics. */
+/* Console-only routing; original uart_line_feed keeps HW4-EDIT-A semantics.
+ * With an empty E3 and E1 screen focus, one ASCII printable byte returns
+ * E1_START_EDIT and has ALREADY been inserted once in E3. Caller must rebase
+ * the physical editor anchor before drawing; never feed the byte twice. */
 UartLineEvent uart_line_feed_screen(UartLine *line, uint8_t ch);
 void uart_line_ack(UartLine *line);
 #endif

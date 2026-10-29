@@ -156,7 +156,14 @@ static UartLineEvent feed_impl(UartLine *line, uint8_t ch, bool screen_enabled)
         return UART_LINE_IGNORED;
     }
 
-    if (screen_enabled && line->screen_navigation) return UART_LINE_IGNORED;
+    /* C1: a printable byte while freely navigating an EMPTY E3 starts a
+     * brand-new E3 edit. No E2 read/copy, no implicit rebind with pending
+     * source, and no control/BS/DEL/invalid CSI may start the edit. */
+    const bool start_e1_edit = screen_enabled && line->screen_navigation &&
+        line->length == 0U && line->cursor_pos == 0U &&
+        !line->poisoned && ch >= 0x20U && ch <= 0x7eU;
+    if (screen_enabled && line->screen_navigation && !start_e1_edit)
+        return UART_LINE_IGNORED;
     if (ch == 0x08U || ch == 0x7fU) return erase_before(line);
     if (ch < 0x20U || ch > 0x7eU) {
         ++line->nonascii_bytes;
@@ -173,6 +180,10 @@ static UartLineEvent feed_impl(UartLine *line, uint8_t ch, bool screen_enabled)
             line->length - line->cursor_pos + 1U);
     line->data[line->cursor_pos++] = ch;
     ++line->length;
+    if (start_e1_edit) {
+        line->screen_navigation = false;
+        return UART_LINE_E1_START_EDIT; /* byte consumed exactly once */
+    }
     return UART_LINE_APPEND;
 }
 

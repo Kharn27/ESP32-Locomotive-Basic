@@ -2,6 +2,7 @@
 #include "basic_variable_ref.h"
 
 #include <stdint.h>
+#include <string.h>
 
 typedef struct {
     uint8_t *data; /* NULL during validation/measurement */
@@ -233,6 +234,18 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             return status;
         }
         token = body[pos++];
+        /* J1.16-B: only the complete, canonical implicit A=0.5 record.
+         * No interpretation of opaque cache bytes, other names or literals. */
+        if (token == 0x0du) {
+            static const uint8_t half_line[] = {
+                0x0du, 0u, 0u, 0xc1u, 0xefu, 0x1fu,
+                0u, 0u, 0u, 0u, 0x80u
+            };
+            if (pos != 1u || length != sizeof(half_line) ||
+                memcmp(body, half_line, sizeof(half_line)) != 0)
+                return BL_BAD_SEQUENCE;
+            return append_word(out, "A=0.5");
+        }
         /* E1BC emits 01 C0 for ', including at the beginning of a
          * line. The prefixed 01 is not an explicit source colon. */
         if (token == 0x01u && pos < length && body[pos] == 0xc0u) {
@@ -557,6 +570,15 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                         break;
                     }
                 }
+            } else if (t == 0x0du) {
+                static const uint8_t half_print[] = {
+                    0xbfu, (uint8_t)' ', 0x0du, 0u, 0u, 0xc1u
+                };
+                if (length != sizeof(half_print) ||
+                    memcmp(body, half_print, sizeof(half_print)) != 0)
+                    return BL_BAD_SEQUENCE;
+                status = append_byte(out, (uint8_t)'A');
+                pos = length;
             } else if (t >= 0x02u && t <= 0x04u) {
                 BasicVariableRef ref;
                 BVRStatus ref_status = bvr_decode(body, length, pos - 1u, &ref);

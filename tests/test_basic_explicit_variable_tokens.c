@@ -142,6 +142,7 @@ static int test_tokenizer_and_listing(void)
 {
     static const uint8_t intref[] = {0xbfu,' ',0x02u,0,0,0xc1u};
     static const uint8_t realref[] = {0xbfu,' ',0x04u,0,0,'x','y',0xfau};
+    static const uint8_t implicit_half_a[] = {0xbfu,' ',0x0du,0,0,0xc1u};
     static const uint8_t strref[] = {0xbfu,' ',0x03u,0,0,'N','O','M','.','2'|0x80};
     static const uint8_t compound[] = {0xbfu,' ',0x02u,0,0,0xc1u,0x01u,0x98u};
     static const uint8_t string[] = {0xbfu,' ','"','A','%','"'};
@@ -149,7 +150,7 @@ static int test_tokenizer_and_listing(void)
     static const uint8_t apostrophe[] = {0x01u,0xc0u,' ','A','%',':','E','N','D'};
     static const uint8_t spaces[] = {' ',0xbfu,' ',' ',0x02u,0,0,0xc1u,' '};
     static const char *invalid[] = {
-        "PRINT A", "PRINT 1A%", "PRINT A%%", "PRINT A%$",
+        "PRINT 1A%", "PRINT A%%", "PRINT A%$",
         "PRINT A!!", "PRINT A%1", "PRINT A%ABC", "PRINT A%_",
         "PRINT A#","PRINT A_B%", "PRINT A..2%?", "PRINT %A",
         "PRINT ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNO%",
@@ -159,6 +160,8 @@ static int test_tokenizer_and_listing(void)
     size_t n, i;
 
     CHECK(roundtrip("PRINT A%", intref, sizeof(intref)) == 0);
+    /* Pre-B rejection promoted only for this one implicit A reference. */
+    CHECK(roundtrip("PRINT A", implicit_half_a, sizeof(implicit_half_a)) == 0);
     CHECK(roundtrip("PRINT xyz!", realref, sizeof(realref)) == 0);
     CHECK(roundtrip("PRINT NOM.2$", strref, sizeof(strref)) == 0);
     CHECK(roundtrip("PRINT A%:END", compound, sizeof(compound)) == 0);

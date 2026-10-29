@@ -107,6 +107,8 @@ static int run(F *f) {
         CHECK(memcmp(f->output," 0.5 \n",6u)==0 && f->output[6]==0x77);
         ++events;
         f->written=313u;r=step(f,sizeof(f->output));
+        CHECK(r.status==BSR_OK && f->written==0u); /* END statement. */
+        f->written=313u;r=step(f,sizeof(f->output));
         CHECK(r.status==BSR_END && r.executor_status==BE_END);
         CHECK(f->written==313u && f->runtime.state==BSR_IDLE);
         CHECK(step(f,sizeof(f->output)).status==BSR_NOT_RUNNING);
@@ -217,6 +219,24 @@ static int print_negative(void) {
     CHECK(bsr_step(&f.runtime,(uint8_t *)(void *)f.entries,1u,
                    &nochange).status==BSR_OVERLAP);
     CHECK(nochange==111u);
+    CHECK(init(&f)==0);
+    CHECK(send(&f,"10 PRINT A").status==BSR_OK);
+    CHECK(bsr_init(&f.runtime,&f.program).status==BSR_OK);
+    CHECK(send(&f,"RUN").status==BSR_OK);
+    CHECK(fail(&f,BE_UNSUPPORTED,sizeof(f.output))==0); /* No store. */
+    CHECK(init(&f)==0);
+    CHECK(send(&f,"10 A=0.5").status==BSR_OK);
+    CHECK(send(&f,"RUN").status==BSR_OK);
+    {
+        size_t j;
+        for(j=0u;j<3u;++j){
+            BasicVariableKey other=akey((uint8_t)BVT_INTEGER);
+            other.name[0]=(uint8_t)('B'+(int)j);
+            value.type=(uint8_t)BVT_INTEGER;value.data.integer=1;
+            CHECK(bvs_assign(&f.store,&other,&value)==BVS_OK);
+        }
+        CHECK(fail(&f,BE_STORE_FULL,sizeof(f.output))==0);
+    }
     return 0;
 }
 static int nmin(void) {
@@ -243,6 +263,8 @@ int main(int argc,char **argv) {
     CHECK(run(&f)==0);
     CHECK(source_negative()==0);
     CHECK(submit_negative()==0);
+    /* Revalidate intact original before mutation campaigns. */
+    CHECK(oracle(&f,argv[1])==0);
     CHECK(mutated_records()==0);
     CHECK(print_negative()==0);
     CHECK(nmin()==0);

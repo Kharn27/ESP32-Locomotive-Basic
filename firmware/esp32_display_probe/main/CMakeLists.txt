@@ -15,7 +15,8 @@ if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
         SRCS
             "hw4_c2_console.c" "cpc_font.c"
             "../../../video/cpc_video.c" "../../../video/cpc_palette.c" "../../../video/cpc_boot.c"
-            "../../../video/cpc_text.c" "../../../io/cpc_uart_console.c"
+            "../../../video/cpc_text.c" "../../../video/hw4_scroll_metrics.c"
+            "../../../io/cpc_uart_console.c"
             "../../../io/uart_line.c" "../../../io/cpc_screen_nav.c"
             "../../../io/cpc_ready_policy.c" "../../../io/cpc_diag_policy.c"
         INCLUDE_DIRS "." "../../../video" "../../../io"

@@ -452,6 +452,9 @@ endif()
 # HW4-C2: independent portable UART collection and screen echo/paging.
 add_library(uart_line STATIC io/uart_line.c)
 target_include_directories(uart_line PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/io)
+add_library(cpc_ready_policy STATIC io/cpc_ready_policy.c)
+target_include_directories(cpc_ready_policy PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/io)
+target_link_libraries(cpc_ready_policy PUBLIC cpc_text)
 add_library(cpc_uart_console STATIC io/cpc_uart_console.c)
 target_include_directories(cpc_uart_console PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/io)
 target_link_libraries(cpc_uart_console PUBLIC cpc_text)
@@ -463,6 +466,11 @@ if(BUILD_TESTING)
     add_executable(test_cpc_uart_console tests/test_cpc_uart_console.c)
     target_link_libraries(test_cpc_uart_console PRIVATE cpc_uart_console uart_line)
     add_test(NAME hw4_c2_screen_paging COMMAND test_cpc_uart_console)
+
+    add_executable(test_hw4_ready_a tests/test_hw4_ready_a.c)
+    target_link_libraries(test_hw4_ready_a PRIVATE
+                          cpc_ready_policy cpc_uart_console basic_session_runtime)
+    add_test(NAME hw4_ready_a_real_policy_vram_runtime COMMAND test_hw4_ready_a)
 
     add_executable(test_hw4_c2_integration tests/test_hw4_c2_integration.c)
     target_link_libraries(test_hw4_c2_integration PRIVATE

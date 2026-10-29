@@ -32,6 +32,31 @@ class TestA0(unittest.TestCase):
             kw=dict(KW);kw.update(change)
             with self.subTest(change=change), self.assertRaises(EvidenceError):
                 analyze(text, **kw)
+    def test_app_version_provenance_rejects_invalid_and_dirty(self):
+        text = (DATA/"valid.uart.log").read_text()
+        # Boot version comes from the IDF app descriptor; only an exact,
+        # unmodified 7..40-hex prefix of the expected 40-hex SHA is evidence.
+        invalid = ("arbitrary", "v1.2.3", "unknown", "319e887-dirty",
+                   KW["sha"] + "-dirty", "319e888", "deadbee",
+                   "319e88", KW["sha"] + "f", "319e887-notgit")
+        for version in invalid:
+            log = text.replace("version=319e887 ", "version=" + version + " ", 1)
+            with self.subTest(version=version), self.assertRaises(EvidenceError):
+                analyze(log, **KW)
+        for version in ("319e8872", KW["sha"]):
+            log = text.replace("version=319e887 ", "version=" + version + " ", 1)
+            with self.subTest(valid_version=version):
+                self.assertEqual(analyze(log, **KW)["manifest"]["app_version"],
+                                 version)
+        # The original fixture's 7-hex build version remains valid.
+        self.assertEqual(analyze(text, **KW)["manifest"]["app_version"], "319e887")
+
+    def test_app_version_provenance_rejects_ambiguous_boots(self):
+        text = (DATA/"valid.uart.log").read_text()
+        start = text.splitlines()[0]
+        with self.assertRaises(EvidenceError):
+            analyze(text + "\\n" + start + "\\n", **KW)
+
     def test_legacy_scroll_and_bin_falsifications(self):
         text=(DATA/"valid.uart.log").read_text()
         bad=[text.replace("scrolls=2 repaint_us_total", "scrolls=4 repaint_us_total"),

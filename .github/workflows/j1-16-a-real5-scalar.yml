@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   original-cpc-acquisition:
-    if: github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-16-a-real5-scalar-cpc' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-16-a-real5-scalar' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -101,12 +101,12 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add "$DEST"
             git commit -m "evidence(J1.16-A): archive ten doubled original CPC scalar REAL5 sessions"
-            REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/oracle/j1-16-a-real5-scalar-cpc | awk '{print $1}')"
+            REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/oracle/j1-16-a-real5-scalar | awk '{print $1}')"
             test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA" || {
               echo "CONCURRENT_BRANCH_ADVANCE refusing to publish evidence"
               exit 1
             }
-            git push origin HEAD:refs/heads/oracle/j1-16-a-real5-scalar-cpc
+            git push origin HEAD:refs/heads/oracle/j1-16-a-real5-scalar
           else
             python3 tools/j1_16_real5_scalar_verify.py --evidence "$DEST" --permanent --self-test
             for name in $(find "$DEST/original" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort); do

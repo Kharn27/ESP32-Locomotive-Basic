@@ -29,7 +29,6 @@ on:
       - "tools/j1_signed_assignment_audit.py"
       - "tests/oracles/j1_native_capabilities.json"
       - "tools/j0_exit_audit.py"
-      - "docs/ROADMAP_GATES.md"
   workflow_dispatch:
 
 permissions:
@@ -98,7 +97,10 @@ jobs:
           set -euo pipefail
           cmake -S . -B "${RUNNER_TEMP}/c99-build"
           cmake --build "${RUNNER_TEMP}/c99-build" -j 2
-          ctest --test-dir "${RUNNER_TEMP}/c99-build" --output-on-failure
+          # CI-C99 owns the complete four-cell regression matrix. Keep
+          # the oracle-specific portable comparator smoke only here.
+          ctest --test-dir "${RUNNER_TEMP}/c99-build" --output-on-failure \\
+            -R "^(cpc_|basic_program_)"
 
       - name: J0.28 post-C1 vertical slice, sealed history and negative falsifications
         run: |

@@ -621,6 +621,9 @@ static BEStatus execute_line(const BasicProgram *program,
         }
         if (token == 0xbbu) { /* PEN (autonomous, evidence-bounded) */
             unsigned int number;
+            /* A standalone PEN cannot follow PRINT/FOR within a line. */
+            if (preceding_statement || start_pos != 0u)
+                return BE_UNSUPPORTED;
             int negative = 0;
             size_t argument = pos;
             skip_spaces(body, length, &pos);

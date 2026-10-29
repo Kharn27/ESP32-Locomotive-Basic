@@ -191,7 +191,7 @@ static int test_unverified_and_bad_source(void)
 static int test_raw_and_aliasing(void)
 {
     static const struct {
-        uint8_t bytes[7];
+        uint8_t bytes[12];
         size_t n;
         BEStatus status;
     } invalid[] = {
@@ -201,7 +201,9 @@ static int test_raw_and_aliasing(void)
         {{0xbbu,0x20u,0x19u,0x04u},4u,BE_BAD_SEQUENCE},
         {{0xbbu,0x20u,0x10u,0x01u,0xbfu},5u,BE_BAD_SEQUENCE},
         {{0xbbu,0x20u,0x0eu,0xffu},4u,BE_BAD_SEQUENCE},
-        {{0xbbu,0x20u,0xf5u,0x10u},4u,BE_BAD_SEQUENCE}
+        {{0xbbu,0x20u,0xf5u,0x10u},4u,BE_BAD_SEQUENCE},
+        {{0xbfu,0x20u,'\"','X','\"',0x01u,0xbbu,0x20u,0x12u},
+         9u,BE_UNSUPPORTED}
     };
     size_t i;
     for (i=0u;i<sizeof(invalid)/sizeof(invalid[0]);++i) {

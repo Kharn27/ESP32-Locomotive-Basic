@@ -59,6 +59,13 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_executor PRIVATE basic_executor basic_tokenizer)
     add_test(NAME basic_executor COMMAND test_basic_executor)
 
+    # J1.17-B: native PEN token/LIST, typed no-heap video events and
+    # atomic refusal paths; sealed CPC A remains immutable.
+    add_executable(test_basic_pen_native tests/test_basic_pen_native.c)
+    target_link_libraries(test_basic_pen_native PRIVATE
+                          basic_session_runtime basic_listing basic_tokenizer)
+    add_test(NAME j1_17_b_pen_native COMMAND test_basic_pen_native)
+
     add_executable(test_basic_session_runtime tests/test_basic_session_runtime.c)
     target_link_libraries(test_basic_session_runtime PRIVATE basic_session_runtime)
     add_test(NAME basic_session_runtime COMMAND test_basic_session_runtime)

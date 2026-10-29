@@ -4,14 +4,14 @@
 
 ## Inventaire vérifiable, avant/après
 
-La référence CI-OPT2 comptait **28 workflows** avant l'oracle E-A. Après la fusion #172, **29 fichiers `.github/workflows/*.yml`** existent dans `main`, incluant `j1-16-e-a-small-store.yml`. CI-OPT3 ajoute la porte stable `ci-opt3-routing.yml`, soit **30 fichiers**, répartis sans doublon dans les cinq propriétaires suivants :
+La référence CI-OPT2 comptait **28 workflows** avant l'oracle E-A. Après la fusion #172, **29 fichiers `.github/workflows/*.yml`** existent dans `main`, incluant `j1-16-e-a-small-store.yml`. CI-OPT3 ajoute la porte stable `ci-opt3-routing.yml`, soit **30 fichiers** à la date de PR #175. Depuis la fusion HW4-SCROLL-OPT-A0 #168 (29 octobre 2026), **31 fichiers** sont explicitement inventoriés, répartis sans doublon dans les mêmes cinq familles :
 
 | Famille | Fichiers de workflow | Preuve/sortie propriétaire |
 |---|---|---|
 | **C99** (3) | `basic-program.yml`, `ci-arch.yml`, **`ci-opt3-routing.yml`** | Matrice complète GCC/Clang × sanitizers OFF/ON, isolation ARCH et contrôle permanent du routage |
 | **CPC permanent** (2) | `ci-cpc-permanent.yml`, `cpc-oracle.yml` | SHA scellés, falsifications, historique CPC ; oracle indépendant sous conditions de chemins |
 | **CPC acquisition** (19) | `cpc-oracle-image.yml` et les 18 workflows `j1-*-a`, `j1-12-b1`, `j1-16-d-a`, `j1-16-e-a` détaillés ci-dessous | Nouvelle acquisition Caprice32 GHCR épinglé / ROM CPC historique ; seulement si mission et chemin pertinent, `workflow_dispatch` conservé |
-| **HW4** (5) | `hw4-c3-b1-scroll.yml`, `hw4-c3-b2-scroll.yml`, `hw4-diag-a.yml`, `hw4-edit-p1.yml`, `hw4-ready-a.yml` | Vidéo/scroll/éditeur/UART, tests C99 et acquisition d'écran ciblés |
+| **HW4** (6) | `hw4-c3-b1-scroll.yml`, `hw4-c3-b2-scroll.yml`, `hw4-diag-a.yml`, `hw4-edit-p1.yml`, `hw4-ready-a.yml`, **`hw4-scroll-opt-a0-memory.yml`** | Vidéo/scroll/éditeur/UART, tests C99 et acquisition d'écran ciblés |
 | **Xtensa** (1) | `ci-xtensa.yml` | Trois profils ESP-IDF v5.5.6, ABI, budgets, `one app_main` ; filtré par sources cible, build et `tools/ci/**` |
 
 **Tous les 18 workflows CPC historiques conservés :** `j1-2-a-boundaries.yml`, `j1-3-a-subtraction.yml`, `j1-4-a-multiplication.yml`, `j1-5-a-division.yml`, `j1-6-a-mod.yml`, `j1-7-a-add-vars.yml`, `j1-8-a-sub-vars.yml`, `j1-9-a-binary-family.yml`, `j1-10-a-if-then.yml`, `j1-11-a-gosub-return.yml`, `j1-12-a-for-next-integer.yml`, `j1-12-b1-cpc-reacquire.yml`, `j1-13-a-integer-relations.yml`, `j1-14-a-if-inline-else.yml`, `j1-15-a-string-scalar.yml`, `j1-16-a-real5-scalar.yml`, `j1-16-d-a-negative-store.yml`, `j1-16-e-a-small-store.yml`.
@@ -33,7 +33,7 @@ vidéo / éditeur / UART"]
 non annulable"| PERM
 ```
 
-La classification est **conceptuelle**, sans remplacer les workflows d'oracle existants par un simulateur. Le script `tools/ci/opt3_routing.py` lit et audite les véritables fichiers YAML ; il vérifie leur propriétaire, les filtres, les dépendances E-A/D-A, les chemins source/archive, et rejette toute apparition d'un 31e workflow non intégré. La porte `CI-OPT3 five-family routing gate` reste **toujours déclenchée** sur les PR et sur `main`.
+La classification est **conceptuelle**, sans remplacer les workflows d'oracle existants par un simulateur. Le script `tools/ci/opt3_routing.py` lit et audite les véritables fichiers YAML ; il vérifie leur propriétaire, les filtres, les dépendances E-A/D-A, les chemins source/archive, et rejette tout workflow supplémentaire inconnu au-delà des **31 workflows** enregistrés. La porte `CI-OPT3 five-family routing gate` reste **toujours déclenchée** sur les PR et sur `main`.
 
 ## Routage avant/après et garanties
 
@@ -52,7 +52,7 @@ La classification est **conceptuelle**, sans remplacer les workflows d'oracle ex
 
 **Modifications apportées :** filtres de chemins additifs sur douze acquisitions anciennes jusqu'alors inconditionnelles ; suppression du seul déclencheur générique `docs/ROADMAP_GATES.md` pour J1.3/4/5. Les tâches capables d'archiver conservent `cancel-in-progress: false` et sont sérialisées par identité de PR sans `github.sha`, afin d'éviter d'interrompre une capture en cours. Les garde-fous de branche, de HEAD exact, de référence ROM, de conteneur GHCR et de publication conditionnelle **n'ont pas été modifiés**.
 
-Le simulateur de routage vérifie **neuf scénarios** positifs/négatifs distincts ainsi que les liens dédiés D-A/E-A et le refus de promouvoir un oracle non enregistré. Un script `tools/j1_99_unknown_oracle.py` ne reçoit **pas** arbitrairement une preuve CPC. Le contrôle fail-closed `ci-cpc-permanent.yml` reste inconditionnel à chaque PR ; l'absence d'exécution d'une acquisition spécialisée est enregistrée `SKIPPED` ou `NOT_TRIGGERED`, jamais `SUCCESS`.
+Le simulateur de routage vérifie désormais **quinze scénarios** positifs/négatifs distincts ainsi que les liens dédiés D-A/E-A et le refus de promouvoir un oracle non enregistré. Un script `tools/j1_99_unknown_oracle.py` ne reçoit **pas** arbitrairement une preuve CPC. Le contrôle fail-closed `ci-cpc-permanent.yml` reste inconditionnel à chaque PR ; l'absence d'exécution d'une acquisition spécialisée est enregistrée `SKIPPED` ou `NOT_TRIGGERED`, jamais `SUCCESS`.
 
 ## Sceaux historiques et correctif C1
 
@@ -83,3 +83,11 @@ Inspection GitHub du 29 octobre 2026 : aucun `ruleset` actif visible sur l'API d
 La vérité est celle des runs GitHub effectués sur **le HEAD exact de la PR #175** (à compléter dans la REMISE DÉVELOPPEUR). Vérifier en priorité : routeur stable, C99 quatre cellules, CPC permanent (avec D-A/E-A/C1), ARCH et Xtensa trois profils car `tools/ci/**` a changé. Ne jamais convertir un workflow filtré ou un sous-job `SKIPPED` en `SUCCESS`.
 
 **Aucun changement de `core/`, `firmware/`, `io/`, `hal/`, `video/` ni archives scellées.** Aucune autorisation J1.16-E-B/J1.17. PR soumise exclusivement à la revue et à la fusion du Pilotage.
+
+## CI-OPT3-C1 — correction après HW4-SCROLL-OPT-A0 #168 (mandat #180)
+
+À l'instant de la fusion de #168 sur `main@8fe1ab63e53662910bf174f72445d001c03b5a29`, le 31e workflow `hw4-scroll-opt-a0-memory.yml` était présent mais absent de `FAMILIES` : la barrière [run 40960027347](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40960027347) échouait avec `UNKNOWN_OR_MISSING_WORKFLOW`. Le correctif **enregistre explicitement le nom dans la famille HW4**, sans rendre l'audit permissif : `set(sources) == set(expected)` reste obligatoire et `len(expected) == len(set(expected)) == 31` demeure vérifié. **La famille HW4 passe de 5 à 6 workflows**, les quatre autres familles ne changent pas et la cartographie garde cinq familles.
+
+Le contrat de huit chemins de déclenchement A0 est vérifié **à l'identique** : métriques vidéo, console et CMake firmware, comparateur mémoire, outil UART, test du parser, document baseline et édition du YAML lui-même. Les contre-épreuves exécutent les simulations de route propres à ces chemins ; `DOC_ONLY` interdit toujours HW4 et les acquisitions CPC historiques. Quatre injections en mémoire (workflow inconnu, suppression, renommage, retrait d'un chemin d'A0) sont toutes refusées par le garde réel. Le contrôle de faux HEAD du workflow `ci-opt3-routing.yml`, les sceaux D-A/E-A/C1 et la configuration des acquisitions restent inchangés.
+
+Ce correctif n'édite ni le runtime/CYD, ni une archive CPC, ni la branche J1.17-A / PR #179. Le seul déclenchement attendu du correctif via `tools/ci/opt3_routing.py` est celui des portes permanentes et d'Xtensa (`tools/ci/**`) ; **aucune acquisition CPC historique ne doit être lancée**. Le nouveau job A0 n'est pas déclenché par le seul patch de routage et de documentation ; son **auto-routage** est prouvé par le simulateur. Les preuves définitives CI se lisent dans la PR corrective sur son HEAD exact, après exécution effective et sans confondre absence de job et succès.

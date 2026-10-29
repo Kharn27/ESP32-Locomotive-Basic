@@ -28,7 +28,8 @@ FAMILIES = {
         "j1-15-a-string-scalar.yml", "j1-16-a-real5-scalar.yml",
         "j1-16-d-a-negative-store.yml", "j1-16-e-a-small-store.yml"),
     "HW4": ("hw4-c3-b1-scroll.yml", "hw4-c3-b2-scroll.yml",
-            "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml"),
+            "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
+            "hw4-scroll-opt-a0-memory.yml"),
     "XTENSA": ("ci-xtensa.yml",),
 }
 EXPECTED_ROUTES = {
@@ -46,6 +47,19 @@ EXPECTED_ROUTES = {
     "j1-16-e-a-small-store.yml": ("tools/j1_16_e_a_store.py", "tests/fixtures/cpc6128/j1_16_e_a_small_store/**"),
 }
 HISTORICAL = {x for x in FAMILIES["CPC_ACQUISITION"] if x.startswith("j1-")}
+# Explicit HW4-SCROLL-OPT-A0 trigger contract from PR #168, not a generic
+# "tools/**" or "docs/**" wildcard that would wake unrelated jobs.
+HW4_A0 = "hw4-scroll-opt-a0-memory.yml"
+HW4_A0_PATHS = (
+    "video/hw4_scroll_metrics.*",
+    "firmware/esp32_display_probe/main/hw4_c2_console.c",
+    "firmware/esp32_display_probe/main/CMakeLists.txt",
+    "tools/ci/hw4_a0_compare_memory.py",
+    "tools/hw4_scroll_a0_uart.py",
+    "tests/test_hw4_scroll_metrics_parser.py",
+    "docs/HW4-SCROLL-OPT-A0-baseline.md",
+    ".github/workflows/hw4-scroll-opt-a0-memory.yml",
+)
 
 
 class UnsafeRoute(ValueError):
@@ -110,9 +124,14 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(expected) == 30 and len(set(expected)) == 30,
+    demand(len(expected) == 31 and len(set(expected)) == 31,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(set(sources) == set(expected), "UNKNOWN_OR_MISSING_WORKFLOW")
+    a0_paths = filters(sources[HW4_A0])
+    demand(a0_paths is not None and
+           len(a0_paths) == len(HW4_A0_PATHS) and
+           set(a0_paths) == set(HW4_A0_PATHS),
+           "HW4_A0_FILTER_CONTRACT_MISMATCH")
     for name, src in sources.items():
         demand(re.search(r"(?m)^  workflow_dispatch:", src),
                "MANUAL_DISPATCH_REMOVED_" + name)
@@ -163,7 +182,19 @@ def negative_tests(sources):
         "CORE": (["core/basic_executor.c"], essential | {"XTENSA"}, set()),
         "HW4": (["video/cpc_video.c"], essential | {"XTENSA", "HW4"}, set()),
         "FIRMWARE": (["firmware/esp32_display_probe/main/hw4_c2_console.c"],
-                     essential | {"XTENSA"}, set()),
+                     essential | {"XTENSA", "HW4"}, {"CPC_ACQUISITION"}),
+        "HW4_A0_METRICS": (["video/hw4_scroll_metrics.c"],
+                          essential | {"XTENSA", "HW4"}, {"CPC_ACQUISITION"}),
+        "HW4_A0_MEMORY_TOOL": (["tools/ci/hw4_a0_compare_memory.py"],
+                              essential | {"XTENSA", "HW4"}, {"CPC_ACQUISITION"}),
+        "HW4_A0_UART_TOOL": (["tools/hw4_scroll_a0_uart.py"],
+                            essential | {"HW4"}, {"CPC_ACQUISITION", "XTENSA"}),
+        "HW4_A0_PARSER_TEST": (["tests/test_hw4_scroll_metrics_parser.py"],
+                              essential | {"HW4"}, {"CPC_ACQUISITION", "XTENSA"}),
+        "HW4_A0_BASELINE_DOC": (["docs/HW4-SCROLL-OPT-A0-baseline.md"],
+                               essential | {"HW4"}, {"CPC_ACQUISITION", "XTENSA"}),
+        "HW4_A0_SELF_EDIT": ([".github/workflows/hw4-scroll-opt-a0-memory.yml"],
+                            essential | {"HW4"}, {"CPC_ACQUISITION", "XTENSA"}),
         "ORACLE_TOOL": (["tools/j1_16_e_a_store.py"],
                         essential | {"CPC_ACQUISITION"}, {"XTENSA"}),
         "ARCHIVE_TAMPER": ([
@@ -190,6 +221,30 @@ def negative_tests(sources):
            ["tools/j1_99_unknown_oracle.py"], sources)),
            "UNREGISTERED_ORACLE_FALSELY_ACQUIRED")
     print("CI-OPT3 UNREGISTERED_ORACLE_NOT_PROMOTED")
+    # Mutate only in-memory copies: prove inventory and the exact A0 filters
+    # are fail-closed without touching historical oracle files or YAML.
+    missing_filter = sources[HW4_A0].replace(
+        "      - 'tools/ci/hw4_a0_compare_memory.py'\n", "")
+    demand(missing_filter != sources[HW4_A0], "A0_FILTER_NEGATIVE_INERT")
+    altered = {
+        "UNKNOWN_WORKFLOW": ({**sources, "unknown-extra.yml": sources[HW4_A0]},
+                             "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "REMOVED_A0": ({k: v for k, v in sources.items() if k != HW4_A0},
+                       "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "RENAMED_A0": ({**{k: v for k, v in sources.items() if k != HW4_A0},
+                        "renamed-a0.yml": sources[HW4_A0]},
+                       "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "A0_FILTER_REMOVED": ({**sources, HW4_A0: missing_filter},
+                              "HW4_A0_FILTER_CONTRACT_MISMATCH"),
+    }
+    for label, (broken, code) in altered.items():
+        try:
+            audit(broken)
+        except UnsafeRoute as exc:
+            demand(str(exc) == code, "INVENTORY_NEGATIVE_WRONG_REASON_" + label)
+        else:
+            raise UnsafeRoute("INVENTORY_NEGATIVE_ACCEPTED_" + label)
+        print("CI-OPT3 INVENTORY_FALSIFICATION_REJECTED", label, code)
 
 
 def check_diff(base, sources):
@@ -227,7 +282,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=30 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=31 FAMILIES=5")
 
 
 if __name__ == "__main__":

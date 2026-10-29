@@ -14,6 +14,7 @@
 #include "cpc_diag_policy.h"
 #include "cpc_screen_nav.h"
 #include "cpc_video.h"
+#include "hw4_scroll_metrics.h"
 #include "cyd_ili9341.h"
 #include "uart_line.h"
 #include "driver/uart.h"
@@ -67,6 +68,9 @@ static CpcUartEditor s_edit;
 static CpcScreenNavigation s_nav;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
 static size_t s_scroll_reported;
+/* A0: CONSOLE-only class counters; a scroll-associated dirty flush may
+ * also contain cursor, text or !CLS writes. Never label it scroll-exclusive. */
+static Hw4ScrollMetrics s_scroll_metrics;
 /* B2-C1 instrumentation: bounded histogram, never a second framebuffer. */
 static struct {
     uint32_t flushes, bands, max_us, histogram[12];
@@ -115,6 +119,38 @@ static void lcd_metrics_report(const char *stage)
            (unsigned)s_lcd_metrics.max_echo_batch);
 }
 
+
+static void scroll_metrics_report(const char *stage)
+{
+    Hw4ScrollMetrics *m=&s_scroll_metrics;
+    const unsigned seq=++m->report_seq;
+    printf("HW4-SCROLL-A0 SAMPLE seq=%u stage=%s text_scrolls=%u "
+           "resets=%u pending_up=%u pending_down=%u cpu_mhz=%u "
+           "bytes_per_band=%u classes=cumulative schema=1\n",
+           seq,stage,(unsigned)s_text.scrolls,(unsigned)m->resets,
+           (unsigned)m->pending_up,(unsigned)m->pending_down,
+           (unsigned)CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+           (unsigned)CYD_LCD_DMA_BYTES);
+    for(unsigned type=0U;type<2U;++type) {
+        const Hw4ScrollClass *v=&m->cls[type];
+        printf("HW4-SCROLL-A0 CLASS seq=%u name=%s flushes=%u "
+               "bands=%u spi_bytes=%llu us_total=%llu min_us=%u max_us=%u "
+               "p50_upper_us=%u p95_upper_us=%u up=%u down=%u "
+               "reset_tagged=%u hist=",
+               seq,type ? "scroll_associated" : "ordinary",
+               (unsigned)v->flushes,(unsigned)v->bands,
+               (unsigned long long)v->spi_bytes,
+               (unsigned long long)v->us_total,(unsigned)v->min_us,
+               (unsigned)v->max_us,
+               (unsigned)hw4_scroll_quantile_upper(v,50U),
+               (unsigned)hw4_scroll_quantile_upper(v,95U),
+               (unsigned)v->up,(unsigned)v->down,
+               (unsigned)v->reset_tagged);
+        for(unsigned i=0U;i<HW4_SCROLL_BINS;++i)
+            printf("%s%u",i ? "," : "",(unsigned)v->hist[i]);
+        printf("\n");
+    }
+}
 
 /* All ASCII, including the eight legacy console patterns, now uses the
  * original HW3 shared font; no local glyph copies or visual fallbacks. */
@@ -177,6 +213,7 @@ static bool send_dirty_band(void *context, unsigned row)
 }
 static bool repaint_dirty(void)
 {
+    hw4_scroll_observe_text(&s_scroll_metrics,(uint32_t)s_text.scrolls);
     if(s_video.dirty_bands!=0U) {
         unsigned sent=0U;
         uint32_t start=esp_cpu_get_cycle_count();
@@ -195,6 +232,8 @@ static bool repaint_dirty(void)
         unsigned bin=0U;
         while(bin<11U && us>s_latency_bounds_us[bin]) ++bin;
         ++s_lcd_metrics.histogram[bin];
+        if(ok) hw4_scroll_flush(&s_scroll_metrics,sent,us,
+                                (uint64_t)sent*CYD_LCD_DMA_BYTES);
         if(!ok) {
             CydLcdDiagnostics d;
             bool got=cyd_lcd_diagnostics(&d);
@@ -365,7 +404,9 @@ static bool execute_line(void)
     if(is_command(source,length,"!CLS")) {
         printf("HW4-C2 DIAGNOSTIC_SCREEN_CLEAR source=!CLS "
                "program_preserved=1\n");
+        hw4_scroll_observe_text(&s_scroll_metrics,(uint32_t)s_text.scrolls);
         if(!cpc_uart_console_clear(&s_text)) return false;
+        hw4_scroll_clear(&s_scroll_metrics,(uint32_t)s_text.scrolls);
         s_scroll_reported=0U;
         transition=CPC_READY_HOST_CLS; /* screen-only, no CPC equivalent */
     } else if(is_command(source,length,"!DEMO")) {
@@ -543,9 +584,14 @@ void app_main(void)
             const char *direction=event==UART_LINE_NAV_LEFT ? "LEFT" :
                                   event==UART_LINE_NAV_RIGHT ? "RIGHT" :
                                   event==UART_LINE_NAV_UP ? "UP" : "DOWN";
+            const unsigned edge_row=s_video.cursor_row;
             if(!cpc_screen_nav_move(&s_nav,&s_text,&s_edit,&s_line,event)) {
                 (void)fail("SCREEN_NAV",-1); return;
             }
+            if(event==UART_LINE_NAV_UP && edge_row==0U)
+                hw4_scroll_nav(&s_scroll_metrics,-1);
+            if(event==UART_LINE_NAV_DOWN && edge_row==24U)
+                hw4_scroll_nav(&s_scroll_metrics,1);
             printf("HW4-EDIT-B1-A NAV direction=%s row=%u col=%u "
                    "focus=SCREEN anchor_valid=%u step_policy=ONE_ROW\n",
                    direction,(unsigned)s_video.cursor_row,
@@ -584,6 +630,7 @@ void app_main(void)
             uart_line_ack(&s_line);
             memory_report("after_line");
             lcd_metrics_report("after_line");
+            scroll_metrics_report("after_line");
         } else if(event==UART_LINE_REJECTED) {
             echo_batch_record(echo_pending,true);
             echo_pending=0U;
@@ -596,6 +643,7 @@ void app_main(void)
                !prompt()) return;
             uart_line_ack(&s_line);
             lcd_metrics_report("after_rejected");
+            scroll_metrics_report("after_rejected");
         }
         if(echo_pending>=ECHO_MAX_BYTES) {
             if(!repaint_dirty()) return;

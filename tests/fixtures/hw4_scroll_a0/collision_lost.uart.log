@@ -1,0 +1,12 @@
+HW4-C2 START project=esp32_display_probe version=319e887 idf=v5.5.6 target=esp32 ON_DEVICE_UNVERIFIED
+HW4-C2 ORIENTATION_PASS case=9
+HW4-C2 DEVICE_MEMORY stage=interactive_ready heap8_free=252604 heap8_largest=126976 heap8_min=250000 stack_margin_bytes=4792 dma_transfers=30 dma_timeouts=0 dma_fault=0 lcd_error=ESP_OK
+HW4-C3-B2-C1 LCD_METRICS stage=after_line flushes=2 bands=27 spi_bytes=138240 scrolls=2 repaint_us_total=131000 repaint_p50_upper_us=256000 repaint_p95_upper_us=256000 repaint_max_us=130000 echo_idle_batches=0 echo_command_batches=1 echo_batch_max=10 mode=histogram_upper_bounds
+HW4-SCROLL-A0 SAMPLE seq=1 stage=after_line text_scrolls=2 resets=0 pending_up=0 pending_down=0 cpu_mhz=240 bytes_per_band=5120 classes=cumulative schema=1
+HW4-SCROLL-A0 CLASS seq=1 name=ordinary flushes=1 bands=2 spi_bytes=10240 us_total=1000 min_us=1000 max_us=1000 p50_upper_us=1000 p95_upper_us=1000 up=0 down=0 reset_tagged=0 hist=0,1,0,0,0,0,0,0,0,0,0,0
+HW4-SCROLL-A0 CLASS seq=1 name=scroll_associated flushes=1 bands=25 spi_bytes=128000 us_total=130000 min_us=130000 max_us=130000 p50_upper_us=256000 p95_upper_us=256000 up=2 down=1 reset_tagged=0 hist=0,0,0,0,0,0,0,0,0,1,0,0
+HW4-C3-B2-C1 LCD_METRICS stage=after_line flushes=4 bands=53 spi_bytes=271360 scrolls=0 repaint_us_total=302000 repaint_p50_upper_us=256000 repaint_p95_upper_us=256000 repaint_max_us=170000 echo_idle_batches=0 echo_command_batches=2 echo_batch_max=10 mode=histogram_upper_bounds
+HW4-SCROLL-A0 SAMPLE seq=2 stage=after_line text_scrolls=0 resets=1 pending_up=0 pending_down=0 cpu_mhz=240 bytes_per_band=5120 classes=cumulative schema=1
+HW4-SCROLL-A0 CLASS seq=2 name=ordinary flushes=2 bands=3 spi_bytes=15360 us_total=2000 min_us=1000 max_us=1000 p50_upper_us=1000 p95_upper_us=1000 up=0 down=0 reset_tagged=0 hist=0,2,0,0,0,0,0,0,0,0,0,0
+HW4-SCROLL-A0 CLASS seq=2 name=scroll_associated flushes=2 bands=50 spi_bytes=256000 us_total=300000 min_us=130000 max_us=170000 p50_upper_us=256000 p95_upper_us=256000 up=0 down=1 reset_tagged=1 hist=0,0,0,0,0,0,0,0,0,2,0,0
+HW4-C2 DEVICE_MEMORY stage=after_line heap8_free=252604 heap8_largest=126976 heap8_min=250000 stack_margin_bytes=4792 dma_transfers=87 dma_timeouts=0 dma_fault=0 lcd_error=ESP_OK

@@ -1,0 +1,48 @@
+name: CI-OPT3 five-family routing gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-opt3-route-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  routing-and-seal-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout proposed HEAD
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Audit five-family routes and reject false HEAD
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ci/opt3_routing.py --self-test --expect-head "$EXPECTED_HEAD"
+          if test -n "$BASE_SHA"; then
+            python3 tools/ci/opt3_routing.py --base-sha "$BASE_SHA" --expect-head "$EXPECTED_HEAD"
+          fi
+          if python3 tools/ci/opt3_routing.py --expect-head 0000000000000000000000000000000000000000 > /tmp/ci-opt3-false-head.log 2>&1; then
+            echo "CI-OPT3 FALSE_HEAD_ACCEPTED"; exit 1
+          fi
+          grep -F "OPT3_HEAD_MISMATCH" /tmp/ci-opt3-false-head.log
+          echo "CI-OPT3 FALSE_HEAD_REJECTED"
+      - name: Permanent sealed CPC D-A/E-A and C1 fraud rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_16_d_a_store.py --evidence tests/fixtures/cpc6128/j1_16_d_a_negative_store --permanent --self-test
+          python3 tools/j1_16_e_a_store.py --evidence tests/fixtures/cpc6128/j1_16_e_a_small_store --permanent --self-test
+          echo "CI-OPT3 SEALED_D_A_E_A_C1_PASS"

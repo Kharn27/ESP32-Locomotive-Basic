@@ -594,7 +594,7 @@ static BEStatus execute_line(const BasicProgram *program,
                              const BasicExecutor *executor,
                              BEEmitter *out, size_t *next, BEFlow *flow,
                              BasicVariableStore *variables,
-                             BEAssignment *assignment)
+                             BEAssignment *assignment, int *pen_event)
 {
     const uint8_t *body = program->data + line->body_offset;
     size_t length = line->body_length;
@@ -618,6 +618,41 @@ static BEStatus execute_line(const BasicProgram *program,
             /* Apostrophe marker E1BC: 01 C0, not an empty statement. */
             return comment_end(body, length, pos + 1u,
                                line->next_offset, next);
+        }
+        if (token == 0xbbu) { /* PEN (autonomous, evidence-bounded) */
+            unsigned int number;
+            int negative = 0;
+            size_t argument = pos;
+            skip_spaces(body, length, &pos);
+            if (pos == length) return BE_TRUNCATED;
+            if (pos == argument) return BE_BAD_SEQUENCE;
+            token = body[pos++];
+            if (token == 0xf5u) {
+                negative = 1;
+                if (pos == length) return BE_TRUNCATED;
+                token = body[pos++];
+            }
+            if (token >= 0x0eu && token <= 0x17u) {
+                number = (unsigned int)(token - 0x0eu);
+            } else if (token == 0x19u) {
+                if (pos == length) return BE_TRUNCATED;
+                number = (unsigned int)body[pos++];
+                if (number < 10u || number > 16u) return BE_BAD_SEQUENCE;
+            } else {
+                return unexpected(token);
+            }
+            skip_spaces(body, length, &pos);
+            if (pos != length) return BE_BAD_SEQUENCE;
+            if (negative) {
+                if (number != 1u) return BE_BAD_SEQUENCE;
+                return BE_PEN_RANGE;
+            }
+            if (number == 16u) return BE_PEN_RANGE;
+            if (number >= 5u && number <= 14u) return BE_PEN_UNVERIFIED;
+            if (pen_event == NULL) return BE_EVENT_REQUIRED;
+            *pen_event = (int)number;
+            *next = line->next_offset;
+            return BE_OK;
         }
         if (token == 0xbfu) { /* PRINT */
             argument_start = pos;
@@ -1348,8 +1383,10 @@ BEStatus be_init(BasicExecutor *executor, const BasicProgram *program)
     return be_init_with_store(executor, program, NULL);
 }
 
-BEStatus be_step(BasicExecutor *executor, uint8_t *output,
-                 size_t output_capacity, size_t *written)
+static BEStatus be_step_impl(BasicExecutor *executor, uint8_t *output,
+                             size_t output_capacity, size_t *written,
+                             BEVideoEvent *events, size_t event_capacity,
+                             size_t *event_written, int with_events)
 {
     const BasicProgram *program;
     BasicProgramLine line;
@@ -1366,7 +1403,16 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
     BEStatus status;
     size_t current;
     size_t start_pos;
+    int pen_event = -1, pen_check = -1;
+    size_t event_bytes = 0u;
 
+    if (with_events) {
+        if (events == NULL || event_written == NULL)
+            return BE_INVALID_ARGUMENT;
+        if (event_capacity > SIZE_MAX / sizeof(*events))
+            return BE_INVALID_ARGUMENT;
+        event_bytes = event_capacity * sizeof(*events);
+    }
     if (executor == NULL || output == NULL || written == NULL) {
         return BE_INVALID_ARGUMENT;
     }
@@ -1386,7 +1432,20 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
         overlaps(written, sizeof(*written), output, output_capacity) ||
         overlaps(written, sizeof(*written), executor, sizeof(*executor)) ||
         overlaps(written, sizeof(*written), program, sizeof(*program)) ||
-        overlaps(written, sizeof(*written), program->data, program->capacity)) {
+        overlaps(written, sizeof(*written), program->data, program->capacity) ||
+        (with_events && (
+         overlaps(events, event_bytes, executor, sizeof(*executor)) ||
+         overlaps(events, event_bytes, program, sizeof(*program)) ||
+         overlaps(events, event_bytes, program->data, program->capacity) ||
+         overlaps(events, event_bytes, output, output_capacity) ||
+         overlaps(events, event_bytes, written, sizeof(*written)) ||
+         overlaps(event_written, sizeof(*event_written), events, event_bytes) ||
+         overlaps(event_written, sizeof(*event_written), written, sizeof(*written)) ||
+         overlaps(event_written, sizeof(*event_written), output, output_capacity) ||
+         overlaps(event_written, sizeof(*event_written), executor, sizeof(*executor)) ||
+         overlaps(event_written, sizeof(*event_written), program, sizeof(*program)) ||
+         overlaps(event_written, sizeof(*event_written), program->data, program->capacity)))) {
+
         return BE_OVERLAP;
     }
     variables = executor->variables;
@@ -1410,7 +1469,15 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
             overlaps(variables->string_arena, variables->string_capacity, program, sizeof(*program)) ||
             overlaps(variables->string_arena, variables->string_capacity, program->data, program->capacity) ||
             overlaps(variables->string_arena, variables->string_capacity, output, output_capacity) ||
-            overlaps(variables->string_arena, variables->string_capacity, written, sizeof(*written))) {
+            overlaps(variables->string_arena, variables->string_capacity, written, sizeof(*written)) ||
+            (with_events && (
+             overlaps(events, event_bytes, variables, sizeof(*variables)) ||
+             overlaps(events, event_bytes, variables->entries, entry_bytes) ||
+             overlaps(events, event_bytes, variables->string_arena, variables->string_capacity) ||
+             overlaps(event_written, sizeof(*event_written), variables, sizeof(*variables)) ||
+             overlaps(event_written, sizeof(*event_written), variables->entries, entry_bytes) ||
+             overlaps(event_written, sizeof(*event_written), variables->string_arena,
+                      variables->string_capacity)))) {
             return BE_OVERLAP;
         }
     }
@@ -1433,7 +1500,8 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
         return BE_BAD_PROGRAM;
     }
     status = execute_line(program, &line, start_pos, executor,
-                          &probe, &next, &transition, variables, &assignment);
+                          &probe, &next, &transition, variables, &assignment,
+                          with_events ? &pen_event : NULL);
     if (status != BE_OK) {
         return status;
     }
@@ -1458,12 +1526,15 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
     if (probe.length > output_capacity) {
         return BE_NO_SPACE;
     }
+    if (with_events && pen_event >= 0 && event_capacity == 0u)
+        return BE_EVENT_NO_SPACE;
     writer.data = output;
     writer.length = 0u;
     status = execute_line(program, &line, start_pos, executor,
                           &writer, &check_next, &second_transition,
-                          variables, &second);
-    if (status != BE_OK || writer.length != probe.length || check_next != next ||
+                          variables, &second,
+                          with_events ? &pen_check : NULL);
+    if (status != BE_OK || pen_event != pen_check || writer.length != probe.length || check_next != next ||
         transition.action != second_transition.action ||
         transition.next_statement != second_transition.next_statement ||
         transition.frame.cursor != second_transition.frame.cursor ||
@@ -1523,8 +1594,32 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
         executor->for_depth = 0u;
         memset(executor->for_stack, 0, sizeof(executor->for_stack));
     }
+    if (with_events) {
+        if (pen_event >= 0) {
+            events[0].type = BE_VIDEO_SET_TEXT_PEN;
+            events[0].pen = (uint8_t)pen_event;
+        }
+        *event_written = pen_event >= 0 ? 1u : 0u;
+    }
     *written = writer.length;
     executor->statement_offset = transition.next_statement;
     executor->cursor = next;
     return BE_OK;
+}
+
+/* Legacy ABI keeps PRINT behavior but cannot silently swallow PEN. */
+BEStatus be_step(BasicExecutor *executor, uint8_t *output,
+                 size_t output_capacity, size_t *written)
+{
+    return be_step_impl(executor, output, output_capacity, written,
+                        NULL, 0u, NULL, 0);
+}
+
+BEStatus be_step_with_events(BasicExecutor *executor, uint8_t *output,
+                             size_t output_capacity, size_t *written,
+                             BEVideoEvent *events, size_t event_capacity,
+                             size_t *event_written)
+{
+    return be_step_impl(executor, output, output_capacity, written,
+                        events, event_capacity, event_written, 1);
 }

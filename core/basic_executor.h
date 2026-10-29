@@ -31,8 +31,22 @@ typedef enum {
     BE_NEXT_WITHOUT_FOR,
     BE_NEXT_VARIABLE_MISMATCH,
     BE_FOR_STACK_FULL,
-    BE_FOR_WITHOUT_NEXT
+    BE_FOR_WITHOUT_NEXT,
+    BE_EVENT_REQUIRED, /* Legacy API cannot consume PEN effects. */
+    BE_EVENT_NO_SPACE, /* Caller-owned event array lacks one slot. */
+    BE_PEN_RANGE, /* Native host diagnostic, not CPC ERR=5. */
+    BE_PEN_UNVERIFIED /* Values 5..14 not measured in J1.17-A. */
 } BEStatus;
+
+/* J1.17-B: a logical side channel, never PRINT bytes or a video driver. */
+typedef enum {
+    BE_VIDEO_SET_TEXT_PEN = 1
+} BEVideoEventType;
+
+typedef struct {
+    BEVideoEventType type;
+    uint8_t pen;
+} BEVideoEvent;
 
 /* J1.11-B: fixed per-executor call stack, no heap and no C recursion.
  * Eight nested GOSUB frames are supported; this is NOT a CPC ROM limit.
@@ -122,5 +136,19 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
  */
 BEStatus be_step(BasicExecutor *executor, uint8_t *output,
                  size_t output_capacity, size_t *written);
+
+/* Event-aware variant preserves the legacy PRINT byte channel and all
+ * preflight/commit semantics. Exactly one event for autonomous PEN 0..4,15;
+ * no event for PRINT or END. Events and *event_written are untouched on
+ * failure, including zero capacity, overlap, unsupported/unverified PEN and
+ * missing receiver. All regions must be pairwise disjoint (full capacities).
+ * Non-NULL events and event_written are required even for capacity zero.
+ * BE_OK writes *event_written = 0 or 1. No allocation or hardware callback.
+ * Legacy be_step rejects valid PEN with BE_EVENT_REQUIRED, never drops it.
+ * Events on separate numbered lines precede subsequent PRINT steps. */
+BEStatus be_step_with_events(BasicExecutor *executor, uint8_t *output,
+                             size_t output_capacity, size_t *written,
+                             BEVideoEvent *events, size_t event_capacity,
+                             size_t *event_written);
 
 #endif

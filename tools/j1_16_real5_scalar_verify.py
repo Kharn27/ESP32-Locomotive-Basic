@@ -18,9 +18,31 @@ from j1_16_real5_scalar_oracle import MAIN_CASES, EXPLORATORY, GHCR_PIN, checkou
 
 BASE = ROOT / "tests/fixtures/cpc6128/j1_16_real5_scalar"
 # Pinned independently only AFTER first real ROM acquisition, never synthesized.
-PINNED_MANIFEST_SHA = "PENDING_REAL_CPC_ACQUISITION"
-PINNED_RAM = {}
-PINNED_PRINTER = {}
+PINNED_MANIFEST_SHA = "d219da77fca0ec619565c8499583157f669532109d0c1f3e1959f2e53d697214"
+PINNED_RAM = {
+    "R_ZERO": "72ce77388872a581b5264111651e9f8731c4f445587d54049ab24a6d602cea0a",
+    "R_ONE": "6006d23f5cd752a02763abdd7ef3f5a1604fa71dbe87c3259cf029172bfe4e68",
+    "R_NEG_ONE": "0021d791866d0d37c30da31dc9b147187ac5c48ac76fc98d3cbfe7ce8c1f0d08",
+    "R_HALF": "739e9f10e3e6f00921701e94502bd60160d8a30cd6efe98e72b72369d3570fb0",
+    "R_NEG_HALF": "3f4695ed6d6f62fec96584f10374be9ef5b56e1d2c53196305be4d69ef941654",
+    "R_QUARTER": "7e8b54ec9a3107f60d3c650cffa7d937bbb3d6bccae60eb239428807b9a07314",
+    "R_EXPLICIT": "18baa3ec53a70f5a608dbad3740394ad87854c76c2a627117dc7884143eed9f8",
+    "R_REASSIGN": "6dd0f83f9c9bd5a22e4adcdec36a94de7ef70055746302af080d8ad1038a3652",
+    "R_LET": "178b1fb84ebf9e2147ab4af8bb12ba6264833d0a12ebe90e0c06ed9cc6b3cf81",
+    "R_LOWER": "b51932164a7e6c123d548e74bb1d664caed3184da2ff9e51cff500ee2e6e972a"
+}
+PINNED_PRINTER = {
+    "R_ZERO": "599e8a6c46a024ba4d2882b33a7f9a631c06fb4bc994129c6a1603f839b2da66",
+    "R_ONE": "7d86a31a45b2e1f6cbaec323f0cc3c6c42fcc8efe0c7320de54b401f44cbee1b",
+    "R_NEG_ONE": "d33b69661e641c25f83f1257283260ded56f7a58acfb482338b89908251e1d44",
+    "R_HALF": "e821b47be5f3444c89c53d832bf332f5d3a7321a350c71c383f3fecc3e01f8e4",
+    "R_NEG_HALF": "0275a7be5f43abafef60c697000626fc7bd867617c6c6bf8b9dc698d65dd1600",
+    "R_QUARTER": "ea45386340c4a3cefecfe644993e39dc3370ac7df8748934cb52b571a1a2c28e",
+    "R_EXPLICIT": "ee862da4b9f9758ee04ffedefa1166b9fd556adbadbcfad6e35a1ab8c1a61571",
+    "R_REASSIGN": "7f04908d3d02084a0d08e8ff6dfbea68cbebb7fe5efba59e2e5874740b578aa2",
+    "R_LET": "ee862da4b9f9758ee04ffedefa1166b9fd556adbadbcfad6e35a1ab8c1a61571",
+    "R_LOWER": "ee862da4b9f9758ee04ffedefa1166b9fd556adbadbcfad6e35a1ab8c1a61571"
+}
 
 class Invalid(ValueError):
     pass
@@ -211,6 +233,16 @@ def verify(base, permanent=False):
                     name+": FULL_INVENTORY_CHANGED_"+mode)
             checks.append((rom,printer))
         require(checks[0]==checks[1],name+": TWO_ROM_PROCESS_PAIRS_DIFFER")
+        require(item["original"]["pre_run"]["session_start_utc"] !=
+                item["repeat"]["pre_run"]["session_start_utc"] and
+                item["original"]["run"]["session_start_utc"] !=
+                item["repeat"]["run"]["session_start_utc"] and
+                all(item[mode]["pre_run"]["session_start_utc"] <=
+                    item[mode]["pre_run"]["session_end_utc"] and
+                    item[mode]["run"]["session_start_utc"] <=
+                    item[mode]["run"]["session_end_utc"]
+                    for mode in ("original","repeat")),
+                name+": NON_INDEPENDENT_CPC_SESSIONS")
     require(len(m.get("explorations",[]))==len(EXPLORATORY) and
             [i["case"] for i in m["explorations"]]==list(EXPLORATORY),
             "EXPLORATORY_CASES_MISSING")
@@ -276,6 +308,60 @@ def falsify(base):
             else:
                 raise Invalid("ACCEPTED_MUTATION_"+label)
             path.write_bytes(old)
+        # Manifest-level adversarial attacks: fail with a specific reason,
+        # independently of the final SHA seal, on an already verified corpus.
+        manifest_path = t/"manifest.json"
+        authentic_manifest = read(manifest_path)
+        def attack(label, mutate, expected):
+            obj = json.loads(authentic_manifest)
+            mutate(obj)
+            manifest_path.write_text(json.dumps(obj)+"\\n")
+            try:
+                verify(t, permanent=True)
+            except Invalid as exc:
+                require(expected in str(exc), "WRONG_MUTATION_CAUSE_"+label+":"+str(exc))
+                print("PASS J1.16-A REJECTED_"+label+" "+str(exc),flush=True)
+            else:
+                raise Invalid("ACCEPTED_"+label)
+            finally:
+                manifest_path.write_bytes(authentic_manifest)
+        attack("DUPLICATED_CASE",
+               lambda x: x["captures"][1].update(case=x["captures"][0]["case"]),
+               "MISSING_OR_ADDED_CASE")
+        attack("MISSING_CANDIDATE",
+               lambda x: x["captures"].pop(), "MISSING_OR_ADDED_CASE")
+        attack("SCREEN_AS_PRINTER",
+               lambda x: x.update(printer_is_screen_output=True),
+               "PROVENANCE_MANIFEST_INVALID")
+        attack("FORGED_ROM_SHA",
+               lambda x: x["oracle"].update(rom_sha256="0"*64),
+               "UNPINNED_ROM_OR_MODEL")
+        attack("FORGED_CHECKOUT",
+               lambda x: x.update(github_head_sha="0"*40),
+               "PROVISIONAL_SEAL_MISMATCH")
+        attack("PROMOTED_EXPLORATION",
+               lambda x: x["explorations"][0].update(scope="PROMOTED_J1_16_B"),
+               "EXPLORATORY_BOUNDS_OR_EVIDENCE_CHANGED")
+        attack("CONTRADICTORY_REPEAT_SESSION",
+               lambda x: x["captures"][0]["repeat"]["run"].update(
+                   session_start_utc=x["captures"][0]["original"]["run"]["session_start_utc"]),
+               "NON_INDEPENDENT_CPC_SESSIONS")
+        attack("SOURCE_PATH_FORGED",
+               lambda x: x["captures"][0].update(source_path="tests/oracles/inputs/fake.bas"),
+               "ACQUISITION_CLAIM_CHANGED")
+        # Cross-channel and cross-case falsifications on independent files.
+        second=MAIN_CASES[1]
+        swapped=t/"original"/name/"run/printer.dat"
+        authentic_printer=read(swapped)
+        swapped.write_bytes(read(t/"original"/second/"run/printer.dat"))
+        try:
+            verify(t,permanent=True)
+        except Invalid as exc:
+            require("REAL5_TRACE_OR_PROBES_CHANGED" in str(exc),
+                    "WRONG_CROSS_CASE_PRINTER_CAUSE:"+str(exc))
+            print("PASS J1.16-A REJECTED_CROSS_CASE_PRINTER",flush=True)
+        else: raise Invalid("ACCEPTED_CROSS_CASE_PRINTER")
+        finally: swapped.write_bytes(authentic_printer)
         # File deletion must fail before optional checksum checks.
         missing=t/"repeat"/name/"program.bin"
         missing.unlink()
@@ -289,7 +375,7 @@ def falsify(base):
         try: checkout_identity(false)
         except ValueError: print("PASS J1.16-A REJECTED_FALSE_HEAD",flush=True)
         else: raise Invalid("ACCEPTED_FALSE_HEAD")
-    print("PASS J1.16-A 12 MUTATIONS + FALSE HEAD",flush=True)
+    print("PASS J1.16-A 21 MUTATIONS + FALSE HEAD",flush=True)
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)

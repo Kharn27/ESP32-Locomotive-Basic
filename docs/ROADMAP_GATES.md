@@ -545,3 +545,5 @@ Le Pilotage autorise J1.15-B dans [#147](https://github.com/Kharn27/ESP32-Locomo
 ### Barrière J1.16-A — oracle REAL5 scalaire (29 octobre 2026)
 
 L'[issue #157](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/157) autorise seulement l'acquisition indépendante ROM des dix candidats REAL5 et des deux explorations ; permanence des preuves RAM/PRINT #8, double session, falsifications et CI complète sans modifier aucun runtime/HW. Base `main@249725779005fcd57898104fc4a419a015ff2ac6`. **J1.16-B NON AUTORISÉE.** Acceptation et fusion réservées au Pilotage ; aucune validation CYD physique nécessaire.
+
+**Acquisition initiale J1.16-A (run 40874551053) :** dix candidats ROM double pré-RUN et double RUN capturés, `MATCH_EXACT` RAM/imprimante sur chaque paire, dix classifications C99 `UNSUPPORTED` ; `seal.json` provisoire `PENDING_PILOTAGE`, manifeste SHA-256 `d219da77fca0ec619565c8499583157f669532109d0c1f3e1959f2e53d697214`. Les deux explorations restent hors gate. Falsifications et HEAD final soumis à la CI et au Pilotage.

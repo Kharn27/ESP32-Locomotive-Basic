@@ -672,3 +672,6 @@ Mandat [#144](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/144), bas
 
 ### J1.15-B — Variables STRING scalaires C99 (29 octobre 2026)
 Mandat [#147](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/147), base `e019a0cdd67730df21b8737d62e32fb6f1ffe2ea`. Implémentation native bornée proposée dans la [PR #148](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/148), en revue Pilotage, non fusionnée. Aucune arène raccordée à la CYD, `ON_DEVICE_UNVERIFIED`. [Rapport](J1.15-B-string-scalar-native.md).
+
+### J1.15-C — Intégration arène STRING CYD (29 octobre 2026)
+Mandat autorisé [#152](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/152), base vérifiée `main@ed7c82a4cb0ae08c853710ece6bffb098887999f` intégrant la PR #148 J1.15-B. Branche dédiée `feat/j1-15-c-cyd-string-arena`, PR et CI du HEAD à vérifier. CONSOLE uniquement : 64 variables × 64 octets (4096 octets de BSS statique dans `s_basic`), sans PSRAM ni malloc, aucun nouveau BASIC STRING. Garde Xtensa mémoire adaptée strictement à ce profil, tests C99 et firmware/historique préservés. **ON_DEVICE_UNVERIFIED**, validation UART/LCD/RAM/DMA par le PO obligatoire avant décision/fusion Pilotage ; aucun statut définitif revendiqué. [Rapport et protocole](J1.15-C-cyd-string-arena.md). La ligne ci-dessus « B en revue » est une photographie historique avant l'intégration #148.

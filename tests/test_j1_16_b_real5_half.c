@@ -52,6 +52,14 @@ static int oracle(F *f,const char *dir) {
     CHECK(memcmp(bytes,l10,sizeof(l10))==0 && memcmp(bytes+sizeof(l10),l20,sizeof(l20))==0);
     CHECK(memcmp(bytes+sizeof(l10)+sizeof(l20),instrumented,sizeof(instrumented))==0);
     CHECK(bytes[sizeof(l10)+sizeof(l20)+sizeof(instrumented)+2u]==40u);
+    if(f->program.size!=sizeof(l10)+sizeof(l20)+sizeof(native_end)+2u) {
+        size_t d;
+        fprintf(stderr,"diagnostic native_size=%zu expected=%zu\\n",f->program.size,
+                sizeof(l10)+sizeof(l20)+sizeof(native_end)+2u);
+        for(d=0u;d<f->program.size && d<80u;++d)
+            fprintf(stderr,"%02X%s",(unsigned)f->storage[d],(d+1u)%16u?" ":"\\n");
+        fprintf(stderr,"\\n");
+    }
     CHECK(f->program.size==sizeof(l10)+sizeof(l20)+sizeof(native_end)+2u);
     CHECK(memcmp(f->storage,bytes,sizeof(l10)+sizeof(l20))==0);
     CHECK(memcmp(f->storage+sizeof(l10)+sizeof(l20),native_end,sizeof(native_end))==0);

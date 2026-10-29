@@ -469,7 +469,8 @@ if(BUILD_TESTING)
 
     add_executable(test_hw4_ready_a tests/test_hw4_ready_a.c)
     target_link_libraries(test_hw4_ready_a PRIVATE
-                          cpc_ready_policy cpc_uart_console basic_session_runtime)
+                          cpc_ready_policy cpc_uart_console cpc_boot uart_line
+                          basic_session_runtime)
     add_test(NAME hw4_ready_a_real_policy_vram_runtime COMMAND test_hw4_ready_a)
 
     add_executable(test_hw4_c2_integration tests/test_hw4_c2_integration.c)

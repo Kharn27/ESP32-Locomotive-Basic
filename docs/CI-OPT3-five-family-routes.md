@@ -2,16 +2,26 @@
 
 **Mandat :** [Pilotage #174](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/174), phases A/B autorisées après acceptation de [#172](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/172). **Base effective :** `main@86d04e69c9620a7825903e704d72041cf19a35d4`. **PR :** [#175](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/175). Aucun changement au moteur BASIC/firmware, aux snapshots ou aux sceaux SHA.
 
+## CI-OPT3-C1 — correctif post-fusion A0 (29 octobre 2026)
+
+Le [mandat Pilotage](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/168#issuecomment-6509023806) demande de réparer la porte de routage après la fusion de la PR A0 #168 sur `main@8fe1ab63e53662910bf174f72445d001c03b5a29`. Le [run RED #40960027347](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40960027347) produit `CI-OPT3 FAIL UNKNOWN_OR_MISSING_WORKFLOW` : 31 fichiers `.github/workflows/*.yml` sont présents pour 30 enregistrés.
+
+**Inventaire désormais attendu : 31 workflows, cinq familles inchangées** : C99 3, CPC permanent 2, CPC acquisition 19, HW4 **6**, Xtensa 1. L'unique nouveau membre est `hw4-scroll-opt-a0-memory.yml`, dans HW4. Ses huit filtres de chemins sont vérifiés exactement, y compris son propre fichier. Les neuf scénarios historiques sont conservés ; les nouveaux contrôles prouvent le routage des fichiers A0, l'absence d'activation par ROADMAP/core/oracle inconnu, le rejet d'un workflow manquant et le rejet d'une substitution inconnue à **31 fichiers**.
+
+La porte exige toujours `workflow_dispatch`, rejette `UNKNOWN_OR_MISSING_WORKFLOW`, le faux HEAD et les régressions sur les sceaux CPC D-A/E-A. Les **30 workflows** mentionnés dans le bilan historique désignent l'état **avant** fusion #168, pas l'inventaire courant.
+
+**Impact A0 et CYD : aucun.** Aucun fichier firmware, vidéo, BASIC, pilote ou archive CPC n'est modifié. Le Pilotage indique que la baseline CYD A0 est déjà physiquement validée : pas de nouveau flash.
+
 ## Inventaire vérifiable, avant/après
 
-La référence CI-OPT2 comptait **28 workflows** avant l'oracle E-A. Après la fusion #172, **29 fichiers `.github/workflows/*.yml`** existent dans `main`, incluant `j1-16-e-a-small-store.yml`. CI-OPT3 ajoute la porte stable `ci-opt3-routing.yml`, soit **30 fichiers**, répartis sans doublon dans les cinq propriétaires suivants :
+La référence CI-OPT2 comptait **28 workflows** avant l'oracle E-A. Après la fusion #172, **29 fichiers `.github/workflows/*.yml`** existent dans `main`, incluant `j1-16-e-a-small-store.yml`. CI-OPT3 ajoute la porte stable `ci-opt3-routing.yml`, soit **30 fichiers à la livraison initiale de CI-OPT3**, répartis sans doublon dans les cinq propriétaires suivants :
 
 | Famille | Fichiers de workflow | Preuve/sortie propriétaire |
 |---|---|---|
 | **C99** (3) | `basic-program.yml`, `ci-arch.yml`, **`ci-opt3-routing.yml`** | Matrice complète GCC/Clang × sanitizers OFF/ON, isolation ARCH et contrôle permanent du routage |
 | **CPC permanent** (2) | `ci-cpc-permanent.yml`, `cpc-oracle.yml` | SHA scellés, falsifications, historique CPC ; oracle indépendant sous conditions de chemins |
 | **CPC acquisition** (19) | `cpc-oracle-image.yml` et les 18 workflows `j1-*-a`, `j1-12-b1`, `j1-16-d-a`, `j1-16-e-a` détaillés ci-dessous | Nouvelle acquisition Caprice32 GHCR épinglé / ROM CPC historique ; seulement si mission et chemin pertinent, `workflow_dispatch` conservé |
-| **HW4** (5) | `hw4-c3-b1-scroll.yml`, `hw4-c3-b2-scroll.yml`, `hw4-diag-a.yml`, `hw4-edit-p1.yml`, `hw4-ready-a.yml` | Vidéo/scroll/éditeur/UART, tests C99 et acquisition d'écran ciblés |
+| **HW4** (6) | `hw4-c3-b1-scroll.yml`, `hw4-c3-b2-scroll.yml`, `hw4-diag-a.yml`, `hw4-edit-p1.yml`, `hw4-ready-a.yml`, **`hw4-scroll-opt-a0-memory.yml`** | Vidéo/scroll/éditeur/UART, tests C99 et acquisition d'écran ciblés |
 | **Xtensa** (1) | `ci-xtensa.yml` | Trois profils ESP-IDF v5.5.6, ABI, budgets, `one app_main` ; filtré par sources cible, build et `tools/ci/**` |
 
 **Tous les 18 workflows CPC historiques conservés :** `j1-2-a-boundaries.yml`, `j1-3-a-subtraction.yml`, `j1-4-a-multiplication.yml`, `j1-5-a-division.yml`, `j1-6-a-mod.yml`, `j1-7-a-add-vars.yml`, `j1-8-a-sub-vars.yml`, `j1-9-a-binary-family.yml`, `j1-10-a-if-then.yml`, `j1-11-a-gosub-return.yml`, `j1-12-a-for-next-integer.yml`, `j1-12-b1-cpc-reacquire.yml`, `j1-13-a-integer-relations.yml`, `j1-14-a-if-inline-else.yml`, `j1-15-a-string-scalar.yml`, `j1-16-a-real5-scalar.yml`, `j1-16-d-a-negative-store.yml`, `j1-16-e-a-small-store.yml`.
@@ -33,7 +43,7 @@ vidéo / éditeur / UART"]
 non annulable"| PERM
 ```
 
-La classification est **conceptuelle**, sans remplacer les workflows d'oracle existants par un simulateur. Le script `tools/ci/opt3_routing.py` lit et audite les véritables fichiers YAML ; il vérifie leur propriétaire, les filtres, les dépendances E-A/D-A, les chemins source/archive, et rejette toute apparition d'un 31e workflow non intégré. La porte `CI-OPT3 five-family routing gate` reste **toujours déclenchée** sur les PR et sur `main`.
+La classification est **conceptuelle**, sans remplacer les workflows d'oracle existants par un simulateur. Le script `tools/ci/opt3_routing.py` lit et audite les véritables fichiers YAML ; il vérifie leur propriétaire, les filtres, les dépendances E-A/D-A, les chemins source/archive, et rejette tout workflow non enregistré (y compris un remplacement furtif à inventaire de taille inchangée). La porte `CI-OPT3 five-family routing gate` reste **toujours déclenchée** sur les PR et sur `main`.
 
 ## Routage avant/après et garanties
 

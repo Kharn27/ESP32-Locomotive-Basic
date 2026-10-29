@@ -28,7 +28,8 @@ FAMILIES = {
         "j1-15-a-string-scalar.yml", "j1-16-a-real5-scalar.yml",
         "j1-16-d-a-negative-store.yml", "j1-16-e-a-small-store.yml"),
     "HW4": ("hw4-c3-b1-scroll.yml", "hw4-c3-b2-scroll.yml",
-            "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml"),
+            "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
+            "hw4-scroll-opt-a0-memory.yml"),
     "XTENSA": ("ci-xtensa.yml",),
 }
 EXPECTED_ROUTES = {
@@ -46,6 +47,17 @@ EXPECTED_ROUTES = {
     "j1-16-e-a-small-store.yml": ("tools/j1_16_e_a_store.py", "tests/fixtures/cpc6128/j1_16_e_a_small_store/**"),
 }
 HISTORICAL = {x for x in FAMILIES["CPC_ACQUISITION"] if x.startswith("j1-")}
+A0_WORKFLOW = "hw4-scroll-opt-a0-memory.yml"
+A0_PATHS = (
+    "video/hw4_scroll_metrics.*",
+    "firmware/esp32_display_probe/main/hw4_c2_console.c",
+    "firmware/esp32_display_probe/main/CMakeLists.txt",
+    "tools/ci/hw4_a0_compare_memory.py",
+    "tools/hw4_scroll_a0_uart.py",
+    "tests/test_hw4_scroll_metrics_parser.py",
+    "docs/HW4-SCROLL-OPT-A0-baseline.md",
+    ".github/workflows/hw4-scroll-opt-a0-memory.yml",
+)
 
 
 class UnsafeRoute(ValueError):
@@ -110,9 +122,14 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(expected) == 30 and len(set(expected)) == 30,
-           "DUPLICATE_OR_MISSING_FAMILY")
+    demand(len(FAMILIES) == 5 and len(expected) == 31 and
+           len(set(expected)) == 31, "DUPLICATE_OR_MISSING_FAMILY")
     demand(set(sources) == set(expected), "UNKNOWN_OR_MISSING_WORKFLOW")
+    # Fail closed on broadening A0 inputs: all eight narrow paths are required,
+    # including its own workflow file; no blanket video/core/ROM trigger.
+    a0_filters = filters(sources[A0_WORKFLOW])
+    demand(a0_filters is not None and len(a0_filters) == len(A0_PATHS)
+           and set(a0_filters) == set(A0_PATHS), "A0_ROUTE_DRIFT")
     for name, src in sources.items():
         demand(re.search(r"(?m)^  workflow_dispatch:", src),
                "MANUAL_DISPATCH_REMOVED_" + name)
@@ -190,6 +207,45 @@ def negative_tests(sources):
            ["tools/j1_99_unknown_oracle.py"], sources)),
            "UNREGISTERED_ORACLE_FALSELY_ACQUIRED")
     print("CI-OPT3 UNREGISTERED_ORACLE_NOT_PROMOTED")
+    # Preserve the nine historical scenarios; add focused A0 route proofs.
+    for label, path in (
+        ("METRICS", "video/hw4_scroll_metrics.c"),
+        ("FIRMWARE", "firmware/esp32_display_probe/main/hw4_c2_console.c"),
+        ("MEM_COMPARE", "tools/ci/hw4_a0_compare_memory.py"),
+        ("UART_PARSER", "tools/hw4_scroll_a0_uart.py"),
+        ("PARSER_TESTS", "tests/test_hw4_scroll_metrics_parser.py"),
+        ("WORKFLOW_SELF", ".github/workflows/hw4-scroll-opt-a0-memory.yml"),
+    ):
+        demand(A0_WORKFLOW in triggered_names([path], sources) and
+               "HW4" in family_routes([path], sources),
+               "A0_ROUTE_MISSING_" + label)
+        print("CI-OPT3 A0_ROUTE_PASS", label)
+    for label, path in (
+        ("ROADMAP", "docs/ROADMAP_GATES.md"),
+        ("CORE", "core/basic_executor.c"),
+        ("UNKNOWN_ORACLE", "tools/j1_99_unknown_oracle.py"),
+    ):
+        demand(A0_WORKFLOW not in triggered_names([path], sources),
+               "A0_FALSE_TRIGGER_" + label)
+        print("CI-OPT3 A0_NOT_TRIGGERED", label)
+
+    # Removal and substitution of a registered workflow must both fail even
+    # when a substituted unknown name preserves the total count of 31.
+    for label, modified in (
+        ("A0_MISSING", {n: src for n, src in sources.items()
+                        if n != A0_WORKFLOW}),
+        ("UNKNOWN_REPLACEMENT",
+         {("unregistered-shadow.yml" if n == A0_WORKFLOW else n): src
+          for n, src in sources.items()}),
+    ):
+        try:
+            audit(modified)
+        except UnsafeRoute as error:
+            demand(str(error) == "UNKNOWN_OR_MISSING_WORKFLOW",
+                   "FAIL_CLOSED_WRONG_REASON_" + label)
+        else:
+            raise UnsafeRoute("FAIL_CLOSED_NOT_ENFORCED_" + label)
+        print("CI-OPT3 UNKNOWN_WORKFLOW_REJECTED", label)
 
 
 def check_diff(base, sources):
@@ -227,7 +283,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=30 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=31 FAMILIES=5")
 
 
 if __name__ == "__main__":

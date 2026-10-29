@@ -1,0 +1,28 @@
+{
+  "acquisition_head_sha": "f9e2bb363fdc9f48e2263db7265d9bb462ca3fea",
+  "acquisition_run_id": "40917058380",
+  "caprice_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+  "cases": {
+    "R_NEG_ONE": {
+      "equal_value": true,
+      "original": "8c4fb849ea0ed37c07c3390392e1f769425379c96b598c9a04145d371cab9233",
+      "repeat": "a9ebea3b72b380533de73be3713d7e47bf41cfeb555413a4e4fa3b6e481f8477"
+    },
+    "R_ONE": {
+      "equal_value": true,
+      "original": "97b3d8e3b890b93dcd6f1c6598c66bf1bf38b61bc91c459756f94b0a00487fe5",
+      "repeat": "d4fb4c1a8f0dd719a95e45428742712841680afca2f8dacda1d790dc2960cc44"
+    },
+    "R_ZERO": {
+      "equal_value": true,
+      "original": "96b0c822d221456527ee4af34a5b71a60a3ee939cf4726f88cb1ea73a67235a6",
+      "repeat": "d4e6647bafdbc1d1da64085db62322cc336516fff7ee6fd0f62b4a02effb378d"
+    }
+  },
+  "classification": "STORE_SCALAR_REAL5_OBSERVED",
+  "historical_manifest_sha256": "d219da77fca0ec619565c8499583157f669532109d0c1f3e1959f2e53d697214",
+  "phase": "J1.16-E-A",
+  "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+  "schema_version": 1,
+  "stop_instrumentation": "INSERT_ONLY_15_STOP_KEEP_L10_L20"
+}

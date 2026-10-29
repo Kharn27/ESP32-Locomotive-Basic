@@ -3,10 +3,10 @@ name: HW4-READY-A A0 independent CPC screen transitions
 on:
   pull_request:
     paths:
-      - 'tools/hw4_ready_a_cpc.py'
+      - 'tools/hw4_ready_a_v2_cpc.py'
       - '.github/workflows/hw4-ready-a.yml'
       - 'docs/HW4-READY-A-cpc-transitions.md'
-      - 'tests/fixtures/cpc6128/hw4_ready_a/**'
+      - 'tests/fixtures/cpc6128/hw4_ready_a_v2/**'
   workflow_dispatch:
 
 permissions:
@@ -48,15 +48,15 @@ jobs:
           test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
           test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
           cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
-          python3 tools/hw4_ready_a_cpc.py --self-test
+          python3 tools/hw4_ready_a_v2_cpc.py --self-test
       - name: Acquire two fresh CPC process screenshots per transition
         run: |
           set -euo pipefail
-          python3 tools/hw4_ready_a_cpc.py --caprice tests/oracles/caprice32 --output "$RUNNER_TEMP/hw4-ready-a-cpc"
+          python3 tools/hw4_ready_a_v2_cpc.py --caprice tests/oracles/caprice32 --output "$RUNNER_TEMP/hw4-ready-a-cpc"
       - name: Archive original captures once without rewriting any historical fixture
         run: |
           set -euo pipefail
-          DEST=tests/fixtures/cpc6128/hw4_ready_a
+          DEST=tests/fixtures/cpc6128/hw4_ready_a_v2
           if test ! -e "$DEST"; then
             mkdir -p "$DEST"
             cp -a "$RUNNER_TEMP/hw4-ready-a-cpc/." "$DEST/"
@@ -74,7 +74,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: hw4-ready-a-a0-independent-cpc-screen
+          name: hw4-ready-a-a0-v2-clean-cursor
           path: ${{ runner.temp }}/hw4-ready-a-cpc/
           if-no-files-found: warn
           retention-days: 30

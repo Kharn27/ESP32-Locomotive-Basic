@@ -716,3 +716,13 @@ if(BUILD_TESTING)
              "${CMAKE_CURRENT_SOURCE_DIR}/tests/oracles/inputs/j1_15_a"
              "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_15_string_scalar")
 endif()
+
+# J1.15-C: console-owned 64x64 arena, exact production header and negative edges.
+if(BUILD_TESTING)
+    add_executable(test_j1_15_c_cyd_arena tests/test_j1_15_c_cyd_arena.c)
+    target_include_directories(test_j1_15_c_cyd_arena PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main)
+    target_link_libraries(test_j1_15_c_cyd_arena PRIVATE
+        basic_session_runtime basic_variable_store)
+    add_test(NAME j1_15_c_cyd_console_string_arena COMMAND test_j1_15_c_cyd_arena)
+endif()

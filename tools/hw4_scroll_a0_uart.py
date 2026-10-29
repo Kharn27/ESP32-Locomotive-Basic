@@ -86,7 +86,8 @@ def analyze(log, *, sha, idf, profile, spi_hz, cpu_mhz, orientation=9,
             require_bidirectional=False):
     require(re.fullmatch(r"[0-9a-f]{40}", sha) is not None, "full SHA required")
     require(profile == "CONSOLE", "only CONSOLE is instrumented")
-    require(spi_hz > 0 and cpu_mhz > 0, "frequency manifest required")
+    require(spi_hz == 20000000 and cpu_mhz > 0,
+            "SPI manifest must match driver LCD_CLOCK_HZ=20000000")
     require(orientation == 9, "orientation case 9 required")
     require("HW4-C2 START " in log and "HW4-C2 ORIENTATION_PASS case=9" in log,
             "boot/orientation evidence missing")
@@ -98,6 +99,16 @@ def analyze(log, *, sha, idf, profile, spi_hz, cpu_mhz, orientation=9,
                          or sha.startswith(version)), "app version/SHA conflict")
     require("LCD_FAIL_STOP" not in log and "HW4-C2 FAIL " not in log and
             "MEMORY_FAIL" not in log, "hardware failure in log")
+    memory = [fields(line, " DEVICE_MEMORY ") for line in log.splitlines()
+              if " DEVICE_MEMORY " in line]
+    require(any(m.get("stage") == "after_line" for m in memory),
+            "post-command DEVICE_MEMORY evidence missing")
+    for m in memory:
+        require(number(m, "dma_fault") == 0 and
+                number(m, "dma_timeouts") == 0 and
+                m.get("lcd_error") == "ESP_OK", "DMA/LCD health failure")
+        require(number(m, "heap8_free") > 0 and
+                number(m, "stack_margin_bytes") > 0, "invalid heap/stack evidence")
     old, sample, classes = {}, {}, {}
     snapshots = []
     for line in log.splitlines():
@@ -153,6 +164,12 @@ def analyze(log, *, sha, idf, profile, spi_hz, cpu_mhz, orientation=9,
                         for i in range(12):
                             require(snapshot[name]["hist"][i] >= prev[name]["hist"][i],
                                     "cumulative histogram reversed")
+                    if snapshot["resets"] == prev["resets"]:
+                        require(snapshot["text_scrolls"] >= prev["text_scrolls"],
+                                "text scroll counter reset not reported")
+                    prev_sc = prev["scroll_associated"]["up"] + prev["scroll_associated"]["down"] + prev["pending_up"] + prev["pending_down"]
+                    this_sc = snapshot["scroll_associated"]["up"] + snapshot["scroll_associated"]["down"] + snapshot["pending_up"] + snapshot["pending_down"]
+                    require(this_sc >= prev_sc, "scroll event total reversed")
                     delta_resets = snapshot["resets"] - prev["resets"]
                     delta_tag = sum(snapshot[n]["reset_tagged"] -
                                     prev[n]["reset_tagged"] for n in

@@ -176,7 +176,10 @@ static int source_negative(void) {
 }
 static int submit_negative(void) {
     static const char *bad[]={"10 A=0.1","10 A=-1.25","10 A=1.20",
-       "10 A=1.25:PRINT A","20 PRINT A:PRINT A","10 A!=1.5","10 B=1.25","10 a=1.25"};
+       "10 A=-0.5X","10 A=-0.50","10 A=-0.5:PRINT A",
+       "10 LET A=-0.5","10 B=-0.5","10 a=-0.5",
+       "10 A=1.25:PRINT A","20 PRINT A:PRINT A","10 A!=1.5",
+       "10 B=1.25","10 a=1.25"};
     F f;size_t i;CHECK(init(&f)==0 && populate(&f)==0);
     for(i=0u;i<sizeof(bad)/sizeof(bad[0]);++i){
         uint8_t program[sizeof(f.storage)],output[sizeof(f.output)];

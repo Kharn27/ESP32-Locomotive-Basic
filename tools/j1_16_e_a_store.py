@@ -465,7 +465,16 @@ def main():
     p.add_argument("--permanent",action="store_true",
                    help="require independent SHA-256 pins for the archived CPC windows")
     p.add_argument("--check-sources",action="store_true")
+    p.add_argument("--expect-head",help="require the exact Git checkout SHA")
     args=p.parse_args()
+    if args.expect_head:
+        check(len(args.expect_head)==40 and
+              all(c in "0123456789abcdef" for c in args.expect_head),
+              "EXPECTED_HEAD_MALFORMED")
+        actual=subprocess.check_output(
+            ["git","-C",str(ROOT),"rev-parse","HEAD"],text=True).strip()
+        check(actual==args.expect_head,
+              "EXPECTED_HEAD_MISMATCH expected="+args.expect_head+" actual="+actual)
     for case in CASES:
         old_oracle(case)
         stopped_source(case)

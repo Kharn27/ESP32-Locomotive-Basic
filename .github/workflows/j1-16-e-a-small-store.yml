@@ -52,8 +52,13 @@ jobs:
           if grep -E '^(core/|firmware/|video/|hal/|io/|tests/fixtures/cpc6128/j1_16_real5_scalar/|tests/oracles/inputs/|tests/oracles/caprice32/)' /tmp/j116-ea-paths.txt; then
             echo 'J1.16-E-A MODIFIED_NATIVE_OR_HISTORICAL_PATH'; exit 1
           fi
-          python3 tools/j1_16_e_a_store.py --check-sources
-          echo 'J1.16-E-A PINNED_ROM_CPC6128 APT_NONE CAPRICE_BUILD_NONE'
+          python3 tools/j1_16_e_a_store.py --check-sources --expect-head "$GITHUB_HEAD_SHA"
+          WRONG_HEAD=0000000000000000000000000000000000000000
+          if python3 tools/j1_16_e_a_store.py --check-sources --expect-head "$WRONG_HEAD" >/tmp/e-a-false-head.log 2>&1; then
+            echo 'J1.16-E-A FALSE_HEAD_INCORRECTLY_ACCEPTED'; exit 1
+          fi
+          grep -F 'EXPECTED_HEAD_MISMATCH' /tmp/e-a-false-head.log
+          echo 'J1.16-E-A FALSE_HEAD_REJECTED PINNED_ROM_CPC6128 APT_NONE CAPRICE_BUILD_NONE'
 
       - name: Acquire six fresh STOP boundary CPC snapshots (two per case)
         shell: bash

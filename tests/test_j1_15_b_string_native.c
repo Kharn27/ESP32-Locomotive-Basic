@@ -77,6 +77,46 @@ static int roundtrip(Fixture *f) {
     CHECK(memcmp(f->again.data,f->program.data,f->program.size)==0);
     return 0;
 }
+/* C1 proof: a single executed print, never merely a PRINT keyword
+ * in the source or two equivalent outputs. Empty STRING still emits LF. */
+static int witness_event(size_t *events, const uint8_t *output,
+                         size_t written, const char *expected)
+{
+    const size_t length = strlen(expected);
+    if (written == 0u) return 1; /* Silent assignment or control step. */
+    ++*events; /* Count BEFORE comparison: duplicates fail closed. */
+    return *events == 1u && written == length + 1u &&
+           memcmp(output,expected,length) == 0 &&
+           output[length] == (uint8_t)'\n';
+}
+static int witness_complete(size_t events, int saw_end, BSRState state)
+{
+    return events == 1u && saw_end && state == BSR_IDLE;
+}
+/* Independent falsifications of the same helpers used by the corpus. */
+static int witness_negative_controls(void)
+{
+    const uint8_t hello[] = "BONJOUR\n";
+    const uint8_t empty[] = "\n";
+    size_t events = 0u;
+    CHECK(!witness_complete(events,1,BSR_IDLE)); /* zero prints */
+    CHECK(witness_event(&events,hello,sizeof(hello)-1u,"BONJOUR"));
+    CHECK(witness_complete(events,1,BSR_IDLE));
+    CHECK(!witness_complete(events,0,BSR_IDLE)); /* no BSR_END */
+    CHECK(!witness_complete(events,1,BSR_RUNNING));
+    CHECK(!witness_event(&events,hello,sizeof(hello)-1u,"BONJOUR"));
+    CHECK(events == 2u && !witness_complete(events,1,BSR_IDLE));
+    events = 0u;
+    CHECK(witness_event(&events,empty,1u,"")); /* S_EMPTY is one LF */
+    CHECK(witness_complete(events,1,BSR_IDLE));
+    events = 0u;
+    CHECK(!witness_event(&events,hello,sizeof(hello)-1u,"BONJOUX"));
+    events = 0u;
+    CHECK(!witness_event(&events,hello,1u,"BONJOUR"));
+    puts("J1.15-B C1 ZERO_PRINT_REJECTED DOUBLE_IDENTICAL_PRINT_REJECTED EMPTY_STRING_LF_PASS");
+    return 0;
+}
+
 static int corpus(const char *sources,const char *archives) {
     struct {const char *id;const char *expect;} cases[]={
         {"s_empty",""}, {"s_one","X"},{"s_hello","BONJOUR"},
@@ -91,7 +131,8 @@ static int corpus(const char *sources,const char *archives) {
         char path[512],line[512];
         FILE *fp;
         size_t expected_len=strlen(cases[i].expect);
-        int prints=0,ends=0;
+        int prints=0,ends=0,saw_end=0;
+        size_t output_events=0u,steps=0u;
         CHECK(setup(&f,128u)==0);
         CHECK(snprintf(path,sizeof(path),"%s/%s.bas",sources,cases[i].id)>0);
         fp=fopen(path,"rb");
@@ -139,17 +180,20 @@ static int corpus(const char *sources,const char *archives) {
         CHECK(roundtrip(&f)==0);
         CHECK(submit(&f,"RUN").status==BSR_OK);
         while (f.rt.state==BSR_RUNNING) {
-            BSRResult r=step(&f,sizeof(f.output));
+            BSRResult r;
+            CHECK(++steps<=64u); /* Fail closed on looping RUN. */
+            r=step(&f,sizeof(f.output));
             CHECK(r.status==BSR_OK || r.status==BSR_END);
-            if (r.status==BSR_END) break;
-            if (f.written!=0u) {
-                CHECK(f.written==expected_len+1u);
-                CHECK(memcmp(f.output,cases[i].expect,expected_len)==0);
-                CHECK(f.output[expected_len]=='\n');
+            if (r.status==BSR_END) {
+                saw_end=1;
+                break;
             }
+            CHECK(witness_event(&output_events,f.output,f.written,
+                                cases[i].expect));
         }
-        printf("J1.15-B %s PARTIAL_CPC_RECORD_MATCH LIST_ROUNDTRIP MATCH_SEMANTIC_VALUE\n",
-               cases[i].id);
+        CHECK(witness_complete(output_events,saw_end,f.rt.state));
+        printf("J1.15-B %s PARTIAL_CPC_RECORD_MATCH LIST_ROUNDTRIP MATCH_SEMANTIC_VALUE events=%zu END=PASS\n",
+               cases[i].id,output_events);
     }
     return 0;
 }
@@ -229,7 +273,10 @@ static int runtime_atomic(void) {
 }
 static int invalid_grammar(void) {
     const char *bad[]={"A$=\"A\"\"B\"","A$=\"UNFINISHED","A$=\"A\"+\"B\"",
-                       "A$=A$","A$=\"A\":PRINT A$","A$=\"A\"XYZ","A$=\"X\"\t"};
+                       "A$=A$","A$=\"A\":PRINT A$","A$=\"A\"XYZ","A$=\"X\"\t",
+                       "A$=\"X\" :PRINT A$", "A$=\"X\"  : PRINT A$",
+                       "LET A$=\"X\" :END", "a$=\"X\" : PRINT a$",
+                       "A$=\"X\" PRINT A$", "A$=\"X\"  +\"Y\""};
     uint8_t dest[80],saved[80];size_t written=88u,i;
     memset(dest,0xa5,sizeof(dest));memcpy(saved,dest,sizeof(dest));
     for(i=0u;i<sizeof(bad)/sizeof(bad[0]);++i) {
@@ -239,6 +286,28 @@ static int invalid_grammar(void) {
     }
     {const uint8_t badnul[]={'A','$','=','"',0,'"'};
      CHECK(bt_tokenize(badnul,sizeof(badnul),dest,sizeof(dest),&written)!=BT_OK);}
+    /* Numbered source rejection is atomic, and simple trailing spaces
+     * remain supported and LIST-retokenisable. */
+    {
+        Fixture f;
+        uint8_t program_before[2048];
+        size_t original_size;
+        CHECK(setup(&f,128u)==0);
+        CHECK(submit(&f,"10 A$=\"VALID\"  ").status==BSR_OK);
+        CHECK(submit(&f,"20 PRINT A$").status==BSR_OK);
+        CHECK(submit(&f,"30 END").status==BSR_OK);
+        CHECK(submit(&f,"LIST").status==BSR_OK);
+        CHECK(roundtrip(&f)==0);
+        memcpy(program_before,f.data,sizeof(program_before));
+        original_size=f.program.size;
+        CHECK(submit(&f,"10 A$=\"X\" :PRINT A$").status!=BSR_OK);
+        CHECK(f.program.size==original_size);
+        CHECK(memcmp(program_before,f.data,sizeof(program_before))==0);
+        CHECK(submit(&f,"10 LET A$=\"X\"  : END").status!=BSR_OK);
+        CHECK(f.program.size==original_size);
+        CHECK(memcmp(program_before,f.data,sizeof(program_before))==0);
+    }
+    puts("J1.15-B C1 SPACED_SUFFIX_REJECTED TRAILING_SPACES_LIST_ROUNDTRIP_PASS");
     return 0;
 }
 
@@ -289,6 +358,7 @@ static int forged_cache_and_missing_arena(void) {
 int main(int argc,char **argv) {
     CHECK(argc==3);
     CHECK(store_boundaries()==0);
+    CHECK(witness_negative_controls()==0);
     CHECK(forged_cache_and_missing_arena()==0);
     CHECK(invalid_grammar()==0);
     CHECK(runtime_atomic()==0);

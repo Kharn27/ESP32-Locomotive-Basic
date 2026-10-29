@@ -44,13 +44,23 @@ EXACT_SOURCES = {
     "R_NEG_ONE": b"10 A=-1\n20 PRINT A\n30 PRINT #8,A\n40 END\n",
 }
 PINNED_MANIFEST = "d219da77fca0ec619565c8499583157f669532109d0c1f3e1959f2e53d697214"
-# Independent anchor is intentionally unset until the genuine CPC capture.
-# Initial acquisition is unsealed; a follow-up commit pins each real
-# window SHA-256 here, OUTSIDE the archive's mutable metadata chain.
+# Independent SHA-256 pins (outside archive) of six REAL CPC windows,
+# acquired from six fresh Caprice32 sessions via workflow #40917058380.
+# Bot archive commit: 92bc2bc76e33cac966124fdc05efc23eeab9613c.
+# Checked against the actual GitHub window.bin bytes, not merely capture.json.
 SEALED_E_A_WINDOWS = {
-    "R_ZERO": {"original": None, "repeat": None},
-    "R_ONE": {"original": None, "repeat": None},
-    "R_NEG_ONE": {"original": None, "repeat": None},
+    "R_ZERO": {
+        "original": "150b9024a92a2a270fb0328960a736fe0b517d7dfca943cc095d8529cd3737bd",
+        "repeat": "150b9024a92a2a270fb0328960a736fe0b517d7dfca943cc095d8529cd3737bd",
+    },
+    "R_ONE": {
+        "original": "4520814e7a9015b769bba4d5f22b008d34ef642d12b88709a20d69e6cc04a4a5",
+        "repeat": "4520814e7a9015b769bba4d5f22b008d34ef642d12b88709a20d69e6cc04a4a5",
+    },
+    "R_NEG_ONE": {
+        "original": "971281e31d583880a786a9a3ea65c4ff89c8561957ea93172b6661232afb224f",
+        "repeat": "971281e31d583880a786a9a3ea65c4ff89c8561957ea93172b6661232afb224f",
+    },
 }
 
 class Bad(ValueError):

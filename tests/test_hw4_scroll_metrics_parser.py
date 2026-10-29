@@ -32,6 +32,14 @@ class TestA0(unittest.TestCase):
             kw=dict(KW);kw.update(change)
             with self.subTest(change=change), self.assertRaises(EvidenceError):
                 analyze(text, **kw)
+    def test_legacy_scroll_and_bin_falsifications(self):
+        text=(DATA/"valid.uart.log").read_text()
+        bad=[text.replace("scrolls=2 repaint_us_total", "scrolls=4 repaint_us_total"),
+             text.replace("min_us=130000 max_us=130000",
+                          "min_us=127000 max_us=130000")]
+        for log in bad:
+            with self.assertRaises(EvidenceError):
+                analyze(log, **KW)
     def test_full_protocol_requires_20_each(self):
         with self.assertRaises(EvidenceError):
             analyze((DATA/"valid.uart.log").read_text(),

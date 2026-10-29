@@ -1,7 +1,13 @@
 name: J1.10-A CPC6128 independent IF THEN oracle
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-10-a-if-then.yml'
+      - 'tools/j1_10_if_then_verify.py'
+      - 'tests/oracles/j1_10_if_then_oracle.py'
+      - 'tests/oracles/inputs/j1_10_a/**'
+      - 'tests/fixtures/cpc6128/j1_10_if_then/**'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +15,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j110-if-then-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: j110-if-then-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

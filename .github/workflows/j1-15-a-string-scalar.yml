@@ -1,7 +1,13 @@
 name: J1.15-A CPC6128 independent scalar STRING oracle
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-15-a-string-scalar.yml'
+      - 'tools/j1_15_string_scalar_verify.py'
+      - 'tests/oracles/j1_15_string_scalar_oracle.py'
+      - 'tests/oracles/inputs/j1_15_a/**'
+      - 'tests/fixtures/cpc6128/j1_15_string_scalar/**'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +15,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j115-string-scalar-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: j115-string-scalar-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

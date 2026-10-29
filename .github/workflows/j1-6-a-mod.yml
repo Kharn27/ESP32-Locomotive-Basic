@@ -1,7 +1,13 @@
 name: J1.6-A independent CPC INTEGER mod
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-6-a-mod.yml'
+      - 'tools/j1_6_mod_verify.py'
+      - 'tests/oracles/j1_6_mod_oracle.py'
+      - 'tests/oracles/inputs/j1_6_a/**'
+      - 'tests/fixtures/cpc6128/j1_integer_mod/**'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +15,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j16-mod-original-archive-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: j16-mod-original-archive-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

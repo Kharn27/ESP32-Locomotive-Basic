@@ -1,7 +1,13 @@
 name: J1.13-A CPC6128 independent INTEGER IF RELATIONS oracle
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-13-a-integer-relations.yml'
+      - 'tools/j1_13_relational_if_verify.py'
+      - 'tests/oracles/j1_13_relational_if_oracle.py'
+      - 'tests/oracles/inputs/j1_13_a/**'
+      - 'tests/fixtures/cpc6128/j1_13_integer_relations/**'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +15,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j113-integer-relations-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: j113-integer-relations-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

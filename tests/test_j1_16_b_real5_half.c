@@ -120,7 +120,7 @@ static int run(F *f) {
     return 0;
 }
 static int source_negative(void) {
-    static const char *bad[]={"A=0.1","A=1.25","A=-0.5","A=0","A=0.50",
+    static const char *bad[]={"A=0.1","A=1.20","A=-0.5","A=0","A=0.50",
         "A!=1.5","A!=0.5","A=0.5:PRINT A","A=0.5 : END",
         "LET A=0.5","B=0.5","a=0.5","A=0.5X","A=0.5 ",
         "PRINT B","PRINT A:PRINT A","PRINTA","? A",
@@ -137,7 +137,7 @@ static int source_negative(void) {
     return 0;
 }
 static int submit_negative(void) {
-    static const char *bad[]={"10 A=0.1","10 A=-0.5","10 A=1.25",
+    static const char *bad[]={"10 A=0.1","10 A=-0.5","10 A=1.20",
        "10 A=0.5:PRINT A","20 PRINT A:PRINT A","10 A!=1.5","10 B=0.5","10 a=0.5"};
     F f;size_t i;CHECK(init(&f)==0 && populate(&f)==0);
     for(i=0u;i<sizeof(bad)/sizeof(bad[0]);++i){

@@ -147,11 +147,11 @@ static BEStatus binding_error(BVBStatus status)
 /* J1.14-B inline IF arm: parse a complete INTEGER BVR EF immediate,
  * even if that arm will not be taken. No store lookup or mutation here.
  * The two-pass caller preflights capacity and commits only the chosen arm. */
-/* J1.16-B: the 0D marker is an implicit scalar reference, not BVT_REAL
+/* J1.16-B/C: the 0D marker is an implicit scalar reference, not BVT_REAL
  * (05), nor the explicit REAL marker (04). Only the measured uppercase A
  * with a zero cache may be resolved in the default-REAL context.
  * The shared canonicalizer produces the same typed key as the store API. */
-static BEStatus half_real_key(const uint8_t *body, size_t length,
+static BEStatus scalar_real_key(const uint8_t *body, size_t length,
                               size_t at, BasicVariableKey *out,
                               size_t *consumed)
 {
@@ -710,35 +710,47 @@ static BEStatus execute_line(const BasicProgram *program,
                     static const uint8_t half_print[] = {
                         0xbfu, (uint8_t)' ', 0x0du, 0u, 0u, 0xc1u
                     };
-                    static const uint8_t half_bits[5] = {0u, 0u, 0u, 0u, 0x80u};
-                    static const uint8_t half_text[] = {' ', '0', '.', '5', ' '};
+                    static const uint8_t bits[2][5] = {
+                        {0u, 0u, 0u, 0u, 0x80u}, /* R_HALF */
+                        {0u, 0u, 0u, 0x20u, 0x81u} /* R_QUARTER */
+                    };
+                    static const uint8_t text[2][6] = {
+                        {' ', '0', '.', '5', ' ', 0u},
+                        {' ', '1', '.', '2', '5', ' '}
+                    };
+                    static const size_t text_length[2] = {5u, 6u};
                     BasicVariableKey key;
                     BasicVariableValue value;
                     size_t consumed;
-                    size_t i;
+                    size_t i, choice = 2u;
                     BVSStatus lookup;
                     if (variables == NULL) return BE_UNSUPPORTED;
                     if (length != sizeof(half_print) ||
                         memcmp(body, half_print, sizeof(half_print)) != 0)
                         return BE_BAD_SEQUENCE;
-                    status = half_real_key(body, length, pos - 1u, &key, &consumed);
+                    status = scalar_real_key(body, length, pos - 1u, &key, &consumed);
                     if (status != BE_OK) return status;
                     if (pos - 1u + consumed != length) return BE_BAD_SEQUENCE;
                     lookup = bvs_get(variables, &key, &value);
                     if (lookup == BVS_NOT_FOUND) return BE_VARIABLE_NOT_FOUND;
                     if (lookup != BVS_OK) return store_error(lookup);
                     if (value.type != (uint8_t)BVT_REAL) return BE_INVALID_TYPE;
-                    /* Formatting is permitted only if the ACTUAL stored bits
-                     * equal the CPC-attested half. No host floating point. */
-                    if (memcmp(value.data.real5, half_bits, sizeof(half_bits)) != 0)
-                        return BE_UNSUPPORTED;
-                    for (i = 0u; i < sizeof(half_text); ++i) {
-                        status = emit(out, half_text[i]);
+                    /* Select text from actual stored REAL5 bytes only.
+                     * These are two sealed witnesses, not a REAL5 decoder. */
+                    for (i = 0u; i < 2u; ++i) {
+                        if (memcmp(value.data.real5, bits[i], 5u) == 0) {
+                            choice = i;
+                            break;
+                        }
+                    }
+                    if (choice == 2u) return BE_UNSUPPORTED;
+                    for (i = 0u; i < text_length[choice]; ++i) {
+                        status = emit(out, text[choice][i]);
                         if (status != BE_OK) return status;
                     }
                     pos = length;
                 } else if (token == 0x04u) {
-                    return BE_UNSUPPORTED; /* Explicit REAL outside J1.16-B. */
+                    return BE_UNSUPPORTED; /* Explicit REAL outside J1.16-B/C. */
                 } else {
                     return unexpected(token);
                 }
@@ -970,17 +982,20 @@ static BEStatus execute_line(const BasicProgram *program,
             flow->action = BE_FLOW_CLEAR;
             return BE_OK;
         } else if (token == 0x0du) {
-            static const uint8_t half_line[] = {
-                0x0du, 0u, 0u, 0xc1u, 0xefu, 0x1fu,
-                0u, 0u, 0u, 0u, 0x80u
+            static const uint8_t real_line[2][11] = {
+                {0x0du, 0u, 0u, 0xc1u, 0xefu, 0x1fu,
+                 0u, 0u, 0u, 0u, 0x80u},
+                {0x0du, 0u, 0u, 0xc1u, 0xefu, 0x1fu,
+                 0u, 0u, 0u, 0x20u, 0x81u}
             };
             BasicVariableKey key;
             BasicVariableValue value = {0};
             size_t consumed;
             size_t i;
             if (preceding_statement || variables == NULL) return BE_UNSUPPORTED;
-            if (length != sizeof(half_line) ||
-                memcmp(body, half_line, sizeof(half_line)) != 0)
+            if (length != sizeof(real_line[0]) ||
+                (memcmp(body, real_line[0], sizeof(real_line[0])) != 0 &&
+                 memcmp(body, real_line[1], sizeof(real_line[1])) != 0))
                 return BE_BAD_SEQUENCE;
             status = half_real_key(body, length, pos - 1u, &key, &consumed);
             if (status != BE_OK || consumed != 4u) return BE_BAD_SEQUENCE;

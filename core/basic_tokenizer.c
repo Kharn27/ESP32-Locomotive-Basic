@@ -335,28 +335,25 @@ static BTStatus scalar_string_assignment(const uint8_t *source, size_t length,
     return BT_OK;
 }
 
-/* Only R_HALF from the read-only CPC6128 J1.16-A oracle: the implicit A
- * marker/cache and literal REAL5 bits are measured, not computed in C. */
-static BTStatus half_real_statement(BTEmitter *out, int assignment)
+/* J1.16-B/C: bounded, verbatim CPC R_HALF and R_QUARTER records.
+ * Both source lexemes and REAL5 bytes are observations, not a converter. */
+static BTStatus scalar_real_statement(BTEmitter *out, int assignment,
+                                      unsigned int quarter)
 {
     static const uint8_t reference[] = {0x0du, 0u, 0u, 0xc1u};
-    static const uint8_t half[] = {0xefu, 0x1fu, 0u, 0u, 0u, 0u, 0x80u};
+    static const uint8_t literal[2][7] = {
+        {0xefu, 0x1fu, 0u, 0u, 0u, 0u, 0x80u}, /* 0.5 */
+        {0xefu, 0x1fu, 0u, 0u, 0u, 0x20u, 0x81u} /* 1.25 */
+    };
     size_t i;
     BTStatus status;
-    if (!assignment) {
-        /* PRINT's BF and its lexical space have already been emitted. */
-        for (i = 0u; i < sizeof(reference); ++i) {
-            status = emit(out, reference[i]);
-            if (status != BT_OK) return status;
-        }
-        return BT_OK;
-    }
     for (i = 0u; i < sizeof(reference); ++i) {
         status = emit(out, reference[i]);
         if (status != BT_OK) return status;
     }
-    for (i = 0u; i < sizeof(half); ++i) {
-        status = emit(out, half[i]);
+    if (!assignment) return BT_OK; /* PRINT A: reference only. */
+    for (i = 0u; i < sizeof(literal[0]); ++i) {
+        status = emit(out, literal[quarter != 0u][i]);
         if (status != BT_OK) return status;
     }
     return BT_OK;
@@ -452,7 +449,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             } else if (keyword != NULL && length == 7u && index == 6u &&
                        source[5] == (uint8_t)' ' &&
                        source[index] == (uint8_t)'A') {
-                status = half_real_statement(out, 0);
+                status = scalar_real_statement(out, 0, 0u);
                 ++index;
             } else if (ascii_letter(source[index])) {
                 status = explicit_variable(source, length, &index, out,
@@ -474,9 +471,10 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 return BT_UNSUPPORTED_CONSTRUCT;
             }
         } else if (statement == ST_ASSIGN) {
-            if (keyword == NULL && index == 0u && length == 5u &&
-                memcmp(source, "A=0.5", 5u) == 0) {
-                status = half_real_statement(out, 1);
+            if (keyword == NULL && index == 0u &&
+                ((length == 5u && memcmp(source, "A=0.5", 5u) == 0) ||
+                 (length == 6u && memcmp(source, "A=1.25", 6u) == 0))) {
+                status = scalar_real_statement(out, 1, length == 6u);
                 index = length;
             } else if (string_lhs(source, length, index)) {
                 status = scalar_string_assignment(source, length, &index, out);

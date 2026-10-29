@@ -815,3 +815,18 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/
         --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_d_a_negative_store"
         --permanent --self-test)
 endif()
+
+# J1.16-E-A: source/history gate is always active. The archival pin gate
+# becomes mandatory as soon as genuine Caprice32 records exist.
+if(BUILD_TESTING)
+    add_test(NAME j1_16_e_a_scalar_store_sources
+        COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_16_e_a_store.py" --check-sources)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_e_a_small_store/manifest.json")
+        add_test(NAME j1_16_e_a_scalar_store_permanent
+            COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_16_e_a_store.py"
+            --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_e_a_small_store"
+            --permanent --self-test)
+    endif()
+endif()

@@ -1,0 +1,23 @@
+{
+  "acquisition_head_sha": "99a44259211eed11881d365005bb3d47fb386503",
+  "acquisition_run_id": "40906855153",
+  "caprice_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+  "cases": {
+    "R_HALF": {
+      "equal_value": true,
+      "original": "5527b42a769b2b99176b2d66cc0bddc1df8f61cfdf4c7c409d10516e8501c026",
+      "repeat": "2e8964f8052872a33b69624b47e1e30bbd8f690380142289c880a0ca5804d928"
+    },
+    "R_NEG_HALF": {
+      "equal_value": true,
+      "original": "2a76a6bc2a9e5b3e68fef02d4144ee90caeb99da0f5e1593bb3edf90eacc3ea2",
+      "repeat": "a715d8312566c80eda8ba66b1302a916a6a7d76fa21c72cf972863f40d7fd7a5"
+    }
+  },
+  "classification": "STORE_SIGNED_REAL5_OBSERVED",
+  "historical_manifest_sha256": "d219da77fca0ec619565c8499583157f669532109d0c1f3e1959f2e53d697214",
+  "phase": "J1.16-D-A",
+  "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+  "schema_version": 1,
+  "stop_instrumentation": "INSERT_ONLY_15_STOP_KEEP_L10_L20"
+}

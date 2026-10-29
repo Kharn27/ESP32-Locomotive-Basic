@@ -1,0 +1,50 @@
+{
+  "case": "R_NEG_HALF",
+  "classification": "STORE_SIGNED_REAL5_OBSERVED",
+  "commands": [
+    "10 A=-0.5",
+    "15 STOP",
+    "20 PRINT A",
+    "30 PRINT #8,A",
+    "40 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "entry_link_hex": "00 00",
+  "historical_printer_sha256": "0275a7be5f43abafef60c697000626fc7bd867617c6c6bf8b9dc698d65dd1600",
+  "historical_program_sha256": "3f4695ed6d6f62fec96584f10374be9ef5b56e1d2c53196305be4d69ef941654",
+  "instrumented_program_hex": "11 00 0A 00 0D 05 00 C1 EF F5 1F 00 00 00 00 80 00 06 00 0F 00 CE 00 0B 00 14 00 BF 20 0D 00 00 C1 00 0E 00 1E 00 BF 20 23 16 2C 0D 00 00 C1 00 06 00 28 00 98 00 00 00",
+  "instrumented_program_sha256": "1a835014156551d518a0ef8f1f371869140f99b3c9ec2ebc5cbf2b670469ff15",
+  "instrumented_source_sha256": "a9d67850dfc1c9ae0d65a2d3a4f0fd305c0b8d77c5faa3947bf0539c6970b256",
+  "name_byte_hex": "C1",
+  "pointers": {
+    "array_end": 433,
+    "array_start": 433,
+    "program_base": 367,
+    "program_end": 424,
+    "scalar_start": 424
+  },
+  "post_run_l10_hex": "11 00 0A 00 0D 05 00 C1 EF F5 1F 00 00 00 00 80 00",
+  "post_run_l20_hex": "0B 00 14 00 BF 20 0D 00 00 C1 00",
+  "printer_bytes_before_print": 0,
+  "sequence": [
+    "LIST_EDIT",
+    "RUN",
+    "EXEC_L10",
+    "STOP_L15",
+    "CAPTURE_SNA",
+    "PRINT_L20_NOT_RUN"
+  ],
+  "session": "repeat",
+  "snapshot_header_first_16_hex": "4D 56 20 2D 20 53 4E 41 00 00 00 00 00 00 00 00",
+  "snapshot_sha256": "3d7caac3a79ef5352b9a98b44773399c4a2f3c6975f5f9d19edc98dc0511192c",
+  "source_sha256": "36b49d66db8a0766e76eb3ebfb3cd0d6e3fd15d5e4a283e5fb3ffe2592ddf467",
+  "stop_line_hex": "06 00 0F 00 CE 00",
+  "stop_png_sha256": "f0cb5e5002340c4f3f97ea7d9646325679b07d7f863efbaf02e81ecbdbc19a50",
+  "type_byte_hex": "04",
+  "value_hex": "00 00 00 80 80",
+  "value_offset": 428,
+  "window_hex": "00 00 C1 04 00 00 00 80 80",
+  "window_length": 9,
+  "window_sha256": "a9a8c1e7dd29fd9851401e70b1dadfb4574a3a2866b3d0901385c181443cc798"
+}

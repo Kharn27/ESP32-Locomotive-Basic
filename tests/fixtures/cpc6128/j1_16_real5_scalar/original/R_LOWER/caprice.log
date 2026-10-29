@@ -1,0 +1,8 @@
+exit code: 0
+Using configuration file: /__w/_temp/j116-cpc/original/R_LOWER/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j116-cpc/original/R_LOWER/screenshot_20261029_123733.png
+INFO    src/cap32.cpp:2212 - Dumping machine snapshot to /tmp/loco-c5-sna-15a0ntyw/snapshot_20261029_123733.sna
+
+[stderr]

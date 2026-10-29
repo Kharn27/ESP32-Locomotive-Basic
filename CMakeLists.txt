@@ -744,3 +744,13 @@ if(BUILD_TESTING)
         cpc_screen_nav basic_session_runtime basic_variable_binding)
     add_test(NAME hw4_edit_b1_b_vertical_guard COMMAND test_hw4_edit_b1_b)
 endif()
+
+# J1.16-A: independent CPC REAL5 scalar oracle, source-only before first genuine capture.
+if(BUILD_TESTING)
+    add_test(NAME j1_16_a_real5_source_matrix COMMAND
+        ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_16_real5_scalar_verify.py" --check-sources)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_real5_scalar/manifest.json")
+        add_test(NAME j1_16_a_real5_cpc_permanent COMMAND
+            ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_16_real5_scalar_verify.py" --permanent --self-test)
+    endif()
+endif()

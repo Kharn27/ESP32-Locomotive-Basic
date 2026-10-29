@@ -805,3 +805,12 @@ if(BUILD_TESTING)
         COMMAND test_j1_16_c_real5_quarter
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_real5_scalar")
 endif()
+
+# J1.16-D-A: read-only CPC6128 STOP-boundary REAL5 variable-store proof.
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_d_a_negative_store/manifest.json")
+    add_test(NAME j1_16_d_a_signed_real5_store_permanent
+        COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_16_d_a_store.py"
+        --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_d_a_negative_store"
+        --permanent --self-test)
+endif()

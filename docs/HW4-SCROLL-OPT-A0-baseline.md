@@ -2,6 +2,13 @@
 
 Mandat Pilotage : [#156 / commentaire 6501773436](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/156#issuecomment-6501773436). Base imposée : `main@319e8872c88842840e0992f305ec047fe516cb38`. Branche : `feat/hw4-scroll-opt-a0-baseline`. **Aucune optimisation implémentée** ; pas de changement de VRAM, BASIC, E2, scrolling, DMA, orientation ou curseur.
 
+## C1 — intégration de main (29 octobre 2026)
+
+- Parent A0 : `32a61282c51ca9a4c622034632d26f2d642b60a9` ; parent synchronisé : `main@517b7eaa3e443c537a2909a06ee6b129c5e1465b`. La fusion conserve **sans modification** le corpus et l'oracle J1.16-D-A ; la résolution textuelle est l'addition des deux blocs CMake (A0 + `j1_16_d_a_signed_real5_store_permanent`).
+- Inventaire CTest attendu sur le code combiné : **99 cas** (97 préexistants sur ce main + 2 tests A0), à qualifier `99/99 PASS` seulement après le pipeline C99 du HEAD fusionné. Le nombre ancien `98/98` ne qualifie pas C1.
+- Les tableaux Xtensa ci-dessous comparent volontairement A0 à **l'ancienne base épinglée** `main@319e8872` ; le job CI de comparaison doit être revérifié sur le SHA fusionné. Aucune mesure physique du scrolling n'est encore disponible : `ON_DEVICE_UNVERIFIED`.
+- Le PO devra flasher **le nouveau HEAD exact de la PR après CI**, pas `32a61282c51ca9a4c622034632d26f2d642b60a9`. Vérifier `git rev-parse HEAD` et `App version` ; le protocole §3 reste inchangé.
+
 ## 1. Ce qui est mesuré
 
 `repaint_dirty()` garde exactement un appel à `cpc_video_flush_dirty` par image dirty ; l'horloge est toujours `esp_cpu_get_cycle_count()` divisée par `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ`. L'instrumentation A0 est réalisée **après** l'appel de transfert, sans UART par bande. Les statistiques comptent les bandes **envoyées avec succès** par le callback, chacune de `CYD_LCD_DMA_BYTES=5120` octets (320×8×2). Les transferts boot de `repaint_full` (30 bandes) ne sont pas comptés dans cette baseline dirty.

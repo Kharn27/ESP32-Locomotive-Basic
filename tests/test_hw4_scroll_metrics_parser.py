@@ -8,7 +8,7 @@ from hw4_scroll_a0_uart import analyze, EvidenceError
 
 DATA = ROOT / "tests" / "fixtures" / "hw4_scroll_a0"
 KW = dict(sha="319e8872c88842840e0992f305ec047fe516cb38",
-          idf="v5.5.6", profile="CONSOLE", spi_hz=40000000, cpu_mhz=240)
+          idf="v5.5.6", profile="CONSOLE", spi_hz=20000000, cpu_mhz=240)
 
 class TestA0(unittest.TestCase):
     def test_positive(self):
@@ -27,7 +27,7 @@ class TestA0(unittest.TestCase):
     def test_manifest_mismatches(self):
         text=(DATA/"valid.uart.log").read_text()
         for change in (dict(cpu_mhz=160),dict(idf="v5.5.5"),
-                       dict(profile="HW3"),dict(spi_hz=0),
+                       dict(profile="HW3"),dict(spi_hz=0),dict(spi_hz=40000000),
                        dict(sha="1234")):
             kw=dict(KW);kw.update(change)
             with self.subTest(change=change), self.assertRaises(EvidenceError):

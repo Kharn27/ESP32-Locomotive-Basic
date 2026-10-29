@@ -11,6 +11,7 @@
 #include "cpc_text.h"
 #include "cpc_uart_console.h"
 #include "cpc_ready_policy.h"
+#include "cpc_diag_policy.h"
 #include "cpc_screen_nav.h"
 #include "cpc_video.h"
 #include "cyd_ili9341.h"
@@ -280,7 +281,17 @@ static bool basic_submit(const uint8_t *source,size_t length,
     if(r.status!=BSR_OK) {
         printf("HW4-C2 BASIC_SUBMIT_FAIL status=%d (no program mutation)\n",
                (int)r.status);
-        return display_error(); /* recoverable BASIC diagnostic */
+        /* Text is a CPC presentation mapping; Ready stays the independent
+         * HW4-READY-A BASIC_DIAGNOSTIC transition in execute_line(). */
+        CpcDiagCategory category=cpc_diag_policy_select(source,length,r);
+        printf("HW4-DIAG-A DIAG_POLICY origin=submit category=%s "
+               "status=%d session=%d message=%s source_bytes=%u\n",
+               cpc_diag_policy_category(category),(int)r.status,
+               (int)r.session.status,cpc_diag_policy_message(category),
+               (unsigned)length);
+        if(!cpc_diag_policy_write(&s_text,category))
+            return fail("DIAG_TEXT",-1);
+        return true;
     }
     if(s_basic.written>0U && !display_bytes("LIST_BYTES",s_basic.output,
                                           s_basic.written)) return false;

@@ -122,6 +122,7 @@ jobs:
           python3 tools/j1_17_a_pen_evidence.py --check-sources
           if test -f tests/fixtures/cpc6128/j1_17_a_pen/manifest.json; then
             python3 tools/j1_17_a_pen_evidence.py --evidence tests/fixtures/cpc6128/j1_17_a_pen --permanent --self-test
+            python3 tools/j1_17_a_pen_pixels.py --evidence tests/fixtures/cpc6128/j1_17_a_pen --self-test
           else
             echo 'J1.17-A ARCHIVE_NOT_YET_ACQUIRED — CPC_UNVERIFIED'
           fi
@@ -174,6 +175,7 @@ jobs:
             --output "$RUNNER_TEMP/j117-pen" --expect-head "$GITHUB_HEAD_SHA"
           python3 tools/j1_17_a_pen_evidence.py \
             --evidence "$RUNNER_TEMP/j117-pen" --self-test
+          python3 tools/j1_17_a_pen_pixels.py --evidence "$RUNNER_TEMP/j117-pen" --self-test
           echo 'J1.17-A FRESH_16_SESSIONS_VERIFIED UNSEALED'
       - name: Archive once; thereafter require immutable external seal and fresh re-acquisition
         shell: bash

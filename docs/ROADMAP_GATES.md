@@ -567,3 +567,7 @@ Mandat Pilotage [#166](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/
 ### Gate J1.16-E-A — trois magasins scalaires CPC authentiques (29 octobre 2026)
 
 **Décision Pilotage postérieure à J1.16-D-B acceptée et fusionnée :** [mission #171](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/171) sur `main@2191363f0d8d78b7c7f34ed734b85b981c06baaf` autorise uniquement la caractérisation `A=0`, `A=1`, `A=-1` au STOP L15 avant PRINT, six processus Caprice32/ROM CPC authentiques, fenêtres et pointeurs relevés, archives J1.16-A/D-A immuables, ancre SHA indépendante anti-fraude coordonnée, falsifications et quatre familles CI sur HEAD final. Si le magasin est ambigu, `STORE_UNVERIFIED` ; conserver `UNSUPPORTED` natif dans tous les cas. Aucun test CYD demandé, aucun E-B/J1.17. [Dossier](J1.16-E-A-real5-small-store-oracle.md). Revue et fusion réservées au Pilotage.
+
+### J1.17-A — PEN, mesure oracle MODE 1 (mandat Pilotage #177)
+
+Mission strictement **preuve CPC** : `PEN 0/1/2/3/4/15/16/-1`, deux sessions Caprice32 indépendantes par cas, RAM/LIST/RUN/captures écran et codes d'erreur, sceaux SHA-256 externes, négatifs et CI. [PR #179](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/179) en **revue Pilotage**, jamais un jalon accepté par le Développeur. Aucun code `PEN` natif, aucun firmware CYD, aucun déclenchement automatique de J1.17-B, INK ou MODE. Voir [rapport](J1.17-A-pen-cpc-oracle.md).

@@ -9,7 +9,6 @@ on:
       - "tools/j1_3_subtraction_verify.py"
       - "tests/fixtures/cpc6128/j1_integer_subtraction/**"
       - "docs/J1.3-A-integer-subtraction-oracle.md"
-      - "docs/ROADMAP_GATES.md"
   workflow_dispatch:
 
 permissions:

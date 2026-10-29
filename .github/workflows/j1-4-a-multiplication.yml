@@ -9,7 +9,6 @@ on:
       - "tools/j1_4_multiplication_verify.py"
       - "tests/fixtures/cpc6128/j1_integer_multiplication/**"
       - "docs/J1.4-A-integer-multiplication-oracle.md"
-      - "docs/ROADMAP_GATES.md"
   workflow_dispatch:
 
 permissions:

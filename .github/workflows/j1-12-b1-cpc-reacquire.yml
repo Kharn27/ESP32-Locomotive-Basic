@@ -1,7 +1,15 @@
 name: J1.12-B1 re-acquire sealed FOR NEXT CPC records
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-12-b1-cpc-reacquire.yml'
+      - 'tools/j1_12_for_next_verify.py'
+      - 'tests/oracles/j1_12_for_next_oracle.py'
+      - 'tests/oracles/inputs/j1_12_a/**'
+      - 'tests/fixtures/cpc6128/j1_12_for_next/**'
+      - 'core/basic_tokenizer.c'
+      - 'core/basic_listing.c'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +17,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j112-b1-reacquire-${{ github.head_ref || github.ref }}-${{ github.sha }}
+  group: j112-b1-reacquire-${{ github.head_ref || github.ref }}
   cancel-in-progress: false
 
 jobs:

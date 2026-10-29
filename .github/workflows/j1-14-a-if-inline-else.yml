@@ -1,7 +1,13 @@
 name: J1.14-A CPC6128 independent INLINE IF/ELSE oracle
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-14-a-if-inline-else.yml'
+      - 'tools/j1_14_if_inline_else_verify.py'
+      - 'tests/oracles/j1_14_if_inline_else_oracle.py'
+      - 'tests/oracles/inputs/j1_14_a/**'
+      - 'tests/fixtures/cpc6128/j1_14_if_inline_else/**'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +15,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j114-if-inline-else-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: j114-if-inline-else-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

@@ -9,7 +9,6 @@ on:
       - "tools/j1_5_division_verify.py"
       - "tests/fixtures/cpc6128/j1_integer_division/**"
       - "docs/J1.5-A-integer-division-oracle.md"
-      - "docs/ROADMAP_GATES.md"
   workflow_dispatch:
 
 permissions:

@@ -1,7 +1,13 @@
 name: J1.12-A CPC6128 independent FOR NEXT oracle
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-12-a-for-next-integer.yml'
+      - 'tools/j1_12_for_next_verify.py'
+      - 'tests/oracles/j1_12_for_next_oracle.py'
+      - 'tests/oracles/inputs/j1_12_a/**'
+      - 'tests/fixtures/cpc6128/j1_12_for_next/**'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +15,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j112-for-next-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: j112-for-next-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

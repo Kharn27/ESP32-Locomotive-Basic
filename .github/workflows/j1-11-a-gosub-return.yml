@@ -1,7 +1,13 @@
 name: J1.11-A CPC6128 independent GOSUB RETURN oracle
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-11-a-gosub-return.yml'
+      - 'tools/j1_11_gosub_return_verify.py'
+      - 'tests/oracles/j1_11_gosub_return_oracle.py'
+      - 'tests/oracles/inputs/j1_11_a/**'
+      - 'tests/fixtures/cpc6128/j1_11_gosub_return/**'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +15,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j111-gosub-return-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: j111-gosub-return-cpc-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

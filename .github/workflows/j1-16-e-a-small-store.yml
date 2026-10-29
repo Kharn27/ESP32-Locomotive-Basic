@@ -1,7 +1,14 @@
 name: J1.16-E-A CPC REAL5 small scalar variable-store oracle
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-16-e-a-small-store.yml'
+      - 'tools/j1_16_e_a_store.py'
+      - 'tests/fixtures/cpc6128/j1_16_e_a_small_store/**'
+      - 'tests/oracles/inputs/j1_16_a/**'
+      - 'tests/fixtures/cpc6128/j1_16_real5_scalar/**'
+      - 'tests/oracles/token_ram_oracle.py'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +16,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j116-ea-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: j116-ea-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

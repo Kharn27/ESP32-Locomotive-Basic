@@ -1,7 +1,13 @@
 name: J1.8-A independent CPC INTEGER variable subtraction
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-8-a-sub-vars.yml'
+      - 'tools/j1_8_sub_vars_verify.py'
+      - 'tests/oracles/j1_8_sub_vars_oracle.py'
+      - 'tests/oracles/inputs/j1_8_a/**'
+      - 'tests/fixtures/cpc6128/j1_integer_sub_vars/**'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +15,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: j18-sub-vars-original-archive-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: j18-sub-vars-original-archive-${{ github.head_ref || github.ref }}-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

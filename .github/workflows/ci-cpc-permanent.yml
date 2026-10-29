@@ -94,6 +94,17 @@ jobs:
             echo 'J1.15-A ORIGINAL_ARCHIVE_PENDING: no ROM proof claimed'
           fi
 
+      - name: J1.16-E-A CPC zero/one/negative one store — external SHA seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_16_e_a_store.py --check-sources
+          if test -f tests/fixtures/cpc6128/j1_16_e_a_small_store/manifest.json; then
+            python3 tools/j1_16_e_a_store.py --evidence tests/fixtures/cpc6128/j1_16_e_a_small_store --permanent --self-test
+          else
+            echo 'J1.16-E-A ARCHIVE_NOT_YET_ACQUIRED — SOURCE_ONLY NOT STORE VERIFIED'
+          fi
+
       - name: J1.16-D-A signed store — immutable CPC variable windows and mutations
         shell: bash
         run: |

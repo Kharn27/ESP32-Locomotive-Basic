@@ -1,0 +1,20 @@
+{
+  "case": "05_d04_trailing_space",
+  "keyboard_inputs": [
+    "10 "
+  ],
+  "trailing_space": true,
+  "tail": "CAP32_DELAYCAP32_DELAYCAP32_SCRNSHOTCAP32_EXIT",
+  "argv": [
+    "xvfb-run",
+    "-a",
+    "/__w/ESP32-Locomotive-Basic/ESP32-Locomotive-Basic/tests/oracles/caprice32/cap32",
+    "-c",
+    "/__w/_temp/hw4-diag-a-cpc/original/05_d04_trailing_space/cap32.cfg",
+    "-a",
+    "10 ",
+    "-a",
+    "CAP32_DELAYCAP32_DELAYCAP32_SCRNSHOTCAP32_EXIT"
+  ],
+  "screen_not_printer": true
+}

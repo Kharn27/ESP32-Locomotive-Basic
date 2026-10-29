@@ -1,0 +1,80 @@
+name: HW4-DIAG-A A0 independent CPC screen transitions
+
+on:
+  pull_request:
+    paths:
+      - 'tools/hw4_diag_a_cpc.py'
+      - '.github/workflows/hw4-diag-a.yml'
+      - 'docs/HW4-DIAG-A-cpc-line-does-not-exist.md'
+      - 'tests/fixtures/cpc6128/hw4_diag_a/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  screen-capture:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/hw4-diag-a-line-not-exist' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: write
+      packages: read
+    env:
+      GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Verify exact checkout and pinned original CPC emulator
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$GITHUB_HEAD_SHA"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          python3 tools/hw4_diag_a_cpc.py --self-test
+      - name: Acquire two fresh CPC process screenshots per transition
+        run: |
+          set -euo pipefail
+          python3 tools/hw4_diag_a_cpc.py --caprice tests/oracles/caprice32 --output "$RUNNER_TEMP/hw4-diag-a-cpc"
+      - name: Archive original captures once without rewriting any historical fixture
+        run: |
+          set -euo pipefail
+          DEST=tests/fixtures/cpc6128/hw4_diag_a
+          if test ! -e "$DEST"; then
+            mkdir -p "$DEST"
+            cp -a "$RUNNER_TEMP/hw4-diag-a-cpc/." "$DEST/"
+            ! find "$DEST" -type f \( -name '*.rom' -o -name '*.sna' -o -name '*.dsk' \) | grep .
+            git config user.name loco-cyd-evidence-bot
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add "$DEST"
+            git commit -m 'evidence(HW4-DIAG-A): archive authentic CPC screen transitions A0'
+            REMOTE_HEAD="$(git ls-remote origin refs/heads/feat/hw4-diag-a-line-not-exist | awk '{print $1}')"
+            test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA"
+            git push origin HEAD:refs/heads/feat/hw4-diag-a-line-not-exist
+          else
+            echo 'A0 original historical captures preserved; repeated fresh acquisition available as workflow artifact'
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hw4-diag-a-a0-authentic-cpc
+          path: ${{ runner.temp }}/hw4-diag-a-cpc/
+          if-no-files-found: warn
+          retention-days: 30

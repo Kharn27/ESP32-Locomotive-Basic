@@ -1,0 +1,20 @@
+{
+  "case": "01_numbered_10",
+  "keyboard_inputs": [
+    "10 PRINT 2"
+  ],
+  "bare_enter": false,
+  "tail": "CAP32_DELAYCAP32_DELAYCAP32_SCRNSHOTCAP32_EXIT",
+  "argv": [
+    "xvfb-run",
+    "-a",
+    "/__w/ESP32-Locomotive-Basic/ESP32-Locomotive-Basic/tests/oracles/caprice32/cap32",
+    "-c",
+    "/__w/_temp/hw4-ready-a-cpc/original/01_numbered_10/cap32.cfg",
+    "-a",
+    "10 PRINT 2",
+    "-a",
+    "CAP32_DELAYCAP32_DELAYCAP32_SCRNSHOTCAP32_EXIT"
+  ],
+  "screen_not_printer": true
+}

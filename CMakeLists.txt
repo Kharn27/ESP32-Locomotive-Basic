@@ -706,6 +706,17 @@ if(BUILD_TESTING)
     endif()
 endif()
 
+# J1.15-B: native bounded scalar STRING and CPC-original partial-record tests.
+if(BUILD_TESTING)
+    add_executable(test_j1_15_b_string_native tests/test_j1_15_b_string_native.c)
+    target_link_libraries(test_j1_15_b_string_native PRIVATE
+                          basic_session_runtime basic_variable_store)
+    add_test(NAME j1_15_b_native_string_cpc_partial COMMAND
+             test_j1_15_b_string_native
+             "${CMAKE_CURRENT_SOURCE_DIR}/tests/oracles/inputs/j1_15_a"
+             "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_15_string_scalar")
+endif()
+
 # HW4-EDIT-B1-A: additive host-only navigation regression.
 add_library(cpc_screen_nav STATIC io/cpc_screen_nav.c)
 target_include_directories(cpc_screen_nav PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/io)

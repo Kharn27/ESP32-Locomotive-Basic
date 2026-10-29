@@ -53,9 +53,9 @@ static int submit_overlap(const BasicSessionRuntime *runtime,
                           const uint8_t *output, size_t output_capacity,
                           const size_t *written)
 {
-    const void *parts[9];
-    size_t lengths[9];
-    size_t count = runtime->variables == NULL ? 7u : 9u;
+    const void *parts[10];
+    size_t lengths[10];
+    size_t count = runtime->variables == NULL ? 7u : 10u;
     size_t i, j;
     parts[0] = runtime;
     lengths[0] = sizeof(*runtime);
@@ -76,6 +76,8 @@ static int submit_overlap(const BasicSessionRuntime *runtime,
         lengths[7] = sizeof(*runtime->variables);
         parts[8] = runtime->variables->entries;
         lengths[8] = runtime->variables->capacity * sizeof(BasicVariableEntry);
+        parts[9] = runtime->variables->string_arena;
+        lengths[9] = runtime->variables->string_capacity;
     }
     for (i = 0u; i < count; ++i) {
         for (j = i + 1u; j < count; ++j) {
@@ -111,7 +113,17 @@ static int step_overlap(const BasicSessionRuntime *runtime,
                      runtime->variables->capacity * sizeof(BasicVariableEntry)) ||
             overlaps(written, sizeof(*written), runtime->variables, sizeof(*runtime->variables)) ||
             overlaps(written, sizeof(*written), runtime->variables->entries,
-                     runtime->variables->capacity * sizeof(BasicVariableEntry))));
+                     runtime->variables->capacity * sizeof(BasicVariableEntry)) ||
+            overlaps(runtime->variables->string_arena, runtime->variables->string_capacity,
+                     runtime, sizeof(*runtime)) ||
+            overlaps(runtime->variables->string_arena, runtime->variables->string_capacity,
+                     program, sizeof(*program)) ||
+            overlaps(runtime->variables->string_arena, runtime->variables->string_capacity,
+                     program->data, program->capacity) ||
+            overlaps(runtime->variables->string_arena, runtime->variables->string_capacity,
+                     output, capacity) ||
+            overlaps(runtime->variables->string_arena, runtime->variables->string_capacity,
+                     written, sizeof(*written))));
 }
 
 static uint8_t upper(uint8_t c)
@@ -160,7 +172,9 @@ BSRResult bsr_init_with_store(BasicSessionRuntime *runtime, BasicProgram *progra
         }
         if (overlaps(runtime, sizeof(*runtime), variables, sizeof(*variables)) ||
             overlaps(runtime, sizeof(*runtime), variables->entries,
-                     variables->capacity * sizeof(BasicVariableEntry))) {
+                     variables->capacity * sizeof(BasicVariableEntry)) ||
+            overlaps(runtime, sizeof(*runtime), variables->string_arena,
+                     variables->string_capacity)) {
             return simple(BSR_OVERLAP);
         }
     }

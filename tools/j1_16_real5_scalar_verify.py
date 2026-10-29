@@ -315,7 +315,7 @@ def falsify(base):
         def attack(label, mutate, expected):
             obj = json.loads(authentic_manifest)
             mutate(obj)
-            manifest_path.write_text(json.dumps(obj)+"\\n")
+            manifest_path.write_text(json.dumps(obj)+"\n")
             try:
                 verify(t, permanent=True)
             except Invalid as exc:

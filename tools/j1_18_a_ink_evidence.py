@@ -40,15 +40,15 @@ GHCR = 'ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5
 def setup(case):
     return ['MODE 1', 'INK 0,' + ('6' if case == 'I00' else '0'),
             'INK 1,26', 'INK 2,6', 'INK 3,18',
-            'PAPER 0', 'INK 1', 'CLS', 'NEW']
+            'PAPER 0', 'PEN 1', 'CLS', 'NEW']
+# Caprice screenshot filenames are wall-clock-second based. Space the two
+# within-process captures by enough real execution time to prevent overwrite.
+CHRONO_DELAY = ' '.join(['CAP32_DELAY'] * 96)
 CHRONO = ['MODE 1', 'INK 0,0', 'INK 1,26', 'INK 2,6', 'INK 3,18',
-          'PAPER 0', 'INK 1', 'CLS', 'NEW']
+          'PAPER 0', 'PEN 1', 'CLS', 'NEW']
 # Extract independently from the FIRST authentic GitHub acquisition and pin
 # its actual archive byte hashes here. Never derive these from manifest.json.
-# The permanent verifier fails CLOSED until all 16 entries are pinned.
-# External SHA-256 pins observed in genuine GitHub Actions run 40956293250,
-# obtained from actual raw files before bot commit 0f8d7e42f5c4cdb79964910d7271702cd289beed.
-# Independently cross-checked against the downloaded 113-file Actions archive.
+# Historic J1.17-A pins are *not* INK evidence. INK SHA are separate.
 # Acquired external SHA-256 pins MUST be filled in only after a real
 # Caprice32 Actions acquisition has archived its independently produced files.
 # Never generate these pins from a suspect archive being verified.
@@ -215,7 +215,7 @@ def capture_chronology(cap, out, session, tmp):
     cmds = CHRONO + ['INK 1,6', 'LOCATE 1,15', 'PRINT "J118INK"',
                     'CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT',
                     'INK 1,26',
-                    'CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT']
+                    CHRONO_DELAY + ' CAP32_SCRNSHOT CAP32_EXIT']
     chron = launch(cap,dest,tmp,cmds,False,shots=2)
     r = {'session':session,'commands':cmds,'caprice':chron,
          'before_sha256':sha(read(dest/'screen_0.png')),
@@ -356,7 +356,7 @@ def verify(out, permanent=False):
             'SOURCE_TOKEN_RECORD_REUSED')
     chrono_cmds=CHRONO+['INK 1,6','LOCATE 1,15','PRINT "J118INK"',
                         'CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT','INK 1,26',
-                        'CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT']
+                        CHRONO_DELAY + ' CAP32_SCRNSHOT CAP32_EXIT']
     for session in SESSIONS:
         dest=out/session/'chronology'
         rec=json.loads(read(dest/'capture.json'))

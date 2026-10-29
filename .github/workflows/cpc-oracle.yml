@@ -99,7 +99,7 @@ jobs:
           cmake --build "${RUNNER_TEMP}/c99-build" -j 2
           # CI-C99 owns the complete four-cell regression matrix. Keep
           # the oracle-specific portable comparator smoke only here.
-          ctest --test-dir "${RUNNER_TEMP}/c99-build" --output-on-failure \\
+          ctest --test-dir "${RUNNER_TEMP}/c99-build" --output-on-failure \
             -R "^(cpc_|basic_program_)"
 
       - name: J0.28 post-C1 vertical slice, sealed history and negative falsifications

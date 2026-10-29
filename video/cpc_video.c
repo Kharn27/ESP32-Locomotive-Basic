@@ -255,3 +255,31 @@ bool cpc_video_flush_dirty(CpcVideo *v, CpcVideoBandSender send, void *ctx)
     }
     return true;
 }
+
+
+/* B1: top-edge navigation exposes blank/unknown cells from the top.
+ * No scrollback; E2 and MODE1 raster move atomically after validation. */
+bool cpc_video_scroll_down(CpcVideo *v, unsigned rows)
+{
+    if (!valid(v) || v->mode != CPC_MODE_1 || v->paper >= 4U ||
+        rows > 25U || v->cursor_row >= 25U || v->cursor_column >= 40U)
+        return false;
+    if (rows == 0U) return true;
+    const size_t shift = (size_t)rows * 640U;
+    const size_t retained = CPC_VIDEO_BYTES - shift;
+    const uint8_t paper = (uint8_t)(v->paper * UINT8_C(0x55));
+    if (retained != 0U) memmove(v->pixels + shift, v->pixels, retained);
+    memset(v->pixels, paper, shift);
+    const size_t cells = (size_t)rows * CPC_VIDEO_MODE1_COLUMNS;
+    const size_t bits = (size_t)rows * (CPC_VIDEO_MODE1_COLUMNS / 8U);
+    if (cells != CPC_VIDEO_MODE1_CELLS)
+        memmove(v->cell_char + cells, v->cell_char,
+                CPC_VIDEO_MODE1_CELLS - cells);
+    memset(v->cell_char, 0, cells);
+    if (bits != CPC_VIDEO_MODE1_VALID_BYTES)
+        memmove(v->cell_valid + bits, v->cell_valid,
+                CPC_VIDEO_MODE1_VALID_BYTES - bits);
+    memset(v->cell_valid, 0, bits);
+    v->dirty_bands |= ALL_DIRTY;
+    return true;
+}

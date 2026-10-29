@@ -9,6 +9,7 @@
 #include "cpc_boot.h"
 #include "cpc_text.h"
 #include "cpc_uart_console.h"
+#include "cpc_screen_nav.h"
 #include "cpc_video.h"
 #include "cyd_ili9341.h"
 #include "uart_line.h"
@@ -54,6 +55,7 @@ static CpcVideo s_video;
 static CpcText s_text;
 static UartLine s_line;
 static CpcUartEditor s_edit;
+static CpcScreenNavigation s_nav;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
 static size_t s_scroll_reported;
 /* B2-C1 instrumentation: bounded histogram, never a second framebuffer. */
@@ -242,6 +244,7 @@ static bool prompt(void)
     if(cleared) return fail("UNEXPECTED_AUTO_CLEAR",-1);
     if(!cpc_uart_console_edit_begin(&s_text,&s_edit))
         return fail("EDIT_BEGIN",-1);
+    cpc_screen_nav_init(&s_nav);
     if(!repaint_dirty()) return false;
     printf("HW4-C3-B2 INPUT_READY capacity=%u screen_row=%u "
            "policy=mode1_scroll\n",UART_LINE_CAPACITY,s_text.row);
@@ -365,7 +368,7 @@ static bool uart_init(void)
         e=ESP_OK;
     if(e!=ESP_OK) return fail("UART_DRIVER",(int)e);
     printf("HW4-C2 UART_READY port=0 baud=115200 input=raw "
-           "CR_LF_CRLF=1 BS=08_7f LEFT=1b5b44 RIGHT=1b5b43 DELETE=1b5b337e\n");
+           "CR_LF_CRLF=1 BS=08_7f LEFT=1b5b44 RIGHT=1b5b43 DELETE=1b5b337e UP=1b5b41 DOWN=1b5b42 RETURN_EDIT=ENTER_OR_HOME\n");
     return true;
 }
 void app_main(void)
@@ -431,7 +434,7 @@ void app_main(void)
             }
             continue;
         }
-        UartLineEvent event=uart_line_feed(&s_line,ch);
+        UartLineEvent event=uart_line_feed_screen(&s_line,ch);
         if(event==UART_LINE_APPEND || event==UART_LINE_DELETE ||
            event==UART_LINE_DELETE_FORWARD ||
            event==UART_LINE_LEFT || event==UART_LINE_RIGHT) {
@@ -458,6 +461,40 @@ void app_main(void)
             if(!cpc_uart_console_edit(&s_text,&s_edit,&s_line,changed)) {
                 (void)fail("EDIT_SYNC",-1); return;
             }
+            ++echo_pending;
+        } else if(event==UART_LINE_NAV_LEFT || event==UART_LINE_NAV_RIGHT ||
+                  event==UART_LINE_NAV_UP || event==UART_LINE_NAV_DOWN) {
+            const char *direction=event==UART_LINE_NAV_LEFT ? "LEFT" :
+                                  event==UART_LINE_NAV_RIGHT ? "RIGHT" :
+                                  event==UART_LINE_NAV_UP ? "UP" : "DOWN";
+            if(!cpc_screen_nav_move(&s_nav,&s_text,&s_edit,&s_line,event)) {
+                (void)fail("SCREEN_NAV",-1); return;
+            }
+            printf("HW4-EDIT-B1-A NAV direction=%s row=%u col=%u "
+                   "focus=SCREEN anchor_valid=%u step_policy=ONE_ROW\n",
+                   direction,(unsigned)s_video.cursor_row,
+                   (unsigned)s_video.cursor_column,
+                   (unsigned)s_nav.anchor_valid);
+            ++echo_pending;
+        } else if(event==UART_LINE_RETURN_EDIT) {
+            if(!cpc_screen_nav_resume(&s_nav,&s_text,&s_edit,&s_line)) {
+                (void)fail("SCREEN_NAV_RESUME",-1); return;
+            }
+            printf("HW4-EDIT-B1-A RETURN_EDIT row=%u col=%u "
+                   "source_bytes=%u source_preserved=1 policy=E1_NEXT_ROW_CR\n",
+                   (unsigned)s_video.cursor_row,
+                   (unsigned)s_video.cursor_column,
+                   (unsigned)s_line.length);
+            ++echo_pending;
+        } else if(event==UART_LINE_RETURN_HOME) {
+            if(!cpc_screen_nav_home(&s_nav,&s_text,&s_edit,&s_line)) {
+                (void)fail("SCREEN_NAV_HOME",-1); return;
+            }
+            printf("HW4-EDIT-B1-A RETURN_HOME row=%u col=%u "
+                   "source_bytes=%u source_preserved=1\n",
+                   (unsigned)s_video.cursor_row,
+                   (unsigned)s_video.cursor_column,
+                   (unsigned)s_line.length);
             ++echo_pending;
         } else if(event==UART_LINE_OVERFLOW) {
             printf("HW4-C2 INPUT_OVERFLOW max_bytes=%u "

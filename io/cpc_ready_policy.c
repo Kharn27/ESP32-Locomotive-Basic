@@ -52,8 +52,8 @@ bool cpc_ready_policy_apply(CpcText *text, CpcReadyTransition transition,
                             bool *emitted_out)
 {
     static const uint8_t ready[] = "Ready\n";
-    if(text==NULL || transition<0 ||
-       transition>=CPC_READY_TRANSITION_COUNT) return false;
+    if(text==NULL || (unsigned)transition >=
+       (unsigned)CPC_READY_TRANSITION_COUNT) return false;
     const bool emit=cpc_ready_policy_emit(transition);
     if(emit && !cpc_text_write(text,ready,sizeof(ready)-1U)) return false;
     if(emitted_out!=NULL) *emitted_out=emit;

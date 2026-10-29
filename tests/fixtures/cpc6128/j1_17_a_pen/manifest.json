@@ -1,0 +1,51 @@
+{
+  "acquisition_head": "a249eae3c81f63d571bdef5bdb3ac7aeac24ac8c",
+  "cases": {
+    "P00": {
+      "original": "8c674a4ed1e68be4fd00b407265c9b0103a6dd16ee3531906edb7aca533b5c97",
+      "repeat": "1ef0c7380dbce2a3fec46e5cab48078f6d73b2823b66fca7625cad842a1caf73"
+    },
+    "P01": {
+      "original": "be55da2a8b3156350e2cda3d1c640d83156f26d287d493a2e275481d04080634",
+      "repeat": "d0b553a78cfbd6cb50bd13f61cc64d6e2a24a0d300fd20bde46a16c8862c4024"
+    },
+    "P02": {
+      "original": "e72d31816c69e63307ca8cd02db80f5bc5a5badc26c746f7cb5e8c07fa465fe5",
+      "repeat": "a85ba02c89ecaff05d394c770d1ae95047e9a64bdb84feac3cf2ce27507f1875"
+    },
+    "P03": {
+      "original": "5b9bb9a2550b10fdd791d0a6f149007157ffdd82158eab1a4c90200ffedb859b",
+      "repeat": "a9c0c44c7f3fc7f0ab73ac0ff5d39ee84d1b6caf8c3c2299037eb9bd67bb94ce"
+    },
+    "P04": {
+      "original": "c5e18fcd570cbb24e1a6f4dcddf60ca2bb275b1a60a5a620b9fb1228b2217635",
+      "repeat": "bd03441cf3ae854658a1552c01873d2d9a202d207c17622458517caf76dfaeb3"
+    },
+    "P15": {
+      "original": "0d06bb3add2a32c201a78ef25a5e9f11ea190954c48a61f309e73f0fb235b576",
+      "repeat": "e3b5628ccb8ed6096b92eeb4dfd54cdf9ca2b602bd9a14aa1c0464c71ac7c8cd"
+    },
+    "P16": {
+      "original": "bb546ff543c0c04786a19f5cbce4c480197b3355573effc6e64c1a424350378f",
+      "repeat": "9c6919a32574bef000bdf49fb30f1e91cd785512269f65c08affb5b72afa1ac0"
+    },
+    "PN1": {
+      "original": "181aa74c086429911a13ae9d91e12845daabed7309917a2032467312785045e5",
+      "repeat": "0257302c97a74d13dcecf2232b30c92b7934c1cd607494ab2b1f781be088f959"
+    }
+  },
+  "full_snapshots_archived": false,
+  "native_changes": false,
+  "oracle": {
+    "basic": "1.1",
+    "caprice": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "ghcr": "ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c",
+    "model": "CPC6128",
+    "rom": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "version": "Caprice32 v4.6.0-8c778bf072a06fb7c23b9cccd179041db7f79a52\nAPP_PATH: Not provided\nCompiled with:\nNumber of video plugins available: 11"
+  },
+  "phase": "J1.17-A",
+  "run_id": "40956293250",
+  "schema_version": 1,
+  "visual_classification": "VISUAL_UNVERIFIED"
+}

@@ -38,15 +38,15 @@ static void two_taps(void)
 {
     Hw4TouchT1 s;
     ready(&s);
-    unsigned orientation = 9U;
+    unsigned orientation = 10U;
     press(&s, 100U);
     release(&s, 180U, HW4_TOUCH_SHORT_ROTATE);
     orientation = orientation == 9U ? 10U : 9U;
-    REQUIRE(orientation == 10U && s.armed && !s.active_pressed);
+    REQUIRE(orientation == 9U && s.armed && !s.active_pressed);
     press(&s, 300U);
     release(&s, 430U, HW4_TOUCH_SHORT_ROTATE);
     orientation = orientation == 9U ? 10U : 9U;
-    REQUIRE(orientation == 9U);
+    REQUIRE(orientation == 10U);
     REQUIRE(tick(&s, false, 600U) == HW4_TOUCH_NONE);
 }
 static void bounce_and_short(void)

@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: J0 provenance, SHA, printer/RUN/LIST and coordinated falsifications
         shell: bash
         run: |
@@ -114,3 +115,107 @@ jobs:
           else
             echo 'J1.16-D-A STORE_UNVERIFIED: no original store archive'
           fi
+
+      - name: J1.17-A permanently sealed PEN CPC witness gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_17_a_pen_evidence.py --check-sources
+          if test -f tests/fixtures/cpc6128/j1_17_a_pen/manifest.json; then
+            python3 tools/j1_17_a_pen_evidence.py --evidence tests/fixtures/cpc6128/j1_17_a_pen --permanent --self-test
+            python3 tools/j1_17_a_pen_pixels.py --evidence tests/fixtures/cpc6128/j1_17_a_pen --self-test
+          else
+            echo 'J1.17-A ARCHIVE_NOT_YET_ACQUIRED — CPC_UNVERIFIED'
+          fi
+
+  pen-cpc-acquisition:
+    if: (github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-17-a-pen-cpc' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref_name == 'oracle/j1-17-a-pen-cpc')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    permissions:
+      contents: write
+      packages: read
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: true
+      - name: Pin ROM, emulator, HEAD and prove no runtime changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$GITHUB_HEAD_SHA"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          git diff origin/main...HEAD --name-only | tee /tmp/j117-paths.txt
+          if grep -E '^(core/|video/|firmware/|hal/|io/|tests/oracles/caprice32/|tests/fixtures/cpc6128/j1_16_|tools/j1_16_)' /tmp/j117-paths.txt; then
+            echo 'J1.17-A FORBIDDEN_DIFF_PATH'; exit 1
+          fi
+          python3 tools/j1_17_a_pen_evidence.py --check-sources --expect-head "$GITHUB_HEAD_SHA"
+          echo 'J1.17-A PINNED_HEAD_ROM_CAPRICE_SCOPE_PASS'
+      - name: Acquire two independent fresh CPC sessions per PEN case
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_17_a_pen_evidence.py \
+            --caprice tests/oracles/caprice32 \
+            --output "$RUNNER_TEMP/j117-pen" --expect-head "$GITHUB_HEAD_SHA"
+          python3 tools/j1_17_a_pen_evidence.py \
+            --evidence "$RUNNER_TEMP/j117-pen" --self-test
+          python3 tools/j1_17_a_pen_pixels.py --evidence "$RUNNER_TEMP/j117-pen" --self-test
+          echo 'J1.17-A FRESH_16_SESSIONS_VERIFIED UNSEALED'
+      - name: Archive once; thereafter require immutable external seal and fresh re-acquisition
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST=tests/fixtures/cpc6128/j1_17_a_pen
+          if test ! -f "$DEST/manifest.json"; then
+            test ! -e "$DEST"
+            mkdir -p "$DEST"
+            cp -a "$RUNNER_TEMP/j117-pen/." "$DEST/"
+            ! find "$DEST" -type f \( -name '*.sna' -o -name '*.rom' -o -name '*.dsk' -o -name 'cap32.cfg' \) | grep .
+            python3 tools/j1_17_a_pen_evidence.py --evidence "$DEST" --self-test
+            echo 'J1.17-A ARCHIVE_CREATED_PENDING_EXTERNAL_PIN'
+            find "$DEST" -type f -print0 | sort -z | xargs -0 sha256sum | tee /tmp/j117-file-shas.txt
+            git config user.name 'loco-cyd-evidence-bot'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add "$DEST"
+            git commit -m 'evidence(J1.17-A): archive 16 genuine CPC PEN sessions'
+            REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/oracle/j1-17-a-pen-cpc | awk '{print $1}')"
+            test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA" || {
+              echo 'CONCURRENT_HEAD_ADVANCE_ARCHIVE_NOT_PUSHED'; exit 1;
+            }
+            git push origin HEAD:refs/heads/oracle/j1-17-a-pen-cpc
+          else
+            python3 tools/j1_17_a_pen_evidence.py --evidence "$DEST" --permanent --self-test
+            for case in P00 P01 P02 P03 P04 P15 P16 PN1; do
+              for sess in original repeat; do
+                cmp "$DEST/$sess/$case/program.bin" "$RUNNER_TEMP/j117-pen/$sess/$case/program.bin"
+                cmp "$DEST/$sess/$case/run/printer.dat" "$RUNNER_TEMP/j117-pen/$sess/$case/run/printer.dat"
+              done
+              echo "J1.17-A $case FRESH_RAM_AND_ERR_ERL_MATCH_ARCHIVE"
+            done
+            echo 'J1.17-A EXTERNALLY_SEALED_PERMANENT_AND_FRESH_PASS'
+          fi
+      - name: Preserve bounded CPC oracle evidence for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: j117-a-pen-16-sessions
+          path: ${{ runner.temp }}/j117-pen/
+          if-no-files-found: warn
+          retention-days: 30

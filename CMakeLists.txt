@@ -841,3 +841,16 @@ if(BUILD_TESTING)
             --permanent --self-test)
     endif()
 endif()
+
+# HW4-TOUCH-T1: ESP-IDF-independent PENIRQ gesture state machine.
+# The console compiles this SAME source; CI tests mock GPIO and time.
+if(BUILD_TESTING)
+    add_executable(test_hw4_touch_t1
+        tests/test_hw4_touch_t1.c
+        firmware/esp32_display_probe/main/hw4_touch_t1.c)
+    target_include_directories(test_hw4_touch_t1 PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main)
+    target_compile_options(test_hw4_touch_t1 PRIVATE -std=c99 -Wall
+        -Wextra -Wpedantic -Wconversion -Werror)
+    add_test(NAME hw4_touch_t1_gestures COMMAND test_hw4_touch_t1)
+endif()

@@ -329,7 +329,7 @@ static int nmin(void) {
     return 0;
 }
 int main(int argc,char **argv) {
-    F f;CHECK(argc==2);
+    F f;CHECK(argc==3);
     CHECK(init(&f)==0 && populate(&f)==0);
     CHECK(oracle(&f,argv[1])==0);
     CHECK(argc==3);

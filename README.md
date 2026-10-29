@@ -372,3 +372,7 @@ test physique du HEAD final par le PO.
 - **J1.15-A** : caractérisation CPC ROM des variables STRING scalaires (sans code natif) — voir [protocole](docs/J1.15-A-string-scalar-cpc-oracle.md).
 
 - **J1.15-B (en revue Pilotage)** : variables STRING scalaires natives C99 à arène bornée fournie par l'appelant, `A$="texte"` et `PRINT A$`, sans raccordement firmware ; [rapport](docs/J1.15-B-string-scalar-native.md).
+
+- **J1.15-C (mandat Pilotage #152, non fusionné)** : arène STRING statique 64×64=4096 o raccordée au seul firmware CONSOLE CYD (pas de malloc/PSRAM), contrôles d'initialisation, garde DRAM exceptionnelle bornée et test de régression C99. [Rapport et protocole matériel PO](docs/J1.15-C-cyd-string-arena.md). Base intégrée J1.15-B `main@ed7c82a4cb0ae08c853710ece6bffb098887999f`. **ON_DEVICE_UNVERIFIED** jusqu'au test physique sur le SHA final ; revue et fusion exclusivement Pilotage. La mention précédente « B en revue » est historique, dépassée par la fusion #148.
+
+- **J1.15-C intégration conditionnelle avec HW4-EDIT-B1-A** : PR #150 fusionnée par Pilotage dans `main` ; PR #153 résout le chevauchement firmware/CMake/CI et conserve l'éditeur MODE 1. Le PO a validé les fonctions STRING sur l'ancien SHA `684e1ce` ; **nouveau test CYD du HEAD intégré et photographie LCD exigés avant fusion**. [Rapport d'intégration](docs/J1.15-C-cyd-string-arena.md).

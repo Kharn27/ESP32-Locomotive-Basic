@@ -299,11 +299,89 @@ static void c1_carriage_return_position(void)
     guards();
 }
 
+
+/* C1: screen focus must never reinterpret E2 as E3, nor lose a
+ * partially written E3 source during physical-CR relocation. */
+static void c1_partial_and_home(void)
+{
+    reset(10U,0U);
+    assert(seq("10 PRINT 2")==UART_LINE_APPEND);
+    assert(line.length==10U && line.cursor_pos==10U);
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(v.cursor_row==8U && v.cursor_column==10U);
+    assert(cpc_video_put_cell(&v,10U,8U,'Z',glyph,NULL));
+    assert(feed('\r')==UART_LINE_RETURN_EDIT);
+    assert(v.cursor_row==9U && v.cursor_column==10U);
+    assert(edit.row==9U && edit.column==0U);
+    assert(text.row==9U && text.column==10U);
+    assert(line.length==10U && line.cursor_pos==10U);
+    assert(memcmp(line.data,"10 PRINT 2",11U)==0);
+    cell(0U,9U,true,'1');
+    assert(!line.ready && !line.screen_navigation);
+    assert(feed('\n')==UART_LINE_NONE);
+    assert(feed('X')==UART_LINE_APPEND);
+    assert(memcmp(line.data,"10 PRINT 2X",12U)==0);
+    assert(feed('\r')==UART_LINE_READY); /* one Enter in E3 */
+    uart_line_ack(&line);guards();
+
+    reset(7U,3U);
+    assert(seq("HELLO")==UART_LINE_APPEND);
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(v.cursor_row==6U && v.cursor_column==8U);
+    save();
+    assert(seq("\x1b[H")==UART_LINE_RETURN_HOME);
+    assert(edit.row==7U && edit.column==3U);
+    assert(v.cursor_row==7U && v.cursor_column==8U);
+    same();
+    assert(!line.ready && memcmp(line.data,"HELLO",6U)==0);
+    assert(feed('\r')==UART_LINE_READY);
+    uart_line_ack(&line);guards();
+}
+static void c1_full_capacity_and_deferred_wrap(void)
+{
+    reset(0U,0U);
+    for(unsigned i=0U;i<120U;++i) assert(feed('A')==UART_LINE_APPEND);
+    assert(line.length==120U && line.cursor_pos==120U);
+    /* Place E1 on visible physical row0, then navigate screen only.
+     * The buffer E3 is unchanged, irrespective of existing old E2 text. */
+    assert(cpc_video_cursor(&v,21U,0U,true));
+    assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
+    assert(seq("\x1b[D")==UART_LINE_NAV_LEFT);
+    assert(v.cursor_row==0U && v.cursor_column==21U);
+    assert(feed('\r')==UART_LINE_RETURN_EDIT);
+    assert(edit.row==1U && edit.column==0U && edit.painted==120U);
+    assert(line.length==120U && line.cursor_pos==120U);
+    for(unsigned i=0U;i<120U;++i) assert(line.data[i]=='A');
+    assert(line.data[120U]==0U && !line.ready);
+    cell(0U,1U,true,'A');cell(39U,3U,true,'A');
+    assert(text.row==3U && text.column==40U);
+    assert(v.cursor_row==4U && v.cursor_column==0U);
+    assert(feed('\r')==UART_LINE_READY); /* normal E3 submission */
+    uart_line_ack(&line);guards();
+
+    reset(5U,0U);
+    for(unsigned i=0U;i<40U;++i) assert(feed('B')==UART_LINE_APPEND);
+    assert(text.row==5U && text.column==40U); /* legitimate pending wrap */
+    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(v.cursor_row==5U && v.cursor_column==0U);
+    assert(feed('\r')==UART_LINE_RETURN_EDIT);
+    assert(edit.row==6U && edit.column==0U && edit.painted==40U);
+    assert(text.row==6U && text.column==40U);
+    assert(v.cursor_row==7U && v.cursor_column==0U);
+    cell(0U,6U,true,'B');cell(39U,6U,true,'B');
+    assert(line.length==40U && !line.ready);
+    assert(feed('\r')==UART_LINE_READY);
+    uart_line_ack(&line);guards();
+}
+
 int main(void)
 {
     arrows();overlay();scroll();invalid_and_paper();e3_and_ansi();
     expelled_e3();
     c1_carriage_return_position();
+    c1_partial_and_home();
+    c1_full_capacity_and_deferred_wrap();
     puts("HW4-EDIT-B1-A E1/E2/E3 destructive navigation PASS");
     return 0;
 }

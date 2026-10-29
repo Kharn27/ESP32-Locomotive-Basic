@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: 2191363f0d8d78b7c7f34ed734b85b981c06baaf
+          ref: 5445708885694dbd464c444f9ef9185f12a6383f
           path: base
           persist-credentials: false
       - name: Compare actual Xtensa sections and binaries at exact base/HEAD
@@ -41,7 +41,7 @@ jobs:
           PROFILE: ${{ matrix.profile }}
         run: |
           set -euo pipefail
-          test "$(git -C base rev-parse HEAD)" = 2191363f0d8d78b7c7f34ed734b85b981c06baaf
+          test "$(git -C base rev-parse HEAD)" = 5445708885694dbd464c444f9ef9185f12a6383f
           test "$(git -C head rev-parse HEAD)" = "$EXPECTED_HEAD"
           docker run --rm -v "$PWD:/workspace" -w /workspace \
             -e IDF_GIT_SAFE_DIR=/workspace -e PROFILE="$PROFILE" \
@@ -64,7 +64,7 @@ jobs:
               done
             '
           python3 head/tools/ci/hw4_a0_compare_memory.py \
-            --base-sha 2191363f0d8d78b7c7f34ed734b85b981c06baaf \
+            --base-sha 5445708885694dbd464c444f9ef9185f12a6383f \
             --profile "$PROFILE" \
             --base-size "base/a0-$PROFILE-sections.txt" \
             --head-size "head/a0-$PROFILE-sections.txt" \

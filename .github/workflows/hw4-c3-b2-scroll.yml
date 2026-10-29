@@ -22,6 +22,10 @@ on:
       - 'tools/hw4_c3_b2_uart_po.py'
       - '.github/workflows/hw4-c3-b2-scroll.yml'
   workflow_dispatch:
+concurrency:
+  group: ci-opt2-hw4-scroll-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 jobs:

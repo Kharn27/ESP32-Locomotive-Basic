@@ -317,9 +317,15 @@ static BTStatus scalar_string_assignment(const uint8_t *source, size_t length,
         ++end;
     }
     if (end == length) return BT_MALFORMED_INPUT;
-    /* No adjacent quote, concatenation or trailing expression. */
-    if (end + 1u < length && source[end + 1u] != (uint8_t)' ')
-        return BT_UNSUPPORTED_CONSTRUCT;
+    /* A scalar STRING assignment is autonomous. Validate past trailing
+     * spaces before accepting anything. Otherwise A$="X" :PRINT A$
+     * tokenizes but fails LIST/RUN. one_pass emits the spaces unchanged. */
+    {
+        size_t suffix = end + 1u;
+        while (suffix < length && source[suffix] == (uint8_t)' ')
+            ++suffix;
+        if (suffix != length) return BT_UNSUPPORTED_CONSTRUCT;
+    }
     while (start <= end) {
         status = emit(out, source[start++]);
         if (status != BT_OK) return status;

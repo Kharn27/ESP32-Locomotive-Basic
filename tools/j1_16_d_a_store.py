@@ -110,8 +110,9 @@ def inspect_snapshot(snap, case):
     check(same_except_opaque_cache(token[0], L10[case], (5,6)) and
           same_except_opaque_cache(token[2], L20, (7,8)),
           "ROM_RECORD_L10_L20_DIVERGENCE")
-    check(token[1][2:4] == b"\x0f\x00" and len(token[1]) <= 20 and
-          token[1][-1] == 0, "STOP_RECORD_MISSING")
+    # CE was observed from the genuine CPC STOP token, not guessed from ROM.
+    check(token[1] == bytes.fromhex("06 00 0F 00 CE 00"),
+          "STOP_RECORD_MISSING")
     window = bytes(ram[start:end])
     check(0 < len(window) <= 128, "SCALAR_WINDOW_EMPTY_OR_TOO_LONG")
     # Parse only a single bounded scalar candidate. This parser MUST NOT
@@ -303,8 +304,10 @@ def verify(root):
                   same_except_opaque_cache(l20,L20,(7,8)) and
                   l10.hex(" ").upper()==item["post_run_l10_hex"] and
                   l20.hex(" ").upper()==item["post_run_l20_hex"] and
-                  token[rows[1]["offset"]:rows[1]["offset"]+rows[1]["length"]].hex(" ").upper()
-                  ==item["stop_line_hex"],"TOKEN_OR_STOP_CHRONOLOGY_"+case)
+                  token[rows[1]["offset"]:rows[1]["offset"]+rows[1]["length"]]
+                  ==bytes.fromhex("06 00 0F 00 CE 00") and
+                  item["stop_line_hex"]=="06 00 0F 00 CE 00",
+                  "TOKEN_OR_STOP_CHRONOLOGY_"+case)
             check(digest(read(d/"stop.png"))==item["stop_png_sha256"] and
                   read(d/"stop.png").startswith(b"\x89PNG\r\n\x1a\n"),
                   "STOP_SCREEN_PROVENANCE_"+case)
@@ -336,7 +339,7 @@ def mutations(root):
     # Test directly against a genuine, newly acquired archive. Each clone
     # falsifies one axis; detection must precede any claim of observation.
     import shutil
-    for field in ("byte","name","offset","case","sha","chronology"):
+    for field in ("byte","name","offset","case","sha","chronology","stop_token"):
         with tempfile.TemporaryDirectory(prefix="j116-da-mut-") as td:
             alt=Path(td)/"archive"
             shutil.copytree(root,alt)
@@ -356,6 +359,8 @@ def mutations(root):
                 item["window_sha256"]="0"*64
             elif field=="chronology":
                 item["sequence"][3]="PRINT_L20_ALREADY_EXECUTED"
+            elif field=="stop_token":
+                item["stop_line_hex"]="06 00 0F 00 C0 00"
             if field!="byte":
                 capture.write_text(json.dumps(item,sort_keys=True,indent=2)+"\n")
                 m=json.loads(read(alt/"manifest.json"))

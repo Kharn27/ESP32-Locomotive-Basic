@@ -14,6 +14,12 @@ typedef enum {
     UART_LINE_DELETE_FORWARD, /* ESC[3~: under cursor */
     UART_LINE_LEFT,
     UART_LINE_RIGHT,
+    UART_LINE_NAV_LEFT,
+    UART_LINE_NAV_RIGHT,
+    UART_LINE_NAV_UP,
+    UART_LINE_NAV_DOWN,
+    UART_LINE_RETURN_EDIT, /* E1 ENTER: CR to next visible row, no submit */
+    UART_LINE_RETURN_HOME, /* E1 CSI Home: restore E3 anchor, no CR */
     UART_LINE_READY,
     UART_LINE_REJECTED,
     UART_LINE_IGNORED,
@@ -33,6 +39,7 @@ typedef struct {
     size_t cursor_pos; /* 0..length, next insertion point */
     bool poisoned;
     bool ready;
+    bool screen_navigation; /* E1 focus, E3 untouched */
     bool last_cr;
     bool rejected_ansi_incomplete;
     size_t rejected_lines;
@@ -60,5 +67,7 @@ typedef struct {
  * Call uart_line_ack() after READY/REJECTED, before next byte. */
 void uart_line_init(UartLine *line);
 UartLineEvent uart_line_feed(UartLine *line, uint8_t ch);
+/* Console-only routing; original uart_line_feed keeps HW4-EDIT-A semantics. */
+UartLineEvent uart_line_feed_screen(UartLine *line, uint8_t ch);
 void uart_line_ack(UartLine *line);
 #endif

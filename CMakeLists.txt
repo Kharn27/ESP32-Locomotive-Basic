@@ -717,6 +717,16 @@ if(BUILD_TESTING)
              "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_15_string_scalar")
 endif()
 
+# HW4-EDIT-B1-A: additive host-only navigation regression.
+add_library(cpc_screen_nav STATIC io/cpc_screen_nav.c)
+target_include_directories(cpc_screen_nav PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/io)
+target_link_libraries(cpc_screen_nav PUBLIC cpc_uart_console uart_line)
+if(BUILD_TESTING)
+    add_executable(test_hw4_edit_b1_a tests/test_hw4_edit_b1_a.c)
+    target_link_libraries(test_hw4_edit_b1_a PRIVATE cpc_screen_nav)
+    add_test(NAME hw4_edit_b1_a_screen_navigation COMMAND test_hw4_edit_b1_a)
+endif()
+
 # J1.15-C: console-owned 64x64 arena, exact production header and negative edges.
 if(BUILD_TESTING)
     add_executable(test_j1_15_c_cyd_arena tests/test_j1_15_c_cyd_arena.c)

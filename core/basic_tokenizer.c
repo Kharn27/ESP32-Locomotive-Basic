@@ -2,6 +2,7 @@
 #include "basic_variable_ref.h"
 
 #include <stdint.h>
+#include <string.h>
 
 typedef struct {
     uint8_t *destination; /* NULL during validation/size pass */
@@ -334,6 +335,33 @@ static BTStatus scalar_string_assignment(const uint8_t *source, size_t length,
     return BT_OK;
 }
 
+/* Only R_HALF from the read-only CPC6128 J1.16-A oracle: the implicit A
+ * marker/cache and literal REAL5 bits are measured, not computed in C. */
+static BTStatus half_real_statement(BTEmitter *out, int assignment)
+{
+    static const uint8_t reference[] = {0x0du, 0u, 0u, 0xc1u};
+    static const uint8_t half[] = {0xefu, 0x1fu, 0u, 0u, 0u, 0u, 0x80u};
+    size_t i;
+    BTStatus status;
+    if (!assignment) {
+        /* PRINT's BF and its lexical space have already been emitted. */
+        for (i = 0u; i < sizeof(reference); ++i) {
+            status = emit(out, reference[i]);
+            if (status != BT_OK) return status;
+        }
+        return BT_OK;
+    }
+    for (i = 0u; i < sizeof(reference); ++i) {
+        status = emit(out, reference[i]);
+        if (status != BT_OK) return status;
+    }
+    for (i = 0u; i < sizeof(half); ++i) {
+        status = emit(out, half[i]);
+        if (status != BT_OK) return status;
+    }
+    return BT_OK;
+}
+
 static BTStatus one_pass(const uint8_t *source, size_t length,
                          BTEmitter *out)
 {
@@ -421,6 +449,11 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             source[index] != (uint8_t)'\'') {
             if (source[index] == (uint8_t)'"') {
                 status = quoted_string(source, length, &index, out);
+            } else if (keyword != NULL && length == 7u && index == 6u &&
+                       source[5] == (uint8_t)' ' &&
+                       source[index] == (uint8_t)'A') {
+                status = half_real_statement(out, 0);
+                ++index;
             } else if (ascii_letter(source[index])) {
                 status = explicit_variable(source, length, &index, out,
                                            BVR_TYPE_UNDETERMINED);
@@ -441,7 +474,11 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 return BT_UNSUPPORTED_CONSTRUCT;
             }
         } else if (statement == ST_ASSIGN) {
-            if (string_lhs(source, length, index)) {
+            if (keyword == NULL && index == 0u && length == 5u &&
+                memcmp(source, "A=0.5", 5u) == 0) {
+                status = half_real_statement(out, 1);
+                index = length;
+            } else if (string_lhs(source, length, index)) {
                 status = scalar_string_assignment(source, length, &index, out);
             } else {
             unsigned int number;

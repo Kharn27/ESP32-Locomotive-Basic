@@ -726,6 +726,16 @@ if(BUILD_TESTING)
              "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_15_string_scalar")
 endif()
 
+# J1.16-B: immutable CPC R_HALF and native REAL5 half scalar.
+if(BUILD_TESTING)
+    add_executable(test_j1_16_b_real5_half tests/test_j1_16_b_real5_half.c)
+    target_link_libraries(test_j1_16_b_real5_half PRIVATE
+        basic_session_runtime basic_variable_store)
+    add_test(NAME j1_16_b_native_real5_half_cpc_partial
+        COMMAND test_j1_16_b_real5_half
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_real5_scalar")
+endif()
+
 # HW4-EDIT-B1-A: additive host-only navigation regression.
 add_library(cpc_screen_nav STATIC io/cpc_screen_nav.c)
 target_include_directories(cpc_screen_nav PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/io)

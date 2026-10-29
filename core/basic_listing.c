@@ -580,7 +580,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                     0xbfu, (uint8_t)' ', 0x0du, 0u, 0u, 0xc1u
                 };
                 if (length != sizeof(scalar_print) ||
-                    memcmp(body, scalar_print, sizeof(half_print)) != 0)
+                    memcmp(body, scalar_print, sizeof(scalar_print)) != 0)
                     return BL_BAD_SEQUENCE;
                 status = append_byte(out, (uint8_t)'A');
                 pos = length;

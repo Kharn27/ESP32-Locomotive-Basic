@@ -697,3 +697,7 @@ Mandat [#157](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/157), bas
 ### J1.16-D-B — premier témoin REAL5 négatif natif (mandat 29 octobre 2026)
 
 **Décision Pilotage postérieure à J1.16-D-A** : la PR #167 D-A/C1 a été acceptée et fusionnée à `main@517b7eaa3e443c537a2909a06ee6b129c5e1465b`. L'[issue #169](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/169) autorise exclusivement `A=-0.5 / PRINT A / END` en C99, payload final `00 00 00 80 80` issu de la capture D-A, sans étendre les nombres négatifs. [Rapport D-B](J1.16-D-B-native-real5-negative-half.md). PR en proposition à Pilotage, preuves CI sur HEAD à vérifier, `ON_DEVICE_UNVERIFIED`, aucun J1.17 autorisé.
+
+### J1.16-E-A — caractérisation CPC des magasins 0, +1, -1 (29 octobre 2026)
+
+**Décision Pilotage postérieure à J1.16-D-B** : PR #170 acceptée et fusionnée dans `main@2191363f0d8d78b7c7f34ed734b85b981c06baaf` ; [mission #171](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/171) autorise exclusivement l'oracle ROM des scalaires `R_ZERO`, `R_ONE`, `R_NEG_ONE`, deux processus CPC indépendants par cas, observation de cinq octets stockés, sceau SHA externe et falsifications. [Protocole](J1.16-E-A-real5-small-store-oracle.md). Aucun nouveau REAL5 natif, aucun code HW, `ON_DEVICE_UNVERIFIED`. Les résultats de PR et CI doivent être contrôlés sur HEAD final avant acceptation Pilotage ; E-B/J1.17 restent interdits.

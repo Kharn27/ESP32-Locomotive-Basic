@@ -52,9 +52,7 @@ static int equal_keys(const BasicVariableKey *a, const BasicVariableKey *b)
 
 static int valid_value(const BasicVariableValue *value)
 {
-    return valid_type(value->type) &&
-           (value->type != (uint8_t)BVT_STRING ||
-            (value->data.string.offset == 0u && value->data.string.length == 0u));
+    return valid_type(value->type);
 }
 
 /* Structural and live-entry validation precedes all reads and mutations. */
@@ -73,7 +71,20 @@ static BVSStatus check_store(const BasicVariableStore *store, size_t *out_bytes,
         return BVS_INVALID_STORE;
     }
     bytes = store->capacity * sizeof(BasicVariableEntry);
-    if (overlaps(store, sizeof(*store), store->entries, bytes)) {
+    if ((store->string_capacity == 0u) != (store->string_arena == NULL) ||
+        store->string_capacity > UINT32_MAX ||
+        (store->string_capacity != 0u &&
+         (store->capacity == 0u ||
+          store->string_slot_bytes != store->string_capacity / store->capacity ||
+          store->string_slot_bytes == 0u)) ||
+        (store->string_capacity == 0u && store->string_slot_bytes != 0u)) {
+        return BVS_INVALID_STORE;
+    }
+    if (overlaps(store, sizeof(*store), store->entries, bytes) ||
+        overlaps(store, sizeof(*store), store->string_arena,
+                 store->string_capacity) ||
+        overlaps(store->entries, bytes, store->string_arena,
+                 store->string_capacity)) {
         return BVS_OVERLAPPING_MEMORY;
     }
     if (validate_entries != 0) {
@@ -82,6 +93,16 @@ static BVSStatus check_store(const BasicVariableStore *store, size_t *out_bytes,
             if (!valid_key(&entry->key) || !valid_value(&entry->value) ||
                 entry->value.type != entry->key.type) {
                 return BVS_INVALID_STORE;
+            }
+            if (entry->value.type == (uint8_t)BVT_STRING) {
+                const BasicStringValue *v = &entry->value.data.string;
+                if (v->length == 0u) {
+                    if (v->offset != 0u) return BVS_INVALID_STORE;
+                } else if (store->string_arena == NULL ||
+                           v->length > store->string_slot_bytes ||
+                           v->offset != i * store->string_slot_bytes) {
+                    return BVS_INVALID_STORE;
+                }
             }
         }
     }
@@ -94,7 +115,8 @@ static int unsafe(const BasicVariableStore *store, size_t bytes,
                   const void *argument, size_t length)
 {
     return overlaps(store, sizeof(*store), argument, length) ||
-           overlaps(store->entries, bytes, argument, length);
+           overlaps(store->entries, bytes, argument, length) ||
+           overlaps(store->string_arena, store->string_capacity, argument, length);
 }
 
 /* Internal find: caller has validated store and key; has no side effects. */
@@ -109,27 +131,42 @@ static size_t locate(const BasicVariableStore *store, const BasicVariableKey *ke
     return store->count;
 }
 
-BVSStatus bvs_init(BasicVariableStore *store, BasicVariableEntry *entries,
-                   size_t capacity)
+BVSStatus bvs_init_with_arena(BasicVariableStore *store,
+                             BasicVariableEntry *entries, size_t capacity,
+                             uint8_t *arena, size_t arena_capacity)
 {
     size_t bytes;
-    if (store == NULL || (capacity == 0u) != (entries == NULL)) {
+    if (store == NULL || (capacity == 0u) != (entries == NULL) ||
+        (arena_capacity == 0u) != (arena == NULL) ||
+        arena_capacity > UINT32_MAX ||
+        (arena_capacity != 0u &&
+         (capacity == 0u || arena_capacity / capacity == 0u))) {
         return BVS_INVALID_ARGUMENT;
     }
     if (capacity > SIZE_MAX / sizeof(*entries)) {
         return BVS_INVALID_ARGUMENT;
     }
     bytes = capacity * sizeof(*entries);
-    if (overlaps(store, sizeof(*store), entries, bytes)) {
+    if (overlaps(store, sizeof(*store), entries, bytes) ||
+        overlaps(store, sizeof(*store), arena, arena_capacity) ||
+        overlaps(entries, bytes, arena, arena_capacity)) {
         return BVS_OVERLAPPING_MEMORY;
     }
-    if (bytes > 0u) {
-        memset(entries, 0, bytes);
-    }
+    if (bytes > 0u) memset(entries, 0, bytes);
+    if (arena_capacity > 0u) memset(arena, 0, arena_capacity);
     store->entries = entries;
     store->capacity = capacity;
     store->count = 0u;
+    store->string_arena = arena;
+    store->string_capacity = arena_capacity;
+    store->string_slot_bytes = arena_capacity == 0u ? 0u : arena_capacity/capacity;
     return BVS_OK;
+}
+
+BVSStatus bvs_init(BasicVariableStore *store, BasicVariableEntry *entries,
+                   size_t capacity)
+{
+    return bvs_init_with_arena(store, entries, capacity, NULL, 0u);
 }
 
 BVSStatus bvs_validate(const BasicVariableStore *store)
@@ -147,6 +184,9 @@ BVSStatus bvs_reset(BasicVariableStore *store)
     }
     if (bytes > 0u) {
         memset(store->entries, 0, bytes);
+    }
+    if (store->string_capacity > 0u) {
+        memset(store->string_arena, 0, store->string_capacity);
     }
     store->count = 0u;
     return BVS_OK;
@@ -268,8 +308,9 @@ BVSStatus bvs_set(BasicVariableStore *store, const BasicVariableKey *key,
     if (!valid_type(value->type) || value->type != key->type) {
         return BVS_INVALID_TYPE;
     }
-    if (!valid_value(value)) {
-        return BVS_UNSUPPORTED_STRING;
+    if (value->type == (uint8_t)BVT_STRING &&
+        (value->data.string.offset != 0u || value->data.string.length != 0u)) {
+        return BVS_UNSUPPORTED_STRING; /* External descriptor cannot own bytes. */
     }
     index = locate(store, key);
     if (index == store->count) {
@@ -305,8 +346,9 @@ BVSStatus bvs_assign(BasicVariableStore *store, const BasicVariableKey *key,
     if (!valid_type(value->type) || value->type != key->type) {
         return BVS_INVALID_TYPE;
     }
-    if (!valid_value(value)) {
-        return BVS_UNSUPPORTED_STRING;
+    if (value->type == (uint8_t)BVT_STRING &&
+        (value->data.string.offset != 0u || value->data.string.length != 0u)) {
+        return BVS_UNSUPPORTED_STRING; /* Use bvs_assign_string for byte ownership. */
     }
     index = locate(store, key);
     if (index == store->count) {
@@ -322,4 +364,107 @@ BVSStatus bvs_assign(BasicVariableStore *store, const BasicVariableKey *key,
         store->entries[index].value = *value;
     }
     return BVS_OK;
+}
+
+/* Everything except the final write is pure and shared with the executor
+ * preflight.  The assigned slot is indexed by the complete key identity. */
+static BVSStatus preflight_string(const BasicVariableStore *store,
+                                 const BasicVariableKey *key,
+                                 const uint8_t *source, size_t length,
+                                 size_t *out_index)
+{
+    size_t bytes, index, i;
+    BVSStatus status;
+    if (store == NULL || key == NULL || (length != 0u && source == NULL))
+        return BVS_INVALID_ARGUMENT;
+    status = check_store(store, &bytes, 1);
+    if (status != BVS_OK) return status;
+    if (unsafe(store, bytes, key, sizeof(*key)) ||
+        unsafe(store, bytes, source, length) ||
+        overlaps(key, sizeof(*key), source, length))
+        return BVS_OVERLAPPING_MEMORY;
+    if (!valid_key(key)) return BVS_INVALID_KEY;
+    if (key->type != (uint8_t)BVT_STRING) return BVS_INVALID_TYPE;
+    for (i = 0u; i < length; ++i) {
+        uint8_t ch = source[i];
+        if (ch < 0x20u || ch > 0x7eu || ch == (uint8_t)'"')
+            return BVS_INVALID_STRING;
+    }
+    index = locate(store, key);
+    if (index == store->count && index == store->capacity)
+        return BVS_FULL;
+    if (length > 0u && (store->string_arena == NULL ||
+                         length > store->string_slot_bytes))
+        return BVS_NO_STRING_SPACE;
+    *out_index = index;
+    return BVS_OK;
+}
+
+BVSStatus bvs_can_assign_string(const BasicVariableStore *store,
+                                const BasicVariableKey *key,
+                                const uint8_t *bytes, size_t length)
+{
+    size_t index;
+    return preflight_string(store, key, bytes, length, &index);
+}
+
+BVSStatus bvs_assign_string(BasicVariableStore *store,
+                            const BasicVariableKey *key,
+                            const uint8_t *bytes, size_t length)
+{
+    size_t index;
+    BasicVariableEntry entry;
+    BVSStatus status = preflight_string(store, key, bytes, length, &index);
+    if (status != BVS_OK) return status;
+    memset(&entry, 0, sizeof(entry));
+    entry.key = *key;
+    entry.value.type = (uint8_t)BVT_STRING;
+    if (length != 0u) {
+        entry.value.data.string.offset = (uint32_t)(index*store->string_slot_bytes);
+        entry.value.data.string.length = (uint32_t)length;
+    }
+    /* No later operation can fail.  Zero old content (no stale bytes)
+     * and rewrite the same slot: unlimited reassignments, no exhaustion. */
+    if (store->string_slot_bytes != 0u) {
+        uint8_t *slot = store->string_arena + index*store->string_slot_bytes;
+        memset(slot, 0, store->string_slot_bytes);
+        if (length != 0u) memcpy(slot, bytes, length);
+    }
+    store->entries[index] = entry;
+    if (index == store->count) ++store->count;
+    return BVS_OK;
+}
+
+BVSStatus bvs_string_span(const BasicVariableStore *store,
+                          const BasicStringValue *value,
+                          const uint8_t **out_bytes, size_t *out_length)
+{
+    size_t bytes, i;
+    BVSStatus status;
+    if (store == NULL || value == NULL || out_bytes == NULL || out_length == NULL)
+        return BVS_INVALID_ARGUMENT;
+    status = check_store(store, &bytes, 1);
+    if (status != BVS_OK) return status;
+    if (unsafe(store, bytes, value, sizeof(*value)) ||
+        unsafe(store, bytes, out_bytes, sizeof(*out_bytes)) ||
+        unsafe(store, bytes, out_length, sizeof(*out_length)) ||
+        overlaps(value, sizeof(*value), out_bytes, sizeof(*out_bytes)) ||
+        overlaps(value, sizeof(*value), out_length, sizeof(*out_length)) ||
+        overlaps(out_bytes, sizeof(*out_bytes), out_length, sizeof(*out_length)))
+        return BVS_OVERLAPPING_MEMORY;
+    if (value->length == 0u && value->offset == 0u) {
+        *out_bytes = NULL; *out_length = 0u; return BVS_OK;
+    }
+    /* The provided descriptor must correspond to an existing live entry. */
+    for (i = 0u; i < store->count; ++i) {
+        const BasicVariableValue *item = &store->entries[i].value;
+        if (item->type == (uint8_t)BVT_STRING &&
+            item->data.string.offset == value->offset &&
+            item->data.string.length == value->length && value->length != 0u) {
+            *out_bytes = store->string_arena + value->offset;
+            *out_length = value->length;
+            return BVS_OK;
+        }
+    }
+    return BVS_INVALID_STRING;
 }

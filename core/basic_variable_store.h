@@ -16,12 +16,14 @@ typedef enum {
     BVS_INVALID_TYPE,
     BVS_INVALID_STORE,
     BVS_UNSUPPORTED_STRING,
-    BVS_OVERLAPPING_MEMORY
+    BVS_OVERLAPPING_MEMORY,
+    BVS_NO_STRING_SPACE,
+    BVS_INVALID_STRING
 } BVSStatus;
 
 typedef struct {
-    uint32_t offset; /* Reserved for a future, caller-owned byte arena. */
-    uint32_t length; /* J0.15 requires offset == length == 0. */
+    uint32_t offset; /* Byte position within the caller-owned arena. */
+    uint32_t length; /* Zero-length strings use offset=0. */
 } BasicStringValue;
 
 typedef struct {
@@ -42,6 +44,9 @@ typedef struct {
     BasicVariableEntry *entries; /* Caller-owned array; NULL when capacity 0. */
     size_t capacity;
     size_t count;
+    uint8_t *string_arena; /* NULL for legacy bvs_init, never allocated. */
+    size_t string_capacity;
+    size_t string_slot_bytes; /* Fixed width per ENTRY (incl. numeric). */
 } BasicVariableStore;
 
 /* All buffers must be genuine accessible objects of the declared extent.
@@ -52,6 +57,33 @@ typedef struct {
  */
 BVSStatus bvs_init(BasicVariableStore *store, BasicVariableEntry *entries,
                    size_t capacity);
+/* Same initialization, plus a disjoint caller-owned byte arena.  Each entry
+ * owns [index*slot_bytes,(index+1)*slot_bytes), where slot_bytes=floor(
+ * string_capacity/entry_capacity). This deliberately sacrifices space to
+ * guarantee O(1) overwrite/reassignment, bounded memory, no fragmentation.
+ * No CPC ROM maximum is inferred from this host storage policy.
+ */
+BVSStatus bvs_init_with_arena(BasicVariableStore *store,
+                             BasicVariableEntry *entries, size_t capacity,
+                             uint8_t *arena, size_t arena_capacity);
+/* Validate an upcoming scalar STRING assignment with NO mutation. */
+BVSStatus bvs_can_assign_string(const BasicVariableStore *store,
+                               const BasicVariableKey *key,
+                               const uint8_t *bytes, size_t length);
+/* Atomic create-or-replace, including its fixed slot.  No malloc.
+ * Input must be disjoint from descriptor, entries and arena (entire extent).
+ * Embedded NUL, CR, LF and quotes are rejected. Empty strings are supported
+ * with or without an arena.  All errors preserve bytes and metadata.
+ */
+BVSStatus bvs_assign_string(BasicVariableStore *store,
+                            const BasicVariableKey *key,
+                            const uint8_t *bytes, size_t length);
+/* A borrowed immutable span, valid until reassignment/reset.  The result
+ * pointer and length do not change on failure.  Not a NUL-terminated C string.
+ */
+BVSStatus bvs_string_span(const BasicVariableStore *store,
+                          const BasicStringValue *value,
+                          const uint8_t **out_bytes, size_t *out_length);
 /* Pure structural validation, including live entries. */
 BVSStatus bvs_validate(const BasicVariableStore *store);
 BVSStatus bvs_reset(BasicVariableStore *store);

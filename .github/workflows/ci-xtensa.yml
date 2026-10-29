@@ -102,8 +102,13 @@ jobs:
                 python3 /project/tools/ci/report_abi.py "$dir/loco_esp32_display_probe.elf" > "$out/xtensa-abi.txt"
                 xtensa-esp-elf-nm --defined-only "$dir/loco_esp32_display_probe.elf" | grep -F " loco_probe_abi_sizes"
                 test "$(grep -Ec "^[A-Za-z_0-9]+=[0-9]+ bytes$" "$out/xtensa-abi.txt")" -eq 16
-                grep -Fx "LocoProbeStorage=19072 bytes" "$out/xtensa-abi.txt"
-                grep -Fx "core_descriptor_bytes=636" "$out/xtensa-abi.txt"
+                # J1.15-B: store descriptor grows by three 32-bit fields,
+                # 12 bytes; no STRING arena is added to firmware in this PR.
+                # Keep all linked ELF ABI metrics observable and pinned.
+                cat "$out/xtensa-abi.txt"
+                grep -Fx "BasicVariableStore=24 bytes" "$out/xtensa-abi.txt"
+                grep -Fx "LocoProbeStorage=19084 bytes" "$out/xtensa-abi.txt"
+                grep -Fx "core_descriptor_bytes=648" "$out/xtensa-abi.txt"
                 grep -Fx "owned_buffers_and_entries_bytes=18432" "$out/xtensa-abi.txt"
                 if python3 /project/tools/ci/report_abi.py partitions.csv > "$out/abi-negative.log" 2>&1; then
                   echo "U1-B invalid ELF was accepted"; exit 1

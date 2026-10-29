@@ -251,7 +251,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             return append_comment(body, length, pos, out);
         }
         switch (token) {
-        case 0x02u: statement = BL_ST_ASSIGN; status = BL_OK; break;
+        case 0x02u: case 0x03u: statement = BL_ST_ASSIGN; status = BL_OK; break;
         case 0xa5u: statement = BL_ST_ASSIGN; status = append_word(out, "LET"); break;
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
         case 0xa0u: statement = BL_ST_GOTO; status = append_word(out, "GOTO"); break;
@@ -279,7 +279,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         space_start = pos;
         /* For implicit LET the initial 02 is already consumed. The next
          * bytes are opaque CPC caches, NOT lexical spaces (even if 0x20). */
-        if (statement != BL_ST_ASSIGN || token != 0x02u) {
+        if (statement != BL_ST_ASSIGN || (token != 0x02u && token != 0x03u)) {
             status = append_spaces(body, length, &pos, out);
             if (status != BL_OK) {
                 return status;
@@ -289,7 +289,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         if (statement == BL_ST_ASSIGN) {
             BasicVariableRef ref;
             BVRStatus ref_status;
-            size_t ref_start = token == 0x02u ? pos - 1u : pos;
+            size_t ref_start = token == 0x02u || token == 0x03u ? pos - 1u : pos;
             size_t i;
             uint8_t t;
             unsigned int number = 0u;
@@ -301,7 +301,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             if (ref_start >= length) {
                 return BL_TRUNCATED;
             }
-            if (body[ref_start] != 0x02u) {
+            if (body[ref_start] != 0x02u && body[ref_start] != 0x03u) {
                 return body[ref_start] >= 0x80u ?
                        BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
             }
@@ -311,9 +311,13 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             }
             if (ref_status != BVR_OK ||
                 ref.family != BVR_FAMILY_EXPLICIT ||
-                ref.explicit_type != BVR_TYPE_INTEGER) {
+                (ref.explicit_type != BVR_TYPE_INTEGER &&
+                 ref.explicit_type != BVR_TYPE_STRING)) {
                 return BL_BAD_SEQUENCE;
             }
+            if (ref.explicit_type == BVR_TYPE_STRING &&
+                (ref.cache_low != 0u || ref.cache_high != 0u))
+                return BL_BAD_SEQUENCE;
             /* A5 02 without an intervening space is valid imported binary;
              * spelling LET A% makes the listing retokenisable. */
             if (token == 0xa5u && ref_start == space_start) {
@@ -329,7 +333,8 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                     return status;
                 }
             }
-            status = append_byte(out, (uint8_t)'%');
+            status = append_byte(out, ref.explicit_type == BVR_TYPE_STRING ?
+                                 (uint8_t)'$' : (uint8_t)'%');
             if (status != BL_OK) {
                 return status;
             }
@@ -356,6 +361,26 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 return BL_TRUNCATED;
             }
             t = body[pos++];
+            if (ref.explicit_type == BVR_TYPE_STRING) {
+                size_t opening;
+                if (t != (uint8_t)'"') return BL_BAD_SEQUENCE;
+                opening = pos;
+                status = append_byte(out, t);
+                if (status != BL_OK) return status;
+                while (pos < length && body[pos] != (uint8_t)'"') {
+                    uint8_t ch = body[pos++];
+                    if (ch < 0x20u || ch > 0x7eu) return BL_BAD_SEQUENCE;
+                    status = append_byte(out, ch);
+                    if (status != BL_OK) return status;
+                }
+                if (pos == length || pos < opening) return BL_TRUNCATED;
+                status = append_byte(out, body[pos++]);
+                if (status != BL_OK) return status;
+                status = append_spaces(body, length, &pos, out);
+                if (status != BL_OK) return status;
+                if (pos != length) return BL_BAD_SEQUENCE;
+                return BL_OK; /* Autonomous STRING line: no suffix. */
+            }
             if (t == 0xf5u) {
                 negative = 1;
                 /* CPC unary minus is an operator before the magnitude;
@@ -543,6 +568,8 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (ref_status != BVR_OK || ref.family != BVR_FAMILY_EXPLICIT) {
                     return BL_BAD_SEQUENCE;
                 }
+                /* Legacy PRINT references may have CPC-populated opaque
+                 * nonzero caches.  J1.15-B only constrains new assignments. */
                 switch (ref.explicit_type) {
                 case BVR_TYPE_INTEGER: suffix = (uint8_t)'%'; break;
                 case BVR_TYPE_STRING: suffix = (uint8_t)'$'; break;

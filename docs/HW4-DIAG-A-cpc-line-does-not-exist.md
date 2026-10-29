@@ -24,3 +24,48 @@ Mandat du Pilotage : [issue #159](https://github.com/Kharn27/ESP32-Locomotive-Ba
 **Statuts :** ces dix écrans sont `OBSERVÉ CPC`; la règle de présentation pour `10` et `10 ` absents est probante. Le curseur visible repart en première colonne de la ligne suivant le `Ready` le cas échéant, et après la ligne saisie quand le `Ready` est absent. Le moteur natif direct `GOTO 999` est `NON SUPPORTÉ`, et l'application de la règle à d'autres diagnostics internes est `NON TESTÉ` / exclue. `10 PRINT 2` suivi de `10` ne produit pas d'erreur et ne doit pas produire de `Ready`. La présence de `Line does not exist` sur le CPC pour GOTO n'autorise **pas** à changer le diagnostic `ERROR` sur CYD pour cette commande.
 
 **Barrière A0 → A1 : franchissable** pour la suppression absente uniquement, sans toucher `core/` ni à `io/cpc_ready_policy.*`.
+
+
+## A1 — implémentation bornée (aucune modification de `core/`)
+
+L'adaptateur C99 `io/cpc_diag_policy.{h,c}` détermine `NUMBERED_DELETE_ABSENT` **seulement si** tous les critères suivants sont vérifiés : `BSRResult.status == BSR_SESSION_ERROR`, `session.status == BS_NOT_FOUND`, tous les sous-statuts `BT/BP/BL` sont `OK`, et l'entrée originale est un entier décimal de ligne valide (1..65535) suivi uniquement d'espaces ASCII ou de fin d'entrée. Les nombres saisis sont des **numéros de lignes**, jamais des numéros d'erreur ROM. Le contrôle de syntaxe est une garde de présentation, pas une réécriture de la grammaire. Les cas A0 `10` et `10 ` sont attestés ; la généralisation aux autres valeurs de numéros repose sur la sémantique native identique, non sur un écran CPC acquis pour chaque valeur.
+
+`CPC_DIAG_LINE_DOES_NOT_EXIST` écrit exactement `Line does not exist\n` ; `CPC_DIAG_HOST_GENERIC` écrit exactement `ERROR\n`. La vraie fonction de production `cpc_diag_policy_write()` écrit une seule fois dans `CpcText`, sans framebuffer supplémentaire, allocation dynamique ou copie de programme. Dans `hw4_c2_console.c`, la décision est prise sur l'objet **réel** `BSRResult` renvoyé par `bsr_submit`, et non sur des codes `6`/`1` inventés. Les autres erreurs de `bsr_submit`, les erreurs de `bsr_step`, la limite de pas, et les événements UART rejetés restent des diagnostics `ERROR` d'origine hôte. Les traces bornées `HW4-DIAG-A DIAG_POLICY` identifient catégorie, origine, statut session pour `submit` et message ; aucun contenu utilisateur illimité.
+
+La responsabilité de `Ready` demeure **intégralement** celle de `io/cpc_ready_policy` issue de la PR #161. Après une suppression absente, `BASIC_DIAGNOSTIC` produit exactement un `Ready` ; suppression réussie => aucun diagnostic ni Ready. `LIST`/`NEW`/`RUN` conservent leur politique et `!CLS`/`!DEMO` restent des commandes hôtes.
+
+### Tests natifs de production
+
+`tests/test_hw4_diag_a.c` instancie réellement `BasicSessionRuntime`, `BasicVariableStore` avec arène STRING, programme, `UartLine`, console vidéo MODE 1, `cpc_diag_policy_select/write` et `cpc_ready_policy_apply` ; aucune réussite `BSR` simulée pour les cas positifs. Les cas incluent : `10` absent, `10 ` absent, création/suppression `10 PRINT 2` + `LIST` vide, `NEW` + `10`, `GOTO 999` et `listt` conservant `ERROR`, numéro `0` invalide, faux états de diagnostic isolés en tests **négatifs**, comptages du `Ready`, caractères réellement peints et canaris VRAM. L'exécution native `10 A$="BONJOUR"` / `20 PRINT A$` / `30 END` vérifie le résultat `BONJOUR` **avant** le Ready final de `RUN` ; un diagnostic au bas de l'écran vérifie le scrolling sans clipping. `tools/hw4_diag_a_evidence.py` ajoute un CTest permanent de l'archive A0 : 10 captures originales + 10 répétitions SHA, provenance, clavier, sortie émulateur et contrôle négatif de sceau.
+
+**À renseigner en dernier après contrôle du HEAD :** CI Linux GCC/Clang OFF/ON + ASan/UBSan, CI CPC permanent + A0, CI ARCH/E2/scroll et Xtensa 3 profils, puis mémoire et `App version`. Une CI sautée n'est jamais présentée comme PASS.
+
+## Protocole matériel PO obligatoire — avant décision du Pilotage
+
+Sur le poste Linux avec ESP-IDF 5.5.6 actif, partir de la branche et vérifier le SHA **complet** contre celui remis dans la PR. Si le cache ESP-IDF correspond à un autre profil, utiliser un build CONSOLE neuf/isolé et ne jamais mélanger les sélecteurs de profils.
+
+```bash
+git fetch origin feat/hw4-diag-a-line-not-exist
+git switch feat/hw4-diag-a-line-not-exist
+git pull --ff-only origin feat/hw4-diag-a-line-not-exist
+git rev-parse HEAD
+cd firmware/esp32_display_probe
+idf.py -DLOCO_CYD_PROFILE=CONSOLE build
+idf.py -p /dev/ttyUSB0 flash
+idf.py -p /dev/ttyUSB0 monitor
+```
+
+Vérifier la ligne `App version` contre le préfixe du SHA complet, puis tester les entrées ci-dessous sur l'écran CYD **et** en UART. Les séquences D02 démarrent après `NEW` pour garantir l'état du programme.
+
+| Test PO | Actions CYD exactes | Verdict attendu (texte / Ready) |
+|---|---|---|
+| P00 boot | Mise sous tension | un `Ready` initial, curseur cohérent |
+| P01 absent | `NEW`, `10` + Enter | `Line does not exist`, puis exactement un `Ready` |
+| P02 existant | `10 PRINT 2`, `10` + Enter | suppression sans erreur et sans `Ready` additionnel |
+| P03 prouver suppression | `LIST` + Enter | liste vide et un `Ready` |
+| P04 après NEW | `NEW`, `10` + Enter | texte historique identique et un `Ready` |
+| P05 témoin direct | `GOTO 999`, puis `listt` | `ERROR` générique pour chacun, aucun faux mapping historique |
+| P06 régression | `10 PRINT 2`, `20 END`, `LIST`, `RUN` | liste intacte, sortie numérique `2`, `Ready` après LIST et RUN |
+| P07 hôte | `!CLS` | effacement sans `Ready` supplémentaire |
+
+Consigner **PASS/FAIL par scénario**, photos/constats des textes, casse, espaces et position du curseur, journal UART `HW4-DIAG-A DIAG_POLICY` et `HW4-READY-A READY_POLICY`, `HW4-C2 DEVICE_MEMORY` (`heap8_free`, `heap8_largest`, pile), `HW4-C3-B2-C1 LCD_METRICS`, `dma_fault=0`, `dma_timeouts=0`, `lcd_error=ESP_OK` et absence de panic. Le PO n'est **pas** chargé de fusionner. Sans ces preuves sur le **HEAD exact** : `ON_DEVICE_UNVERIFIED`, avis de livraison **conditionnel**, PR non fusionnée, Pilotage responsable de la décision.

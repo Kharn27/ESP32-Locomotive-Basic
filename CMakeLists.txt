@@ -406,6 +406,17 @@ if(BUILD_TESTING)
 endif()
 
 
+# HW4-SCROLL-OPT-A0: portable bounded telemetry, no LCD or BASIC dependency.
+add_library(hw4_scroll_metrics STATIC video/hw4_scroll_metrics.c)
+target_include_directories(hw4_scroll_metrics PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/video)
+if(BUILD_TESTING)
+    add_executable(test_hw4_scroll_metrics tests/test_hw4_scroll_metrics.c)
+    target_link_libraries(test_hw4_scroll_metrics PRIVATE hw4_scroll_metrics)
+    add_test(NAME hw4_scroll_a0_classification COMMAND test_hw4_scroll_metrics)
+    add_test(NAME hw4_scroll_a0_uart_parser COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_hw4_scroll_metrics_parser.py")
+endif()
+
 # HW4-C1: native BASIC output bytes -> portable MODE 1 text adapter -> VRAM.
 # Independent Linux verification, no ROM, TFT transport, heap or fixture edits.
 add_library(cpc_text STATIC video/cpc_text.c)

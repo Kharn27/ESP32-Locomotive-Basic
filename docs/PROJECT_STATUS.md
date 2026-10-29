@@ -689,3 +689,7 @@ Mandat [#157](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/157), bas
 ### J1.16-C — second scalaire REAL5 natif 1.25 (mandat 29 octobre 2026)
 
 **Décision Pilotage nouvelle et postérieure à la section B ci-dessus :** J1.16-B/C1 accepté et fusionné [PR #162](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/162), base `main@4f09cf4f4a142a235415634ffc1e6d6bbaec574f`. [Issue #164](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/164) autorise exclusivement R_QUARTER `A=1.25 / PRINT A / END` en complément du témoin R_HALF, sans flottants génériques. Branche dédiée `feat/j1-16-c-native-real5-quarter`, PR/résultats soumis à la revue du Pilotage. [Rapport](J1.16-C-real5-quarter-native.md). `ON_DEVICE_UNVERIFIED`, aucune modification firmware/HW/oracle ; pas de jalon suivant autorisé.
+
+### J1.16-D-A — caractérisation du magasin CPC REAL5 signé (29 octobre 2026)
+
+**Décision Pilotage nouvelle, postérieure à J1.16-C :** PR #165 J1.16-C acceptée et fusionnée, base `main@694e0b8ef4a3c8bdfa4f6ee922bb24c8b137c270`. L'[issue #166](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/166) autorise exclusivement la capture indépendante du **store CPC** pour R_HALF/R_NEG_HALF, après L10 et avant PRINT L20, deux acquisitions par cas, provenance et falsifications. Aucun REAL5 négatif en C99, aucun changement firmware/SDK/HW. [Rapport](J1.16-D-A-real5-negative-store-oracle.md). `ON_DEVICE_UNVERIFIED`. Classification et acceptation réservées au Pilotage ; D-B/J1.17 non autorisés.

@@ -11,7 +11,7 @@ typedef struct {
 
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
-    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT
+    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT, ST_PEN
 } BTStatement;
 
 typedef struct {
@@ -23,6 +23,7 @@ typedef struct {
 /* CPC keyword codes checked against basic.asm: E54A, E5DB, E4FF, E5A6, E63A, E663. */
 static const BTKeyword keywords[] = {
     {"PRINT", 0xbfu, ST_PRINT},
+    {"PEN",   0xbbu, ST_PEN},
     {"LIST",  0xa7u, ST_LIST},
     {"RUN",   0xcau, ST_RUN},
     {"NEW",   0xb1u, ST_NEW},
@@ -470,6 +471,30 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 }
             } else {
                 return BT_UNSUPPORTED_CONSTRUCT;
+            }
+        } else if (statement == ST_PEN) {
+            /* J1.17-A CPC BB: numeric immediate only. Tokenising 5..14
+             * does NOT assert CPC execution support for those unmeasured cases. */
+            unsigned int pen;
+            if (index == length || source[index] == (uint8_t)':')
+                return BT_MALFORMED_INPUT;
+            if (source[index] == (uint8_t)'-') {
+                ++index;
+                if (index == length || source[index] != (uint8_t)'1')
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                ++index;
+                status = emit(out, 0xf5u);
+                if (status == BT_OK) status = emit(out, 0x0fu);
+            } else {
+                status = decimal(source, length, &index, 255u, &pen);
+                if (status == BT_OK && pen > 16u)
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                if (status == BT_OK) {
+                    status = emit(out, (uint8_t)(pen < 10u ?
+                                                 0x0eu + pen : 0x19u));
+                    if (status == BT_OK && pen >= 10u)
+                        status = emit(out, (uint8_t)pen);
+                }
             }
         } else if (statement == ST_ASSIGN) {
             if (keyword == NULL && index == 0u &&

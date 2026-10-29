@@ -59,6 +59,10 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_executor PRIVATE basic_executor basic_tokenizer)
     add_test(NAME basic_executor COMMAND test_basic_executor)
 
+    add_executable(test_basic_pen_events tests/test_basic_pen_events.c)
+    target_link_libraries(test_basic_pen_events PRIVATE basic_session_runtime)
+    add_test(NAME basic_pen_events COMMAND test_basic_pen_events)
+
     add_executable(test_basic_session_runtime tests/test_basic_session_runtime.c)
     target_link_libraries(test_basic_session_runtime PRIVATE basic_session_runtime)
     add_test(NAME basic_session_runtime COMMAND test_basic_session_runtime)

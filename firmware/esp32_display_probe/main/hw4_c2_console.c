@@ -44,7 +44,7 @@ enum {
     LCD_ROWS_PER_BAND = 8,
     CPC_ROWS = 25,
     RUN_STEP_BUDGET = 256,
-    PEN_EVENT_CAPACITY = 16, /* bounded static typed events, no second VRAM */
+    PEN_EVENT_CAPACITY = 3, /* A0 DRAM guard: 3 typed events, no heap/VRAM */
     ECHO_IDLE_MS = 20,
     ECHO_MAX_BYTES = UART_LINE_CAPACITY
 };

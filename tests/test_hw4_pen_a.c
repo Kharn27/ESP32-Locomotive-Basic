@@ -272,6 +272,22 @@ static void test_runtime_atomic_and_diagnostics(void)
     assert(hw4_pen_replay(&f.text,f.output,f.written,f.events,
                           f.event_written)==HW4_PEN_OK);
     assert(f.text.bytes_received==4U && f.video.pen==1U);
+
+    /* The exact CONSOLE static capacity (3) must reject a fourth event
+     * without committing a single byte or advancing the executor. */
+    setup();
+    assert(submit("10 PEN 2:PEN 1:PEN 3:PEN 2").status==BSR_OK);
+    assert(submit("RUN").status==BSR_OK);
+    f.written=55U; f.event_written=66U;
+    {
+        BasicSessionRuntime previous=f.runtime;
+        BSRResult status=step(OUT_CAP,3U);
+        assert(status.status==BSR_EXECUTOR_ERROR &&
+               status.executor_status==BE_NO_EVENT_SPACE);
+        assert(memcmp(&f.runtime,&previous,sizeof(previous))==0);
+        assert(f.written==55U && f.event_written==66U);
+        assert(f.video.pen==1U && f.text.bytes_received==0U);
+    }
 }
 
 static void test_scrolling_preserves_text_counters(void)

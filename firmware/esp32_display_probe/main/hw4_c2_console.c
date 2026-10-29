@@ -462,6 +462,18 @@ void app_main(void)
                 (void)fail("EDIT_SYNC",-1); return;
             }
             ++echo_pending;
+        } else if(event==UART_LINE_NAV_BLOCKED) {
+            /* The consumed final CSI byte identifies the direction. No E1
+             * movement, screen write, E3 edit, BASIC submit or repaint. */
+            printf("HW4-EDIT-B1-B NAV_BLOCKED direction=%s "
+                   "reason=E3_NONEMPTY source_bytes=%u\n",
+                   ch==(uint8_t)'A' ? "UP" : "DOWN",
+                   (unsigned)s_line.length);
+            /* Optional terminal bell only: one UART0 BEL per refusal, not
+             * a claim that this CYD has a working physical sound device. */
+            const char bell='\a';
+            if(uart_write_bytes(UART_NUM_0,&bell,1U)!=1)
+                printf("HW4-EDIT-B1-B BEL_UNAVAILABLE transport=UART0\n");
         } else if(event==UART_LINE_NAV_LEFT || event==UART_LINE_NAV_RIGHT ||
                   event==UART_LINE_NAV_UP || event==UART_LINE_NAV_DOWN) {
             const char *direction=event==UART_LINE_NAV_LEFT ? "LEFT" :

@@ -86,6 +86,14 @@ static UartLineEvent seq(const char *s)
     for(size_t i=0U;s[i];++i)e=feed((uint8_t)s[i]);
     return e;
 }
+/* Explicit HOST setup, not an attested CPC path: E1 focus may coexist
+ * with a nonempty E3 through a prior horizontal screen-navigation path.
+ * Preserve C1's existing E1/E2/E3 invariants without violating U04. */
+static void host_e1_with_pending_e3(void)
+{
+    assert(line.length>0U && !line.screen_navigation);
+    line.screen_navigation=true;
+}
 static void cell(unsigned c,unsigned r,bool expected,uint8_t ch)
 {
     uint8_t got=0xeeU;bool known=!expected;
@@ -195,7 +203,8 @@ static void e3_and_ansi(void)
     assert(feed('I')==UART_LINE_APPEND);
     assert(memcmp(line.data,"10 PRINT 2",11U)==0);
     save();
-    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(seq("\x1b[A")==UART_LINE_NAV_BLOCKED);
+    host_e1_with_pending_e3();
     assert(feed('Z')==UART_LINE_IGNORED);
     assert(feed(0x08U)==UART_LINE_IGNORED);
     assert(seq("\x1b[3~")==UART_LINE_IGNORED);
@@ -208,7 +217,8 @@ static void e3_and_ansi(void)
     uart_line_ack(&line);
     reset(7U,10U);
     assert(seq("LIST")==UART_LINE_APPEND);
-    assert(seq("\x1b[A")==UART_LINE_NAV_UP);
+    assert(seq("\x1b[A")==UART_LINE_NAV_BLOCKED);
+    host_e1_with_pending_e3();
     save();
     assert(feed(0x1bU)==UART_LINE_IGNORED);
     assert(feed('[')==UART_LINE_IGNORED);
@@ -242,6 +252,7 @@ static void expelled_e3(void)
     for(unsigned i=0U;i<120U;++i) assert(feed('A')==UART_LINE_APPEND);
     assert(line.length==120U && line.cursor_pos==120U);
     assert(cpc_video_cursor(&v,0U,24U,true));
+    host_e1_with_pending_e3(); /* synthetic C1 expulsion scenario */
     assert(seq("\x1b[B")==UART_LINE_NAV_DOWN);
     assert(!nav.anchor_valid);
     for(unsigned i=0U;i<120U;++i) assert(line.data[i]=='A');
@@ -307,6 +318,7 @@ static void c1_partial_and_home(void)
     reset(10U,0U);
     assert(seq("10 PRINT 2")==UART_LINE_APPEND);
     assert(line.length==10U && line.cursor_pos==10U);
+    host_e1_with_pending_e3(); /* retain C1 physical-CR regression */
     assert(seq("\x1b[A")==UART_LINE_NAV_UP);
     assert(seq("\x1b[A")==UART_LINE_NAV_UP);
     assert(v.cursor_row==8U && v.cursor_column==10U);
@@ -327,6 +339,7 @@ static void c1_partial_and_home(void)
 
     reset(7U,3U);
     assert(seq("HELLO")==UART_LINE_APPEND);
+    host_e1_with_pending_e3(); /* retain HOME E1-focus regression */
     assert(seq("\x1b[A")==UART_LINE_NAV_UP);
     assert(v.cursor_row==6U && v.cursor_column==8U);
     save();
@@ -363,6 +376,7 @@ static void c1_full_capacity_and_deferred_wrap(void)
     reset(5U,0U);
     for(unsigned i=0U;i<40U;++i) assert(feed('B')==UART_LINE_APPEND);
     assert(text.row==5U && text.column==40U); /* legitimate pending wrap */
+    host_e1_with_pending_e3(); /* synthetic deferred-wrap E1 focus */
     assert(seq("\x1b[A")==UART_LINE_NAV_UP);
     assert(v.cursor_row==5U && v.cursor_column==0U);
     assert(feed('\r')==UART_LINE_RETURN_EDIT);

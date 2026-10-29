@@ -101,6 +101,11 @@ static UartLineEvent feed_impl(UartLine *line, uint8_t ch, bool screen_enabled)
             ansi_clear(line);
             if (simple && n == 0U && screen_enabled && !line->poisoned &&
                 (ch == (uint8_t)'A' || ch == (uint8_t)'B')) {
+                /* U04: only the console screen router refuses vertical
+                 * navigation while an E3 edit is underway. In E1 focus,
+                 * preserve the pre-existing host policy, even with E3 data. */
+                if (!line->screen_navigation && line->length > 0U)
+                    return UART_LINE_NAV_BLOCKED;
                 line->screen_navigation = true;
                 return ch == (uint8_t)'A' ? UART_LINE_NAV_UP : UART_LINE_NAV_DOWN;
             }

@@ -726,3 +726,11 @@ if(BUILD_TESTING)
     target_link_libraries(test_hw4_edit_b1_a PRIVATE cpc_screen_nav)
     add_test(NAME hw4_edit_b1_a_screen_navigation COMMAND test_hw4_edit_b1_a)
 endif()
+
+# HW4-EDIT-B1-B: U04 editor-focus vertical refusal and native BASIC C99 proof.
+if(BUILD_TESTING)
+    add_executable(test_hw4_edit_b1_b tests/test_hw4_edit_b1_b.c)
+    target_link_libraries(test_hw4_edit_b1_b PRIVATE
+        cpc_screen_nav basic_session_runtime basic_variable_binding)
+    add_test(NAME hw4_edit_b1_b_vertical_guard COMMAND test_hw4_edit_b1_b)
+endif()

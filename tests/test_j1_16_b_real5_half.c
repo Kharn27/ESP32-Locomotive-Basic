@@ -123,7 +123,8 @@ static int source_negative(void) {
     static const char *bad[]={"A=0.1","A=1.25","A=-0.5","A=0","A=0.50",
         "A!=1.5","A!=0.5","A=0.5:PRINT A","A=0.5 : END",
         "LET A=0.5","B=0.5","a=0.5","A=0.5X","A=0.5 ",
-        "PRINT B","PRINT A:PRINT A"};
+        "PRINT B","PRINT A:PRINT A","PRINTA","? A",
+        "PRINT  A"," PRINT A","PRINT A "};
     uint8_t dest[64],saved[64];size_t written=888u,i;
     memset(dest,0x5a,sizeof(dest));memcpy(saved,dest,sizeof(dest));
     for(i=0u;i<sizeof(bad)/sizeof(bad[0]);++i){

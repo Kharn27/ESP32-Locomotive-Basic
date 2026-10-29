@@ -449,8 +449,9 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             source[index] != (uint8_t)'\'') {
             if (source[index] == (uint8_t)'"') {
                 status = quoted_string(source, length, &index, out);
-            } else if (source[index] == (uint8_t)'A' &&
-                       index + 1u == length) {
+            } else if (keyword != NULL && length == 7u && index == 6u &&
+                       source[5] == (uint8_t)' ' &&
+                       source[index] == (uint8_t)'A') {
                 status = half_real_statement(out, 0);
                 ++index;
             } else if (ascii_letter(source[index])) {
@@ -473,8 +474,8 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 return BT_UNSUPPORTED_CONSTRUCT;
             }
         } else if (statement == ST_ASSIGN) {
-            if (length - index == 5u &&
-                memcmp(source + index, "A=0.5", 5u) == 0) {
+            if (keyword == NULL && index == 0u && length == 5u &&
+                memcmp(source, "A=0.5", 5u) == 0) {
                 status = half_real_statement(out, 1);
                 index = length;
             } else if (string_lhs(source, length, index)) {

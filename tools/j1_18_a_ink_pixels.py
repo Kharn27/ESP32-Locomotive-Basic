@@ -85,6 +85,7 @@ import tempfile
 def histogram(path, roi=ROI):
     rows=png_rgb(path)
     x0,y0,x1,y1=roi
+    need(0 <= x0 < x1 <= WIDTH and 0 <= y0 < y1 <= HEIGHT, 'ROI_OUTSIDE_IMAGE')
     colors={}
     for y in range(y0,y1):
         for x in range(x0,x1):

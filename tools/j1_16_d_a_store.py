@@ -40,6 +40,20 @@ EXACT_SOURCES = {
     "R_NEG_HALF": b"10 A=-0.5\n20 PRINT A\n30 PRINT #8,A\n40 END\n",
 }
 PINNED_MANIFEST = "d219da77fca0ec619565c8499583157f669532109d0c1f3e1959f2e53d697214"
+# C1 independent D-A archive anchor, checked into this oracle TOOL, not
+# derived from archive manifest/capture.json. These SHA-256 are for genuine
+# CPC RAM window.bin files committed by the acquisition bot ce461b3.
+# Both sessions are pinned individually, even though they match bit for bit.
+SEALED_D_A_WINDOWS = {
+    "R_HALF": {
+        "original": "aadc941857d69c64808ef72ef19a774bc9ba001415efd44e06b4f53fce6afabe",
+        "repeat": "aadc941857d69c64808ef72ef19a774bc9ba001415efd44e06b4f53fce6afabe",
+    },
+    "R_NEG_HALF": {
+        "original": "a9a8c1e7dd29fd9851401e70b1dadfb4574a3a2866b3d0901385c181443cc798",
+        "repeat": "a9a8c1e7dd29fd9851401e70b1dadfb4574a3a2866b3d0901385c181443cc798",
+    },
+}
 
 class Bad(ValueError):
     pass
@@ -251,7 +265,10 @@ def acquire(cap, output):
     verify(output)
     print("J1.16-D-A ACQUIRED",manifest["classification"],"HEAD",head,flush=True)
 
-def verify(root):
+def verify(root, permanent=False):
+    # Fresh CPC acquisition: check self-consistency and repeatability, not
+    # the historical sessions' variable metadata or SHA. Permanent sealed
+    # archive: additionally enforce independent immutable window pins.
     m=json.loads(read(root/"manifest.json"))
     check(m["schema_version"]==1 and m["phase"]=="J1.16-D-A" and
           m["historical_manifest_sha256"]==PINNED_MANIFEST and
@@ -269,6 +286,9 @@ def verify(root):
                   "CAPTURE_SHA_MISMATCH_"+case)
             item=json.loads(b)
             window=read(d/"window.bin")
+            if permanent:
+                check(digest(window)==SEALED_D_A_WINDOWS[case][session],
+                      "SEALED_D_A_ARCHIVE_MISMATCH_"+case+"_"+session)
             check(item["case"]==case and item["session"]==session and
                   item["historical_program_sha256"]==ORIGINAL_SHA[case] and
                   item["historical_printer_sha256"]==PRINTER_SHA[case] and
@@ -335,7 +355,14 @@ def verify(root):
     print("J1.16-D-A VERIFIED",expected,"HALF",cases["R_HALF"][0]["value_hex"],
           "NEG_HALF",cases["R_NEG_HALF"][0]["value_hex"],flush=True)
 
-def mutations(root):
+def mutations(root, permanent=False):
+    # All tests mutate *clones*. Preserve and rehash the real input archive
+    # at the end; no negative test can rewrite genuine sealed bytes.
+    protected = [root/"manifest.json"]
+    protected += [root/session/case/name for case in CASES
+                  for session in ("original", "repeat")
+                  for name in ("window.bin", "capture.json", "stop.png")]
+    protected_sha = {str(p.relative_to(root)):digest(read(p)) for p in protected}
     # Test directly against a genuine, newly acquired archive. Each clone
     # falsifies one axis; detection must precede any claim of observation.
     import shutil
@@ -367,11 +394,54 @@ def mutations(root):
                 m["cases"]["R_NEG_HALF"]["original"]=digest(read(capture))
                 (alt/"manifest.json").write_text(json.dumps(m,sort_keys=True,indent=2)+"\n")
             try:
-                verify(alt)
+                verify(alt, permanent=permanent)
             except Bad:
                 print("J1.16-D-A MUTATION_REJECTED",field,flush=True)
             else:
                 raise Bad("MUTATION_ACCEPTED_"+field)
+
+    if permanent:
+        # C1: double-window coordinated forgery. Recompute ALL mutable local
+        # SHA claims and metadata to recreate the original vulnerability.
+        # Without a separate sealed pin, verify(..., permanent=False) PASSES.
+        with tempfile.TemporaryDirectory(prefix="j116-da-collusive-") as td:
+            alt=Path(td)/"archive"
+            shutil.copytree(root,alt)
+            m=json.loads(read(alt/"manifest.json"))
+            for session in ("original","repeat"):
+                directory=alt/session/"R_NEG_HALF"
+                window=bytearray(read(directory/"window.bin"))
+                check(len(window)==9 and window[2:4]==bytes.fromhex("C1 04"),
+                      "COORDINATED_TEST_BAD_BASELINE")
+                window[7]^=1  # actual fourth REAL5 byte; same in both sessions
+                forged=bytes(window)
+                (directory/"window.bin").write_bytes(forged)
+                capture_file=directory/"capture.json"
+                item=json.loads(read(capture_file))
+                item["window_hex"]=forged.hex(" ").upper()
+                item["window_length"]=len(forged)
+                item["window_sha256"]=digest(forged)
+                item["value_hex"]=forged[4:9].hex(" ").upper()
+                capture_file.write_text(json.dumps(item,sort_keys=True,indent=2)+"\n")
+                m["cases"]["R_NEG_HALF"][session]=digest(read(capture_file))
+            (alt/"manifest.json").write_text(json.dumps(m,sort_keys=True,indent=2)+"\n")
+            # Regression assertion: the coordinated fake is self-consistent.
+            # Only the independent archive anchor may stop its promotion.
+            verify(alt, permanent=False)
+            try:
+                verify(alt, permanent=True)
+            except Bad as e:
+                check(str(e).startswith("SEALED_D_A_ARCHIVE_MISMATCH"),
+                      "COORDINATED_FORGERY_WRONG_REJECTION_"+str(e))
+                print("J1.16-D-A COORDINATED_MUTATION_REJECTED "
+                      "SEALED_D_A_ARCHIVE_MISMATCH",flush=True)
+            else:
+                raise Bad("COORDINATED_MUTATION_ACCEPTED")
+
+    for p in protected:
+        check(digest(read(p))==protected_sha[str(p.relative_to(root))],
+              "ORIGINAL_ARCHIVE_MUTATED_"+str(p.relative_to(root)))
+    print("J1.16-D-A ORIGINAL_ARCHIVE_UNCHANGED",len(protected),flush=True)
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -379,6 +449,8 @@ def main():
     p.add_argument("--output",type=Path)
     p.add_argument("--evidence",type=Path)
     p.add_argument("--self-test",action="store_true")
+    p.add_argument("--permanent",action="store_true",
+                   help="require independent SHA-256 pins for the archived CPC windows")
     p.add_argument("--check-sources",action="store_true")
     args=p.parse_args()
     for case in CASES:
@@ -390,9 +462,11 @@ def main():
         check(args.output is not None and args.evidence is None,"ACQUIRE_ARGS")
         acquire(args.caprice.resolve(),args.output.resolve())
     if args.evidence:
-        verify(args.evidence.resolve())
+        verify(args.evidence.resolve(),permanent=args.permanent)
         if args.self_test:
-            mutations(args.evidence.resolve())
+            mutations(args.evidence.resolve(),permanent=args.permanent)
+    check(not args.permanent or args.evidence is not None,
+          "PERMANENT_REQUIRES_ARCHIVED_EVIDENCE")
     check(args.check_sources or args.caprice or args.evidence, "MISSING_MODE")
 
 if __name__=="__main__":

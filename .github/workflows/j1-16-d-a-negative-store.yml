@@ -61,6 +61,7 @@ jobs:
           set -euo pipefail
           python3 tools/j1_16_d_a_store.py --caprice tests/oracles/caprice32 --output "$RUNNER_TEMP/j116-da"
           python3 tools/j1_16_d_a_store.py --evidence "$RUNNER_TEMP/j116-da" --self-test
+          echo 'J1.16-D-A FRESH_ACQUISITION_VERIFIED (no independent archive pin)'
 
       - name: Preserve original captures once or compare new independent acquisition
         shell: bash
@@ -72,7 +73,7 @@ jobs:
             mkdir -p "$DEST"
             cp -a "$RUNNER_TEMP/j116-da/." "$DEST/"
             ! find "$DEST" -type f \( -name '*.sna' -o -name '*.rom' -o -name '*.dsk' -o -name 'cap32.cfg' \) | grep .
-            python3 tools/j1_16_d_a_store.py --evidence "$DEST" --self-test
+            python3 tools/j1_16_d_a_store.py --evidence "$DEST" --permanent --self-test
             git config user.name "loco-cyd-evidence-bot"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add "$DEST"
@@ -84,7 +85,7 @@ jobs:
             git push origin HEAD:refs/heads/oracle/j1-16-d-a-real5-negative-store
             echo 'J1.16-D-A BOT_ARCHIVE_CREATED'
           else
-            python3 tools/j1_16_d_a_store.py --evidence "$DEST" --self-test
+            python3 tools/j1_16_d_a_store.py --evidence "$DEST" --permanent --self-test
             for case in R_HALF R_NEG_HALF; do
               for session in original repeat; do
                 cmp "$DEST/$session/$case/window.bin" "$RUNNER_TEMP/j116-da/$session/$case/window.bin"

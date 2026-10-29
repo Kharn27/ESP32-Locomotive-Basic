@@ -801,5 +801,5 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/
         COMMAND ${Python3_EXECUTABLE}
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_16_d_a_store.py"
         --evidence "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_d_a_negative_store"
-        --self-test)
+        --permanent --self-test)
 endif()

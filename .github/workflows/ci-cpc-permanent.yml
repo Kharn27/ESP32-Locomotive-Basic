@@ -99,7 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           if test -f tests/fixtures/cpc6128/j1_16_d_a_negative_store/manifest.json; then
-            python3 tools/j1_16_d_a_store.py --evidence tests/fixtures/cpc6128/j1_16_d_a_negative_store --self-test
+            python3 tools/j1_16_d_a_store.py --evidence tests/fixtures/cpc6128/j1_16_d_a_negative_store --permanent --self-test
           else
             echo 'J1.16-D-A STORE_UNVERIFIED: no original store archive'
           fi

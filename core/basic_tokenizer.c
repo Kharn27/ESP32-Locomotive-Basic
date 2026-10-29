@@ -11,7 +11,7 @@ typedef struct {
 
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
-    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT
+    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT, ST_PEN
 } BTStatement;
 
 typedef struct {
@@ -23,6 +23,7 @@ typedef struct {
 /* CPC keyword codes checked against basic.asm: E54A, E5DB, E4FF, E5A6, E63A, E663. */
 static const BTKeyword keywords[] = {
     {"PRINT", 0xbfu, ST_PRINT},
+    {"PEN",   0xbbu, ST_PEN},
     {"LIST",  0xa7u, ST_LIST},
     {"RUN",   0xcau, ST_RUN},
     {"NEW",   0xb1u, ST_NEW},
@@ -642,6 +643,36 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 status = emit(out, 0xe6u);
                 if (status == BT_OK) status = spaces(source, length, &index, out);
                 if (status == BT_OK) status = for_integer(source, length, &index, out);
+            }
+        } else if (statement == ST_PEN) {
+            unsigned int number;
+            int negative = 0;
+            /* CPC A: BB space (0E..17 | 19 0A..10 | F5 0F).
+             * Values 5..14 can be LISTed, but remain UNVERIFIED at RUN.
+             * No expressions, variable, extra argument or colon. */
+            if (index < length && source[index] == (uint8_t)'-') {
+                negative = 1;
+                ++index;
+                status = emit(out, 0xf5u);
+            }
+            if (status != BT_OK) return status;
+            status = decimal(source, length, &index, 16u, &number);
+            if (status != BT_OK) return status;
+            if (negative && number != 1u)
+                return BT_UNSUPPORTED_CONSTRUCT;
+            if (number < 10u) {
+                status = emit(out, (uint8_t)(0x0eu + number));
+            } else {
+                status = emit(out, 0x19u);
+                if (status == BT_OK)
+                    status = emit(out, (uint8_t)number);
+            }
+            if (status != BT_OK) return status;
+            /* PEN is an autonomous statement in this increment. */
+            {
+                size_t end = index;
+                while (end < length && source[end] == (uint8_t)' ') ++end;
+                if (end != length) return BT_UNSUPPORTED_CONSTRUCT;
             }
         } else if (statement == ST_NEXT) {
             /* NEXT without variable is a separate, observed CPC form. */

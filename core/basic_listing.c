@@ -17,6 +17,7 @@ typedef enum {
     BL_ST_IF,
     BL_ST_FOR,
     BL_ST_NEXT,
+    BL_ST_PEN,
     BL_ST_EMPTY
 } BLStatement;
 
@@ -276,6 +277,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0x02u: case 0x03u: statement = BL_ST_ASSIGN; status = BL_OK; break;
         case 0xa5u: statement = BL_ST_ASSIGN; status = append_word(out, "LET"); break;
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
+        case 0xbbu: statement = BL_ST_PEN; status = append_word(out, "PEN"); break;
         case 0xa0u: statement = BL_ST_GOTO; status = append_word(out, "GOTO"); break;
         case 0x9fu: statement = BL_ST_GOSUB; status = append_word(out, "GOSUB"); break;
         case 0xc9u: status = append_word(out, "RETURN"); break;
@@ -308,6 +310,38 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             }
         }
 
+        if (statement == BL_ST_PEN) {
+            unsigned int value;
+            uint8_t t;
+            int negative = 0;
+            if (pos == length) return BL_TRUNCATED;
+            if (pos == space_start) return BL_BAD_SEQUENCE;
+            t = body[pos++];
+            if (t == 0xf5u) {
+                negative = 1;
+                if (pos == length) return BL_TRUNCATED;
+                t = body[pos++];
+            }
+            if (t >= 0x0eu && t <= 0x17u) {
+                value = (unsigned int)(t - 0x0eu);
+            } else if (t == 0x19u) {
+                if (pos == length) return BL_TRUNCATED;
+                value = body[pos++];
+                if (value < 10u || value > 16u) return BL_BAD_SEQUENCE;
+            } else {
+                return t >= 0x80u ? BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
+            }
+            if (negative && value != 1u) return BL_BAD_SEQUENCE;
+            if (negative) {
+                status = append_byte(out, (uint8_t)'-');
+                if (status != BL_OK) return status;
+            }
+            status = append_decimal(out, value);
+            if (status != BL_OK) return status;
+            status = append_spaces(body, length, &pos, out);
+            if (status != BL_OK) return status;
+            return pos == length ? BL_OK : BL_BAD_SEQUENCE;
+        }
         if (statement == BL_ST_ASSIGN) {
             BasicVariableRef ref;
             BVRStatus ref_status;

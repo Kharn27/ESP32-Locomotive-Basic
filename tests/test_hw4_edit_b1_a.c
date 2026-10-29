@@ -251,10 +251,57 @@ static void expelled_e3(void)
     assert(feed('\r')==UART_LINE_READY);
     uart_line_ack(&line);guards();
 }
+
+/* C1 RED reproducer: original 1c6e211 reuses E3 old anchor instead of
+ * ENTER's visible E1 row+1. No new API needed to demonstrate the defect. */
+static void c1_carriage_return_position(void)
+{
+    reset(0U,21U);
+    assert(cpc_video_put_cell(&v,21U,0U,'Q',glyph,NULL));
+    assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
+    assert(seq("\x1b[D")==UART_LINE_NAV_LEFT);
+    assert(v.cursor_row==0U && v.cursor_column==21U);
+    assert(feed('\r')==UART_LINE_RETURN_EDIT);
+    /* PO fault witness NAV row=0 col=21, old RETURN_EDIT row=24 col=0. */
+    assert(v.cursor_row==1U && v.cursor_column==0U);
+    assert(edit.row==1U && edit.column==0U && line.length==0U);
+    assert(!line.ready);
+    assert(feed('\n')==UART_LINE_NONE); /* CRLF is one physical key */
+    assert(feed('\r')==UART_LINE_READY); /* one Enter in E3 is sufficient */
+    uart_line_ack(&line);guards();
+
+    reset(12U,20U);
+    assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
+    assert(seq("\x1b[D")==UART_LINE_NAV_LEFT);
+    assert(v.cursor_row==12U && v.cursor_column==20U);
+    assert(feed('\n')==UART_LINE_RETURN_EDIT);
+    assert(v.cursor_row==13U && v.cursor_column==0U);
+    assert(edit.row==13U && edit.column==0U && !line.ready);
+    assert(feed('\r')==UART_LINE_READY);
+    uart_line_ack(&line);guards();
+
+    reset(24U,0U);
+    assert(cpc_video_put_cell(&v,0U,0U,'Q',glyph,NULL));
+    assert(cpc_video_put_cell(&v,1U,24U,'Z',glyph,NULL));
+    assert(seq("\x1b[D")==UART_LINE_NAV_LEFT);
+    assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
+    assert(v.cursor_row==24U && v.cursor_column==0U);
+    save();
+    assert(feed('\r')==UART_LINE_RETURN_EDIT);
+    assert(v.cursor_row==24U && v.cursor_column==0U);
+    assert(edit.row==24U && edit.column==0U);
+    assert(memcmp(g.pixels,pixels+640U,CPC_VIDEO_BYTES-640U)==0);
+    cell(0U,0U,false,0U); /* row0 expelled, no E2 ghost */
+    cell(1U,23U,true,'Z');
+    cell(0U,24U,false,0U);
+    guards();
+}
+
 int main(void)
 {
     arrows();overlay();scroll();invalid_and_paper();e3_and_ansi();
     expelled_e3();
+    c1_carriage_return_position();
     puts("HW4-EDIT-B1-A E1/E2/E3 destructive navigation PASS");
     return 0;
 }

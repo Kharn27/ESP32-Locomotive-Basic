@@ -55,7 +55,7 @@ class TestA0(unittest.TestCase):
         text = (DATA/"valid.uart.log").read_text()
         start = text.splitlines()[0]
         with self.assertRaises(EvidenceError):
-            analyze(text + "\\n" + start + "\\n", **KW)
+            analyze(text + "\n" + start + "\n", **KW)
 
     def test_legacy_scroll_and_bin_falsifications(self):
         text=(DATA/"valid.uart.log").read_text()

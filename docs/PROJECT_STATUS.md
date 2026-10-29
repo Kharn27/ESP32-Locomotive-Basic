@@ -713,3 +713,7 @@ Mandat [#157](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/157), bas
 ### J1.17-B — PEN natif C99 et canal vidéo typé (mandat #185, 29 octobre 2026)
 
 Après fusion J1.17-A [PR #179](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/179) et barrière CI 5/5 levée par le Pilotage, [mission #185](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/185) autorise exclusivement la tokenisation/LIST et l'exécution immédiate PEN 0..4,15 avec événements typés sans écran CYD ; PEN 5..14 restent UNVERIFIED/UNSUPPORTED et 16/-1 ont un diagnostic hôte atomique. [Rapport](J1.17-B-pen-native.md). Statut : développement en PR, revue/acceptation/fusion Pilotage uniquement ; aucune autorisation INK/MODE ou raccordement firmware.
+
+### J1.18-A — INK oracle CPC indépendant (PR #191, décision Pilotage attendue)
+
+[#189](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/189) : 13 cas INK × 2 sessions indépendantes CPC6128/BASIC1.1 avec RAM/LIST/RUN, ERR/ERL, contrôle PNG RGB, recoloration à deux instants sans nouveau PRINT, 243 fichiers bruts archivés et SHA externes. Provenance initiale `6e9b17b8d545a57ef3942f217c9b4d3daeae8c38`, archivage `0d4214fdc4670dcdaa36f7704fe692b92d43d963` ; 113 preuves PEN antérieures non modifiées. [Rapport INK](J1.18-A-ink-cpc-oracle.md). **Statut : EN REVUE PILOTAGE / NON FUSIONNÉE**, pas de code INK natif, pas de raccordement CYD, `ON_DEVICE_UNVERIFIED`. La forme triple reste `TEMPORAL_UNVERIFIED` ; les mesures RGB sont propres aux captures. Aucun jalon J1.18-B autorisé par cette livraison.

@@ -78,6 +78,13 @@ BSRResult bsr_step(BasicSessionRuntime *runtime,
                    uint8_t *output, size_t output_capacity,
                    size_t *written);
 
+/* Caller-owned typed event channel. BSR_RUNNING and all output/event
+ * regions and counts remain unchanged on any error. No CYD routing. */
+BSRResult bsr_step_with_events(BasicSessionRuntime *runtime,
+                               uint8_t *output, size_t output_capacity,
+                               size_t *written, BEVideoEvent *events,
+                               size_t event_capacity, size_t *event_written);
+
 /* Idempotent; drops RUNNING without touching stored BASIC lines. */
 BSRResult bsr_stop(BasicSessionRuntime *runtime);
 

@@ -36,6 +36,7 @@ SETUP = ['MODE 1', 'INK 0,0', 'INK 1,26', 'INK 2,6', 'INK 3,18',
 # its actual archive byte hashes here. Never derive these from manifest.json.
 # The permanent verifier fails CLOSED until all 16 entries are pinned.
 SEALED = {}
+SEALED_MANIFEST = ''  # SHA256 of first archived manifest, pinned outside archive
 
 
 class Invalid(ValueError):
@@ -231,7 +232,15 @@ def verify(out, permanent=False):
             m['native_changes'] is False and m['full_snapshots_archived'] is False and
             m['visual_classification'] == 'VISUAL_UNVERIFIED' and
             set(m['cases']) == set(CASES), 'MANIFEST_PROVENANCE_INVALID')
+    # A forged but syntactically well-formed HEAD must not pass a live checkout.
+    ancestry = subprocess.run(['git', '-C', str(ROOT), 'merge-base', '--is-ancestor',
+                               m['acquisition_head'], 'HEAD'],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    require(ancestry.returncode == 0, 'FALSE_OR_UNREACHABLE_ACQUISITION_HEAD')
     if permanent:
+        require(bool(re.fullmatch(r'[0-9a-f]{64}', SEALED_MANIFEST)) and
+                sha(read(out / 'manifest.json')) == SEALED_MANIFEST,
+                'EXTERNAL_MANIFEST_SEAL_MISMATCH')
         require(set(SEALED) == set(CASES) and all(
             set(SEALED[c]) == set(SESSIONS) for c in CASES), 'EXTERNAL_PEN_SEAL_NOT_ESTABLISHED')
     prog_set = {}

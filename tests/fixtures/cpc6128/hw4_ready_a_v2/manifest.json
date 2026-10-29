@@ -1,0 +1,438 @@
+{
+  "schema": 1,
+  "mission": "HW4-READY-A",
+  "phase": "A0",
+  "repo_head": "8605e54fbfc8ae1e86d68cf5b26bddf2b504b386",
+  "run_id": "40882225719",
+  "captured_utc": "2026-10-29T13:28:45.723133+00:00",
+  "oracle": {
+    "emulator": "Caprice32",
+    "commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "version": "Caprice32 v4.6.0-8c778bf072a06fb7c23b9cccd179041db7f79a52\nAPP_PATH: Not provided\nCompiled with:\nNumber of video plugins available: 11",
+    "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "model": "CPC6128",
+    "rom": "CPC6128 BASIC 1.1",
+    "ram_kib": 128,
+    "container": "ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c"
+  },
+  "capture_purpose": "VISUAL_INSPECTION_REQUIRED",
+  "screen_is_not_printer": true,
+  "rom_archived": false,
+  "original_archives_untouched": true,
+  "cases": [
+    {
+      "id": "00_boot",
+      "keyboard": [],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-10-29T13:28:45.723977+00:00",
+          "finished_utc": "2026-10-29T13:28:46.158295+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/00_boot/screen.png",
+          "screen_sha256": "44dd5c29d2278251ac244dd703fc205009728631c7965451f5c3e770cb8495b7",
+          "screen_size_bytes": 4379,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-10-29T13:28:46.159618+00:00",
+          "finished_utc": "2026-10-29T13:28:46.529279+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/00_boot/screen.png",
+          "screen_sha256": "44dd5c29d2278251ac244dd703fc205009728631c7965451f5c3e770cb8495b7",
+          "screen_size_bytes": 4379,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    },
+    {
+      "id": "01_numbered_10",
+      "keyboard": [
+        "10 PRINT 2"
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-10-29T13:28:46.530795+00:00",
+          "finished_utc": "2026-10-29T13:28:46.985373+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/01_numbered_10/screen.png",
+          "screen_sha256": "888cc0a3fc452b046fb32b3b35b3a0d64001adc0f86419199612df7ae7137bd8",
+          "screen_size_bytes": 4555,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "377aa85485356c8f3e9d3367ae82b4f7f9387a8dad09086e8c97f7ff7876ad1d",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-10-29T13:28:46.986427+00:00",
+          "finished_utc": "2026-10-29T13:28:47.424537+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/01_numbered_10/screen.png",
+          "screen_sha256": "888cc0a3fc452b046fb32b3b35b3a0d64001adc0f86419199612df7ae7137bd8",
+          "screen_size_bytes": 4555,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "377aa85485356c8f3e9d3367ae82b4f7f9387a8dad09086e8c97f7ff7876ad1d",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    },
+    {
+      "id": "02_numbered_20",
+      "keyboard": [
+        "10 PRINT 2",
+        "20 END"
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-10-29T13:28:47.426021+00:00",
+          "finished_utc": "2026-10-29T13:28:47.913411+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/02_numbered_20/screen.png",
+          "screen_sha256": "3c820e99ce34ac907d1d3a8a2276001d9ec13a11c8fa669cc71b414e92373b57",
+          "screen_size_bytes": 4698,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "ddc20fde65c3c4643bbb55ad6b4c4c3265f4603a1b832b5f99ddb23a4c3f28fd",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-10-29T13:28:47.914875+00:00",
+          "finished_utc": "2026-10-29T13:28:48.404030+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/02_numbered_20/screen.png",
+          "screen_sha256": "3c820e99ce34ac907d1d3a8a2276001d9ec13a11c8fa669cc71b414e92373b57",
+          "screen_size_bytes": 4698,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "ddc20fde65c3c4643bbb55ad6b4c4c3265f4603a1b832b5f99ddb23a4c3f28fd",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    },
+    {
+      "id": "03_empty_enter",
+      "keyboard": [
+        "10 PRINT 2",
+        "20 END",
+        ""
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-10-29T13:28:48.405492+00:00",
+          "finished_utc": "2026-10-29T13:28:48.900987+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/03_empty_enter/screen.png",
+          "screen_sha256": "dc351b8febe3d664b7376bd97497b97c5d7957dbd31cf36b909bf6f7679ef488",
+          "screen_size_bytes": 4706,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "eea067ea789d44c905b5c36bc47b65a95581f59819d6f73dde811e7b7b3fc615",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-10-29T13:28:48.902543+00:00",
+          "finished_utc": "2026-10-29T13:28:49.402568+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/03_empty_enter/screen.png",
+          "screen_sha256": "dc351b8febe3d664b7376bd97497b97c5d7957dbd31cf36b909bf6f7679ef488",
+          "screen_size_bytes": 4706,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "eea067ea789d44c905b5c36bc47b65a95581f59819d6f73dde811e7b7b3fc615",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    },
+    {
+      "id": "04_list",
+      "keyboard": [
+        "10 PRINT 2",
+        "20 END",
+        "LIST"
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-10-29T13:28:49.403921+00:00",
+          "finished_utc": "2026-10-29T13:28:49.950158+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/04_list/screen.png",
+          "screen_sha256": "c27700573576eb91fae822c44c5c89b98317394730dac39c6f711f461b9169db",
+          "screen_size_bytes": 5197,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "9f88cf1ab9649eb3a79319a586f724ce6d8f1d1bb9411c5f039a7ef744fbccf6",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-10-29T13:28:49.951240+00:00",
+          "finished_utc": "2026-10-29T13:28:50.467077+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/04_list/screen.png",
+          "screen_sha256": "c27700573576eb91fae822c44c5c89b98317394730dac39c6f711f461b9169db",
+          "screen_size_bytes": 5197,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "9f88cf1ab9649eb3a79319a586f724ce6d8f1d1bb9411c5f039a7ef744fbccf6",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    },
+    {
+      "id": "05_new",
+      "keyboard": [
+        "10 PRINT 2",
+        "20 END",
+        "NEW"
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-10-29T13:28:50.468305+00:00",
+          "finished_utc": "2026-10-29T13:28:50.977889+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/05_new/screen.png",
+          "screen_sha256": "082ce1cb64bf854899ad20494c568c980fefc8dfc4d42f857d136b62ffa935ba",
+          "screen_size_bytes": 4900,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "81fb7bcf5992ba5c767a2d597a156a0943d6b10a967a142c929ac4563188ac9e",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-10-29T13:28:50.979041+00:00",
+          "finished_utc": "2026-10-29T13:28:51.491045+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/05_new/screen.png",
+          "screen_sha256": "082ce1cb64bf854899ad20494c568c980fefc8dfc4d42f857d136b62ffa935ba",
+          "screen_size_bytes": 4900,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "81fb7bcf5992ba5c767a2d597a156a0943d6b10a967a142c929ac4563188ac9e",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    },
+    {
+      "id": "06_run_normal",
+      "keyboard": [
+        "10 PRINT 2",
+        "20 END",
+        "RUN"
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-10-29T13:28:51.492387+00:00",
+          "finished_utc": "2026-10-29T13:28:52.005402+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/06_run_normal/screen.png",
+          "screen_sha256": "ba89e2acdfdbce6d4d3b3687370b54abf1ebf1ca725cae7c0268721caff2bd83",
+          "screen_size_bytes": 4931,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "40dd9ef326c227d97b5e4ce04f4222d79fb8751408eab073006ff9a54461e2d2",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-10-29T13:28:52.006839+00:00",
+          "finished_utc": "2026-10-29T13:28:52.524510+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/06_run_normal/screen.png",
+          "screen_sha256": "ba89e2acdfdbce6d4d3b3687370b54abf1ebf1ca725cae7c0268721caff2bd83",
+          "screen_size_bytes": 4931,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "40dd9ef326c227d97b5e4ce04f4222d79fb8751408eab073006ff9a54461e2d2",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    },
+    {
+      "id": "07_stop",
+      "keyboard": [
+        "10 PRINT 2",
+        "20 STOP",
+        "RUN"
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-10-29T13:28:52.525754+00:00",
+          "finished_utc": "2026-10-29T13:28:53.046363+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/07_stop/screen.png",
+          "screen_sha256": "ceca9c385a2574b37ff9730e1ad01677c29e8dbd90d60d96a0de3d9e969fc8e0",
+          "screen_size_bytes": 5109,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "b681971010fc8dec405461d66e4184fe340eaa43ce7c871606d6eadec3e69f4e",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-10-29T13:28:53.047448+00:00",
+          "finished_utc": "2026-10-29T13:28:53.566599+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/07_stop/screen.png",
+          "screen_sha256": "ceca9c385a2574b37ff9730e1ad01677c29e8dbd90d60d96a0de3d9e969fc8e0",
+          "screen_size_bytes": 5109,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "b681971010fc8dec405461d66e4184fe340eaa43ce7c871606d6eadec3e69f4e",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    },
+    {
+      "id": "08_error",
+      "keyboard": [
+        "10 PRINT 2",
+        "20 END",
+        "GOTO 999"
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-10-29T13:28:53.568013+00:00",
+          "finished_utc": "2026-10-29T13:28:54.119993+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/08_error/screen.png",
+          "screen_sha256": "8148419764a3b71c0182b9917d9e2a9bb2dfc4823a6be2fd8b5c1a2944bc1e4a",
+          "screen_size_bytes": 5154,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "9fc9e7d82a1e609c987b0f9ddd565f4c58471e96d8978f24e75be46a21828339",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-10-29T13:28:54.121321+00:00",
+          "finished_utc": "2026-10-29T13:28:54.671872+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/08_error/screen.png",
+          "screen_sha256": "8148419764a3b71c0182b9917d9e2a9bb2dfc4823a6be2fd8b5c1a2944bc1e4a",
+          "screen_size_bytes": 5154,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "9fc9e7d82a1e609c987b0f9ddd565f4c58471e96d8978f24e75be46a21828339",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    },
+    {
+      "id": "09_run_new",
+      "keyboard": [
+        "10 PRINT 2",
+        "20 END",
+        "RUN",
+        "NEW"
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-10-29T13:28:54.673360+00:00",
+          "finished_utc": "2026-10-29T13:28:55.214487+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/09_run_new/screen.png",
+          "screen_sha256": "3a59cbbab44dd43761f42f93328fc6b83630e007ebe2d13b5e6748455f55b26c",
+          "screen_size_bytes": 5129,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "35c177bd49a830c93da7bce10a6890c25b1ec046753492a731fd23b4db2d9fba",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-10-29T13:28:55.215931+00:00",
+          "finished_utc": "2026-10-29T13:28:55.758081+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/09_run_new/screen.png",
+          "screen_sha256": "3a59cbbab44dd43761f42f93328fc6b83630e007ebe2d13b5e6748455f55b26c",
+          "screen_size_bytes": 5129,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "35c177bd49a830c93da7bce10a6890c25b1ec046753492a731fd23b4db2d9fba",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    }
+  ]
+}

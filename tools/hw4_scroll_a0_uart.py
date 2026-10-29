@@ -71,11 +71,14 @@ def check_class(data, name, bytes_per_band):
         lo, hi = out["min_us"], out["max_us"]
         require(lo <= hi and count * lo <= out["us_total"] <= count * hi,
                 "duration min/max/total inconsistent")
-        require(any(hist[i] and (lo <= BOUNDS[i]) for i in range(12)),
-                "minimum outside histogram")
-        require(any(hist[i] and (hi <= BOUNDS[i]) and
-                    (i == 0 or hi > BOUNDS[i-1]) for i in range(12)),
-                "maximum outside histogram")
+        first = next(i for i, n in enumerate(hist) if n)
+        last = max(i for i, n in enumerate(hist) if n)
+        require(lo <= BOUNDS[first] and
+                (first == 0 or lo > BOUNDS[first-1]),
+                "minimum outside first occupied histogram bin")
+        require(hi <= BOUNDS[last] and
+                (last == 0 or hi > BOUNDS[last-1]),
+                "maximum outside last occupied histogram bin")
     if name == "ordinary":
         require(out["up"] == out["down"] == 0, "ordinary class contains scroll")
     else:
@@ -143,6 +146,8 @@ def analyze(log, *, sha, idf, profile, spi_hz, cpu_mhz, orientation=9,
                     old_name = "repaint_us_total" if key == "us_total" else key
                     require(a[key] + b[key] == number(old, old_name),
                             "legacy/class counter contradiction: " + key)
+                require(number(old, "scrolls") == number(sample, "text_scrolls"),
+                        "legacy vs sample text scrolls mismatch")
                 require(a["up"] + b["up"] + number(sample, "pending_up") >=
                         number(sample, "text_scrolls"), "up scroll undercount")
                 require(number(sample, "pending_down") >= 0, "invalid pending count")

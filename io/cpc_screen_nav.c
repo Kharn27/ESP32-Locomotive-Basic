@@ -85,8 +85,35 @@ bool cpc_screen_nav_move(CpcScreenNavigation *nav, CpcText *text,
         adjust_scroll(nav,text,edit,line,image_up);
     return cpc_video_cursor(v,col,row,true);
 }
+/* C1: ENTER is a CR/LF from the currently visible E1 cursor,
+ * NOT a return to the (possibly scrolled-away) CpcText/E3 old anchor.
+ * Restore the exact E3 buffer at column zero of the next row.
+ * HOME remains separate and keeps the old refocus semantics. */
 bool cpc_screen_nav_resume(CpcScreenNavigation *nav, CpcText *text,
                            CpcUartEditor *edit, const UartLine *line)
+{
+    if (!valid(nav,text,edit,line) || text->glyph == NULL) return false;
+    CpcVideo *v = text->video;
+    if (v->cursor_row >= 25U || v->cursor_column >= 40U) return false;
+    unsigned target_row = v->cursor_row;
+    if (target_row == 24U) {
+        if (!cpc_video_scroll_up(v,1U)) return false;
+        ++text->scrolls;
+    } else {
+        ++target_row;
+    }
+    text->row = target_row;
+    text->column = 0U; /* CpcText 40 is deferred wrap, not an E1 column. */
+    nav->anchor_valid = false;
+    if (!cpc_uart_console_edit_begin(text,edit)) return false;
+    /* Even if an older E3 fragment remains on screen, that is now E2
+     * display only. Never recover it as input, repaint only from E3. */
+    if (!cpc_uart_console_edit(text,edit,line,0U)) return false;
+    nav->anchor_valid = true;
+    return true;
+}
+bool cpc_screen_nav_home(CpcScreenNavigation *nav, CpcText *text,
+                         CpcUartEditor *edit, const UartLine *line)
 {
     if (!valid(nav,text,edit,line)) return false;
     if (!nav->anchor_valid) {

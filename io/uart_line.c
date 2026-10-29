@@ -126,7 +126,7 @@ static UartLineEvent feed_impl(UartLine *line, uint8_t ch, bool screen_enabled)
             if (simple && n == 0U && ch == (uint8_t)'H' &&
                 screen_enabled && line->screen_navigation) {
                 line->screen_navigation = false;
-                return UART_LINE_RETURN_EDIT;
+                return UART_LINE_RETURN_HOME;
             }
             /* All remaining CSI, especially Delete-under, are inert in
              * SCREEN focus. Never run an E3 edit from a historic cell. */

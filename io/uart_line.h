@@ -18,7 +18,8 @@ typedef enum {
     UART_LINE_NAV_RIGHT,
     UART_LINE_NAV_UP,
     UART_LINE_NAV_DOWN,
-    UART_LINE_RETURN_EDIT,
+    UART_LINE_RETURN_EDIT, /* E1 ENTER: CR to next visible row, no submit */
+    UART_LINE_RETURN_HOME, /* E1 CSI Home: restore E3 anchor, no CR */
     UART_LINE_READY,
     UART_LINE_REJECTED,
     UART_LINE_IGNORED,

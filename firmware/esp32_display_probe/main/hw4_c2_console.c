@@ -481,6 +481,16 @@ void app_main(void)
                 (void)fail("SCREEN_NAV_RESUME",-1); return;
             }
             printf("HW4-EDIT-B1-A RETURN_EDIT row=%u col=%u "
+                   "source_bytes=%u source_preserved=1 policy=E1_NEXT_ROW_CR\n",
+                   (unsigned)s_video.cursor_row,
+                   (unsigned)s_video.cursor_column,
+                   (unsigned)s_line.length);
+            ++echo_pending;
+        } else if(event==UART_LINE_RETURN_HOME) {
+            if(!cpc_screen_nav_home(&s_nav,&s_text,&s_edit,&s_line)) {
+                (void)fail("SCREEN_NAV_HOME",-1); return;
+            }
+            printf("HW4-EDIT-B1-A RETURN_HOME row=%u col=%u "
                    "source_bytes=%u source_preserved=1\n",
                    (unsigned)s_video.cursor_row,
                    (unsigned)s_video.cursor_column,

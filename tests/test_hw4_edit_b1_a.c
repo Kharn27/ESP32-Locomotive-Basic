@@ -68,6 +68,8 @@ static UartLineEvent feed(uint8_t ch)
         assert(cpc_screen_nav_move(&nav,&text,&edit,&line,e));
     else if(e==UART_LINE_RETURN_EDIT)
         assert(cpc_screen_nav_resume(&nav,&text,&edit,&line));
+    else if(e==UART_LINE_RETURN_HOME)
+        assert(cpc_screen_nav_home(&nav,&text,&edit,&line));
     else if(e==UART_LINE_APPEND||e==UART_LINE_DELETE||
             e==UART_LINE_DELETE_FORWARD||e==UART_LINE_LEFT||
             e==UART_LINE_RIGHT) {
@@ -106,7 +108,7 @@ static void arrows(void)
     assert(seq("\x1b[B")==UART_LINE_NAV_DOWN);
     assert(v.cursor_row==12U && v.cursor_column==19U);
     same();
-    assert(seq("\x1b[H")==UART_LINE_RETURN_EDIT);
+    assert(seq("\x1b[H")==UART_LINE_RETURN_HOME);
     assert(!line.screen_navigation);
     assert(feed('\r')==UART_LINE_READY);
     uart_line_ack(&line);
@@ -116,7 +118,7 @@ static void arrows(void)
     assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
     assert(v.cursor_row==5U && v.cursor_column==0U);
     same();
-    assert(seq("\x1b[H")==UART_LINE_RETURN_EDIT);
+    assert(seq("\x1b[H")==UART_LINE_RETURN_HOME);
     reset(0U,0U);
     assert(seq("\x1b[D")==UART_LINE_NAV_LEFT);
     assert(v.cursor_row==0U && v.cursor_column==0U);
@@ -217,7 +219,7 @@ static void e3_and_ansi(void)
     assert(seq("\x1b[1;2A")==UART_LINE_IGNORED);
     assert(seq("\x1b[?25l")==UART_LINE_IGNORED);
     assert(seq("\x1b[3~")==UART_LINE_IGNORED);
-    assert(seq("\x1b[H")==UART_LINE_RETURN_EDIT);
+    assert(seq("\x1b[H")==UART_LINE_RETURN_HOME);
     assert(feed(0x1bU)==UART_LINE_IGNORED);
     assert(feed('[')==UART_LINE_IGNORED);
     assert(feed('3')==UART_LINE_IGNORED);

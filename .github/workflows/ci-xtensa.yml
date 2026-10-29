@@ -132,7 +132,7 @@ jobs:
   # Run main -> PR in one and the same workspace, with no fullclean, -B,
   # additional project, or custom configuration. A CI-only test: no flash.
   po-standard-build:
-    if: github.event_name == 'pull_request' && (github.head_ref == 'feat/hw4-edit-a-cpc-cursor' || github.head_ref == 'feat/hw4-edit-p1-semantic-cells' || github.head_ref == 'feat/arch-hw4-u1-a-unified-profiles' || github.head_ref == 'feat/arch-hw4-u1-b-retire-legacy-probe' || github.head_ref == 'feat/hw4-edit-b1-a-screen-navigation')
+    if: github.event_name == 'pull_request' && (github.head_ref == 'feat/hw4-edit-a-cpc-cursor' || github.head_ref == 'feat/hw4-edit-p1-semantic-cells' || github.head_ref == 'feat/arch-hw4-u1-a-unified-profiles' || github.head_ref == 'feat/arch-hw4-u1-b-retire-legacy-probe' || github.head_ref == 'feat/hw4-edit-b1-a-screen-navigation' || github.head_ref == 'feat/hw4-edit-b1-b-vertical-guard')
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:

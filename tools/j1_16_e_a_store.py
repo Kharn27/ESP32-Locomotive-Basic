@@ -372,7 +372,9 @@ def verify(root, permanent=False):
         for pair in cases.values() for z in pair) else "STORE_UNVERIFIED")
     check(m["classification"]==expected,"FALSE_STORE_CLASSIFICATION")
     print("J1.16-E-A VERIFIED",expected,
-          " ".join(case+"="+cases[case][0]["value_hex"] for case in CASES),
+          " ".join(case+"="+(cases[case][0]["value_hex"]
+                           if cases[case][0]["value_hex"] is not None
+                           else "UNVERIFIED") for case in CASES),
           flush=True)
 
 
@@ -422,6 +424,52 @@ def mutations(root, permanent=False):
                 print("J1.16-E-A MUTATION_REJECTED",field,flush=True)
             else:
                 raise Bad("MUTATION_ACCEPTED_"+field)
+
+    # C1 regression: a coherent, unidentifiable scalar window must be
+    # reportable without manufacturing a five-byte REAL5 payload.
+    import io
+    from contextlib import redirect_stdout
+    with tempfile.TemporaryDirectory(prefix="j116-e-a-unverified-") as td:
+        alt=Path(td)/"archive"
+        shutil.copytree(root,alt)
+        m=json.loads(read(alt/"manifest.json"))
+        for session in ("original","repeat"):
+            directory=alt/session/"R_NEG_ONE"
+            window=bytearray(read(directory/"window.bin"))
+            check(len(window)==9 and window[2:4]==bytes.fromhex("C1 04"),
+                  "UNVERIFIED_TEST_BAD_BASELINE")
+            window[3]=0x05  # Non-identifiable type; do not reinterpret bytes.
+            forged=bytes(window)
+            (directory/"window.bin").write_bytes(forged)
+            capture=directory/"capture.json"
+            item=json.loads(read(capture))
+            item["window_hex"]=forged.hex(" ").upper()
+            item["window_sha256"]=digest(forged)
+            item["type_byte_hex"]="05"
+            item["value_offset"]=None
+            item["value_hex"]=None
+            item["classification"]="STORE_UNVERIFIED"
+            capture.write_text(json.dumps(item,sort_keys=True,indent=2)+"\n")
+            m["cases"]["R_NEG_ONE"][session]=digest(read(capture))
+        m["classification"]="STORE_UNVERIFIED"
+        (alt/"manifest.json").write_text(json.dumps(m,sort_keys=True,indent=2)+"\n")
+        with io.StringIO() as captured:
+            with redirect_stdout(captured):
+                verify(alt,permanent=False)
+            report=captured.getvalue()
+        check("J1.16-E-A VERIFIED STORE_UNVERIFIED" in report and
+              "R_NEG_ONE=UNVERIFIED" in report and
+              "STORE_SCALAR_REAL5_OBSERVED" not in report,
+              "UNVERIFIED_TEST_WRONGLY_PROMOTED")
+        try:
+            verify(alt,permanent=True)
+        except Bad as e:
+            check(str(e).startswith("SEALED_E_A_ARCHIVE_MISMATCH_R_NEG_ONE_"),
+                  "UNVERIFIED_TEST_WRONG_SEAL_REJECTION_"+str(e))
+        else:
+            raise Bad("UNVERIFIED_TEST_PERMANENT_ACCEPTED")
+        print("J1.16-E-A UNVERIFIED_SCALAR_RETAINED STORE_UNVERIFIED "
+              "PERMANENT_SEAL_REJECTED",flush=True)
 
     if permanent:
         # C1: double-window coordinated forgery. Recompute ALL mutable local

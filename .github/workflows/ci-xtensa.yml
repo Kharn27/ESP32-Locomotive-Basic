@@ -2,6 +2,18 @@ name: CI-XTENSA U1-B three profiles one ESP-IDF root
 
 on:
   pull_request:
+    paths:
+      - 'core/**'
+      - 'firmware/**'
+      - 'hal/**'
+      - 'io/**'
+      - 'video/**'
+      - '**/CMakeLists.txt'
+      - '**/Kconfig*'
+      - '**/sdkconfig*'
+      - '**/partitions.csv'
+      - 'tools/ci/**'
+      - '.github/workflows/ci-xtensa.yml'
   push:
     branches: [main]
   workflow_dispatch:

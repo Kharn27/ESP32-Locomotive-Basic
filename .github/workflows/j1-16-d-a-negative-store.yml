@@ -1,7 +1,12 @@
 name: J1.16-D-A CPC REAL5 signed variable-store oracle
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - '.github/workflows/j1-16-d-a-negative-store.yml'
+      - 'tools/j1_16_d_a_store.py'
+      - 'tests/fixtures/cpc6128/j1_16_d_a_negative_store/**'
+      - 'docs/J1.16-D-A-real5-negative-store-oracle.md'
   workflow_dispatch:
 
 permissions:
@@ -9,8 +14,8 @@ permissions:
   packages: read
 
 concurrency:
-  group: j116-da-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
-  cancel-in-progress: false
+  group: j116-da-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   rom-store-observation:

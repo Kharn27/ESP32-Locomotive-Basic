@@ -59,6 +59,10 @@ jobs:
           grep -F 'LCD_FAIL_STOP' "$src"
           grep -F 'retry=0' "$src"
           grep -F 'pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : 100U)' "$src"
-          grep -F 'return display_ready() && prompt()' "$src"
+          # HW4-READY-A decouples Ready from prompt; keep terminal flush
+          # and ensure dispatch comes from the tested portable policy.
+          grep -F 'return apply_ready_policy(transition) && prompt();' "$src"
+          grep -F 'cpc_ready_policy_apply(&s_text,transition,&emitted)' "$src"
+          ! grep -F 'return display_ready() && prompt()' "$src"
           python3 tools/hw4_c3_b2_uart_po.py --dry-run >/tmp/hw4-c3-b2-uart-commands.txt
           test "$(grep -c ' PRINT 7' /tmp/hw4-c3-b2-uart-commands.txt)" = 32

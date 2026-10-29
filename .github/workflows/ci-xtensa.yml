@@ -73,7 +73,12 @@ jobs:
               idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$PROFILE" set-target esp32 > "$out/set-target.log" 2>&1
               idf.py -B "$dir" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE="$PROFILE" build > "$out/build.log" 2>&1
               idf.py -B "$dir" size > "$out/size.txt" 2>&1
-              python3 /project/tools/ci/check_u1b_memory.py "$PROFILE" "$out/size.txt" | tee "$out/memory-parity.txt"
+              xtensa-esp-elf-nm -S --defined-only "$dir/loco_esp32_display_probe.elf" > "$out/symbols.txt"
+              python3 /project/tools/ci/check_u1b_memory.py "$PROFILE" "$out/size.txt" \
+                --nm-file "$out/symbols.txt" \
+                --console-source /project/firmware/esp32_display_probe/main/hw4_c2_console.c \
+                --contract /project/firmware/esp32_display_probe/main/j1_15_c_string_arena.h \
+                | tee "$out/memory-parity.txt"
               idf.py -B "$dir" size-components > "$out/size-components.txt" 2>&1
               grep -Fx "LOCO_CYD_PROFILE:STRING=$PROFILE" "$dir/CMakeCache.txt"
               test -s "$dir/loco_esp32_display_probe.bin"

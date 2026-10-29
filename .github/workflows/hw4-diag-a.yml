@@ -5,7 +5,7 @@ on:
     paths:
       - 'tools/hw4_diag_a_cpc.py'
       - '.github/workflows/hw4-diag-a.yml'
-      - 'docs/HW4-DIAG-A-cpc-transitions.md'
+      - 'docs/HW4-DIAG-A-cpc-line-does-not-exist.md'
       - 'tests/fixtures/cpc6128/hw4_diag_a/**'
   workflow_dispatch:
 
@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   screen-capture:
-    if: github.event_name == 'pull_request' && github.head_ref == 'feat/hw4-diag-a-cpc-transitions' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/hw4-diag-a-line-not-exist' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
@@ -65,9 +65,9 @@ jobs:
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
             git add "$DEST"
             git commit -m 'evidence(HW4-DIAG-A): archive authentic CPC screen transitions A0'
-            REMOTE_HEAD="$(git ls-remote origin refs/heads/feat/hw4-diag-a-cpc-transitions | awk '{print $1}')"
+            REMOTE_HEAD="$(git ls-remote origin refs/heads/feat/hw4-diag-a-line-not-exist | awk '{print $1}')"
             test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA"
-            git push origin HEAD:refs/heads/feat/hw4-diag-a-cpc-transitions
+            git push origin HEAD:refs/heads/feat/hw4-diag-a-line-not-exist
           else
             echo 'A0 original historical captures preserved; repeated fresh acquisition available as workflow artifact'
           fi

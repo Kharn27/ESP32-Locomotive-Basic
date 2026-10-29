@@ -33,7 +33,7 @@ CASES = {
     "08_error": ["10 PRINT 2", "20 END", "GOTO 999"],
     "09_run_new": ["10 PRINT 2", "20 END", "RUN", "NEW"],
 }
-CPC_TAIL = "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+CPC_TAIL = "CAP32_DELAYCAP32_DELAYCAP32_SCRNSHOTCAP32_EXIT"
 
 def sha(raw):
     return hashlib.sha256(raw).hexdigest()
@@ -55,7 +55,8 @@ def self_test():
         require(all("\n" not in cmd and "\r" not in cmd for cmd in commands),
                 "INVALID_KEYBOARD_INPUT")
         argv = expected_argv(Path("/cap"), Path("/cap/cap32.cfg"), commands)
-        require(argv[-2:] == ["-a", CPC_TAIL], "MISSING_SCREENSHOT")
+        require(argv[-2:] == ["-a", CPC_TAIL] and " " not in CPC_TAIL,
+                "SCREENSHOT_TAIL_MUST_NOT_TYPE_HOST_SPACES")
         if name == "03_empty_enter":
             require("" in commands and argv.count("") == 1, "BARE_ENTER_MISSING")
     print("HW4-READY-A A0 SELF_TEST PASS cases=10 fresh_process_pairs=10 "

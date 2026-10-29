@@ -84,7 +84,7 @@ def check(profile, values, arena_size=None, nm=None):
         if profile != "CONSOLE" and key == "DRAM" and diff > LEGACY_MARGIN:
             raise ValueError(f"J1.15-C STOP: {profile} DRAM grew > {LEGACY_MARGIN}")
     if profile == "CONSOLE" and arena_size is not None:
-        print(f"J1.15-C CONSOLE_ARENA_ELF_BSS_BYTES={arena_size} "
+        print(f"J1.15-C CONSOLE_STORAGE_ELF_BSS_BYTES={arena_size} "
               f"ARENA_BYTES={ARENA_BYTES} EXTRA_BUDGET_BYTES={ARENA_BYTES} PASS")
     print(f"U1-B SIZE_{profile}=PASS")
 

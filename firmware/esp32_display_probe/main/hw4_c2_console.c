@@ -5,6 +5,7 @@
  */
 #include "basic_session_runtime.h"
 #include "basic_variable_store.h"
+#include "j1_15_c_string_arena.h"
 #include "cpc_font.h"
 #include "cpc_boot.h"
 #include "cpc_text.h"
@@ -28,7 +29,9 @@
 
 enum {
     PROGRAM_CAPACITY = 8192,
-    VARIABLES_CAPACITY = 64,
+    VARIABLES_CAPACITY = J115C_VARIABLES_CAPACITY,
+    STRING_SLOT_BYTES = J115C_STRING_SLOT_BYTES,
+    STRING_ARENA_CAPACITY = J115C_STRING_ARENA_CAPACITY,
     TEMP_CAPACITY = 2048,
     OUTPUT_CAPACITY = 4096,
     LCD_WIDTH = 320,
@@ -45,10 +48,14 @@ typedef struct {
     BasicSessionRuntime runtime;
     uint8_t bytes[PROGRAM_CAPACITY];
     BasicVariableEntry entries[VARIABLES_CAPACITY];
+    uint8_t string_arena[STRING_ARENA_CAPACITY]; /* s_basic-owned, no heap */
     uint8_t temporary[TEMP_CAPACITY];
     uint8_t output[OUTPUT_CAPACITY];
     size_t written;
 } BasicStorage;
+typedef char J115C_BasicStorageArenaExtent[
+    (sizeof(((BasicStorage *)0)->string_arena) ==
+     (size_t)(VARIABLES_CAPACITY * STRING_SLOT_BYTES)) ? 1 : -1];
 static BasicStorage s_basic;
 static CpcVideo s_video;
 static CpcText s_text;
@@ -400,11 +407,16 @@ void app_main(void)
     printf("HW4-C3-A BOOT_READY heading=ESP32_CYD input_col=0 input_row=12\n");
     if(!repaint_full()) return;
     if(bp_init(&s_basic.program,s_basic.bytes,sizeof(s_basic.bytes))!=BP_OK ||
-       bvs_init(&s_basic.variables,s_basic.entries,VARIABLES_CAPACITY)!=BVS_OK ||
+       j115c_init_store(&s_basic.variables,s_basic.entries,
+                         VARIABLES_CAPACITY,s_basic.string_arena,
+                         sizeof(s_basic.string_arena))!=BVS_OK ||
        bsr_init_with_store(&s_basic.runtime,&s_basic.program,
                             &s_basic.variables).status!=BSR_OK) {
         (void)fail("BASIC_INIT",-1); return;
     }
+    printf("J1.15-C BASIC_ARENA_READY entries=%u slot_bytes=%u arena_bytes=%u "
+           "allocation=static\n", VARIABLES_CAPACITY,STRING_SLOT_BYTES,
+           STRING_ARENA_CAPACITY);
     uart_line_init(&s_line);
     if(!uart_init()) return;
     e=cyd_lcd_backlight(true);

@@ -571,3 +571,7 @@ Mandat Pilotage [#166](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/
 ### J1.17-A — PEN, mesure oracle MODE 1 (mandat Pilotage #177)
 
 Mission strictement **preuve CPC** : `PEN 0/1/2/3/4/15/16/-1`, deux sessions Caprice32 indépendantes par cas, RAM/LIST/RUN/captures écran et codes d'erreur, sceaux SHA-256 externes, négatifs et CI. [PR #179](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/179) en **revue Pilotage**, jamais un jalon accepté par le Développeur. Aucun code `PEN` natif, aucun firmware CYD, aucun déclenchement automatique de J1.17-B, INK ou MODE. Voir [rapport](J1.17-A-pen-cpc-oracle.md).
+
+### Suivi J1.17-A-SYNC — post CI-OPT3-C1 (29 octobre 2026)
+
+[PR #179](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/179) synchronisée par merge commit `ecca2dd9985c66ac7d6e258ab394873313d33632` avec `main@8fb3b7269e4c32ab07aecb0d7c3aaa09fc17a43c` ; **CI-OPT3 31 workflows/5 familles, fail-closed**, cinq workflows SUCCESS sur ce commit, archives PEN 113/113 identiques, sceaux D-A/E-A/C1 préservés. La mise à jour documentaire requiert une vérification CI sur son propre HEAD. **Non fusionnée, en revue Pilotage ; aucune autorisation J1.17-B**. Voir [rapport J1.17-A](J1.17-A-pen-cpc-oracle.md).

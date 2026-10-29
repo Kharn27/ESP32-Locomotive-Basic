@@ -31,6 +31,7 @@ VECTOR(go1, 0xa0,0x20,0x1e,0x01,0x00);
 VECTOR(go256, 0xa0,0x20,0x1e,0x00,0x01);
 VECTOR(go65535, 0xa0,0x20,0x1e,0xff,0xff);
 VECTOR(print_only, 0xbf);
+VECTOR(implicit_half_a, 0xbf,0x20,0x0d,0,0,0xc1);
 VECTOR(print_plus_new, 0xbf,0x01,0xb1);
 VECTOR(single_list, 0xa7);
 VECTOR(single_run, 0xca);
@@ -81,6 +82,7 @@ static int test_vectors(void)
     TEXT("GOTO 256", go256);
     TEXT("GOTO 65535", go65535);
     TEXT("PRINT", print_only);
+    TEXT("PRINT A", implicit_half_a); /* J1.16-B narrow new positive. */
     TEXT("PRINT:NEW", print_plus_new);
     TEXT("LIST", single_list);
     TEXT("RUN", single_run);
@@ -127,7 +129,7 @@ static int test_rejections(void)
     REJECT("PRINT 5ABC", BT_UNSUPPORTED_CONSTRUCT);
     REJECT("PRINT 5.0", BT_UNSUPPORTED_CONSTRUCT);
     REJECT("PRINT 1+2", BT_UNSUPPORTED_CONSTRUCT);
-    REJECT("PRINT A", BT_UNSUPPORTED_CONSTRUCT);
+    /* PRINT A was unsupported pre-J1.16-B; tested as R_HALF positive. */
     REJECT("PRINT GOTO 20", BT_UNSUPPORTED_CONSTRUCT);
     REJECT("PRINT \"A\"X", BT_UNSUPPORTED_CONSTRUCT);
     REJECT("PRINT \"A\"\"B\"", BT_UNSUPPORTED_CONSTRUCT);

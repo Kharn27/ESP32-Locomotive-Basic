@@ -2,6 +2,7 @@
 #include "basic_variable_ref.h"
 
 #include <stdint.h>
+#include <string.h>
 
 typedef struct {
     uint8_t *data; /* NULL during validation/measurement */
@@ -233,6 +234,23 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             return status;
         }
         token = body[pos++];
+        /* J1.16-B/C: the two complete CPC-attested REAL5 A records
+         * only; neither cache bits nor other REAL5 payloads are decoded. */
+        if (token == 0x0du) {
+            static const uint8_t real_line[2][11] = {
+                {0x0du, 0u, 0u, 0xc1u, 0xefu, 0x1fu,
+                 0u, 0u, 0u, 0u, 0x80u},
+                {0x0du, 0u, 0u, 0xc1u, 0xefu, 0x1fu,
+                 0u, 0u, 0u, 0x20u, 0x81u}
+            };
+            if (pos != 1u || length != sizeof(real_line[0]))
+                return BL_BAD_SEQUENCE;
+            if (memcmp(body, real_line[0], sizeof(real_line[0])) == 0)
+                return append_word(out, "A=0.5");
+            if (memcmp(body, real_line[1], sizeof(real_line[1])) == 0)
+                return append_word(out, "A=1.25");
+            return BL_BAD_SEQUENCE;
+        }
         /* E1BC emits 01 C0 for ', including at the beginning of a
          * line. The prefixed 01 is not an explicit source colon. */
         if (token == 0x01u && pos < length && body[pos] == 0xc0u) {
@@ -557,6 +575,15 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                         break;
                     }
                 }
+            } else if (t == 0x0du) {
+                static const uint8_t scalar_print[] = {
+                    0xbfu, (uint8_t)' ', 0x0du, 0u, 0u, 0xc1u
+                };
+                if (length != sizeof(scalar_print) ||
+                    memcmp(body, scalar_print, sizeof(scalar_print)) != 0)
+                    return BL_BAD_SEQUENCE;
+                status = append_byte(out, (uint8_t)'A');
+                pos = length;
             } else if (t >= 0x02u && t <= 0x04u) {
                 BasicVariableRef ref;
                 BVRStatus ref_status = bvr_decode(body, length, pos - 1u, &ref);

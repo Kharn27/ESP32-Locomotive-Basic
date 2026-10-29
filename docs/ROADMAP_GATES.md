@@ -575,3 +575,7 @@ Mission strictement **preuve CPC** : `PEN 0/1/2/3/4/15/16/-1`, deux sessions Cap
 ### Suivi J1.17-A-SYNC — post CI-OPT3-C1 (29 octobre 2026)
 
 [PR #179](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/179) synchronisée par merge commit `ecca2dd9985c66ac7d6e258ab394873313d33632` avec `main@8fb3b7269e4c32ab07aecb0d7c3aaa09fc17a43c` ; **CI-OPT3 31 workflows/5 familles, fail-closed**, cinq workflows SUCCESS sur ce commit, archives PEN 113/113 identiques, sceaux D-A/E-A/C1 préservés. La mise à jour documentaire requiert une vérification CI sur son propre HEAD. **Non fusionnée, en revue Pilotage ; aucune autorisation J1.17-B**. Voir [rapport J1.17-A](J1.17-A-pen-cpc-oracle.md).
+
+### Gate J1.17-B — commande PEN logique et événements portable (Pilotage #185)
+
+Ouvert par le Pilotage seulement après succès des cinq CI de `main@6a3470ea3e7dc595c0470f4a5dcb00ab93d50292`. C99 natif `PEN 0,1,2,3,4,15` : un `SET_TEXT_PEN(n)` typé, sans octets PRINT, sans rendu et avec consommation atomique ; `PEN 16,-1` rejetés par diagnostic hôte, `PEN 5..14` non vérifiés par l'oracle A. Prouver les huit tokens/listings, tests de capacité/overlap/rejeu et 31 workflows/five-family CI-OPT3 fail-closed, C99 OFF/ON, Xtensa trois profils. [Dossier](J1.17-B-pen-native.md). Gate d'acceptation et fusion réservés au Pilotage ; aucun jalon matériel CYD, INK, MODE ou PAPER engagé.

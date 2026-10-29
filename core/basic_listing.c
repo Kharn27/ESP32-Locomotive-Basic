@@ -17,6 +17,7 @@ typedef enum {
     BL_ST_IF,
     BL_ST_FOR,
     BL_ST_NEXT,
+    BL_ST_PEN,
     BL_ST_EMPTY
 } BLStatement;
 
@@ -276,6 +277,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0x02u: case 0x03u: statement = BL_ST_ASSIGN; status = BL_OK; break;
         case 0xa5u: statement = BL_ST_ASSIGN; status = append_word(out, "LET"); break;
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
+        case 0xbbu: statement = BL_ST_PEN; status = append_word(out, "PEN"); break;
         case 0xa0u: statement = BL_ST_GOTO; status = append_word(out, "GOTO"); break;
         case 0x9fu: statement = BL_ST_GOSUB; status = append_word(out, "GOSUB"); break;
         case 0xc9u: status = append_word(out, "RETURN"); break;
@@ -866,6 +868,34 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             } else {
                 return BL_BAD_SEQUENCE;
             }
+        } else if (statement == BL_ST_PEN) {
+            unsigned int pen;
+            uint8_t literal;
+            if (pos == length || body[pos] == 0x01u)
+                return BL_BAD_SEQUENCE;
+            if (pos == space_start) {
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) return status;
+            }
+            literal = body[pos++];
+            if (literal >= 0x0eu && literal <= 0x17u) {
+                pen = (unsigned int)(literal - 0x0eu);
+            } else if (literal == 0x19u) {
+                if (pos == length) return BL_TRUNCATED;
+                pen = (unsigned int)body[pos++];
+                if (pen < 10u || pen > 16u) return BL_BAD_SEQUENCE;
+            } else if (literal == 0xf5u) {
+                if (pos == length) return BL_TRUNCATED;
+                if (body[pos++] != 0x0fu) return BL_BAD_SEQUENCE;
+                status = append_byte(out, (uint8_t)'-');
+                if (status != BL_OK) return status;
+                pen = 1u;
+            } else {
+                return literal >= 0x80u || (literal >= 0x0eu && literal <= 0x1fu)
+                     ? BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
+            }
+            status = append_decimal(out, pen);
+            if (status != BL_OK) return status;
         } else if (statement == BL_ST_GOTO || statement == BL_ST_GOSUB) {
             unsigned int line;
             if (pos == length || body[pos] == 0x01u) {

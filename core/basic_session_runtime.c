@@ -275,12 +275,16 @@ BSRResult bsr_submit(BasicSessionRuntime *runtime,
     return from_session(session_result);
 }
 
-BSRResult bsr_step(BasicSessionRuntime *runtime,
-                   uint8_t *output, size_t output_capacity, size_t *written)
+BSRResult bsr_step_events(BasicSessionRuntime *runtime,
+                          uint8_t *output, size_t output_capacity,
+                          size_t *written, BEVideoEvent *events,
+                          size_t event_capacity, size_t *event_written)
 {
     BEStatus status;
     if (runtime == NULL || runtime->program == NULL ||
-        runtime->program->data == NULL || output == NULL || written == NULL) {
+        runtime->program->data == NULL || output == NULL || written == NULL ||
+        event_written == NULL || (events == NULL && event_capacity != 0u) ||
+        event_capacity > SIZE_MAX / sizeof(*events)) {
         return simple(BSR_INVALID_ARGUMENT);
     }
     if (runtime->variables != NULL) {
@@ -289,13 +293,24 @@ BSRResult bsr_step(BasicSessionRuntime *runtime,
             return from_executor(store_status);
         }
     }
-    if (step_overlap(runtime, output, output_capacity, written)) {
+    if (step_overlap(runtime, output, output_capacity, written) ||
+        step_overlap(runtime, (const uint8_t *)events,
+                     event_capacity * sizeof(*events), event_written) ||
+        overlaps(events, event_capacity * sizeof(*events),
+                 output, output_capacity) ||
+        overlaps(events, event_capacity * sizeof(*events),
+                 written, sizeof(*written)) ||
+        overlaps(event_written, sizeof(*event_written),
+                 output, output_capacity) ||
+        overlaps(event_written, sizeof(*event_written),
+                 written, sizeof(*written))) {
         return simple(BSR_OVERLAP);
     }
     if (runtime->state != BSR_RUNNING) {
         return simple(BSR_NOT_RUNNING);
     }
-    status = be_step(&runtime->executor, output, output_capacity, written);
+    status = be_step_events(&runtime->executor, output, output_capacity,
+                            written, events, event_capacity, event_written);
     if (status == BE_END) {
         BSRResult ended = simple(BSR_END);
         runtime->state = BSR_IDLE;
@@ -309,6 +324,14 @@ BSRResult bsr_step(BasicSessionRuntime *runtime,
         return from_executor(status);
     }
     return simple(BSR_OK);
+}
+
+BSRResult bsr_step(BasicSessionRuntime *runtime,
+                   uint8_t *output, size_t output_capacity, size_t *written)
+{
+    size_t ignored_events = 0u;
+    return bsr_step_events(runtime, output, output_capacity, written,
+                           NULL, 0u, &ignored_events);
 }
 
 BSRResult bsr_stop(BasicSessionRuntime *runtime)

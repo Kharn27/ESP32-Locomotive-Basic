@@ -31,8 +31,22 @@ typedef enum {
     BE_NEXT_WITHOUT_FOR,
     BE_NEXT_VARIABLE_MISMATCH,
     BE_FOR_STACK_FULL,
-    BE_FOR_WITHOUT_NEXT
+    BE_FOR_WITHOUT_NEXT,
+    BE_INVALID_PEN, /* host policy for CPC 16/-1, never CPC ERR=5 */
+    BE_EVENT_RECEIVER_REQUIRED,
+    BE_NO_EVENT_SPACE
 } BEStatus;
+
+/* Typed, caller-owned video event, never encoded in PRINT.
+ * print_offset counts PRINT bytes preceding the event within this step;
+ * the caller can replay ordered PRINT slices and events.
+ * pen is a logical CPC argument, NOT a MODE renderer palette index. */
+typedef enum { BE_VIDEO_SET_TEXT_PEN = 1 } BEVideoEventType;
+typedef struct {
+    BEVideoEventType type;
+    uint8_t pen;
+    size_t print_offset;
+} BEVideoEvent;
 
 /* J1.11-B: fixed per-executor call stack, no heap and no C recursion.
  * Eight nested GOSUB frames are supported; this is NOT a CPC ROM limit.
@@ -122,5 +136,17 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
  */
 BEStatus be_step(BasicExecutor *executor, uint8_t *output,
                  size_t output_capacity, size_t *written);
+
+/* Exactly one stored BASIC line per call. Explicit ordered video side channel,
+ * fixed caller-owned capacity; no allocation or hardware dependency.
+ * events=NULL is allowed only for capacity=0; a reached PEN then returns
+ * BE_EVENT_RECEIVER_REQUIRED without consuming anything.
+ * On BE_OK *written and *event_written report counts (including zeros).
+ * On all errors and BE_END neither count, buffer, cursor nor store changes.
+ * All regions, including entire event capacity, must be disjoint. */
+BEStatus be_step_events(BasicExecutor *executor, uint8_t *output,
+                        size_t output_capacity, size_t *written,
+                        BEVideoEvent *events, size_t event_capacity,
+                        size_t *event_written);
 
 #endif

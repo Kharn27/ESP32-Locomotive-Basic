@@ -81,4 +81,12 @@ BSRResult bsr_step(BasicSessionRuntime *runtime,
 /* Idempotent; drops RUNNING without touching stored BASIC lines. */
 BSRResult bsr_stop(BasicSessionRuntime *runtime);
 
+/* Typed portable event step. BEVideoEvent.print_offset preserves relative
+ * order with PRINT within a single step. Legacy bsr_step will not silently
+ * consume PEN without a receiver. No event or count mutations on failure. */
+BSRResult bsr_step_events(BasicSessionRuntime *runtime,
+                          uint8_t *output, size_t output_capacity,
+                          size_t *written, BEVideoEvent *events,
+                          size_t event_capacity, size_t *event_written);
+
 #endif

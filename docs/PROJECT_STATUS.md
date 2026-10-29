@@ -693,3 +693,7 @@ Mandat [#157](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/157), bas
 ### J1.16-D-A — caractérisation du magasin CPC REAL5 signé (29 octobre 2026)
 
 **Décision Pilotage nouvelle, postérieure à J1.16-C :** PR #165 J1.16-C acceptée et fusionnée, base `main@694e0b8ef4a3c8bdfa4f6ee922bb24c8b137c270`. L'[issue #166](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/166) autorise exclusivement la capture indépendante du **store CPC** pour R_HALF/R_NEG_HALF, après L10 et avant PRINT L20, deux acquisitions par cas, provenance et falsifications. Aucun REAL5 négatif en C99, aucun changement firmware/SDK/HW. [Rapport](J1.16-D-A-real5-negative-store-oracle.md). `ON_DEVICE_UNVERIFIED`. Classification et acceptation réservées au Pilotage ; D-B/J1.17 non autorisés.
+
+### J1.16-D-B — premier témoin REAL5 négatif natif (mandat 29 octobre 2026)
+
+**Décision Pilotage postérieure à J1.16-D-A** : la PR #167 D-A/C1 a été acceptée et fusionnée à `main@517b7eaa3e443c537a2909a06ee6b129c5e1465b`. L'[issue #169](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/169) autorise exclusivement `A=-0.5 / PRINT A / END` en C99, payload final `00 00 00 80 80` issu de la capture D-A, sans étendre les nombres négatifs. [Rapport D-B](J1.16-D-B-native-real5-negative-half.md). PR en proposition à Pilotage, preuves CI sur HEAD à vérifier, `ON_DEVICE_UNVERIFIED`, aucun J1.17 autorisé.

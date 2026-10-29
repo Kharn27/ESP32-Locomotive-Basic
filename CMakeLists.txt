@@ -806,6 +806,18 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_real5_scalar")
 endif()
 
+# J1.16-D-B: independent native REAL5 negative witness and two sealed CPC archives.
+if(BUILD_TESTING)
+    add_executable(test_j1_16_d_b_real5_negative
+                   tests/test_j1_16_d_b_real5_negative.c)
+    target_link_libraries(test_j1_16_d_b_real5_negative PRIVATE
+                          basic_session_runtime basic_variable_store)
+    add_test(NAME j1_16_d_b_native_signed_real5_cpc_partial
+        COMMAND test_j1_16_d_b_real5_negative
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_real5_scalar"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_d_a_negative_store")
+endif()
+
 # J1.16-D-A: read-only CPC6128 STOP-boundary REAL5 variable-store proof.
 if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_d_a_negative_store/manifest.json")
     add_test(NAME j1_16_d_a_signed_real5_store_permanent

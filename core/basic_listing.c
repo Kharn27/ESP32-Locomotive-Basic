@@ -234,21 +234,25 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             return status;
         }
         token = body[pos++];
-        /* J1.16-B/C: the two complete CPC-attested REAL5 A records
-         * only; neither cache bits nor other REAL5 payloads are decoded. */
+        /* Three CPC-attested complete scalar records only. Cache bits
+         * and REAL5 payloads must match; no sign arithmetic or decoding. */
         if (token == 0x0du) {
-            static const uint8_t real_line[2][11] = {
+            static const uint8_t real_line[3][12] = {
                 {0x0du, 0u, 0u, 0xc1u, 0xefu, 0x1fu,
-                 0u, 0u, 0u, 0u, 0x80u},
+                 0u, 0u, 0u, 0u, 0x80u, 0u},
                 {0x0du, 0u, 0u, 0xc1u, 0xefu, 0x1fu,
-                 0u, 0u, 0u, 0x20u, 0x81u}
+                 0u, 0u, 0u, 0x20u, 0x81u, 0u},
+                {0x0du, 0u, 0u, 0xc1u, 0xefu, 0xf5u,
+                 0x1fu, 0u, 0u, 0u, 0u, 0x80u}
             };
-            if (pos != 1u || length != sizeof(real_line[0]))
-                return BL_BAD_SEQUENCE;
-            if (memcmp(body, real_line[0], sizeof(real_line[0])) == 0)
-                return append_word(out, "A=0.5");
-            if (memcmp(body, real_line[1], sizeof(real_line[1])) == 0)
-                return append_word(out, "A=1.25");
+            static const size_t lengths[3] = {11u, 11u, 12u};
+            static const char *const texts[3] = {"A=0.5", "A=1.25", "A=-0.5"};
+            size_t i;
+            if (pos != 1u) return BL_BAD_SEQUENCE;
+            for (i = 0u; i < 3u; ++i)
+                if (length == lengths[i] &&
+                    memcmp(body, real_line[i], lengths[i]) == 0)
+                    return append_word(out, texts[i]);
             return BL_BAD_SEQUENCE;
         }
         /* E1BC emits 01 C0 for ', including at the beginning of a

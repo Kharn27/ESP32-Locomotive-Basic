@@ -2,6 +2,14 @@
 
 Mandat Pilotage : [#156 / commentaire 6501773436](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/156#issuecomment-6501773436). Base imposée : `main@319e8872c88842840e0992f305ec047fe516cb38`. Branche : `feat/hw4-scroll-opt-a0-baseline`. **Aucune optimisation implémentée** ; pas de changement de VRAM, BASIC, E2, scrolling, DMA, orientation ou curseur.
 
+## C2 — provenance stricte et intégration J1.16-D-B (29 octobre 2026)
+
+- **Parents Git** : A0 C1 `29a7b647493684aeeaf7464d0f1a3172e4c1892f` (via le commit RED `ed7c18c8bc3008f806901529725f7587c5cebf24`) et `main@2191363f0d8d78b7c7f34ed734b85b981c06baaf` ; merge additif, sans rebase/force-push. Le test REAL5 `j1_16_d_b_native_signed_real5_cpc_partial` est conservé, en plus de `j1_16_d_a_signed_real5_store_permanent` et des deux tests A0.
+- **Audit UART** : `version=` dans l'unique ligne `HW4-C2 START` doit être exactement 7 à 40 caractères hexadécimaux minuscules, préfixe du `--sha` complet. Toute version arbitraire, non-hex, divergente, suffixée `-dirty` ou trace à plusieurs boots est **REFUSÉE** ; un préfixe court n'est pas une attestation cryptographique du binaire.
+- **Preuve RED** : commit `ed7c18c8bc3008f806901529725f7587c5cebf24` ; [CI C99 RED](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40917448392) : 9 assertions de falsification échouent sur l'ancienne condition de provenance. **C2 GREEN : 100 tests CTest attendus par cellule**, 98 du nouveau main + 2 A0 ; confirmer le total dans les nouveaux logs du HEAD final.
+- **Budget incrémental** : le job mémoire C2 compare exactement `main@2191363f0d8d78b7c7f34ed734b85b981c06baaf` au HEAD C2 (et non la référence A0 historique `319e8872`). Seuil IRAM = 0, DRAM additionnelle ≤256 octets sur CONSOLE/HW3/BASIC_PROBE. La table historique section 4 conserve la référence A0 d'origine, **pas** le delta C2.
+- **Barrière PO** : après CI complète seulement, flasher le **SHA C2 exact** communiqué par le Développeur et contrôlé avec `git rev-parse HEAD` (ne pas réutiliser les SHA C1/RED), fournir UART brut, audit, scroll UP/DOWN, !CLS, LIST/RUN, DMA/mémoire et photos. `ON_DEVICE_UNVERIFIED` avant preuves réelles.
+
 ## C1 — intégration de main (29 octobre 2026)
 
 - Parent A0 : `32a61282c51ca9a4c622034632d26f2d642b60a9` ; parent synchronisé : `main@517b7eaa3e443c537a2909a06ee6b129c5e1465b`. La fusion conserve **sans modification** le corpus et l'oracle J1.16-D-A ; la résolution textuelle est l'addition des deux blocs CMake (A0 + `j1_16_d_a_signed_real5_store_permanent`).

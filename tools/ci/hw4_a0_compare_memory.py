@@ -16,7 +16,9 @@ def sections(path):
         raise ValueError(f"{path}: missing IRAM section table")
     return found
 
-def report(base, head, base_bin, head_bin, profile):
+def report(base, head, base_bin, head_bin, profile, base_sha):
+    if re.fullmatch(r"[0-9a-f]{40}", base_sha) is None:
+        raise ValueError("full comparison base SHA required")
     a, b = sections(base), sections(head)
     def category(data, prefixes):
         return sum(v for k, v in data.items() if any(k.startswith(p) for p in prefixes))
@@ -28,7 +30,7 @@ def report(base, head, base_bin, head_bin, profile):
         "BSS (.dram0.bss)": (".dram0.bss",),
     }
     result = []
-    result.append(f"### {profile}: base 319e8872 vs instrumented HEAD\n")
+    result.append(f"### {profile}: base {base_sha} vs instrumented HEAD\n")
     result.append("| Metric | base bytes | HEAD bytes | delta bytes |")
     result.append("|---|---:|---:|---:|")
     for title, prefixes in groups.items():
@@ -49,9 +51,10 @@ def main():
     ap.add_argument("--base-bin", type=Path, required=True)
     ap.add_argument("--head-bin", type=Path, required=True)
     ap.add_argument("--profile", required=True)
+    ap.add_argument("--base-sha", required=True)
     args = ap.parse_args()
     print(report(args.base_size, args.head_size, args.base_bin,
-                 args.head_bin, args.profile))
+                 args.head_bin, args.profile, args.base_sha))
 
 if __name__ == "__main__":
     main()

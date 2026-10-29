@@ -94,13 +94,16 @@ def analyze(log, *, sha, idf, profile, spi_hz, cpu_mhz, orientation=9,
     require(orientation == 9, "orientation case 9 required")
     require("HW4-C2 START " in log and "HW4-C2 ORIENTATION_PASS case=9" in log,
             "boot/orientation evidence missing")
-    start = next(line for line in log.splitlines() if "HW4-C2 START " in line)
-    boot = fields(start.split(" ON_DEVICE_UNVERIFIED", 1)[0],
+    starts = [line for line in log.splitlines() if "HW4-C2 START " in line]
+    require(len(starts) == 1, "exactly one firmware boot/version required")
+    boot = fields(starts[0].split(" ON_DEVICE_UNVERIFIED", 1)[0],
                   "HW4-C2 START ")
     require(boot.get("idf") == idf, "ESP-IDF manifest differs from device")
     version = boot.get("version", "")
-    require(version and (not re.fullmatch(r"[0-9a-f]{7,40}", version)
-                         or sha.startswith(version)), "app version/SHA conflict")
+    # Only clean 7..40 lowercase hex app versions can be verified against
+    # the full expected commit SHA. Reject dirty, tag and arbitrary labels.
+    require(re.fullmatch(r"[0-9a-f]{7,40}", version) is not None and
+            sha.startswith(version), "unverifiable firmware app version/SHA")
     require("LCD_FAIL_STOP" not in log and "HW4-C2 FAIL " not in log and
             "MEMORY_FAIL" not in log, "hardware failure in log")
     memory = [fields(line, " DEVICE_MEMORY ") for line in log.splitlines()

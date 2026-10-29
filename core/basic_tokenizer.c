@@ -335,25 +335,26 @@ static BTStatus scalar_string_assignment(const uint8_t *source, size_t length,
     return BT_OK;
 }
 
-/* J1.16-B/C: bounded, verbatim CPC R_HALF and R_QUARTER records.
- * Both source lexemes and REAL5 bytes are observations, not a converter. */
+/* J1.16-B/C/D-B: three literal CPC records, not a REAL5 converter.
+ * F5 is the lexical minus before the positive 0.5 literal. */
 static BTStatus scalar_real_statement(BTEmitter *out, int assignment,
-                                      unsigned int quarter)
+                                      unsigned int witness)
 {
     static const uint8_t reference[] = {0x0du, 0u, 0u, 0xc1u};
-    static const uint8_t literal[2][7] = {
-        {0xefu, 0x1fu, 0u, 0u, 0u, 0u, 0x80u}, /* 0.5 */
-        {0xefu, 0x1fu, 0u, 0u, 0u, 0x20u, 0x81u} /* 1.25 */
+    static const uint8_t literal[3][8] = {
+        {0xefu, 0x1fu, 0u, 0u, 0u, 0u, 0x80u, 0u}, /* A=0.5 */
+        {0xefu, 0x1fu, 0u, 0u, 0u, 0x20u, 0x81u, 0u}, /* A=1.25 */
+        {0xefu, 0xf5u, 0x1fu, 0u, 0u, 0u, 0u, 0x80u} /* A=-0.5 */
     };
-    size_t i;
+    size_t i, literal_length = witness == 2u ? 8u : 7u;
     BTStatus status;
     for (i = 0u; i < sizeof(reference); ++i) {
         status = emit(out, reference[i]);
         if (status != BT_OK) return status;
     }
     if (!assignment) return BT_OK; /* PRINT A: reference only. */
-    for (i = 0u; i < sizeof(literal[0]); ++i) {
-        status = emit(out, literal[quarter != 0u][i]);
+    for (i = 0u; i < literal_length; ++i) {
+        status = emit(out, literal[witness][i]);
         if (status != BT_OK) return status;
     }
     return BT_OK;
@@ -473,8 +474,11 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
         } else if (statement == ST_ASSIGN) {
             if (keyword == NULL && index == 0u &&
                 ((length == 5u && memcmp(source, "A=0.5", 5u) == 0) ||
-                 (length == 6u && memcmp(source, "A=1.25", 6u) == 0))) {
-                status = scalar_real_statement(out, 1, length == 6u);
+                 (length == 6u && memcmp(source, "A=1.25", 6u) == 0) ||
+                 (length == 6u && memcmp(source, "A=-0.5", 6u) == 0))) {
+                unsigned int witness = length == 5u ? 0u :
+                    (source[2] == (uint8_t)'-' ? 2u : 1u);
+                status = scalar_real_statement(out, 1, witness);
                 index = length;
             } else if (string_lhs(source, length, index)) {
                 status = scalar_string_assignment(source, length, &index, out);

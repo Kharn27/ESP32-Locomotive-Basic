@@ -68,7 +68,8 @@ static CpcUartEditor s_edit;
 static CpcScreenNavigation s_nav;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
 static size_t s_scroll_reported;
-/* A0: CONSOLE-only class counters; no buffer, DMA or video changes. */
+/* A0: CONSOLE-only class counters; a scroll-associated dirty flush may
+ * also contain cursor, text or !CLS writes. Never label it scroll-exclusive. */
 static Hw4ScrollMetrics s_scroll_metrics;
 /* B2-C1 instrumentation: bounded histogram, never a second framebuffer. */
 static struct {

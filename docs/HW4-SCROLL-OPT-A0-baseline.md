@@ -86,9 +86,11 @@ Le parseur exige un vrai SHA 40 hex, la version de boot compatible, la fréquenc
 
 | Profil | Base Flash code / BIN | PR Flash code / BIN | Base IRAM | PR IRAM | Base DRAM/BSS | PR DRAM/BSS | Delta |
 |---|---|---|---|---|---|---|---|
-| CONSOLE | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | NON VÉRIFIÉ |
-| HW3 | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | NON VÉRIFIÉ |
-| BASIC_PROBE | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | À ACQUÉRIR | NON VÉRIFIÉ |
+| CONSOLE | 118478 / 246672 | 119490 / 248096 | 67332 | 67332 | 53480 | 53696 | Flash code **+1012**, BIN **+1424**, IRAM **0**, DRAM **+216** |
+| HW3 | 82878 / 208864 | 82878 / 208864 | 67280 | 67280 | 31520 | 31520 | **0** partout |
+| BASIC_PROBE | 78654 / 170384 | 78654 / 170384 | 51808 | 51808 | 31028 | 31028 | **0** partout |
+
+**Mesure Xtensa réellement exécutée :** [CI mémoire dédiée, run #40911153253](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40911153253), ESP-IDF 5.5.6, comparaison de `main@319e8872` et du HEAD instrumenté `89947bbd27d8586bcf3e8616d37e11b061e8c77d` (mêmes sources firmware que cette version documentaire). Les octets ci-dessus sont les **sections ELF `.flash.text`, `.iram0.*`, `.dram0.*` et la taille réelle du BIN**, pas une estimation de code. BSS séparée : CONSOLE **42408 → 42624 = +216 octets** ; HW3 **20432 → 20432** ; BASIC_PROBE **21248 → 21248**. Aucun gain/perte d'IRAM. Les trois profils de ce run ont été marqués `success`. Toute modification ultérieure du HEAD doit être revérifiée par un nouveau run exact ; aucun ancien SHA ne vaut preuve pour un firmware différent.
 
 Recueillir les artefacts `arch-hw4-u1-b-{console,hw3,basic}` de la CI Xtensa pour **le base exact et le PR HEAD exact** ; comparer `size.txt`, `size-components.txt`, BIN, ABI (`xtensa-abi.txt` BASIC_PROBE), symboles et `memory-parity.txt`. Ne pas remplacer ces résultats par la taille du type C. Aucun `SKIPPED` ne compte comme PASS.
 

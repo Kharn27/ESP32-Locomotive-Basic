@@ -48,6 +48,7 @@ enum {
     CPC_ROWS = 25,
     RUN_STEP_BUDGET = 256,
     ECHO_IDLE_MS = 20,
+    TOUCH_POLL_MS = 20,
     ECHO_MAX_BYTES = UART_LINE_CAPACITY
 };
 typedef struct {
@@ -583,7 +584,7 @@ void app_main(void)
         if(!touch_poll()) return;
         uint8_t ch=0U;
         int got=uart_read_bytes(UART_NUM_0,&ch,1U,
-                                pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : 100U));
+                                pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : TOUCH_POLL_MS));
         if(got<0) { (void)fail("UART_READ",got); return; }
         if(got==0) {
             /* Echo within one idle interval. Fast paste coalesces into

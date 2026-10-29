@@ -85,9 +85,17 @@ def filters(yaml_text):
     return paths if enabled else None
 
 
+def globmatch(path, pattern):
+    # GitHub's '**/' matches zero or more complete directories. Python
+    # fnmatchcase alone incorrectly misses the repository-root CMakeLists.
+    return (fnmatch.fnmatchcase(path, pattern) or
+            (pattern.startswith("**/") and
+             fnmatch.fnmatchcase(path, pattern[3:])))
+
+
 def triggered(paths, src):
     fs = filters(src)
-    return fs is None or any(fnmatch.fnmatchcase(p, f) for p in paths for f in fs)
+    return fs is None or any(globmatch(p, f) for p in paths for f in fs)
 
 
 def triggered_names(paths, sources):

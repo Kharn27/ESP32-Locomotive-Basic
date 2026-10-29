@@ -997,7 +997,7 @@ static BEStatus execute_line(const BasicProgram *program,
                 (memcmp(body, real_line[0], sizeof(real_line[0])) != 0 &&
                  memcmp(body, real_line[1], sizeof(real_line[1])) != 0))
                 return BE_BAD_SEQUENCE;
-            status = half_real_key(body, length, pos - 1u, &key, &consumed);
+            status = scalar_real_key(body, length, pos - 1u, &key, &consumed);
             if (status != BE_OK || consumed != 4u) return BE_BAD_SEQUENCE;
             value.type = (uint8_t)BVT_REAL;
             for (i = 0u; i < sizeof(value.data.real5); ++i)

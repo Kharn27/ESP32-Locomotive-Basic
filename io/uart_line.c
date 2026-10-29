@@ -112,10 +112,12 @@ static UartLineEvent feed_impl(UartLine *line, uint8_t ch, bool screen_enabled)
             if (simple && n == 0U && !line->poisoned &&
                 (ch == (uint8_t)'D' || ch == (uint8_t)'C')) {
                 const bool left = ch == (uint8_t)'D';
+                /* C2: E3 occupied never exits to E1 at left/right boundary. */
                 if (screen_enabled &&
                     (line->screen_navigation ||
-                     (left ? line->cursor_pos == 0U :
-                             line->cursor_pos == line->length))) {
+                     (line->length == 0U &&
+                      (left ? line->cursor_pos == 0U :
+                              line->cursor_pos == line->length)))) {
                     line->screen_navigation = true;
                     return left ? UART_LINE_NAV_LEFT : UART_LINE_NAV_RIGHT;
                 }

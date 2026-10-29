@@ -203,8 +203,8 @@ static void empty_and_e1(void)
     assert(seq("\x1b[B")==UART_LINE_NAV_DOWN);
     assert(seq("\x1b[H")==UART_LINE_RETURN_HOME);
     assert(seq("10")==UART_LINE_APPEND);
-    /* Legitimate host trajectory into E1 even with E3 occupied: exceeding
-     * the right boundary. This combination is CPC_UNVERIFIED, unchanged. */
+    /* C2: host-only E1+occupied E3 must be explicitly synthesized. */
+    line.screen_navigation=true;
     assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
     assert(line.screen_navigation && line.length==2U);
     assert(seq("\x1b[A")==UART_LINE_NAV_UP);
@@ -359,8 +359,9 @@ static void c1_first_key_filters(void)
     assert(seq("\x1b[A")==UART_LINE_NAV_UP);
     assert(seq("\x1b[H")==UART_LINE_RETURN_HOME);
     assert(!line.ready && !line.screen_navigation);
-    /* E1 with nonempty E3 retains fail-closed policy */
+    /* C2: E1+occupied E3 preserved by explicit host state, not by escape. */
     assert(seq("10")==UART_LINE_APPEND);
+    line.screen_navigation=true;
     assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
     assert(line.screen_navigation && line.length==2U);
     assert(key('Z')==UART_LINE_IGNORED && line.length==2U);
@@ -422,8 +423,89 @@ static void c1_edges(void)
     check_guards();
 }
 
+
+/* C2: real PO case 10+RIGHT at source end must NOT escape editor.
+ * CSI is fully consumed; snapshots prove no E1/E2/VRAM or source mutation. */
+static void c2_horizontal_bounds(void)
+{
+    reset(20U,1U);
+    assert(seq("10")==UART_LINE_APPEND);
+    capture();
+    for(unsigned i=0U;i<8U;++i) {
+        assert(seq("\x1b[C")==UART_LINE_NONE);
+        unchanged_visual_source();
+    }
+    assert(!line.screen_navigation && line.cursor_pos==2U);
+    assert(video.cursor_row==20U && video.cursor_column==3U);
+    assert(key('\r')==UART_LINE_READY); /* ONE Enter, no RETURN_EDIT */
+    assert(line.length==2U && memcmp(line.data,"10",3U)==0);
+    uart_line_ack(&line);
+    assert(key('\n')==UART_LINE_NONE); /* CRLF once */
+
+    reset(11U,9U);
+    assert(seq("10 PRINT 2")==UART_LINE_APPEND);
+    for(unsigned i=0U;i<10U;++i)
+        assert(seq("\x1b[D")==UART_LINE_LEFT);
+    capture();
+    for(unsigned i=0U;i<8U;++i) {
+        assert(seq("\x1b[D")==UART_LINE_NONE);
+        unchanged_visual_source();
+    }
+    assert(seq("\x1b[C")==UART_LINE_RIGHT);
+    assert(seq("\x1b[D")==UART_LINE_LEFT);
+    assert(seq("\x1b[3~")==UART_LINE_DELETE_FORWARD);
+    assert(memcmp(line.data,"0 PRINT 2",10U)==0);
+    assert(key('1')==UART_LINE_APPEND);
+    assert(memcmp(line.data,"10 PRINT 2",11U)==0 && !line.screen_navigation);
+    assert(key('\r')==UART_LINE_READY); /* no E1, no duplication */
+    uart_line_ack(&line);
+
+    reset(24U,39U);
+    assert(seq("10")==UART_LINE_APPEND); /* deferred wrap + scroll */
+    capture();
+    for(unsigned i=0U;i<4U;++i) {
+        assert(seq("\x1b[C")==UART_LINE_NONE);
+        unchanged_visual_source();
+    }
+    assert(seq("\x1b[D")==UART_LINE_LEFT);
+    assert(seq("\x1b[D")==UART_LINE_LEFT);
+    capture();
+    assert(seq("\x1b[D")==UART_LINE_NONE);
+    unchanged_visual_source();
+
+    reset(9U,0U);
+    for(unsigned i=0U;i<120U;++i)
+        assert(key('A')==UART_LINE_APPEND);
+    assert(line.length==120U && line.data[120U]==0U);
+    capture();
+    assert(seq("\x1b[C")==UART_LINE_NONE);
+    unchanged_visual_source();
+    for(unsigned i=0U;i<120U;++i)
+        assert(seq("\x1b[D")==UART_LINE_LEFT);
+    capture();
+    assert(seq("\x1b[D")==UART_LINE_NONE);
+    unchanged_visual_source();
+    assert(key('X')==UART_LINE_OVERFLOW);
+    assert(key('\r')==UART_LINE_REJECTED);
+    uart_line_ack(&line);
+
+    reset(5U,5U);
+    assert(seq("10")==UART_LINE_APPEND);
+    assert(key(0x08U)==UART_LINE_DELETE);
+    assert(key(0x08U)==UART_LINE_DELETE);
+    assert(line.length==0U);
+    assert(seq("\x1b[D")==UART_LINE_NAV_LEFT);
+    assert(video.cursor_column==4U && line.screen_navigation);
+    assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
+    assert(key('1')==UART_LINE_E1_START_EDIT);
+    assert(seq("\x1b[C")==UART_LINE_NONE);
+    assert(key('\r')==UART_LINE_READY);
+    check_guards();
+}
+
 int main(void)
 {
+    c2_horizontal_bounds();
     c1_po_route();
     c1_first_key_filters();
     c1_edges();
@@ -432,6 +514,6 @@ int main(void)
     hundred_and_twenty();
     empty_and_e1();
     c1_and_native_basic();
-    puts("HW4-EDIT-B1-B-C1 E1 first printable / U04 / E2 isolation / LIST RUN NEW PASS");
+    puts("HW4-EDIT-B1-B-C2 horizontal E3 bounds / C1 / U04 / E2 / LIST RUN NEW PASS");
     return 0;
 }

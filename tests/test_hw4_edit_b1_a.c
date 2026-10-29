@@ -359,6 +359,7 @@ static void c1_full_capacity_and_deferred_wrap(void)
     /* Place E1 on visible physical row0, then navigate screen only.
      * The buffer E3 is unchanged, irrespective of existing old E2 text. */
     assert(cpc_video_cursor(&v,21U,0U,true));
+    host_e1_with_pending_e3(); /* C2: intentional synthetic E1 focus */
     assert(seq("\x1b[C")==UART_LINE_NAV_RIGHT);
     assert(seq("\x1b[D")==UART_LINE_NAV_LEFT);
     assert(v.cursor_row==0U && v.cursor_column==21U);

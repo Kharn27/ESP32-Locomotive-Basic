@@ -212,20 +212,34 @@ static int mutated_records(void) {
         {4u,0xf4u},{5u,0x1fu},{6u,0x1au},{7u,0x01u},
         {8u,0x01u},{9u,0x01u},{10u,0x80u},{11u,0x81u}};
     size_t i;
-    for(i=0u;i<sizeof(flips)/sizeof(flips[0])+4u;++i){
+    for(i=0u;i<sizeof(flips)/sizeof(flips[0])+3u;++i){
         F f;uint8_t body[sizeof(exact)+1u];size_t n=sizeof(exact);
         CHECK(init(&f)==0);memcpy(body,exact,sizeof(exact));
         if(i<sizeof(flips)/sizeof(flips[0]))body[flips[i].p]=flips[i].v;
         else if(i==sizeof(flips)/sizeof(flips[0]))--n;
         else if(i==sizeof(flips)/sizeof(flips[0])+1u)body[n++]=0x01u;
-        else if(i==sizeof(flips)/sizeof(flips[0])+2u) {
+        else {
             body[5]=0x1fu;body[6]=0xf5u; /* moved sign */
-        } else {
-            memmove(body+5,body+6,6u);--n; /* absent sign */
         }
         CHECK(bp_put(&f.program,10u,body,n)==BP_OK);
         CHECK(send(&f,"RUN").status==BSR_OK);
         CHECK(fail(&f,BE_BAD_SEQUENCE,sizeof(f.output))==0);
+    }
+    /* Removing the sign produces the ALREADY SUPPORTED positive record.
+     * It must not be rejected, but must store +0.5, never -0.5. */
+    {
+        static const uint8_t half_body[]={
+            0x0d,0,0,0xc1,0xef,0x1f,0,0,0,0,0x80
+        };
+        static const uint8_t half_store[]={0,0,0,0,0x80};
+        F f;BasicVariableKey key=akey((uint8_t)BVT_REAL);
+        BasicVariableValue v;
+        CHECK(init(&f)==0);
+        CHECK(bp_put(&f.program,10u,half_body,sizeof(half_body))==BP_OK);
+        CHECK(send(&f,"RUN").status==BSR_OK);
+        CHECK(step(&f,sizeof(f.output)).status==BSR_OK);
+        CHECK(bvs_get(&f.store,&key,&v)==BVS_OK);
+        CHECK(memcmp(v.data.real5,half_store,sizeof(half_store))==0);
     }
     return 0;
 }

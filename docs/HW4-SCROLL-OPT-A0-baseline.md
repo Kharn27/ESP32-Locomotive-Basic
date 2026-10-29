@@ -67,7 +67,7 @@ Le sentier de navigation bas est **une politique HOST**, pas une preuve de confo
 python3 -m unittest tests/test_hw4_scroll_metrics_parser.py
 python3 tools/hw4_scroll_a0_uart.py hw4-scroll-a0.uart.log \
   --sha <SHA_COMPLET_FLASHÉ> --idf v5.5.6 --profile CONSOLE \
-  --spi-hz 20000000 --cpu-mhz 240 --orientation 9 \
+  --spi-hz 20000000 --cpu-mhz <CPU_MHZ_DANS_SAMPLE> --orientation 9 \
   --require-bidirectional --out hw4-scroll-a0-audited.json
 ```
 

@@ -475,6 +475,9 @@ if(BUILD_TESTING)
                           cpc_diag_policy cpc_ready_policy cpc_uart_console
                           cpc_boot uart_line basic_session_runtime)
     add_test(NAME hw4_diag_a_native_cpc_diagnostic COMMAND test_hw4_diag_a)
+    add_test(NAME hw4_diag_a_independent_cpc_permanent
+             COMMAND ${Python3_EXECUTABLE}
+             "${CMAKE_CURRENT_SOURCE_DIR}/tools/hw4_diag_a_evidence.py")
     add_executable(test_hw4_ready_a tests/test_hw4_ready_a.c)
     target_link_libraries(test_hw4_ready_a PRIVATE
                           cpc_ready_policy cpc_uart_console cpc_boot uart_line

@@ -151,6 +151,8 @@ static int run(F *f) {
 }
 static int source_negative(void) {
     static const char *bad[]={"A=0.1","A=1.20","A=-1.25","A=0","A=1.250",
+        "A=-0.50","A=-0.5 ","A=-0.5X","A= -0.5","A =-0.5",
+        "LET A=-0.5","B=-0.5","a=-0.5","A!=-0.5","A=--0.5",
         "A!=1.5","A!=1.25","A=1.25:PRINT A","A=1.25 : END",
         "LET A=1.25","B=1.25","a=1.25","A=1.25X","A=1.25 ",
         "PRINT B","PRINT A:PRINT A","PRINTA","? A",
@@ -164,6 +166,12 @@ static int source_negative(void) {
     }
     CHECK(bt_tokenize((const uint8_t *)"PRINT A!",8u,
                       dest,sizeof(dest),&written)==BT_OK);
+    /* Signed CPC statement is 12 bytes, so 11 bytes is atomic rejection. */
+    memset(dest,0x5a,sizeof(dest));
+    written=2026u;
+    CHECK(bt_tokenize((const uint8_t *)"A=-0.5",6u,
+                      dest,11u,&written)==BT_NO_SPACE);
+    CHECK(written==2026u && memcmp(dest,saved,sizeof(dest))==0);
     return 0;
 }
 static int submit_negative(void) {
@@ -278,7 +286,7 @@ static int print_negative(void) {
     CHECK(send(&f,"RUN").status==BSR_OK);
     CHECK(fail(&f,BE_UNSUPPORTED,sizeof(f.output))==0); /* No store. */
     CHECK(init(&f)==0);
-    CHECK(send(&f,"10 A=1.25").status==BSR_OK);
+    CHECK(send(&f,"10 A=-0.5").status==BSR_OK);
     CHECK(send(&f,"RUN").status==BSR_OK);
     {
         size_t j;
@@ -311,6 +319,7 @@ static int stored_value_separation(void) {
         v.type=(uint8_t)BVT_REAL;
         memcpy(v.data.real5,values[i],5u);
         CHECK(bvs_assign(&f.store,&key,&v)==BVS_OK);
+        if (i==2u) CHECK(fail(&f,BE_NO_SPACE,5u)==0);
         CHECK(step(&f,sizeof(f.output)).status==BSR_OK);
         CHECK(f.written==strlen(output[i]));
         CHECK(memcmp(f.output,output[i],f.written)==0);

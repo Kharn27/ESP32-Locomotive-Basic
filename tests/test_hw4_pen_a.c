@@ -1,6 +1,7 @@
 /* HW4-PEN-A: portable UART-like BASIC -> typed events -> MODE1 VRAM.
  * Does not simulate TFT hardware. Oracle A defines only 0..4 and 15. */
 #include "hw4_pen_bridge.h"
+#include "cpc_uart_console.h"
 #include "basic_session_runtime.h"
 #include <assert.h>
 #include <stdint.h>

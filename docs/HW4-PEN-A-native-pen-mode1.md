@@ -161,3 +161,30 @@ RUN
 ```
 
 Pour chaque `RUN` : exactement **un** `VIDEO_REJECT category=SET_INK_UNSUPPORTED`, **un** `DIAG_POLICY ... message=ERROR`, **aucun** `BSR_STEP_FAIL BSR=2`, **aucun** `HW4-C2 PRINT_BYTES` de la ligne refusée ni du pas suivant, **un seul** retour `Ready` avec éditeur/UART toujours utilisable ; programme conservé à travers `!CLS`. L'écho de saisie n'est pas une sortie PRINT. Fournir SHA flashé, logs UART avec compteurs par RUN, photos et mesures `DEVICE_MEMORY`, verdicts PO PASS/FAIL. **Aucun flash ni fusion par le Développeur.**
+
+
+## C1-RUN-STOP-C2 — réparation du chemin nominal PEN (revue Pilotage 30/10/2026)
+
+**Cause P1 sur `3d504de90c20b499e2a782688ab69508c274bee4` :** `display_print_events()` renvoyait `true` après replay PEN réussi, alors que sa signature `Hw4PenDisplayResult` exige `HW4_PEN_DISPLAY_OK=0`. Comme `true=1=HW4_PEN_DISPLAY_REJECT_DIAGNOSED`, `hw4_pen_run_after_display` interrompait `RUN` après la première ligne PEN. Le correctif C2 remplace **seulement** ce retour nominal par `HW4_PEN_DISPLAY_OK`; les issues `REJECT_DIAGNOSED` et `FATAL` sont conservées.
+
+**Preuve RED versionnée :** HEAD `1bc753939fd8a1d82b34b87c91ae08670305c9be`, [CI-C99 RED 41103557670](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41103557670). Le test C99 `test_c1_c2_successive_pen_lines_reach_end` lit **la sortie de succès dans le vrai fichier `hw4_c2_console.c`**, via `HW4_PEN_C2_CONSOLE_SOURCE` configuré pour ce CTest, puis passe cette valeur à `hw4_pen_run_after_display` en exécutant réellement `bsr_step_events` et `hw4_pen_replay`. RED Clang ON : `nominal=1 steps=1 PEN=1 PRINT_MARKER=0 END=0`, assertion échouée après compilation. Les cas négatifs INK précédents passent encore.
+
+**Couverture GREEN attendue :** trois lignes BASIC positives distinctes `PEN 2:PRINT "A"`, `PEN 1:PRINT "B"`, `PEN 3:PRINT "C"`, puis `PRINT "NEXT_STEP_REACHED"`, puis `END`. Le vrai runtime doit atteindre `BSR_END` après 6 appels, `PEN=3 / PRINT_MARKER=1 / END=1`, **avant et après `!CLS` réel**, programme préservé, Ready/prompt normaux, palette INK2=6/INK3=18. La même suite conserve les branches `OK→CONTINUE`, `REJECT_DIAGNOSED→DONE`, `FATAL→FATAL`, et les négatifs INK mixte/solo `VIDEO_REJECT=1, ERROR=1, BSR_NOT_RUNNING=0, PRINT_BYTES=0, Ready=1, attempts=1` avant/après `!CLS`. Test hôte, **non une preuve physique CYD**. Résultats du HEAD final : consignés dans la remise GitHub, ne pas présumer des CI.
+
+### Protocole PO ciblé C2 — exclusivement après nouvelle autorisation Pilotage
+
+L'ancien SHA `9f742420...` et le SHA P1 `3d504de...` **ne sont pas** des autorisations pour le nouveau HEAD. Après revue favorable et autorisation explicite du Pilotage :
+
+```basic
+NEW
+10 PEN 2:PRINT "A"
+20 PEN 1:PRINT "B"
+30 PEN 3:PRINT "C"
+40 PRINT "NEXT_STEP_REACHED"
+50 END
+RUN
+!CLS
+RUN
+```
+
+Sur **chaque RUN**, vérifier par UART et écran que toutes les lignes A/B/C et `NEXT_STEP_REACHED` sont bien exécutées, que `BSR_END` est atteint, que le prompt/Ready revient normalement et que les couleurs sont conservées après `!CLS` sans `NEW`. Ensuite **reprendre uniquement** les cas de refus INK mixtes et seuls `RUN→!CLS→RUN`, chacun avec un seul `VIDEO_REJECT`, un seul `ERROR`, aucun `BSR_NOT_RUNNING`, aucun PRINT partiel ni pas suivant, et un seul Ready. Fournir SHA réellement flashé, UART, photos TFT, métriques `DEVICE_MEMORY` et PASS/FAIL par scénario. **Le développeur ne flashe pas, n'approuve pas et ne fusionne pas.**

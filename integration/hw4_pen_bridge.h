@@ -42,4 +42,7 @@ Hw4PenStatus hw4_pen_preflight(const CpcText *sink,
 Hw4PenStatus hw4_pen_replay(CpcText *sink,
                             const uint8_t *print_bytes, size_t byte_count,
                             const BEVideoEvent *events, size_t event_count);
+/* CONSOLE-owned !CLS path: delegates to the real UART screen clear,
+ * then (in C1) must restore the explicit PEN ink context. */
+bool hw4_pen_console_clear(CpcText *text);
 #endif

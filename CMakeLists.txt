@@ -440,7 +440,7 @@ endif()
 # HW4-PEN-A: integration is downstream of CORE and VIDEO, never reverse.
 add_library(hw4_pen_bridge STATIC integration/hw4_pen_bridge.c)
 target_include_directories(hw4_pen_bridge PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/integration)
-target_link_libraries(hw4_pen_bridge PUBLIC basic_session_runtime cpc_text)
+target_link_libraries(hw4_pen_bridge PUBLIC basic_session_runtime cpc_text cpc_uart_console)
 if(BUILD_TESTING)
     add_executable(test_hw4_pen_a tests/test_hw4_pen_a.c)
     target_link_libraries(test_hw4_pen_a PRIVATE hw4_pen_bridge)

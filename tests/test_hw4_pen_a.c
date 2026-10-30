@@ -317,6 +317,80 @@ static void test_scrolling_preserves_text_counters(void)
     assert_colour(23U,1U); /* index 29 -> yellow */
 }
 
+
+/* C1 regression: actual CONSOLE !CLS wrapper invokes the real
+ * cpc_uart_console_clear(); no fake video reset or substituted sink.
+ * The same source must FAIL on C1 red and PASS after palette restoration. */
+static void run_c1_colour_cases(void)
+{
+    const uint8_t expected_pen[] = {2U,3U,15U,4U};
+    const uint8_t expected_pixel[] = {2U,3U,3U,0U};
+    const uint8_t expected_ink[] = {6U,18U,18U,1U};
+    size_t i;
+    assert(submit("RUN").status == BSR_OK);
+    for(i=0U;i<4U;++i) {
+        uint16_t rgb[CPC_VIDEO_TFT_WIDTH];
+        assert(step(OUT_CAP,EVENT_CAP).status == BSR_OK);
+        assert(f.event_written==1U && f.events[0].pen==expected_pen[i]);
+        assert(f.events[0].print_offset==0U);
+        assert(f.written==2U && f.output[1]=='\n');
+        assert(hw4_pen_replay(&f.text,f.output,f.written,
+                               f.events,f.event_written)==HW4_PEN_OK);
+        assert(pixel_at(0U,(unsigned)i*8U)==expected_pixel[i]);
+        assert(cpc_video_render_row(&f.video,
+                  CPC_VIDEO_VIEW_TOP+(unsigned)i*8U,rgb,CPC_VIDEO_TFT_WIDTH));
+        assert(rgb[0]==cpc_video_palette_rgb565(expected_ink[i]));
+    }
+    assert(f.text.bytes_received==8U && f.text.glyphs_drawn==4U);
+    assert(f.video.cursor_visible && f.text.bytes_clipped==0U);
+    {
+        const size_t before_bytes=f.text.bytes_received;
+        const uint8_t before_pen=f.video.pen;
+        uint8_t before_vram[CPC_VIDEO_BYTES];
+        BSRResult bad;
+        memcpy(before_vram,f.vram,sizeof(before_vram));
+        f.written=43U; f.event_written=47U;
+        bad=step(OUT_CAP,EVENT_CAP);
+        assert(bad.status==BSR_EXECUTOR_ERROR &&
+               bad.executor_status==BE_INVALID_PEN);
+        assert(f.written==43U && f.event_written==47U);
+        assert(f.text.bytes_received==before_bytes &&
+               f.video.pen==before_pen);
+        assert(memcmp(before_vram,f.vram,sizeof(before_vram))==0);
+    }
+    assert(bsr_stop(&f.runtime).status == BSR_OK);
+}
+static void test_c1_real_console_cls_palette(void)
+{
+    const char *lines[] = {
+        "10 PEN 2:PRINT \"R\"",
+        "20 PEN 3:PRINT \"G\"",
+        "30 PEN 15:PRINT \"F\"",
+        "40 PEN 4:PRINT \"H\"",
+        "50 PEN 16",
+        "60 PRINT \"NEVER\""
+    };
+    bool cleared = true;
+    size_t original_size;
+    setup();
+    for(size_t i=0U;i<sizeof(lines)/sizeof(lines[0]);++i)
+        assert(submit(lines[i]).status==BSR_OK);
+    original_size=f.program.size;
+    assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+    run_c1_colour_cases(); /* passes before !CLS */
+    assert(hw4_pen_console_clear(&f.text)); /* must call real clear */
+    assert(f.program.size==original_size);
+    assert(f.video.mode==CPC_MODE_1 && f.video.paper==0U &&
+           f.video.pen==1U);
+    assert(f.video.ink[0]==1U && f.video.ink[1]==24U);
+    /* C1 RED EXPECTATION: original cpc_uart_console_clear resets mode and
+     * overwrites INK2/3 with defaults (20/6), not boot's 6/18. */
+    assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+    assert(f.text.bytes_received==0U && f.text.glyphs_drawn==0U);
+    assert(cpc_uart_console_prompt(&f.text,&cleared) && !cleared);
+    run_c1_colour_cases(); /* colour and PEN16 still valid after !CLS */
+}
+
 int main(void)
 {
     test_order_and_preserved_print();
@@ -324,6 +398,7 @@ int main(void)
     test_bridge_preflight_atomic();
     test_runtime_atomic_and_diagnostics();
     test_scrolling_preserves_text_counters();
+    test_c1_real_console_cls_palette();
     puts("HW4-PEN-A: typed events, native MODE1 pixels, scroll and atomicity PASS");
     return 0;
 }

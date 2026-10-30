@@ -528,7 +528,7 @@ static bool execute_line(void)
         printf("HW4-C2 DIAGNOSTIC_SCREEN_CLEAR source=!CLS "
                "program_preserved=1\n");
         hw4_scroll_observe_text(&s_scroll_metrics,(uint32_t)s_text.scrolls);
-        if(!cpc_uart_console_clear(&s_text)) return false;
+        if(!hw4_pen_console_clear(&s_text)) return false;
         hw4_scroll_clear(&s_scroll_metrics,(uint32_t)s_text.scrolls);
         s_scroll_reported=0U;
         transition=CPC_READY_HOST_CLS; /* screen-only, no CPC equivalent */

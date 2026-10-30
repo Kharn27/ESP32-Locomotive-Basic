@@ -1,4 +1,5 @@
 #include "hw4_pen_bridge.h"
+#include "cpc_uart_console.h"
 #include <stdint.h>
 
 Hw4PenStatus hw4_pen_pixel_index(const CpcVideo *video, uint8_t logical,
@@ -92,4 +93,11 @@ Hw4PenStatus hw4_pen_replay(CpcText *sink,
         !cpc_text_write(sink, print_bytes + cursor, byte_count - cursor))
         return HW4_PEN_RENDER_FAILED;
     return HW4_PEN_OK;
+}
+
+/* C1 negative control: real existing clear, currently loses INK2 and INK3.
+ * This wrapper is the sole CONSOLE !CLS call site and has no stored state. */
+bool hw4_pen_console_clear(CpcText *text)
+{
+    return cpc_uart_console_clear(text);
 }

@@ -6,7 +6,9 @@
 >
 > **Project goal (English):** a native-C, ultimately fully compatible reimplementation of the **Amstrad CPC 6128 Locomotive BASIC 1.1** — not a generic BASIC interpreter and not a Z80 emulator.
 
-**État : développement en cours — compatibilité CPC complète NON encore atteinte.** La fidélité au CPC 6128 est l’**objectif de référence**, pas une certification de la version actuelle. Voir le [suivi des jalons](docs/PROJECT_STATUS.md).
+**État : développement en cours — compatibilité CPC complète NON encore atteinte.** La fidélité au CPC 6128 est l’**objectif de référence**, pas une certification de la version actuelle. Pour connaître les capacités **réellement exécutées**, leurs limites et les preuves indépendantes, consulter d'abord la **[matrice de couverture Locomotive BASIC 1.1](docs/BASIC_COMMAND_MATRIX.md)** ; le [suivi des jalons](docs/PROJECT_STATUS.md) conserve l'historique des décisions.
+
+> **Lecture du statut :** la section « Où en sommes-nous ? — 27 octobre 2026 » ci-dessous est une **photographie historique datée**, pas le bilan actuel. La [matrice](docs/BASIC_COMMAND_MATRIX.md) distingue en particulier `CLS` (vraie instruction CPC **non implémentée**) et `!CLS` (commande de service firmware **HOST_ONLY**, sans token CPC, qui conserve le programme). Elle sépare également oracle CPC, token/LIST, RUN C99, connexion CYD et tests physiques PO.
 
 ## Le BASIC que nous voulons retrouver
 

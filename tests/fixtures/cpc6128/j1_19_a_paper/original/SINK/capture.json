@@ -1,0 +1,308 @@
+{
+  "case": "SINK",
+  "commands": {
+    "baseline": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "LOCATE 1,15",
+      "PRINT \"J119TEST\"",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+    ],
+    "list": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "10 INK 2,6",
+      "20 PEN 1",
+      "30 PAPER 2",
+      "40 LOCATE 1,15",
+      "50 PRINT \"J119TEST\"",
+      "60 END",
+      "LIST",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
+      "LIST #8",
+      "CAP32_DELAY CAP32_EXIT"
+    ],
+    "run": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "10 INK 2,6",
+      "20 PEN 1",
+      "30 PAPER 2",
+      "40 LOCATE 1,15",
+      "50 PRINT \"J119TEST\"",
+      "60 END",
+      "RUN",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "PRINT #8,ERR",
+      "PRINT #8,ERL",
+      "CAP32_DELAY CAP32_EXIT"
+    ]
+  },
+  "diagnostic_text": "DIAG_CPC_UNVERIFIED",
+  "erl": 0,
+  "err": 0,
+  "lines": [
+    10,
+    20,
+    30,
+    40,
+    50,
+    60
+  ],
+  "list_printer_hex": "313020494e4b20322c360d0a32302050454e20310d0a333020504150455220320d0a3430204c4f4341544520312c31350d0a3530205052494e5420224a31313954455354220d0a363020454e440d0a",
+  "metadata": {
+    "baseline": {
+      "commands": [
+        "MODE 1",
+        "INK 0,0",
+        "INK 1,26",
+        "INK 2,6",
+        "INK 3,18",
+        "PAPER 0",
+        "PEN 1",
+        "CLS",
+        "NEW",
+        "LOCATE 1,15",
+        "PRINT \"J119TEST\"",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+      ],
+      "finished_utc": "2026-10-30T22:19:19.861334+00:00",
+      "screenshot_height": 540,
+      "screenshot_width": 768,
+      "started_utc": "2026-10-30T22:19:18.564623+00:00"
+    },
+    "list": {
+      "commands": [
+        "MODE 1",
+        "INK 0,0",
+        "INK 1,26",
+        "INK 2,6",
+        "INK 3,18",
+        "PAPER 0",
+        "PEN 1",
+        "CLS",
+        "NEW",
+        "10 INK 2,6",
+        "20 PEN 1",
+        "30 PAPER 2",
+        "40 LOCATE 1,15",
+        "50 PRINT \"J119TEST\"",
+        "60 END",
+        "LIST",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
+        "LIST #8",
+        "CAP32_DELAY CAP32_EXIT"
+      ],
+      "finished_utc": "2026-10-30T22:19:18.562707+00:00",
+      "screenshot_height": 540,
+      "screenshot_width": 768,
+      "started_utc": "2026-10-30T22:19:16.624938+00:00"
+    },
+    "run": {
+      "commands": [
+        "MODE 1",
+        "INK 0,0",
+        "INK 1,26",
+        "INK 2,6",
+        "INK 3,18",
+        "PAPER 0",
+        "PEN 1",
+        "CLS",
+        "NEW",
+        "10 INK 2,6",
+        "20 PEN 1",
+        "30 PAPER 2",
+        "40 LOCATE 1,15",
+        "50 PRINT \"J119TEST\"",
+        "60 END",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+        "PRINT #8,ERR",
+        "PRINT #8,ERL",
+        "CAP32_DELAY CAP32_EXIT"
+      ],
+      "finished_utc": "2026-10-30T22:19:21.933607+00:00",
+      "screenshot_height": 540,
+      "screenshot_width": 768,
+      "started_utc": "2026-10-30T22:19:19.862974+00:00"
+    }
+  },
+  "phase": "J1.19-A",
+  "printer_hex": "2030200d0a2030200d0a",
+  "program_hex": "0A 00 0A 00 A2 20 10 2C 14 00 08 00 14 00 BB 20 0F 00 08 00 1E 00 BA 20 10 00 0B 00 28 00 A9 20 0F 2C 19 0F 00 11 00 32 00 BF 20 22 4A 31 31 39 54 45 53 54 22 00 06 00 3C 00 98 00 00 00",
+  "program_sha256": "7b4e1b07d46b625099a3ed14d8fa8ee9295e57427fabee324a3436aadea0fdb4",
+  "ram_lines_hex": {
+    "10": "0A 00 0A 00 A2 20 10 2C 14 00",
+    "20": "08 00 14 00 BB 20 0F 00",
+    "30": "08 00 1E 00 BA 20 10 00",
+    "40": "0B 00 28 00 A9 20 0F 2C 19 0F 00",
+    "50": "11 00 32 00 BF 20 22 4A 31 31 39 54 45 53 54 22 00",
+    "60": "06 00 3C 00 98 00"
+  },
+  "region": {
+    "bank": "physical bank 0, Gate Array RAM config 0",
+    "base_pointer_address": 44644,
+    "base_pointer_value": 367,
+    "end_exclusive": 430,
+    "end_pointer_address": 44646,
+    "length": 62,
+    "line_numbers": [
+      10,
+      20,
+      30,
+      40,
+      50,
+      60
+    ],
+    "records": [
+      {
+        "length": 10,
+        "line": 10,
+        "offset": 0,
+        "terminator_offset": 9
+      },
+      {
+        "length": 8,
+        "line": 20,
+        "offset": 10,
+        "terminator_offset": 17
+      },
+      {
+        "length": 8,
+        "line": 30,
+        "offset": 18,
+        "terminator_offset": 25
+      },
+      {
+        "length": 11,
+        "line": 40,
+        "offset": 26,
+        "terminator_offset": 36
+      },
+      {
+        "length": 17,
+        "line": 50,
+        "offset": 37,
+        "terminator_offset": 53
+      },
+      {
+        "length": 6,
+        "line": 60,
+        "offset": 54,
+        "terminator_offset": 59
+      }
+    ],
+    "sentinel_offset": 60,
+    "snapshot_data_offset": 256,
+    "snapshot_program_offset": 624,
+    "start_address": 368,
+    "terminator_hex": "0000"
+  },
+  "session": "original",
+  "setup": [
+    "MODE 1",
+    "INK 0,0",
+    "INK 1,26",
+    "INK 2,6",
+    "INK 3,18",
+    "PAPER 0",
+    "PEN 1",
+    "CLS",
+    "NEW"
+  ],
+  "source_kind": "CPC6128_CAPRICE32_REAL_ACQUISITION",
+  "source_sha256": "82778c42102488680b4bb8c9fc71bfd51d418e4d1c3c72edae103c57532ec226",
+  "visual": {
+    "baseline/screen.png": {
+      "blank_rgb_histogram": {
+        "0,0,0": 1000
+      },
+      "blank_roi": [
+        210,
+        180,
+        260,
+        200
+      ],
+      "rgb_histogram": {
+        "0,0,0": 1534,
+        "255,255,255": 482
+      },
+      "roi": [
+        64,
+        305,
+        190,
+        321
+      ],
+      "sha256": "5e8fdf75df94df52edb65169fb682bd96a4f73293e99945ddd7f5127f2ee806f"
+    },
+    "list/screen.png": {
+      "blank_rgb_histogram": {
+        "0,0,0": 796,
+        "255,255,255": 204
+      },
+      "blank_roi": [
+        210,
+        180,
+        260,
+        200
+      ],
+      "rgb_histogram": {
+        "0,0,0": 1232,
+        "255,255,255": 784
+      },
+      "roi": [
+        64,
+        305,
+        190,
+        321
+      ],
+      "sha256": "46bd2496d035575212ed767c00f62f55a65dad24747db58aa7f53ff5d3c56fe7"
+    },
+    "run/screen.png": {
+      "blank_rgb_histogram": {
+        "0,0,0": 796,
+        "255,255,255": 204
+      },
+      "blank_roi": [
+        210,
+        180,
+        260,
+        200
+      ],
+      "rgb_histogram": {
+        "0,0,0": 126,
+        "255,0,0": 1150,
+        "255,255,255": 740
+      },
+      "roi": [
+        64,
+        305,
+        190,
+        321
+      ],
+      "sha256": "f6a972b917132da67fff3ea65c38c48bc7c2b98ef6b1f0997f03e0dfa726b693"
+    }
+  },
+  "visual_classification": "VISUAL_UNVERIFIED"
+}

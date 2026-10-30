@@ -1,0 +1,70 @@
+{
+  "caprice": {
+    "commands": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "PAPER -1",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "PRINT #8,ERR",
+      "PRINT #8,ERL",
+      "CAP32_DELAY CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-30T22:19:39.021859+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-30T22:19:37.562971+00:00"
+  },
+  "case": "DN1",
+  "commands": [
+    "MODE 1",
+    "INK 0,0",
+    "INK 1,26",
+    "INK 2,6",
+    "INK 3,18",
+    "PAPER 0",
+    "PEN 1",
+    "CLS",
+    "NEW",
+    "PAPER -1",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+    "PRINT #8,ERR",
+    "PRINT #8,ERL",
+    "CAP32_DELAY CAP32_EXIT"
+  ],
+  "diagnostic_text": "DIAG_CPC_UNVERIFIED",
+  "erl": 0,
+  "err": 5,
+  "phase": "J1.19-A",
+  "printer_hex": "2035200d0a2030200d0a",
+  "session": "original",
+  "source_kind": "CPC6128_CAPRICE32_REAL_ACQUISITION",
+  "statement": "PAPER -1",
+  "visual": {
+    "rgb_histogram": {
+      "0,0,0": 2016
+    },
+    "roi": [
+      64,
+      305,
+      190,
+      321
+    ],
+    "second_rgb_histogram": {
+      "0,0,0": 2016
+    },
+    "second_roi": [
+      64,
+      321,
+      190,
+      337
+    ],
+    "sha256": "5b2cadf7a94cdd851f68c5b566fc39f135ba3c14fa4ba6abf711427d5a2d7310"
+  }
+}

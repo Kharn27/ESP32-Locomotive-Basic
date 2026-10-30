@@ -591,3 +591,5 @@ Base prescrite `main@e857ce66fb28583361ab06cd0d6a642f7fc97a95`, cinq CI post-fus
 ### HW4-PEN-A-C1 — Barrière supplémentaire !CLS et synchronisation main
 
 PR #190 : conserver #184 fusionnée (rotation10/GPIO36/reset) et preuves J1.18-A scellées de `main@5ec280be85d47e330e8a917dc234a4d24fa49a80`. Preuve négative C99 du défaut INK2/INK3 perdus après le vrai `cpc_uart_console_clear()`, puis preuve positive avec le **même** test et correction seulement dans le propriétaire CONSOLE. Exiger GCC/Clang OFF/ON, sanitizers, CI-ARCH/OPT3/CPC, Xtensa 3 profils et comparaison DRAM contre **nouveau main** ; script PO `RUN → !CLS → RUN` sans reboot ni changement de programme, refus `PEN 16` avant/après. **Remise nouvelle revue contradictoire Pilotage**, pas d'essai CYD demandé directement et pas de fusion par Développeur.
+
+**Garde mémoire C1 :** union statique `BasicScratch` pour tokenisation et événements PEN non simultanés, trois événements conservés ; ne jamais réduire arbitrairement les capacités BASIC ni relâcher le budget DRAM +256. Attendre la comparaison vérifiée avec le `main` actuel.

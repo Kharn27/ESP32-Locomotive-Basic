@@ -53,6 +53,16 @@ enum {
     TOUCH_POLL_MS = 20,
     ECHO_MAX_BYTES = UART_LINE_CAPACITY
 };
+/* Submit and RUN are strictly sequential in sole CONSOLE app_main.
+ * Reuse static submission scratch for typed events: aligned C99 union,
+ * unchanged 2048-byte tokenizer and 3-event execution capacities. */
+typedef union {
+    uint8_t temporary[TEMP_CAPACITY];
+    BEVideoEvent events[PEN_EVENT_CAPACITY];
+} BasicScratch;
+typedef char HW4_PEN_SCRATCH_FITS[
+    (sizeof(((BasicScratch *)0)->temporary) >=
+     sizeof(((BasicScratch *)0)->events)) ? 1 : -1];
 typedef struct {
     BasicProgram program;
     BasicVariableStore variables;
@@ -60,7 +70,7 @@ typedef struct {
     uint8_t bytes[PROGRAM_CAPACITY];
     BasicVariableEntry entries[VARIABLES_CAPACITY];
     uint8_t string_arena[STRING_ARENA_CAPACITY]; /* s_basic-owned, no heap */
-    uint8_t temporary[TEMP_CAPACITY];
+    BasicScratch scratch;
     uint8_t output[OUTPUT_CAPACITY];
     size_t written;
 } BasicStorage;
@@ -74,7 +84,6 @@ static UartLine s_line;
 static CpcUartEditor s_edit;
 static CpcScreenNavigation s_nav;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
-static BEVideoEvent s_pen_events[PEN_EVENT_CAPACITY];
 static size_t s_scroll_reported;
 /* A0: CONSOLE-only class counters; a scroll-associated dirty flush may
  * also contain cursor, text or !CLS writes. Never label it scroll-exclusive. */
@@ -350,7 +359,7 @@ static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
 static bool display_print_events(size_t event_count)
 {
     Hw4PenStatus validation=hw4_pen_preflight(&s_text,s_basic.output,
-                            s_basic.written,s_pen_events,event_count);
+                            s_basic.written,s_basic.scratch.events,event_count);
     if(validation!=HW4_PEN_OK) {
         printf("HW4-PEN-A VIDEO_REJECT status=%d printed=0 event_applied=0\n",
                (int)validation);
@@ -361,20 +370,20 @@ static bool display_print_events(size_t event_count)
         log_bytes("PRINT_BYTES",s_basic.output,s_basic.written);
     const size_t clipped_before=s_text.bytes_clipped;
     Hw4PenStatus replay=hw4_pen_replay(&s_text,s_basic.output,
-                             s_basic.written,s_pen_events,event_count);
+                             s_basic.written,s_basic.scratch.events,event_count);
     if(replay!=HW4_PEN_OK) {
         printf("HW4-PEN-A VIDEO_REPLAY_FAILURE status=%d\n",(int)replay);
         return fail("PEN_REPLAY",(int)replay);
     }
     for(size_t i=0U;i<event_count;++i) {
         uint8_t mapped=0U;
-        if(hw4_pen_pixel_index(&s_video,s_pen_events[i].pen,&mapped)
+        if(hw4_pen_pixel_index(&s_video,s_basic.scratch.events[i].pen,&mapped)
            !=HW4_PEN_OK) return fail("PEN_CONTEXT_CHANGED",-1);
         printf("HW4-PEN-A VIDEO_EVENT type=SET_TEXT_PEN logical=%u "
                "pixel=%u print_offset=%u order=%u/%u "
                "renderer=MODE1\n",
-               (unsigned)s_pen_events[i].pen,(unsigned)mapped,
-               (unsigned)s_pen_events[i].print_offset,
+               (unsigned)s_basic.scratch.events[i].pen,(unsigned)mapped,
+               (unsigned)s_basic.scratch.events[i].print_offset,
                (unsigned)(i+1U),(unsigned)event_count);
     }
     if(s_text.bytes_clipped>clipped_before)
@@ -423,7 +432,7 @@ static bool basic_submit(const uint8_t *source,size_t length,
 {
     s_basic.written=0U;
     BSRResult r=bsr_submit(&s_basic.runtime,source,length,
-                          s_basic.temporary,sizeof(s_basic.temporary),
+                          s_basic.scratch.temporary,sizeof(s_basic.scratch.temporary),
                           s_basic.output,sizeof(s_basic.output),
                           &s_basic.written);
     printf("HW4-C2 BASIC_SUBMIT status=%d bs=%d bt=%d bp=%d bl=%d "
@@ -462,7 +471,7 @@ static bool basic_run(void)
         s_basic.written=0U;
         BSRResult r=bsr_step_events(&s_basic.runtime,s_basic.output,
                              sizeof(s_basic.output),&s_basic.written,
-                             s_pen_events,PEN_EVENT_CAPACITY,&event_count);
+                             s_basic.scratch.events,PEN_EVENT_CAPACITY,&event_count);
         if(r.status==BSR_END) {
             printf("HW4-C2 BSR_END status=BE_END steps=%u\n",steps);
             return true;

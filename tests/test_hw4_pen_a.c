@@ -626,7 +626,7 @@ static void test_diag_pen_run_case(const char *line10, const char *line20,
                                    uint16_t bad_line, bool repeat_after_cls)
 {
     const char *expected=bad_line==10U ?
-        "Improper argument in 10\\n" : "Improper argument in 20\\n";
+        "Improper argument in 10\n" : "Improper argument in 20\n";
     const char *expected_painted=bad_line==10U ?
         "Improper argument in 10Ready" : "Improper argument in 20Ready";
     const size_t expected_length=strlen(expected);
@@ -634,7 +634,7 @@ static void test_diag_pen_run_case(const char *line10, const char *line20,
     setup();
     assert(submit(line10).status==BSR_OK);
     assert(submit(line20).status==BSR_OK);
-    assert(submit("30 PRINT \\"NEVER\\"").status==BSR_OK);
+    assert(submit("30 PRINT \"NEVER\"").status==BSR_OK);
     const size_t stored_size=f.program.size;
     memcpy(saved_program,f.program_bytes,sizeof(saved_program));
     for(unsigned pass=0U;pass<(repeat_after_cls?2U:1U);++pass) {
@@ -712,17 +712,17 @@ static void test_diag_pen_native_and_host_guards(void)
     CpcStepDiagnostic forged={CPC_DIAG_PEN_IMPROPER_ARGUMENT,
                              CPC_DIAG_ORIGIN_HOST,10U};
     assert(cpc_diag_policy_format_step(host,message,sizeof(message),&size));
-    assert(size==6U && memcmp(message,"ERROR\\n",size)==0);
+    assert(size==6U && memcmp(message,"ERROR\n",size)==0);
     assert(!cpc_diag_policy_format_step(forged,message,sizeof(message),&size));
     forged.origin=CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE;
     forged.line_number=0U;
     assert(!cpc_diag_policy_format_step(forged,message,sizeof(message),&size));
 
-    test_diag_pen_run_case("10 PEN 16","20 PRINT \\"NEVER_BEFORE\\"",10U,true);
+    test_diag_pen_run_case("10 PEN 16","20 PRINT \"NEVER_BEFORE\"",10U,true);
     test_diag_pen_run_case("10 PEN -1","20 END",10U,false);
     test_diag_pen_run_case("10 PEN 2","20 PEN 16",20U,true);
     test_diag_pen_run_case("10 PEN 2","20 PEN -1",20U,false);
-    test_diag_pen_run_case("10 PEN 2:PRINT \\"NEVER_BEFORE\\":PEN 16",
+    test_diag_pen_run_case("10 PEN 2:PRINT \"NEVER_BEFORE\":PEN 16",
                            "20 END",10U,false);
 
     /* Host-only failures never acquire a false CPC line or ERR/ERL. */

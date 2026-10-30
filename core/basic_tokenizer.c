@@ -11,7 +11,7 @@ typedef struct {
 
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
-    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT, ST_PEN
+    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT, ST_PEN, ST_INK
 } BTStatement;
 
 typedef struct {
@@ -24,6 +24,7 @@ typedef struct {
 static const BTKeyword keywords[] = {
     {"PRINT", 0xbfu, ST_PRINT},
     {"PEN",   0xbbu, ST_PEN},
+    {"INK",   0xa2u, ST_INK},
     {"LIST",  0xa7u, ST_LIST},
     {"RUN",   0xcau, ST_RUN},
     {"NEW",   0xb1u, ST_NEW},
@@ -147,6 +148,33 @@ static BTStatus decimal(const uint8_t *source, size_t length, size_t *index,
     }
     *value = number;
     return BT_OK;
+}
+
+/* INK A2: CPC numeric immediates only. No arithmetic or variables.
+ * -1 is a separate unary F5 token followed by the CPC integer 1. */
+static BTStatus ink_literal(const uint8_t *source, size_t length,
+                            size_t *index, BTEmitter *out,
+                            unsigned int maximum, int *value)
+{
+    BTStatus status;
+    unsigned int n;
+    if (*index < length && source[*index] == (uint8_t)'-') {
+        ++*index;
+        if (*index == length || source[*index] != (uint8_t)'1')
+            return BT_UNSUPPORTED_CONSTRUCT;
+        ++*index;
+        *value = -1;
+        status = emit(out, 0xf5u);
+        if (status == BT_OK) status = emit(out, 0x0fu);
+        return status;
+    }
+    status = decimal(source, length, index, maximum, &n);
+    if (status != BT_OK) return status;
+    *value = (int)n;
+    status = emit(out, (uint8_t)(n < 10u ? 0x0eu + n : 0x19u));
+    if (status == BT_OK && n >= 10u)
+        status = emit(out, (uint8_t)n);
+    return status;
 }
 
 static BTStatus quoted_string(const uint8_t *source, size_t length,
@@ -471,6 +499,28 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 }
             } else {
                 return BT_UNSUPPORTED_CONSTRUCT;
+            }
+        } else if (statement == ST_INK) {
+            int pen_index, colour, third;
+            /* Only standalone literal A2 forms; the third literal is a
+             * token/LIST witness, never a native blinking implementation. */
+            status = ink_literal(source, length, &index, out, 16u, &pen_index);
+            if (status != BT_OK) return status;
+            if (index == length || source[index++] != (uint8_t)',')
+                return BT_MALFORMED_INPUT;
+            status = emit(out, (uint8_t)',');
+            if (status != BT_OK) return status;
+            status = ink_literal(source, length, &index, out, 32u, &colour);
+            if (status != BT_OK) return status;
+            if (index < length && source[index] == (uint8_t)',') {
+                if (pen_index != 1 || colour != 26)
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                ++index;
+                status = emit(out, (uint8_t)',');
+                if (status != BT_OK) return status;
+                status = ink_literal(source, length, &index, out, 32u, &third);
+                if (status != BT_OK) return status;
+                if (third != 6) return BT_UNSUPPORTED_CONSTRUCT;
             }
         } else if (statement == ST_PEN) {
             /* J1.17-A CPC BB: numeric immediate only. Tokenising 5..14

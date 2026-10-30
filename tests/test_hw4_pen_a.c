@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 enum { OUT_CAP = 256, EVENT_CAP = 16 };
@@ -515,6 +516,101 @@ static void test_c1_run_stop(void)
     test_c1_run_stop_case(true);
 }
 
+/* C1-RUN-STOP-C2: read the actual production function's last return,
+ * then use it with real BSR steps and the shared RUN action. This is not
+ * a mocked return: the known bad firmware 'return true' becomes enum 1. */
+static Hw4PenDisplayResult c2_firmware_display_success(void)
+{
+    const char *path=getenv("HW4_PEN_C2_CONSOLE_SOURCE");
+    char line[512];
+    bool in_function=false,ended=false,found=false;
+    Hw4PenDisplayResult result=HW4_PEN_DISPLAY_FATAL;
+    FILE *file;
+    assert(path!=NULL);
+    file=fopen(path,"rb");
+    assert(file!=NULL);
+    while(fgets(line,sizeof(line),file)!=NULL) {
+        if(!in_function) {
+            if(strstr(line,"static Hw4PenDisplayResult display_print_events(")!=NULL)
+                in_function=true;
+            continue;
+        }
+        if(strstr(line,"static bool display_error(void)")!=NULL) {
+            ended=true;
+            break;
+        }
+        if(strstr(line,"return true;")!=NULL) {
+            result=(Hw4PenDisplayResult)true;
+            found=true;
+        } else if(strstr(line,"return HW4_PEN_DISPLAY_OK;")!=NULL) {
+            result=HW4_PEN_DISPLAY_OK;
+            found=true;
+        }
+    }
+    assert(fclose(file)==0);
+    assert(in_function && ended && found);
+    return result;
+}
+
+static void test_c1_c2_successive_pen_lines_reach_end(void)
+{
+    static const char *const program[]={
+        "10 PEN 2:PRINT \"A\"",
+        "20 PEN 1:PRINT \"B\"",
+        "30 PEN 3:PRINT \"C\"",
+        "40 PRINT \"NEXT_STEP_REACHED\"",
+        "50 END"
+    };
+    setup();
+    for(size_t i=0U;i<sizeof(program)/sizeof(program[0]);++i)
+        assert(submit(program[i]).status==BSR_OK);
+    const size_t stored=f.program.size;
+    const Hw4PenDisplayResult nominal=c2_firmware_display_success();
+    assert(hw4_pen_run_after_display(HW4_PEN_DISPLAY_OK)==HW4_PEN_RUN_CONTINUE);
+    assert(hw4_pen_run_after_display(HW4_PEN_DISPLAY_REJECT_DIAGNOSED)==HW4_PEN_RUN_DONE);
+    assert(hw4_pen_run_after_display(HW4_PEN_DISPLAY_FATAL)==HW4_PEN_RUN_FATAL);
+    for(unsigned pass=0U;pass<2U;++pass) {
+        unsigned calls=0U,pen_lines=0U,marker=0U,ended=0U;
+        bool ready=false,cleared=false;
+        if(pass!=0U) {
+            assert(hw4_pen_console_clear(&f.text)); /* real !CLS */
+            assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+            assert(f.program.size==stored);
+        }
+        assert(submit("RUN").status==BSR_OK);
+        for(unsigned i=0U;i<8U;++i) {
+            ++calls;
+            BSRResult r=step(OUT_CAP,3U); /* real CONSOLE event budget */
+            if(r.status==BSR_END) { ++ended; break; }
+            assert(r.status==BSR_OK && r.executor_status==BE_OK);
+            if(f.event_written!=0U) {
+                assert(f.event_written==1U);
+                assert(f.events[0].type==BE_VIDEO_SET_TEXT_PEN);
+                assert(hw4_pen_preflight(&f.text,f.output,f.written,
+                       f.events,f.event_written)==HW4_PEN_OK);
+                assert(hw4_pen_replay(&f.text,f.output,f.written,
+                       f.events,f.event_written)==HW4_PEN_OK);
+                ++pen_lines;
+                Hw4PenRunAction next=hw4_pen_run_after_display(nominal);
+                if(next!=HW4_PEN_RUN_CONTINUE) break;
+            } else if(f.written!=0U) {
+                assert(f.written==18U);
+                assert(memcmp(f.output,"NEXT_STEP_REACHED\n",18U)==0);
+                assert(cpc_text_write(&f.text,f.output,f.written));
+                ++marker;
+            }
+        }
+        fprintf(stderr,"C1-RUN-STOP-C2 pass=%u nominal=%d steps=%u PEN=%u PRINT_MARKER=%u END=%u\n",
+                pass,(int)nominal,calls,pen_lines,marker,ended);
+        fflush(stderr);
+        assert(pen_lines==3U && marker==1U && ended==1U && calls==6U);
+        assert(f.program.size==stored);
+        assert(cpc_ready_policy_apply(&f.text,CPC_READY_RUN_RETURN,&ready));
+        assert(ready);
+        assert(cpc_uart_console_prompt(&f.text,&cleared) && !cleared);
+    }
+}
+
 int main(void)
 {
     test_order_and_preserved_print();
@@ -525,6 +621,7 @@ int main(void)
     test_c1_real_console_cls_palette();
     test_j118b_ink_explicit_reject_no_partial_replay();
     test_c1_run_stop();
+    test_c1_c2_successive_pen_lines_reach_end();
     puts("HW4-PEN-A: typed events, native MODE1 pixels, scroll and atomicity PASS");
     return 0;
 }

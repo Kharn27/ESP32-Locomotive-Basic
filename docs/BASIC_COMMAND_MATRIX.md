@@ -16,6 +16,10 @@
 
 **Dimensions de la table :** « forme native » indique l'entrée reconnue et utilisée aujourd'hui, pas la liste complète de toutes ses formes CPC. La colonne Token/LIST + RUN est la situation du *moteur* C99 ; les colonnes CYD, oracle CPC et PO sont indépendantes. Quand la table indique `UNVERIFIED` pour l'oracle, la présence du nom dans la ROM reste une **preuve statique de vocabulaire**, **pas** une session d'observation. Les entrées sans implémentation portent volontairement `NOT_IMPLEMENTED` malgré la présence de fonctions de bas niveau ailleurs.
 
+### Vérification du décalage de `main` durant DOC-CAT-A
+
+L'audit a démarré sur le SHA `9d4131ef4847b6e6bb324bc7c3a2baddc3851ac3` exigé par #212. **Avant ouverture de la PR**, le dépôt `main` est passé à `09ebb907e51a28e084bbc49711560cb82b21f21f`. L'examen du diff GitHub entre ces deux SHA confirme l'arrivée de l'archive **PAPER J1.19-A / PR #205** et du correctif du **LIST d'alias `?ABS` / PR #213** dans `core/basic_listing.c`. Le tableau intègre donc ces deux faits supplémentaires depuis les documents/preuves nouvellement fusionnés, tout en **conservant la base de branche exacte du démarrage**. Aucun changement de `core/basic_tokenizer.c`, `core/basic_executor.c`, `core/basic_session.c`, `core/basic_session_runtime.c`, `integration/hw4_pen_bridge.c` ou `firmware/esp32_display_probe/main/hw4_c2_console.c` n'a été identifié dans ce diff. Les entrées natives pertinentes restent donc celles auditées ; une future fusion peut encore rendre cette photographie périmée.
+
 ## Sources figées et méthode
 
 - **ROM** : [désassemblage `basic.asm`](http://cpctech.cpc-live.com/docs/basic.asm), table de recherche lexicale **E418 / E44C–E720**, table des opérateurs **E736** et entrée `CLS` **C280**. Les noms du tableau ci-dessous sont les graphies lues dans la table (y compris `ON ERROR GOTO` et `ON BREAK`) ; cela **ne démontre ni la syntaxe complète, ni toutes les variantes directes**, ni les commandes RSX `|…`, périphériques/disquettes/extensions ou toutes les séquences d'échappement. **Inventaire global CPC : INCOMPLET / UNVERIFIED**, inventaire des mots-clés ROM montrés : vérifié statiquement, sans garantie de toutes leurs constructions.
@@ -30,10 +34,11 @@
 | [HW4] | [HW4-C2 UART](HW4-C2-uart-interactive-console.md), [HW4-PEN-A](HW4-PEN-A-native-pen-mode1.md), [#91](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/91) | `RUN/LIST/NEW` et `PRINT` de programmes ciblés ont des rapports PO sur leurs SHA, sans généralisation ; quelques cas PEN/HW4 restent distincts. |
 | [PEN] | [J1.17-A](J1.17-A-pen-cpc-oracle.md), [J1.17-C-A](J1.17-C-A-pen-5-14-cpc-oracle.md), [issue B #210](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/210) | CPC accepte `PEN 5..14` (`ERR=0/ERL=0`, deux palettes, 52 acquisitions) ; au **SHA audité**, C99 renvoie encore `BE_UNSUPPORTED` ; jalon B indépendant non fusionné à cet instant. `PEN 8/12` invisibles dans leurs contextes RGB, sans indice général prouvé. |
 | [INK] | [J1.18-A](J1.18-A-ink-cpc-oracle.md), [J1.18-B](J1.18-B-ink-native.md) | 13 formes scellées ; certains couples C99 émettent `SET_INK` ; le pont CYD rejette tout événement INK (`HW4_PEN_SET_INK_UNSUPPORTED`). La forme clignotante `INK 1,26,6` est LIST-only / unsupported RUN. |
-| [ABS] | [J1.20-A](J1.20-A-abs-integer-cpc-oracle.md), [J1.20-B1](J1.20-B1-abs-token-list-native.md) | 16 sources exactes `FF 00`, 2 archives chaque ; `TOKEN/LIST` natifs sur cas bornés **sans calcul `ABS` en RUN**, y compris témoins d'erreurs à l'exécution CPC. |
+| [ABS] | [J1.20-A](J1.20-A-abs-integer-cpc-oracle.md), [J1.20-B1](J1.20-B1-abs-token-list-native.md), [correctif `?ABS` #213](J1.20-B1-C1-abs-print-alias-list.md) | 16 sources exactes `FF 00`, original + repeat ; token/LIST natifs bornés **sans RUN ABS**. Depuis #213, `?ABS(1)` se liste comme `PRINT ABS(1)` et reste rééditable, mais le round-trip **RAM exact n'est pas revendiqué** : le séparateur `20` ajouté à la forme canonique constitue un delta attesté. |
 | [F10] / [F13] / [F14] | [IF/THEN](J1.10-B-if-then-integer-native.md), [comparaisons](J1.13-B-integer-relational-if-native.md), [ELSE](J1.14-B-if-inline-else-native.md) | IF INTEGER, opérateurs relationnels et ELSE inline dans les corpus jalonnés ; pas de langage booléen général. |
 | [F11] / [F12] | [GOSUB/RETURN](J1.11-B-gosub-return-native.md), [FOR/NEXT](J1.12-B2-for-next-integer-native.md) | Formes de contrôle de flux INTEGER et piles bornées, oracles indépendants dans les rapports A correspondants. |
 | [MATH] / [VAR] / [P15] / [FL] / [EX] / [TOK] | [Rapports J1](PROJECT_STATUS.md), [J1.9](J1.9-B-integer-binary-family-native.md), [J1.15](J1.15-B-string-scalar-native.md), [J0.7](J0.7-basic-executor.md), [J0.4](J0.4-basic-tokenizer.md) | Opérateurs entiers bornés, affectation INTEGER et chaîne scalaire, PRINT de valeurs et de chaînes limitées ; pas d'évaluateur BASIC universel. [FL] vise le saut GOTO, [EX] le chemin END, [TOK] la grammaire native. |
+| [PAPER] | [J1.19-A](J1.19-A-paper-cpc-oracle.md), [PR #205 fusionnée](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/205), [CI de réacquisition scellée](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41137960637) | **CPC_ORACLE_VERIFIED** pour 24 sessions PAPER et diagnostics/ROI bornés ; 264 SHA externes et réacquisition documentés. Ce constat n'ajoute **aucun** `PAPER` au tokenizer/exécuteur C99 ; ne pas le confondre avec l'API vidéo. |
 | [VIDEO] / [CLS] | [`cpc_video.c`](../video/cpc_video.c), [`cpc_uart_console.c`](../io/cpc_uart_console.c), [source ROM CLS C280](http://cpctech.cpc-live.com/docs/basic.asm) | API MODE1 / encres / clear de console **sans** commandes BASIC `MODE/PAPER/CLS`. Oracle CLS à constituer séparément. |
 
 ## Vue rapide pour utiliser le projet
@@ -44,7 +49,7 @@
 | Sortie et variables | `PRINT` de chaînes/entiers/scalaires limités, INTEGER `%`, STRING `$` et trois témoins REAL5 ; colon et commentaires bornés | Fonctions, tableaux, expression générales, imprimerie CPC `#` réelle |
 | Flux | `GOTO/GOSUB/RETURN`, `IF/THEN/ELSE` INTEGER, `FOR/TO/STEP/NEXT` INTEGER bornés | Conditions/expressions générales, `WHILE/WEND`, `ON`, `STOP/CONT` |
 | Opérateurs/fonctions | Comparaisons INTEGER et `+/-/*/\`/`MOD` bornés ; `ABS` uniquement token/LIST | Réel mathématique général, opérateurs logiques/bitwise, `ABS` exécutable |
-| CPC affichage | `PEN 0..4,15` C99, pont MODE1 borné ; `INK` événement natif C99 borné | `PEN 5..14` C99 (issue #210), `INK` raccord CYD, `CLS/MODE/PAPER`, autres dessins |
+| CPC affichage | `PEN 0..4,15` C99, pont MODE1 borné ; `INK` événement natif C99 borné ; `PAPER` **oracle CPC uniquement** | `PEN 5..14` C99 (issue #210), `INK` raccord CYD, `CLS/MODE/PAPER` **natifs**, autres dessins |
 | Périphériques | UART/écran hôte pour les tests indiqués | BASIC `SOUND`, fichiers, imprimante/flux CPC, mémoire/ports, RSX, graphisme complet |
 
 ## Catalogue ROM : une entrée par mot-clé
@@ -121,7 +126,7 @@ Le **mot-clé ROM n'est pas automatiquement un mot-clé reconnu par le tokenizer
 | `MOVE` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
 | `MOVER` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
 | `ORIGIN` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
-| `PAPER` | CPC forme à caractériser | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | API VIDEO existante ≠ instruction BASIC native; [VIDEO] |
+| `PAPER` | CPC direct/numérotée (oracle A) | NOT_IMPLEMENTED | NOT_IMPLEMENTED | CPC_ORACLE_VERIFIED | UNVERIFIED | 12 cas × 2 CPC scellés (0/1/2/3/4/15 OK, 16/-1 ERR=5), mais aucun token/exécution BASIC C99 ni raccord CYD; [PAPER][VIDEO] |
 | `PEN` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | 0..4,15 seulement RUN C99; 5..14 acceptés CPC mais BE_UNSUPPORTED; 16/-1 invalide; CYD MODE1 0..3 + 4/15 bornés; #210 [PEN] |
 | `PLOT` | CPC forme à caractériser | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | appel VIDEO/ROM ≠ connexion BASIC; mission à qualifier |
 | `PLOTR` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
@@ -246,7 +251,7 @@ Le **mot-clé ROM n'est pas automatiquement un mot-clé reconnu par le tokenizer
 
 | Source/forme | Direct vs ligne | Token/LIST | RUN C99 | CYD | CPC/PO et limite | Suite |
 |---|---|---|---|---|---|---|
-| `?"X"` alias `PRINT` | numérotée | LIST_ONLY | C99_NATIVE_BOUNDED (`PRINT`) | CYD_CONNECTED via RUN | CPC forme de référence, résultat exact hors témoins UNVERIFIED | tests syntaxiques supplémentaires |
+| `?"X"` / `?ABS(1)` alias `PRINT` | numérotée | LIST_ONLY | C99_NATIVE_BOUNDED pour chaîne, **pas ABS en RUN** | CYD_CONNECTED pour chaîne via RUN | [J1.20-B1-C1](J1.20-B1-C1-abs-print-alias-list.md) : `?ABS` LIST rééditable mais RAM exacte après retokenisation non garantie | aucun RUN ABS autorisé |
 | `10 A%=...`, `10 LET A%=...` | numérotée | LIST_ONLY | C99_NATIVE_BOUNDED (scalaires INTEGER bornés) | CYD_CONNECTED via RUN | cas A/J1 attestés ; pas tableau ni expression complète | extension sous mandat |
 | `10 A$="X"`, `PRINT A$` | numérotée | LIST_ONLY | C99_NATIVE_BOUNDED (STRING scalaire, arène limitée) | CYD_CONNECTED via RUN | [J1.15](J1.15-B-string-scalar-native.md); [J1.15-C](J1.15-C-cyd-string-arena.md) | extension sous mandat |
 | `A=0.5 / A=1.25 / A=-0.5` | numérotée | LIST_ONLY | C99_NATIVE_BOUNDED (trois records REAL5) | CYD_CONNECTED via RUN | [J1.16-B/C/D-B](J1.16-B-real5-half-native.md) ; pas REAL générique | généralisation non autorisée |

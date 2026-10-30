@@ -14,6 +14,11 @@ permissions:
   contents: read
   packages: read
 
+# CPC archive publishing must never be cancelled by a later PR push.
+concurrency:
+  group: j117c-cpc-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   acquisition:
     if: github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-17-c-a-pen-5-14-cpc' && github.event.pull_request.head.repo.full_name == github.repository

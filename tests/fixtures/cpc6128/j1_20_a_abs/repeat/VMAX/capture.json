@@ -1,0 +1,144 @@
+{
+  "case": "VMAX",
+  "diagnostic_classification": "DIAG_CPC_UNVERIFIED",
+  "erl": 0,
+  "err": 0,
+  "full_snapshot_archived": false,
+  "input_classification": "OBSERVED",
+  "line_numbers_observed": [
+    10,
+    20,
+    30,
+    40
+  ],
+  "line_numbers_requested": [
+    10,
+    20,
+    30,
+    40
+  ],
+  "list": {
+    "commands": [
+      "MODE 1",
+      "NEW",
+      "10 A%=32767",
+      "20 PRINT ABS(A%)",
+      "30 PRINT #8,ABS(A%)",
+      "40 END",
+      "LIST",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-30T21:55:40.859658+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-30T21:55:39.695098+00:00"
+  },
+  "list_commands": [
+    "MODE 1",
+    "NEW",
+    "10 A%=32767",
+    "20 PRINT ABS(A%)",
+    "30 PRINT #8,ABS(A%)",
+    "40 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "list_image_sha256": "925b8b5ffc12f63f406e163e39af3e6d06a26da15b7be4639928e7905243c26f",
+  "printer_is_not_screen_evidence": true,
+  "program_hex": "0D 00 0A 00 02 00 00 C1 EF 1A FF 7F 00 0F 00 14 00 BF 20 FF 00 28 02 00 00 C1 29 00 12 00 1E 00 BF 20 23 16 2C FF 00 28 02 00 00 C1 29 00 06 00 28 00 98 00 00 00",
+  "program_sha256": "2479172217b01d771aad88bef1bcf9d053d2af40987594923771c50064324f6f",
+  "region": {
+    "bank": "physical bank 0, Gate Array RAM config 0",
+    "base_pointer_address": 44644,
+    "base_pointer_value": 367,
+    "end_exclusive": 422,
+    "end_pointer_address": 44646,
+    "length": 54,
+    "line_numbers": [
+      10,
+      20,
+      30,
+      40
+    ],
+    "records": [
+      {
+        "length": 13,
+        "line": 10,
+        "offset": 0,
+        "terminator_offset": 12
+      },
+      {
+        "length": 15,
+        "line": 20,
+        "offset": 13,
+        "terminator_offset": 27
+      },
+      {
+        "length": 18,
+        "line": 30,
+        "offset": 28,
+        "terminator_offset": 45
+      },
+      {
+        "length": 6,
+        "line": 40,
+        "offset": 46,
+        "terminator_offset": 51
+      }
+    ],
+    "sentinel_offset": 52,
+    "snapshot_data_offset": 256,
+    "snapshot_program_offset": 624,
+    "start_address": 368,
+    "terminator_hex": "0000"
+  },
+  "result_printer_hex": "20 33 32 37 36 37 20 0D 0A",
+  "run": {
+    "commands": [
+      "MODE 1",
+      "NEW",
+      "10 A%=32767",
+      "20 PRINT ABS(A%)",
+      "30 PRINT #8,ABS(A%)",
+      "40 END",
+      "RUN",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "PRINT #8,\"@@ABS-ERR@@\";ERR;\",\";ERL",
+      "PRINT #8,\"@@ABS-SCREEN@@\"",
+      "FOR YY=1 TO 25:FOR XX=1 TO 40:LOCATE XX,YY:PRINT #8,COPYCHR$(#0);:NEXT XX:PRINT #8:NEXT YY",
+      "CAP32_DELAY CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-30T21:55:43.536241+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-30T21:55:40.861108+00:00"
+  },
+  "run_commands": [
+    "MODE 1",
+    "NEW",
+    "10 A%=32767",
+    "20 PRINT ABS(A%)",
+    "30 PRINT #8,ABS(A%)",
+    "40 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+    "PRINT #8,\"@@ABS-ERR@@\";ERR;\",\";ERL",
+    "PRINT #8,\"@@ABS-SCREEN@@\"",
+    "FOR YY=1 TO 25:FOR XX=1 TO 40:LOCATE XX,YY:PRINT #8,COPYCHR$(#0);:NEXT XX:PRINT #8:NEXT YY",
+    "CAP32_DELAY CAP32_EXIT"
+  ],
+  "run_image_sha256": "30a46e89c1adbe68c0bddf9efa3f1aa0c0e6f8dd9bcfdfe6d368447726e125b4",
+  "run_printer_sha256": "32ddfd7d493a41b8b85e364a9e1bbeacffd97e9527ca70248a3bf7a36d684a86",
+  "screen_rows": 3,
+  "screen_text_classification": "DIAG_CPC_UNVERIFIED",
+  "screen_text_hex": "0D 0A 52 65 61 64 79 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A 4E 45 57 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20",
+  "session": "repeat",
+  "setup_commands": [
+    "MODE 1",
+    "NEW"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "a8ad7c8b41b95c0c9ed84121e550ce6651b1506226ff61ac1b0654b7d7cfb579",
+  "token_classification": "OBSERVED",
+  "type_classification": "TYPE_UNVERIFIED"
+}

@@ -606,3 +606,8 @@ PR #190 : conserver #184 fusionnée (rotation10/GPIO36/reset) et preuves J1.18-A
 ### HW4-PEN-A-C1-SYNC — J1.18-B, PR #190 (30 octobre 2026)
 
 Base `main@d29424699dbca3ffe0c20b7d3e4caef9d1ee8dfc` (5/5 CI post-fusion #193 SUCCESS). Passerelle PEN : `BE_VIDEO_SET_INK` rejeté explicitement avant tout replay des événements ou octets PRINT de la ligne, avec test mixte `PEN/PRINT/INK/PRINT/PEN`. Correctif réel `!CLS`, union statique C99 (2048 octets / 3 événements), boot/orientation 10 et témoins CPC scellés préservés. Différentiel mémoire Xtensa exigé sur cette base et CI du nouveau HEAD. Barrière matérielle Pilotage inchangée : `ON_DEVICE_UNVERIFIED`, PR non fusionnée, aucune autorisation autonome de flash.
+
+
+### Gate J1.20-A — oracle CPC signé ABS (Pilotage #202, acquisition en PR)
+
+Mandat limité à 16 programmes autonomes × 2 processus Caprice32, token RAM/LIST, sorties exactes et diagnostics attestés, avec frontière `-32768` et comparaison des affectations `B%`, attestations externes et faux-HEAD. Base `main@c24ee5859d5dc8a955f4a20fac266628133bcfc2`. [PR #204](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/204) et [rapport J1.20-A](J1.20-A-abs-integer-cpc-oracle.md). Les résultats CPC positifs/négatifs ne sont **pas** l'autorisation d'une fonction ABS C99, ni de J1.20-B. Les erreurs observées ne sont jamais remplacées par `BE_INTEGER_OVERFLOW`. Aucun travail PAPER #201, firmware ou graphique ; CI du HEAD final à contrôler, `ON_DEVICE_NOT_APPLICABLE_FOR_A`. **Revue et fusion par Pilotage seul.**

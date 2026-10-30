@@ -140,6 +140,19 @@ jobs:
             echo 'J1.18-A INK_ARCHIVE_PENDING — NO_CPC_ORACLE_PASS_CLAIM'
           fi
 
+      - name: J1.20-A ABS signed INTEGER ROM evidence (external seal required)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_20_a_abs_evidence.py --check-sources
+          if test -f tests/fixtures/cpc6128/j1_20_a_abs/manifest.json; then
+            python3 tools/j1_20_a_abs_evidence.py \
+              --evidence tests/fixtures/cpc6128/j1_20_a_abs --permanent --self-test
+            echo 'J1.20-A ABS_EXTERNALLY_SEALED_ORACLE_PASS'
+          else
+            echo 'J1.20-A ABS_ARCHIVE_PENDING — NO CPC ORACLE PASS CLAIM'
+          fi
+
   pen-cpc-acquisition:
     if: (github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-17-a-pen-cpc' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref_name == 'oracle/j1-17-a-pen-cpc')
     runs-on: ubuntu-24.04
@@ -323,6 +336,94 @@ jobs:
           path: |
             ${{ runner.temp }}/j118-ink/
             ${{ runner.temp }}/j118-rgb-observations.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  abs-cpc-acquisition:
+    if: (github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-20-a-abs-integer' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref_name == 'oracle/j1-20-a-abs-integer')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      packages: read
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: true
+      - name: Pin CPC6128 ROM, emulator, acquisition HEAD and oracle-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$GITHUB_HEAD_SHA"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          git diff origin/main...HEAD --name-only | tee /tmp/j120-abs-files.txt
+          if grep -E '^(core/|video/|integration/|firmware/|hal/|io/|tests/oracles/caprice32/|tests/fixtures/cpc6128/j1_1[0-9]_|tests/fixtures/cpc6128/j1_2_|tests/fixtures/cpc6128/j1_19_|tools/j1_19_)' /tmp/j120-abs-files.txt; then
+            echo 'J1.20-A FORBIDDEN_SCOPE_DIFF'; exit 1
+          fi
+          python3 tools/j1_20_a_abs_evidence.py --check-sources --expect-head "$GITHUB_HEAD_SHA"
+          echo 'J1.20-A BASE_PINNED_SCOPE_PASS'
+      - name: Re-acquire 16 ABS cases twice with independent CPC processes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_20_a_abs_evidence.py --caprice tests/oracles/caprice32 \
+            --output "$RUNNER_TEMP/j120-abs" --expect-head "$GITHUB_HEAD_SHA"
+          python3 tools/j1_20_a_abs_evidence.py --evidence "$RUNNER_TEMP/j120-abs" --self-test
+          echo 'J1.20-A FRESH_32_CPC_SESSIONS_UNSEALED'
+      - name: Archive original captures once, otherwise compare permanent evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST=tests/fixtures/cpc6128/j1_20_a_abs
+          if test ! -f "$DEST/manifest.json"; then
+            test ! -e "$DEST"
+            mkdir -p "$DEST"
+            cp -a "$RUNNER_TEMP/j120-abs/." "$DEST/"
+            ! find "$DEST" -type f \( -name '*.sna' -o -name '*.rom' -o -name '*.dsk' -o -name 'cap32.cfg' \) | grep .
+            python3 tools/j1_20_a_abs_evidence.py --evidence "$DEST" --self-test
+            echo 'J1.20-A ARCHIVE_CREATED_PENDING_EXTERNAL_SHA_PINS'
+            find "$DEST" -type f -print0 | sort -z | xargs -0 sha256sum | tee /tmp/j120-abs-file-shas.txt
+            git config user.name 'loco-cyd-evidence-bot'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add "$DEST"
+            git commit -m 'evidence(J1.20-A): archive 32 authentic CPC ABS sessions'
+            REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/oracle/j1-20-a-abs-integer | awk '{print $1}')"
+            test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA" || {
+              echo 'CONCURRENT_HEAD_ADVANCE_ARCHIVE_NOT_PUSHED'; exit 1;
+            }
+            git push origin HEAD:refs/heads/oracle/j1-20-a-abs-integer
+          else
+            python3 tools/j1_20_a_abs_evidence.py --evidence "$DEST" --permanent --self-test
+            for case in A00 A01 AN1 V07 VN7 VMAX VNMAX VMIN B07 BN7 BMIN IMIN L20 EMPTY STRING MULTI; do
+              for sess in original repeat; do
+                cmp "$DEST/$sess/$case/program.bin" "$RUNNER_TEMP/j120-abs/$sess/$case/program.bin"
+                cmp "$DEST/$sess/$case/run/printer.dat" "$RUNNER_TEMP/j120-abs/$sess/$case/run/printer.dat"
+              done
+            done
+            echo 'J1.20-A EXTERNALLY_SEALED_PERMANENT_AND_FRESH_MATCH'
+          fi
+      - name: Upload raw original and repeated CPC ABS observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: j120-a-abs-32-independent-sessions
+          path: ${{ runner.temp }}/j120-abs/
           if-no-files-found: warn
           retention-days: 30
 

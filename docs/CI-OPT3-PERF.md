@@ -5,15 +5,15 @@
 
 ## Résultat (nearest-rank)
 
-Pour n valeurs triées, `P(p)=valeurs[ceil(p*n)-1]`. Départ = plus petit `created_at` des workflows du SHA ; arrivée = plus grand `updated_at` (proxy API si aucun `job.completed_at` mesuré). **Les couloirs parallèles ne sont pas additionnés**. Durées secondes entières avant arrondi décimal.
+Pour n valeurs triées, `P(p)=valeurs[ceil(p*n)-1]`. Départ du HEAD = plus petit `created_at` des workflows du SHA ; arrivée = dernier `jobs[].completed_at` de la tentative finale lorsque les jobs sont connus, sinon **`updated_at` comme proxy API signalé**. Le maximum des dates de verdict (pas une somme des couloirs parallèles) termine le HEAD. **Les couloirs parallèles ne sont pas additionnés**. Durées secondes entières avant arrondi décimal.
 
 | Cohorte | N | P50 (min) | P95 (min) | Max (min) |
 |---|---:|---:|---:|---:|
-| Tous les HEADs terminés, incidents inclus | 41 | 2.70 | 6.13 | 916.47 |
-| HEADs terminés, hors deux incidents sans jobs (diagnostic ordinaire) | 39 | 2.67 | 3.87 | 6.13 |
-| SUCCESS seulement (secondaire / biais de sélection) | 20 | 2.65 | 3.42 | 6.13 |
+| Tous les HEADs terminés, incidents inclus | 41 | 2.70 | 4.42 | 916.47 |
+| HEADs terminés, hors deux incidents sans jobs (diagnostic ordinaire) | 39 | 2.67 | 3.87 | 4.42 |
+| SUCCESS seulement (secondaire / biais de sélection) | 20 | 2.65 | 3.42 | 4.42 |
 
-**Interprétation :** le P95 descriptif ordinaire est 3.87 min, mais `PERF_NOT_YET_VERIFIED`. Il existe 8 PR identifiées et non 41 PR indépendantes ; certains SHA sont corrélés et le mélange de diffs n'est pas apparié à la baseline. La fenêtre inclut des échecs et annulations. L'objectif indicatif `P95 < 5 min` paraît compatible avec le sous-ensemble hors incidents mais **n'est pas certifié** ; un HEAD ordinaire prend jusqu'à 6.13 min. Aucune revendication numérique de gain global avant/après.
+**Interprétation :** le P95 descriptif ordinaire est 3.87 min, mais `PERF_NOT_YET_VERIFIED`. Il existe 8 PR identifiées et non 41 PR indépendantes ; certains SHA sont corrélés et le mélange de diffs n'est pas apparié à la baseline. La fenêtre inclut des échecs et annulations. L'objectif indicatif `P95 < 5 min` paraît compatible avec le sous-ensemble hors incidents mais **n'est pas certifié** ; un HEAD hors incidents sans jobs prend jusqu'à **4,42 min** dans ce snapshot. Aucune revendication numérique de gain global avant/après.
 
 ## Familles — runs terminés, non filtrés par SUCCESS, incidents no-jobs >1h isolés
 
@@ -25,7 +25,7 @@ Pour n valeurs triées, `P(p)=valeurs[ceil(p*n)-1]`. Départ = plus petit `creat
 | CPC indépendant | 21 | 1.35 | 1.53 | 1.62 | success 21, failure 2 |
 | CPC permanent | 39 | 0.75 | 2.67 | 2.70 | success 32, cancelled 5, failure 4 |
 | HW4 autres | 48 | 0.50 | 0.95 | 1.38 | success 42, failure 4, cancelled 2 |
-| HW4 mémoire A0 | 15 | 3.17 | 6.13 | 6.13 | success 9, failure 6 |
+| HW4 mémoire A0 | 15 | 3.17 | 4.38 | 4.38 | success 9, failure 6 |
 | Routeur | 39 | 0.17 | 0.68 | 1.23 | success 37, cancelled 1, failure 3 |
 | Xtensa | 26 | 2.63 | 3.87 | 4.42 | success 16, cancelled 10 |
 
@@ -69,13 +69,13 @@ Pour n valeurs triées, `P(p)=valeurs[ceil(p*n)-1]`. Départ = plus petit `creat
 | [#193](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/193) | [`f7be14c10a8f`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/f7be14c10a8f8a9af79f8e63d77d0c81a23744fa) | 9 · [run 41079523143](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41079523143) | CANCELLED | 1.62 | OLD_HEAD; OLD_HEAD_CANCELLED |
 | [#193](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/193) | [`b412c0d59f85`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/b412c0d59f8526ecaeb03ff94ab9c7c41ce87cdb) | 9 · [run 41079608071](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41079608071) | SUCCESS | 3.08 | OLD_HEAD |
 | [#190](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/190) | [`17ccd33b45df`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/17ccd33b45df337e267b0540699bb8a27f06605d) | 8 · [run 41079673532](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41079673532) | FAILURE | 3.87 | OLD_HEAD |
-| [#190](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/190) | [`061a62473db6`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/061a62473db620f30889b334351d7315437a7ce9) | 8 · [run 41080231142](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41080231142) | FAILURE | 3.27 | OLD_HEAD |
+| [#190](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/190) | [`061a62473db6`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/061a62473db620f30889b334351d7315437a7ce9) | 8 · [run 41080231142](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41080231142) | FAILURE | 3.25 | OLD_HEAD |
 | [#193](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/193) | [`466ea422e8a5`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/466ea422e8a5a4eaedec00875acea1a783bb4c14) | 9 · [run 41080446427](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41080446427) | SUCCESS | 2.67 | — |
 | [#190](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/190) | [`d165c375a2fe`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/d165c375a2fece2a6178b975162a6bf3aca47c61) | 8 · [run 41081507189](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41081507189) | SUCCESS | 3.15 | OLD_HEAD |
 | [#190](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/190) | [`4fbd3c108257`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/4fbd3c108257ee046acaef68eda4d2e927dfa565) | 8 · [run 41085303434](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41085303434) | FAILURE | 3.18 | OLD_HEAD |
 | [#190](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/190) | [`9f742420ea0d`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/9f742420ea0d8bde7abf2627c3d322d8f155ef07) | 8 · [run 41085425262](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41085425262) | SUCCESS | 3.42 | OLD_HEAD |
 | [#190](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/190) | [`b73040b292e5`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/b73040b292e57e3a0149a618ba2abf996eeec75a) | 8 · [run 41099340483](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41099340483) | FAILURE | 3.10 | OLD_HEAD |
-| [#190](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/190) | [`3d504de90c20`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/3d504de90c20b499e2a782688ab69508c274bee4) | 8 · [run 41099638924](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41099638924) | SUCCESS | 6.13 | — |
+| [#190](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/190) | [`3d504de90c20`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/3d504de90c20b499e2a782688ab69508c274bee4) | 8 · [run 41099638924](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41099638924) | SUCCESS | 4.42 | — |
 
 ## Queue, tentatives, reruns, données manquantes
 
@@ -83,9 +83,9 @@ Pour n valeurs triées, `P(p)=valeurs[ceil(p*n)-1]`. Départ = plus petit `creat
 - [HEAD 0f8d7e42f5c4](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/0f8d7e42f5c4cdb79964910d7271702cd289beed) : cinq workflows `FAILURE`, durée proxy 5 212 s (**1 h 26 min 52 s**) ; **0 job dans les cinq réponses API**. [Exemple run 40956551131](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40956551131).
 - [HEAD 0d4214fdc467](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/0d4214fdc4670dcdaa36f7704fe692b92d43d963) : cinq workflows `FAILURE`, durée proxy 54 988 s (**15 h 16 min 28 s**) ; **0 job dans les cinq réponses API**. [Run 40974350096](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40974350096), [40974350095](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40974350095), [40974350098](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40974350098), [40974350079](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40974350079), [40974350124](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40974350124). Cause précise inconnue : **pas 15 h de compilation**.
 - [Échec A0 #190, run 41080231240](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41080231240) : trois jobs `base-vs-head`, démarrés 3 s après leur création, fin CONSOLE à 15:26:18Z avec FAILURE, les deux autres SUCCESS ; la comparaison compile **base historique et HEAD pour trois profils (six images)**. C'est un contrôle mémoire absolu distinct de la réussite Xtensa ; budget inchangé.
-- [A0 succès ultérieur, run 41099638924](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41099638924) : trois jobs SUCCESS, files de 2–3 s ; job HW3 terminé à 17:36:23Z. Ces trois jobs **s'exécutent en parallèle**.
+- [A0 succès ultérieur, run 41099638924](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41099638924) : trois jobs SUCCESS, files de 2–3 s ; job HW3 terminé à 17:36:23Z. Ces trois jobs **s'exécutent en parallèle**. Le dernier `completed_at` est **17:36:23Z**, tandis que le run n'a été actualisé qu'à **17:38:08Z**, soit **105 secondes** de décalage GitHub. Le moteur mesure donc **263 s (4,38 min)** pour ce run, et non 368 s (6,13 min).
 - [C99 J1.18-B, run 41080446207](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41080446207) : quatre jobs Linux SUCCESS ; files `started_at - created_at` de **4, 11, 11 et 24 secondes** (P95 nearest-rank = 24 s). File ≠ temps de compilation.
-- Les relances sont distinguées par `run_attempt` ; l'outil live charge les tentatives et jobs par `/actions/runs/{id}/attempts/{n}/jobs`. Le snapshot fige seulement certains jobs vérifiés, **et n'est pas une preuve exhaustive des queues/reruns**. La réacquisition live authentifiée est nécessaire pour une distribution complète.
+- Les relances sont distinguées par `run_attempt` ; l'outil live charge les tentatives et jobs par `/actions/runs/{id}/attempts/{n}/jobs`. Le snapshot fige seulement certains jobs vérifiés, **et n'est pas une preuve exhaustive des queues/reruns**. La réacquisition live authentifiée est nécessaire pour une distribution complète. Pour un rerun, le temps mur du HEAD reste calculé depuis la création initiale ; **le temps d'attente de la dernière tentative** part de son propre `run_started_at` vérifié par tentative, sinon de son premier `job.created_at` (borne conservatrice, signalée par `workflow_wait_reference`). Jamais de `run.created_at` historique converti en une heure d'attente de runner.
 
 ## Avant / après, comparabilité et classification de diff
 
@@ -96,6 +96,8 @@ Pour n valeurs triées, `P(p)=valeurs[ceil(p*n)-1]`. Départ = plus petit `creat
 **CPC historique :** les acquisitions ROM/Caprice32 spécialisées et leurs `SKIPPED` restent comptées hors SLA ; aucune archive, SHA scellé, falsification ou critère de preuve n'a été modifié par cet audit. Ceci **ne constitue pas** une nouvelle exécution d'oracle CPC.
 
 ## Reproduction locale (stdlib, API GET uniquement)
+
+**Contrôle C1 du snapshot :** 41 HEADs P95 = **4,42 min**, 39 HEADs hors incidents max = **4,42 min**, 20 HEADs SUCCESS max = **4,42 min** ; 15 runs mémoire A0 P95 = **4,38 min**. Les tests `test_frozen_real_*` recomputent ces assertions via le générateur. Le snapshot reste identique et traçable.
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_opt3_perf_report.py' -v

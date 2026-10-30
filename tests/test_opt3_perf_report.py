@@ -98,6 +98,69 @@ class LatencyTests(unittest.TestCase):
         self.assertEqual(d["conclusion"], "SUCCESS")
         self.assertEqual(trace()["runs"][-1]["attempts"][0]["metadata"]["conclusion"], "failure")
 
+    def test_rerun_one_hour_later_does_not_fake_runner_queue(self):
+        run = trace()["runs"][-1]
+        d = perf.analyze_run(run)
+        # Original run 19:08 -> final job at 20:13 is HEAD latency.
+        self.assertEqual(d["wall_seconds"], 3913)
+        # Latest attempt 20:13 -> job starts 20:13:10: only 10 seconds.
+        self.assertEqual(d["workflow_wait_seconds"], 10)
+        self.assertEqual(d["workflow_wait_reference"], "last_attempt_run_started_at")
+        self.assertEqual(d["job_queue_seconds"]["p95"], 8)
+
+    def test_rerun_without_attempt_start_fails_conservatively(self):
+        run = copy.deepcopy(trace()["runs"][-1])
+        run["attempts"][-1]["metadata"].pop("run_started_at")
+        d = perf.analyze_run(run)
+        self.assertEqual(d["workflow_wait_seconds"], 8)
+        self.assertEqual(d["workflow_wait_reference"],
+                         "last_attempt_job_created_at_fallback")
+
+    def test_stale_rerun_start_is_not_one_hour_runner_wait(self):
+        run = copy.deepcopy(trace()["runs"][-1])
+        run["attempts"][-1]["metadata"]["run_started_at"] = run["created_at"]
+        d = perf.analyze_run(run)
+        self.assertEqual(d["workflow_wait_seconds"], 8)
+        self.assertEqual(d["workflow_wait_reference"],
+                         "last_attempt_job_created_at_fallback")
+
+    def test_missing_rerun_jobs_does_not_invent_queue(self):
+        run = copy.deepcopy(trace()["runs"][-1])
+        run["jobs"] = []
+        run["attempts"][-1]["metadata"].pop("run_started_at")
+        d = perf.analyze_run(run)
+        self.assertIsNone(d["workflow_wait_seconds"])
+        self.assertEqual(d["workflow_wait_reference"], "last_attempt_start_unknown")
+
+    def test_frozen_real_head_and_family_percentiles(self):
+        snapshot = json.loads((ROOT / "docs/CI-OPT3-PERF-REAL-20261030.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(snapshot["runs"]), 286)
+        result = perf.summarize(snapshot["runs"], snapshot["cutoff"])
+        self.assertEqual(len(result["heads"]), 41)
+        self.assertEqual(result["all_terminal_raw"]["p95"], 265)  # 4.42 min
+        self.assertEqual(result["all_terminal"]["n"], 39)
+        self.assertEqual(result["all_terminal"]["max"], 265)
+        self.assertEqual(result["successes"]["n"], 20)
+        self.assertEqual(result["successes"]["max"], 265)
+        self.assertEqual(result["by_family"]["HW4_MEMORY_A0"]["p95"], 263)
+
+    def test_frozen_real_late_github_update_is_not_job_end(self):
+        snapshot = json.loads((ROOT / "docs/CI-OPT3-PERF-REAL-20261030.json").read_text(encoding="utf-8"))
+        run = next(r for r in snapshot["runs"] if r["id"] == 41099638924)
+        self.assertEqual(perf.run_duration(run), 368)  # API update lag 105 s
+        detail = perf.analyze_run(run)
+        self.assertEqual(detail["wall_seconds"], 263)
+        self.assertEqual(detail["completion_source"], "jobs")
+
+    def test_frozen_real_report_matches_published_rounded_figures(self):
+        snapshot = json.loads((ROOT / "docs/CI-OPT3-PERF-REAL-20261030.json").read_text(encoding="utf-8"))
+        generated = perf.report(snapshot)
+        published = (ROOT / "docs/CI-OPT3-PERF.md").read_text(encoding="utf-8")
+        self.assertIn("| HEADs terminés TOUS, y compris incidents (raw) | 41 | 2.70 | 4.42 | 916.47 |", generated)
+        self.assertIn("| HW4_MEMORY_A0 | 15 | 3.17 | 4.38 | 4.38 |", generated)
+        for value in ("**4,42 min**", "**4,38 min**", "41099638924", "105 secondes"):
+            self.assertIn(value, published)
+
     def test_dedup_by_run_id(self):
         t = trace()["runs"][0:4]
         self.assertEqual(len(perf.group_heads(t + [copy.deepcopy(t[0])])[0]["runs"]), 4)

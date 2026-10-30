@@ -251,6 +251,73 @@ static BTStatus explicit_variable(const uint8_t *source, size_t length,
 }
 
 
+
+/* J1.20-B1: only CPC-attested lexical ABS forms (FF 00). No RUN semantics.
+ * Syntax-error witnesses are deliberately tokenizable, exactly as CPC RAM. */
+static BTStatus abs_expression(const uint8_t *src, size_t n, size_t *at,
+                               BTEmitter *out, int in_print)
+{
+    size_t matched = 0u, origin;
+    BTStatus st;
+    if (!keyword_matches(src, n, *at, "ABS", &matched))
+        return BT_UNSUPPORTED_CONSTRUCT;
+    *at += matched;
+    if (*at == n || src[*at] != (uint8_t)'(')
+        return BT_UNSUPPORTED_CONSTRUCT;
+    st = emit(out, 0xffu);
+    if (st == BT_OK) st = emit(out, 0u);
+    if (st == BT_OK) st = emit(out, (uint8_t)'(');
+    if (st != BT_OK) return st;
+    ++*at;
+    origin = *at;
+    if (*at == n) return BT_UNSUPPORTED_CONSTRUCT;
+    if (src[*at] == (uint8_t)')') {
+        if (!in_print) return BT_UNSUPPORTED_CONSTRUCT;
+    } else if (src[*at] == (uint8_t)'"') {
+        if (!in_print || n - *at < 3u ||
+            src[*at + 1u] != (uint8_t)'X' ||
+            src[*at + 2u] != (uint8_t)'"')
+            return BT_UNSUPPORTED_CONSTRUCT;
+        st = emit(out, (uint8_t)'"');
+        if (st == BT_OK) st = emit(out, (uint8_t)'X');
+        if (st == BT_OK) st = emit(out, (uint8_t)'"');
+        *at += 3u;
+    } else if (src[*at] == (uint8_t)'-') {
+        if (n - *at >= 6u && memcmp(src + *at, "-32768", 6u) == 0) {
+            static const uint8_t min_bits[] = {0xf5u,0x1fu,0u,0u,0u,0u,0x90u};
+            size_t i;
+            for (i = 0u; st == BT_OK && i < sizeof(min_bits); ++i)
+                st = emit(out, min_bits[i]);
+            *at += 6u;
+        } else if (n - *at >= 2u && memcmp(src + *at, "-1", 2u) == 0) {
+            st = emit(out, 0xf5u);
+            if (st == BT_OK) st = emit(out, 0x0fu);
+            *at += 2u;
+        } else return BT_UNSUPPORTED_CONSTRUCT;
+    } else if (src[*at] == (uint8_t)'0' || src[*at] == (uint8_t)'1') {
+        uint8_t digit = src[(*at)++];
+        st = emit(out, digit == (uint8_t)'0' ? 0x0eu : 0x0fu);
+        if (st == BT_OK && *at < n && src[*at] == (uint8_t)',') {
+            if (!in_print || digit != (uint8_t)'1' ||
+                *at + 1u >= n || src[*at + 1u] != (uint8_t)'2')
+                return BT_UNSUPPORTED_CONSTRUCT;
+            st = emit(out, (uint8_t)',');
+            if (st == BT_OK) st = emit(out, 0x10u);
+            *at += 2u;
+        }
+    } else if (ascii_upper(src[*at]) == (uint8_t)'A' &&
+               *at + 1u < n && src[*at + 1u] == (uint8_t)'%') {
+        st = explicit_variable(src, n, at, out, BVR_TYPE_INTEGER);
+    } else return BT_UNSUPPORTED_CONSTRUCT;
+    if (st != BT_OK) return st;
+    if (*at == n || src[*at] != (uint8_t)')' ||
+        (*at == origin && !in_print))
+        return BT_UNSUPPORTED_CONSTRUCT;
+    st = emit(out, (uint8_t)')');
+    ++*at;
+    return st == BT_OK && *at == n ? BT_OK : BT_UNSUPPORTED_CONSTRUCT;
+}
+
 /* J1.12-B1: literal INTEGER operands of FOR, TO and STEP only.
  * The positive magnitude 32768 belongs to the exact CPC REAL5 -32768
  * path, never to an unsigned host-only 16-bit token. */
@@ -474,7 +541,29 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
         if (statement == ST_PRINT && index < length &&
             source[index] != (uint8_t)':' &&
             source[index] != (uint8_t)'\'') {
-            if (source[index] == (uint8_t)'"') {
+            int stream8 = 0;
+            if (source[index] == (uint8_t)'#') {
+                if (length - index < 3u ||
+                    source[index + 1u] != (uint8_t)'8' ||
+                    source[index + 2u] != (uint8_t)',')
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                stream8 = 1;
+                status = emit(out, (uint8_t)'#');
+                if (status == BT_OK) status = emit(out, 0x16u);
+                if (status == BT_OK) status = emit(out, (uint8_t)',');
+                if (status != BT_OK) return status;
+                index += 3u;
+                if (index == length) return BT_UNSUPPORTED_CONSTRUCT;
+            }
+            if (stream8 && !keyword_matches(source, length, index, "ABS", &count) &&
+                !(length - index == 2u && source[index] == (uint8_t)'B' &&
+                  source[index + 1u] == (uint8_t)'%') &&
+                !(length - index == 2u && source[index] == (uint8_t)'8' &&
+                  source[index + 1u] == (uint8_t)'8'))
+                return BT_UNSUPPORTED_CONSTRUCT;
+            if (keyword_matches(source, length, index, "ABS", &count)) {
+                status = abs_expression(source, length, &index, out, 1);
+            } else if (source[index] == (uint8_t)'"') {
                 status = quoted_string(source, length, &index, out);
             } else if (keyword != NULL && length == 7u && index == 6u &&
                        source[5] == (uint8_t)' ' &&
@@ -585,6 +674,15 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (status == BT_OK) {
                 status = spaces(source, length, &index, out);
             }
+            if (status == BT_OK &&
+                keyword_matches(source, length, index, "ABS", &count)) {
+                /* Only B%=ABS(A%) is a sealed INTEGER assignment form. */
+                if (length < 8u || source[0] != (uint8_t)'B' ||
+                    source[1] != (uint8_t)'%' ||
+                    source[2] != (uint8_t)'=')
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                status = abs_expression(source, length, &index, out, 0);
+            } else {
             /* One INTEGER reference, binary '+', '-', '*', '\\' or MOD, and an unsigned
              * byte constant. CPC encodes '-' with F5 in this context.
              * Shared BVR encoder preserves the historical CPC name format. */
@@ -687,6 +785,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 }
             }
             } /* Preserve the existing INTEGER grammar unchanged. */
+            } /* ABS RHS or existing INTEGER grammar. */
         } else if (statement == ST_FOR) {
             /* No runtime or loop stack is installed by B1. Preserve lexical
              * spaces and use the shared explicit INTEGER BVR cache convention. */

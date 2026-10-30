@@ -177,6 +177,7 @@ static int negatives(void)
 {
     static const char *const invalid[] = {
         "PRINT ABS(2)", "PRINT ABS(32768)", "PRINT ABS(-32769)",
+        "?ABS(2)", "?ABS(ABS(1))", "?ABS(1)+1", "PRINTABS(1)",
         "PRINT ABS(A%+1)", "PRINT ABS(ABS(1))", "PRINT ABS(-32768+1)",
         "PRINT ABS(1,3)", "PRINT ABS(1,2,3)", "PRINT ABS(\"Y\")",
         "PRINT ABS(B%)", "PRINT SGN(1)", "PRINT SQR(1)",
@@ -280,6 +281,103 @@ static int program_atomicity(void)
     return 0;
 }
 
+/* J1.20-B1-C1: reproduce the P2 alias without overwriting the CPC oracle.
+ * '?' stores BF FF00, while the re-enterable PRINT ABS spelling stores
+ * BF 20 FF00.  For aliases the semantic round-trip is exact but raw RAM
+ * differs by one required separator.  This conflict is left to Pilotage. */
+static int alias_list_roundtrip(void)
+{
+    static const struct {
+        const char *source;
+        const char *listed;
+        int compact_alias;
+    } cases[] = {
+        {"10 ?ABS(1)",       "10 PRINT ABS(1)\n",       1},
+        {"10 ?ABS(-1)",      "10 PRINT ABS(-1)\n",      1},
+        {"10 ?ABS(A%)",      "10 PRINT ABS(A%)\n",      1},
+        {"10 ?ABS(-32768)",  "10 PRINT ABS(-32768)\n",  1},
+        {"10 ? ABS(1)",      "10 PRINT ABS(1)\n",       0},
+        {"10 PRINT ABS(1)",  "10 PRINT ABS(1)\n",       0},
+        {"10 PRINT  ABS(1)", "10 PRINT  ABS(1)\n",      0},
+        {"10 PRINT #8,ABS(1)", "10 PRINT #8,ABS(1)\n",  0}
+    };
+    size_t i;
+    for (i = 0u; i < sizeof(cases)/sizeof(cases[0]); ++i) {
+        BasicProgram original, reentered, tiny;
+        BasicProgramLine before, after;
+        uint8_t store[256], restored[256], tiny_store[8], tiny_saved[8];
+        uint8_t tokens[256], output[256], list[256], saved_list[256];
+        uint8_t ram[256], roundtrip[256], saved_ram[256];
+        size_t written = 77u, ram_len, restored_len, listed_len;
+        size_t cur = 0u, cur2 = 0u, j;
+        BSResult result;
+        CHECK(bp_init(&original, store, sizeof(store)) == BP_OK);
+        result = bs_process_line(&original, (const uint8_t *)cases[i].source,
+                                 strlen(cases[i].source),
+                                 tokens, sizeof(tokens), output,
+                                 sizeof(output), &written);
+        CHECK(result.status == BS_OK);
+        CHECK(bp_export(&original, ram, sizeof(ram), &ram_len) == BP_OK);
+        memcpy(saved_ram, ram, sizeof(ram));
+        CHECK(bl_list_program(&original, list, sizeof(list), &listed_len) == BL_OK);
+        if (listed_len != strlen(cases[i].listed) ||
+            memcmp(list, cases[i].listed, listed_len) != 0) {
+            fprintf(stderr, "C1 RED: source <%s> LIST got <%.*s> expected <%s>\n",
+                    cases[i].source, (int)listed_len, list, cases[i].listed);
+            return 1;
+        }
+        /* Two-pass atomic LIST, including a one-byte-short buffer. */
+        memset(list, 0x7cu, sizeof(list));
+        memcpy(saved_list, list, sizeof(list));
+        written = 88u;
+        CHECK(bl_list_program(&original, list, listed_len - 1u, &written) == BL_NO_SPACE);
+        CHECK(written == 88u && memcmp(list, saved_list, sizeof(list)) == 0);
+        CHECK(bl_list_program(&original, list, sizeof(list), &listed_len) == BL_OK);
+        CHECK(bp_init(&reentered, restored, sizeof(restored)) == BP_OK);
+        result = bs_process_line(&reentered, list, listed_len - 1u,
+                                 tokens, sizeof(tokens), output,
+                                 sizeof(output), &written);
+        CHECK(result.status == BS_OK);
+        CHECK(bp_export(&reentered, roundtrip, sizeof(roundtrip),
+                        &restored_len) == BP_OK);
+        CHECK(bp_next(&original, &cur, &before) == BP_OK);
+        CHECK(bp_next(&reentered, &cur2, &after) == BP_OK);
+        CHECK(before.number == after.number);
+        if (cases[i].compact_alias) {
+            /* Document the one-byte contradiction without altering CPC
+             * image fixtures or tokenization of accepted PRINT witnesses. */
+            const uint8_t *left = original.data + before.body_offset;
+            const uint8_t *right = reentered.data + after.body_offset;
+            CHECK(after.body_length == before.body_length + 1u);
+            CHECK(left[0] == 0xbfu && left[1] == 0xffu && left[2] == 0u);
+            CHECK(right[0] == 0xbfu && right[1] == (uint8_t)' ' &&
+                  right[2] == 0xffu && right[3] == 0u);
+            CHECK(memcmp(left + 1u, right + 2u, before.body_length - 1u) == 0);
+            CHECK(restored_len == ram_len + 1u);
+        } else {
+            CHECK(restored_len == ram_len);
+            CHECK(memcmp(ram, roundtrip, ram_len) == 0);
+        }
+        CHECK(memcmp(ram, saved_ram, sizeof(ram)) == 0);
+        /* Storing in too-small BASIC RAM must preserve every byte. */
+        CHECK(bp_init(&tiny, tiny_store, sizeof(tiny_store)) == BP_OK);
+        memcpy(tiny_saved, tiny_store, sizeof(tiny_store));
+        written = 99u;
+        memset(output, 0x5cu, sizeof(output));
+        result = bs_process_line(&tiny, (const uint8_t *)cases[i].source,
+                                 strlen(cases[i].source), tokens, sizeof(tokens),
+                                 output, sizeof(output), &written);
+        CHECK(result.status == BS_PROGRAM_ERROR &&
+              result.program_status == BP_NO_SPACE);
+        CHECK(written == 99u &&
+              memcmp(tiny_store, tiny_saved, sizeof(tiny_store)) == 0);
+        for (j = 0u; j < sizeof(output); ++j)
+            CHECK(output[j] == 0x5cu);
+    }
+    puts("C1 alias LIST re-enterable; exact raw-RAM delta=1 for compact '?' (Pilotage arbitration)");
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     size_t i;
@@ -288,6 +386,7 @@ int main(int argc, char **argv)
         CHECK(each_oracle(argv[1],names[i])==0);
     CHECK(negatives()==0);
     CHECK(program_atomicity()==0);
+    CHECK(alias_list_roundtrip()==0);
     puts("J1.20-B1 16/16 MATCH_EXACT_RAM, LIST source-semantic, RUN unsupported");
     return 0;
 }

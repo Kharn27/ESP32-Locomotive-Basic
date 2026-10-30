@@ -587,3 +587,7 @@ Ouvert par le Pilotage seulement après succès des cinq CI de `main@6a3470ea3e7
 ### HW4-PEN-A — Gate matérielle PEN natif MODE1 (#188)
 
 Base prescrite `main@e857ce66fb28583361ab06cd0d6a642f7fc97a95`, cinq CI post-fusion J1.17-B SUCCESS. Contrôle C99 4 matrices + pont typé dans `CONSOLE` et 3 profils ESP-IDF 5.5.6, budgets mémoire/ABI et oracles scellés immuables. Projet CYD : alternance UART `PEN 2/1/3`, `PRINT` rouge/jaune/vert, curseur, scroll, `PEN 16` rejet hôte, photos/logs/mémoire PO, SHA flashé. Ordre obligatoire : **PR préliminaire Pilotage → autorisation test PO → essai CYD sur SHA exact → revue finale Pilotage → fusion par Pilotage uniquement**. [Protocole](HW4-PEN-A-native-pen-mode1.md). PR #184 rotation/GPIO36/reset : chemin parallèle avec fichiers communs à surveiller ; aucun pré-merge.
+
+### HW4-PEN-A-C1 — Barrière supplémentaire !CLS et synchronisation main
+
+PR #190 : conserver #184 fusionnée (rotation10/GPIO36/reset) et preuves J1.18-A scellées de `main@5ec280be85d47e330e8a917dc234a4d24fa49a80`. Preuve négative C99 du défaut INK2/INK3 perdus après le vrai `cpc_uart_console_clear()`, puis preuve positive avec le **même** test et correction seulement dans le propriétaire CONSOLE. Exiger GCC/Clang OFF/ON, sanitizers, CI-ARCH/OPT3/CPC, Xtensa 3 profils et comparaison DRAM contre **nouveau main** ; script PO `RUN → !CLS → RUN` sans reboot ni changement de programme, refus `PEN 16` avant/après. **Remise nouvelle revue contradictoire Pilotage**, pas d'essai CYD demandé directement et pas de fusion par Développeur.

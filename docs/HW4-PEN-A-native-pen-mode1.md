@@ -22,13 +22,23 @@ L'encre de texte est changée par `cpc_video_set_text_colors()` uniquement lors 
 
 Les correspondances 4→0 et 15→3 sont des **projections expérimentales limitées aux conditions écrites**, indépendantes de l'acceptation logique. Les tests host démontrent la couleur sous les encres configurées ; ils ne remplacent pas une mesure TFT réelle ni ne prouvent une palette CPC complète. Aucun ajout `PEN #`, transparence, `INK`, `MODE`, `PAPER` ni réécriture du cœur J1.17-B.
 
+## HW4-PEN-A-C1 — récupération de la palette après !CLS
+
+**Mandat correctif :** conserver les encres `INK2=6` (rouge) et `INK3=18` (vert) à la sortie de la commande hôte `!CLS`, sans redémarrer le CYD. La vraie fonction générique `cpc_uart_console_clear()` réinitialise le mode et rétablit seulement INK0/INK1 ; l'intégration CONSOLE la délègue désormais à `hw4_pen_console_clear()`, qui **réapplique INK2/INK3 après le clear**, sans état supplémentaire ni modification de `video/`, `io/`, `core/` ou des oracles.
+
+**Preuve RED reproductible (avant correction)** : HEAD `17ccd33b45df337e267b0540699bb8a27f06605d`, [CI-C99 41079673659](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41079673659) : le nouveau test compile dans les quatre cellules mais échoue à la ligne `test_c1_real_console_cls_palette` sur `f.video.ink[2]==6U && f.video.ink[3]==18U` immédiatement après le vrai `cpc_uart_console_clear()`. Le test exécute PEN 2, 3, 15, 4 et l'échec atomique PEN 16 **avant et après !CLS**, en contrôlant les pixels RGB565, le curseur et la conservation des lignes BASIC. Le même test est conservé pour la preuve GREEN, après correction du seul point de réinitialisation CONSOLE.
+
+**Synchronisation de branche :** `main@5ec280be85d47e330e8a917dc234a4d24fa49a80` (oracles scellés J1.18-A et rotation/GPIO36/reset de #184, désormais fusionnée) a été intégré dans la PR #190 par commit à deux parents, sans modification des nouvelles archives J1.18-A ni des preuves J1.17-A. Le profil matériel conserve donc le réglage d'orientation **10** et les initialisations tactiles de `main`.
+
+**Protocole PO mis à jour — À EXÉCUTER UNIQUEMENT APRÈS AUTORISATION DU PILOTAGE :** avec le SHA exact retenu par Pilotage et les commandes de flash ci-dessous, saisir le programme positif, constater les couleurs, puis envoyer directement `!CLS` et `RUN` **sans NEW ni rechargement du programme**. Vérifier après le second RUN : mêmes couleurs `RED` rouge, `GREEN` et `GREEN15` verts, `HIDDEN` bleu-sur-bleu, `YELLOW` jaune ; écran effacé avant la réapparition, sans reboot ; conserver `Ready`, curseur, scroll et code BASIC stocké. Répéter le scénario `PEN 16` avant puis après `!CLS` : dans les deux cas diagnostic `INVALID_PEN` hôte, aucune trace PRINT de `NEVER`. Fournir deux photos couleurs avant/après, extraits UART et mesure mémoire `DEVICE_MEMORY` avec le SHA complet. **Aucun flash demandé par le Développeur : Pilotage décide du déclenchement des essais PO.**
+
 ## Tests automatiques et risques
 
 `tests/test_hw4_pen_a.c` couvre l'exécution numérotée `PEN 2/1/3/4/15` → octets `PRINT` → événements typés → VRAM/pixels/RGB565, la conservation FNV et des cellules, les tranches d'événements et leur ordre, un `PEN` sans impression, l'absence de recoloration rétroactive, les erreurs de type/offset/palette/capacité atomiques, les refus `PEN 16/-1/5/14` après préfixe `PRINT`, et le scrolling en 30 lignes. Les tests historiques de boot, UART, READY, EDIT, scrolling, CPC et RAM sont laissés intacts.
 
 **Limites :** la validation bridge prévient les erreurs **prévisibles** avant de toucher au rendu ; une défaillance TFT matérielle ou une mutation concurrente du sink en plein replay n'est pas transactionnelle. Le CONSOLE conserve le propriétaire unique vidéo et le comportement `repaint_dirty` existant. La capacité maximale de **3 événements par étape** est explicitement bornée : dépassement -> `BE_NO_EVENT_SPACE`, aucune ligne partiellement dessinée.
 
-**Parallélisme :** la PR #184 de rotation/GPIO36/reset touche aussi `firmware/esp32_display_probe/main/hw4_c2_console.c`, `firmware/esp32_display_probe/main/CMakeLists.txt` et `CMakeLists.txt`. Aucun changement #184 n'est repris, aucun rebase ni fusion anticipé : Pilotage doit arbitrer l'ordre d'intégration et toute résolution de conflit.
+**Synchronisation :** #184 est désormais fusionnée dans `main` ; ses modifications GPIO36/rotation/reset sont conservées sans retouche ni code partagé réinventé. Les 243 archives brutes J1.18-A et les 113 témoins J1.17-A restent inchangés. Toute validation de conflit avec `main` se fait sur le HEAD final de la PR #190.
 
 ## Procédure PO — obligatoire *après* revue préliminaire favorable du Pilotage
 
@@ -61,6 +71,8 @@ RUN
 
 Sur TFT : `RED` rouge, `YELLOW` jaune, `GREEN` et `GREEN15` verts, `HIDDEN` invisible bleu-sur-bleu dans ce boot (le contenu logique est néanmoins consommé), `YELLOW AGAIN` jaune. Les caractères déjà tracés gardent leur couleur. `Ready` et le curseur restent actifs ; les changements PEN ne mettent pas les octets commandes dans le texte.
 
+**Répétition après effacement :** saisir `!CLS`, puis `RUN` **sans `NEW`**. Le programme existant doit se réexécuter et produire les mêmes couleurs/événements. La commande hôte de clear n'encode aucun événement `PEN` dans `PRINT_BYTES` et ne réécrit pas les lignes BASIC. Une divergence uniquement sur le second `RUN` est un **FAIL C1**.
+
 **Traces UART positives (formes exactes significatives)** : pour L10, `HW4-C2 PRINT_BYTES length=11 hex=5245440a59454c4c4f570a`, puis deux `HW4-PEN-A VIDEO_EVENT type=SET_TEXT_PEN logical=2 pixel=2 print_offset=0` et `logical=1 pixel=1 print_offset=4`. Pour L20 : `PRINT_BYTES length=14 hex=475245454e0a475245454e31350a`, événements 3 offset0 puis 15 offset6. Pour L30 : `PRINT_BYTES length=7 hex=48494444454e0a` et `logical=4 pixel=0 print_offset=0`. Pour L40 : `logical=1 pixel=1`, `PRINT_BYTES length=13 hex=59454c4c4f5720414741494e0a`. Le nombre d'octets, les offsets et la progression cursor/scroll font foi, pas un `ERR/ERL` CPC inventé.
 
 **Test négatif UART (nouveau programme, aucun changement d'affichage par la ligne invalide)** :
@@ -73,6 +85,8 @@ RUN
 ```
 
 Attendu : `HW4-PEN-A STEP_DIAG category=INVALID_PEN events_applied=0 print_applied=0 origin=HOST_NOT_CPC_ERR`, `HW4-C2 BSR_STEP_FAIL ...`, diagnostic d'erreur HW4, **aucun PRINT_BYTES de NEVER**. Optionnel : répéter pour `PEN 5` et constater `UNSUPPORTED_UNVERIFIED` sans la confondre avec une erreur historique CPC.
+
+**Contrôle C1 du refus `PEN 16` après effacement :** après le `RUN` négatif, saisir `!CLS` puis `RUN` sans `NEW`. Le diagnostic hôte `INVALID_PEN` doit être identique, et `NEVER` ne doit apparaître ni à l'écran ni en `PRINT_BYTES`.
 
 **Scroll / curseur** (après un NEW, volontairement borné par le budget de RUN et pouvant afficher l'erreur hôte de budget à la fin) :
 

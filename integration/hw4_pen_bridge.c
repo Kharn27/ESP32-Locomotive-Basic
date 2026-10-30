@@ -95,9 +95,13 @@ Hw4PenStatus hw4_pen_replay(CpcText *sink,
     return HW4_PEN_OK;
 }
 
-/* C1 negative control: real existing clear, currently loses INK2 and INK3.
- * This wrapper is the sole CONSOLE !CLS call site and has no stored state. */
+/* C1: CONSOLE-specific palette restoration after the real UART clear.
+ * cpc_uart_console_clear() resets MODE1 and INK0/INK1; the PEN display
+ * integration owns the additional explicit INK2=6 and INK3=18. Neither
+ * core nor the generic UART/video layer adopts a global palette policy. */
 bool hw4_pen_console_clear(CpcText *text)
 {
-    return cpc_uart_console_clear(text);
+    if (!cpc_uart_console_clear(text)) return false;
+    return cpc_video_set_ink(text->video, 2U, 6U) &&
+           cpc_video_set_ink(text->video, 3U, 18U);
 }

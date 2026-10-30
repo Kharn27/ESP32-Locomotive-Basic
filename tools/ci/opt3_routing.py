@@ -26,7 +26,8 @@ FAMILIES = {
         "j1-12-a-for-next-integer.yml", "j1-12-b1-cpc-reacquire.yml",
         "j1-13-a-integer-relations.yml", "j1-14-a-if-inline-else.yml",
         "j1-15-a-string-scalar.yml", "j1-16-a-real5-scalar.yml",
-        "j1-16-d-a-negative-store.yml", "j1-16-e-a-small-store.yml"),
+        "j1-16-d-a-negative-store.yml", "j1-16-e-a-small-store.yml",
+        "j1-17-c-a-pen-cpc.yml"),
     "HW4": ("hw4-c3-b1-scroll.yml", "hw4-c3-b2-scroll.yml",
             "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
             "hw4-scroll-opt-a0-memory.yml"),
@@ -45,9 +46,9 @@ EXPECTED_ROUTES = {
     "j1-14-a-if-inline-else.yml": ("tools/j1_14_if_inline_else_verify.py", "tests/fixtures/cpc6128/j1_14_if_inline_else/**"),
     "j1-15-a-string-scalar.yml": ("tools/j1_15_string_scalar_verify.py", "tests/fixtures/cpc6128/j1_15_string_scalar/**"),
     "j1-16-e-a-small-store.yml": ("tools/j1_16_e_a_store.py", "tests/fixtures/cpc6128/j1_16_e_a_small_store/**"),
+    "j1-17-c-a-pen-cpc.yml": ("tools/j1_17_c_a_pen_oracle.py", "tests/fixtures/cpc6128/j1_17_c_a_pen/**"),
 }
 HISTORICAL = {x for x in FAMILIES["CPC_ACQUISITION"] if x.startswith("j1-")}
-
 # J1.19-A C1: a specifically audited existing-workflow job, never a wildcard.
 PAPER_TOOL = "tools/j1_19_a_paper_oracle.py"
 PAPER_WORKFLOW = "ci-cpc-permanent.yml"
@@ -135,7 +136,7 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(expected) == 31 and len(set(expected)) == 31,
+    demand(len(expected) == 32 and len(set(expected)) == 32,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(set(sources) == set(expected), "UNKNOWN_OR_MISSING_WORKFLOW")
     a0_paths = filters(sources[HW4_A0])
@@ -184,7 +185,6 @@ def audit(sources):
            "UNVERIFIED_SCALAR_RETAINED" in ea and
            "SEALED_D_A_ARCHIVE_MISMATCH" in da,
            "E_A_C1_OR_D_A_SEAL_LOST")
-
 
 
 def audit_paper_route(sources):
@@ -403,7 +403,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=31 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=32 FAMILIES=5")
 
 
 if __name__ == "__main__":

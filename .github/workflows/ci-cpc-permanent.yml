@@ -127,6 +127,13 @@ jobs:
           else
             echo 'J1.17-A ARCHIVE_NOT_YET_ACQUIRED — CPC_UNVERIFIED'
           fi
+      - name: J1.17-C-A PEN 5..14 MODE1 externally pinned CPC archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_17_c_a_pen_oracle.py --check-sources
+          python3 tools/j1_17_c_a_pen_oracle.py --evidence tests/fixtures/cpc6128/j1_17_c_a_pen --permanent --self-test
+          echo 'J1.17-C-A EXTERNALLY_SEALED_52_CPC_SESSIONS_VERIFIED'
       - name: J1.18-A INK independent oracle — external SHA seal (when archived)
         shell: bash
         run: |
@@ -427,7 +434,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-  # J1.19-A C1: isolated real CPC oracle, NEVER run for historical or fork PRs.
   paper-cpc-acquisition:
     if: (github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-19-a-paper-cpc' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref_name == 'oracle/j1-19-a-paper-cpc')
     runs-on: ubuntu-24.04

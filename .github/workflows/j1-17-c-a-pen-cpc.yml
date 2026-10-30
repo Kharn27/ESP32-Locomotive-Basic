@@ -25,14 +25,14 @@ jobs:
     container:
       image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
       credentials:
-        username: \${{ github.actor }}
-        password: \${{ secrets.GITHUB_TOKEN }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     env:
-      EXPECTED_HEAD: \${{ github.event.pull_request.head.sha }}
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           submodules: recursive
           fetch-depth: 0
           persist-credentials: true
@@ -86,6 +86,6 @@ jobs:
         if: always()
         with:
           name: j117c-pen-cpc-real-acquisition
-          path: \${{ runner.temp }}/j117c/
+          path: ${{ runner.temp }}/j117c/
           retention-days: 30
           if-no-files-found: ignore

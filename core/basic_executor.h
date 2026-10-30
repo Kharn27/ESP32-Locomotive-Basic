@@ -45,8 +45,9 @@ typedef enum {
  * SET_INK changes logical palette mapping; the renderer may need to
  * recolour already-drawn pixels, not just future PRINT bytes.
  * No RGB table, colour rendering, or blinking is provided by core.
- * New ink/colour bytes consume pre-existing alignment padding before
- * print_offset on the currently supported ESP32 and host ABIs. */
+ * The three historical fields retain their offsets and initializer order.
+ * Appended ink/colour fields increase sizeof(BEVideoEvent); consumers
+ * must recompile and budgets must reflect the caller-owned array size. */
 typedef enum {
     BE_VIDEO_SET_TEXT_PEN = 1,
     BE_VIDEO_SET_INK = 2
@@ -54,9 +55,9 @@ typedef enum {
 typedef struct {
     BEVideoEventType type;
     uint8_t pen; /* historical PEN argument; zero for SET_INK */
+    size_t print_offset; /* original third field: preserve positional initializers */
     uint8_t ink; /* CPC logical palette index, not MODE pixel index */
     uint8_t colour; /* CPC colour code, NOT an RGB or renderer value */
-    size_t print_offset;
 } BEVideoEvent;
 
 /* J1.11-B: fixed per-executor call stack, no heap and no C recursion.

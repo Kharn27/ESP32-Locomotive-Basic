@@ -489,10 +489,27 @@ static bool basic_run(void)
                 "EVENT_CAPACITY" : "HOST_GENERIC";
             printf("HW4-C2 BSR_STEP_FAIL BSR=%d BE=%d step=%u\n",
                    (int)r.status,(int)r.executor_status,steps);
+            /* The failed step is atomic; the executor still points to the
+             * authentic numbered BASIC record. Resolve BEFORE bsr_stop(). */
+            CpcStepDiagnostic diagnostic=cpc_diag_policy_step(
+                r,&s_basic.runtime);
             printf("HW4-PEN-A STEP_DIAG category=%s events_applied=0 "
-                   "print_applied=0 origin=HOST_NOT_CPC_ERR\n",pen_diag);
+                   "print_applied=0 origin=%s basic_line=%u host_cpc_err=none\n",
+                   pen_diag,
+                   diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE ?
+                       "CPC_PEN_ORACLE" : "HOST_NOT_CPC_ERR",
+                   (unsigned)diagnostic.line_number);
+            printf("HW4-DIAG-PEN-A DIAG_POLICY category=%s line=%u "
+                   "source=%s message=%s\n",
+                   cpc_diag_policy_category(diagnostic.category),
+                   (unsigned)diagnostic.line_number,
+                   diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE ?
+                       "NATIVE_PEN_ORACLE" : "HOST",
+                   cpc_diag_policy_message(diagnostic.category));
             (void)bsr_stop(&s_basic.runtime);
-            return display_error();
+            if(!cpc_diag_policy_write_step(&s_text,diagnostic))
+                return fail("STEP_DIAG_TEXT",-1);
+            return true;
         }
         if(event_count!=0U) {
             /* Shared pure C99 decision: diagnosed reject exits RUN to Ready. */

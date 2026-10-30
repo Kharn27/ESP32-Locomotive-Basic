@@ -10,8 +10,35 @@
 typedef enum {
     CPC_DIAG_HOST_GENERIC = 0,
     CPC_DIAG_LINE_DOES_NOT_EXIST,
+    CPC_DIAG_PEN_IMPROPER_ARGUMENT,
     CPC_DIAG_COUNT
 } CpcDiagCategory;
+
+/* This is display provenance, NOT a CPC ERR/ERL register or host status code. */
+typedef enum {
+    CPC_DIAG_ORIGIN_HOST = 0,
+    CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE
+} CpcDiagOrigin;
+
+typedef struct {
+    CpcDiagCategory category;
+    CpcDiagOrigin origin;
+    uint16_t line_number; /* 0 for host diagnostics; never a fixed L10. */
+} CpcStepDiagnostic;
+
+/* A failed, still-running native PEN step keeps its executor cursor. Resolve
+ * the real stored line BEFORE bsr_stop(). A standalone BEStatus or a renderer
+ * rejection is never sufficient evidence for a CPC diagnostic.
+ * Only PEN 16 and PEN -1 have an independent CPC error witness. */
+CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
+                                        const BasicSessionRuntime *runtime);
+/* One LF-terminated diagnostic. Host fallback is ERROR\n, with no fabricated
+ * line number; invalid fabricated CPC contexts fail closed, writing nothing.
+ * format_step is also a byte-exact regression seam, without heap or printf. */
+bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
+                                  uint8_t *output, size_t capacity,
+                                  size_t *written);
+bool cpc_diag_policy_write_step(CpcText *text, CpcStepDiagnostic diagnostic);
 
 /* Only a genuine numbered-line deletion BS_NOT_FOUND can select CPC text.
  * Other errors (including GOTO, LISTT, UART or executor failures) stay

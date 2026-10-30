@@ -1,0 +1,91 @@
+name: J1.17-C-A independent PEN 5-14 CPC acquisition
+
+on:
+  pull_request:
+    paths:
+      - "tools/j1_17_c_a_pen_oracle.py"
+      - "tests/oracles/inputs/j1_17_c_a/**"
+      - "tests/fixtures/cpc6128/j1_17_c_a_pen/**"
+      - "docs/J1.17-C-A-pen-5-14-cpc-oracle.md"
+      - ".github/workflows/j1-17-c-a-pen-cpc.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  acquisition:
+    if: github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-17-c-a-pen-5-14-cpc' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    permissions:
+      contents: write
+      packages: read
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: \${{ github.actor }}
+        password: \${{ secrets.GITHUB_TOKEN }}
+    env:
+      EXPECTED_HEAD: \${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha }}
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Pin authentic CPC ROM, Caprice32 executable, base and mission scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git merge-base --is-ancestor 1d309b667272106f5ba1c85ca8347f25a88850d4 HEAD
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d' ' -f1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          git diff --name-only 1d309b667272106f5ba1c85ca8347f25a88850d4 HEAD | tee /tmp/j117c-scope
+          if grep -E '^(core/|video/|firmware/|io/|integration/|hal/|tests/fixtures/cpc6128/j1_17_a_pen/|tools/j1_17_a_pen)' /tmp/j117c-scope; then
+            echo 'FORBIDDEN_NATIVE_OR_HISTORICAL_DIFF'; exit 1
+          fi
+          python3 tools/j1_17_c_a_pen_oracle.py --check-sources --expect-head "$EXPECTED_HEAD"
+      - name: Authentic fresh CPC sessions or verify immutable already archived acquisition
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST=tests/fixtures/cpc6128/j1_17_c_a_pen
+          if test ! -f "$DEST/manifest.json"; then
+            test ! -e "$DEST"
+            python3 tools/j1_17_c_a_pen_oracle.py \
+              --caprice tests/oracles/caprice32 \
+              --output "$RUNNER_TEMP/j117c" --expect-head "$EXPECTED_HEAD"
+            python3 tools/j1_17_c_a_pen_oracle.py \
+              --evidence "$RUNNER_TEMP/j117c" --self-test
+            mkdir -p "$DEST"
+            cp -a "$RUNNER_TEMP/j117c/." "$DEST/"
+            ! find "$DEST" -type f \( -name '*.sna' -o -name '*.rom' -o -name '*.dsk' -o -name 'cap32.cfg' \) | grep .
+            python3 tools/j1_17_c_a_pen_oracle.py --evidence "$DEST" --self-test
+            sha256sum "$DEST/manifest.json"
+            git config user.name 'loco-cyd-evidence-bot'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add "$DEST"
+            git commit -m 'evidence(J1.17-C-A): archive authentic CPC MODE1 PEN 5-14 contexts'
+            REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/oracle/j1-17-c-a-pen-5-14-cpc | awk '{print $1}')"
+            test "$REMOTE_HEAD" = "$EXPECTED_HEAD" || { echo CONCURRENT_HEAD_ADVANCE; exit 1; }
+            git push origin HEAD:refs/heads/oracle/j1-17-c-a-pen-5-14-cpc
+          else
+            python3 tools/j1_17_c_a_pen_oracle.py --evidence "$DEST" --permanent --self-test
+            echo 'EXTERNALLY_PINNED_CPC_ARCHIVE_VERIFIED'
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: j117c-pen-cpc-real-acquisition
+          path: \${{ runner.temp }}/j117c/
+          retention-days: 30
+          if-no-files-found: ignore

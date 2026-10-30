@@ -135,6 +135,15 @@ if(BUILD_TESTING)
 endif()
 
 
+# J1.20-B1: ABS token FF00, 16 CPC original/repeat RAM images and semantic LIST.
+# No ABS runtime executable is registered or linked beyond the legacy engine.
+if(BUILD_TESTING)
+    add_executable(test_basic_abs_token_list tests/test_basic_abs_token_list.c)
+    target_link_libraries(test_basic_abs_token_list PRIVATE basic_session_runtime)
+    add_test(NAME basic_abs_token_list COMMAND test_basic_abs_token_list
+             "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
 # J0.16: thirteenth suite, explicit scalar references in PRINT/LIST only.
 if(BUILD_TESTING)
     add_executable(test_basic_explicit_variable_tokens tests/test_basic_explicit_variable_tokens.c)

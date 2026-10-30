@@ -1,0 +1,157 @@
+{
+  "case": "B07",
+  "diagnostic_classification": "DIAG_CPC_UNVERIFIED",
+  "erl": 0,
+  "err": 0,
+  "full_snapshot_archived": false,
+  "input_classification": "OBSERVED",
+  "line_numbers_observed": [
+    10,
+    20,
+    30,
+    40,
+    50
+  ],
+  "line_numbers_requested": [
+    10,
+    20,
+    30,
+    40,
+    50
+  ],
+  "list": {
+    "commands": [
+      "MODE 1",
+      "NEW",
+      "10 A%=7",
+      "20 B%=ABS(A%)",
+      "30 PRINT B%",
+      "40 PRINT #8,B%",
+      "50 END",
+      "LIST",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-30T21:56:00.382082+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-30T21:55:59.187879+00:00"
+  },
+  "list_commands": [
+    "MODE 1",
+    "NEW",
+    "10 A%=7",
+    "20 B%=ABS(A%)",
+    "30 PRINT B%",
+    "40 PRINT #8,B%",
+    "50 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "list_image_sha256": "d33a5b2abdf0530fb8c3f66e1225e4c7b29d6fd523c4f9a2deee098f710efea7",
+  "printer_is_not_screen_evidence": true,
+  "program_hex": "0B 00 0A 00 02 00 00 C1 EF 15 00 12 00 14 00 02 00 00 C2 EF FF 00 28 02 00 00 C1 29 00 0B 00 1E 00 BF 20 02 00 00 C2 00 0E 00 28 00 BF 20 23 16 2C 02 00 00 C2 00 06 00 32 00 98 00 00 00",
+  "program_sha256": "613597a7bbea54a936f9c9e3e851ec993241076b4aff53c4bad2e305468aff98",
+  "region": {
+    "bank": "physical bank 0, Gate Array RAM config 0",
+    "base_pointer_address": 44644,
+    "base_pointer_value": 367,
+    "end_exclusive": 430,
+    "end_pointer_address": 44646,
+    "length": 62,
+    "line_numbers": [
+      10,
+      20,
+      30,
+      40,
+      50
+    ],
+    "records": [
+      {
+        "length": 11,
+        "line": 10,
+        "offset": 0,
+        "terminator_offset": 10
+      },
+      {
+        "length": 18,
+        "line": 20,
+        "offset": 11,
+        "terminator_offset": 28
+      },
+      {
+        "length": 11,
+        "line": 30,
+        "offset": 29,
+        "terminator_offset": 39
+      },
+      {
+        "length": 14,
+        "line": 40,
+        "offset": 40,
+        "terminator_offset": 53
+      },
+      {
+        "length": 6,
+        "line": 50,
+        "offset": 54,
+        "terminator_offset": 59
+      }
+    ],
+    "sentinel_offset": 60,
+    "snapshot_data_offset": 256,
+    "snapshot_program_offset": 624,
+    "start_address": 368,
+    "terminator_hex": "0000"
+  },
+  "result_printer_hex": "20 37 20 0D 0A",
+  "run": {
+    "commands": [
+      "MODE 1",
+      "NEW",
+      "10 A%=7",
+      "20 B%=ABS(A%)",
+      "30 PRINT B%",
+      "40 PRINT #8,B%",
+      "50 END",
+      "RUN",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "PRINT #8,\"@@ABS-ERR@@\";ERR;\",\";ERL",
+      "PRINT #8,\"@@ABS-SCREEN@@\"",
+      "FOR YY=1 TO 25:FOR XX=1 TO 40:LOCATE XX,YY:PRINT #8,COPYCHR$(#0);:NEXT XX:PRINT #8:NEXT YY",
+      "CAP32_DELAY CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-30T21:56:03.100179+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-30T21:56:00.383676+00:00"
+  },
+  "run_commands": [
+    "MODE 1",
+    "NEW",
+    "10 A%=7",
+    "20 B%=ABS(A%)",
+    "30 PRINT B%",
+    "40 PRINT #8,B%",
+    "50 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+    "PRINT #8,\"@@ABS-ERR@@\";ERR;\",\";ERL",
+    "PRINT #8,\"@@ABS-SCREEN@@\"",
+    "FOR YY=1 TO 25:FOR XX=1 TO 40:LOCATE XX,YY:PRINT #8,COPYCHR$(#0);:NEXT XX:PRINT #8:NEXT YY",
+    "CAP32_DELAY CAP32_EXIT"
+  ],
+  "run_image_sha256": "28c0bce565ed80acf447bf9b3d466fb068222c0bac5e9c951ec4774c1f9889bc",
+  "run_printer_sha256": "9bd23b1b61e0d23061ee673bda828b2262cb56d41badb948b75e1f602175c869",
+  "screen_rows": 3,
+  "screen_text_classification": "DIAG_CPC_UNVERIFIED",
+  "screen_text_hex": "0D 0A 52 65 61 64 79 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A 4E 45 57 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20",
+  "session": "original",
+  "setup_commands": [
+    "MODE 1",
+    "NEW"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "8e6aa636b04d23ecff468d616cb0681cc8b8f78494dfdcec958af85e49560130",
+  "token_classification": "OBSERVED",
+  "type_classification": "TYPE_UNVERIFIED"
+}

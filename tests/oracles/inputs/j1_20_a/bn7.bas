@@ -1,0 +1,5 @@
+10 A%=-7
+20 B%=ABS(A%)
+30 PRINT B%
+40 PRINT #8,B%
+50 END

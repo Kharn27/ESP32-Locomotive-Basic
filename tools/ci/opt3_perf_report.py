@@ -104,15 +104,42 @@ def analyze_run(run):
         if b is not None and c is not None and c >= b:
             execution.append(c - b)
     attempts = run.get("attempts", [])
-    # Workflow-level queue estimate: from run creation to earliest job start,
-    # distinct from the per-job created->started runner queue.
+    # Workflow wait is NOT the PR/HEAD elapsed time. Reruns retain the
+    # original run.created_at, so it cannot anchor the final attempt's queue.
+    # Use an explicitly dated final attempt; otherwise use its first scheduled
+    # job as a conservative boundary (never infer an hour of runner queue).
+    attempt_count = max(int(run.get("run_attempt") or 1), len(attempts))
     starts = [stamp(j.get("started_at")) for j in jobs or []]
     starts = [v for v in starts if v is not None]
-    workflow_wait = max(0, min(starts) - start) if starts and start is not None else None
+    created = [stamp(j.get("created_at")) for j in jobs or []]
+    created = [v for v in created if v is not None]
+    first_created = min(created) if created else None
+    attempt_start = start
+    wait_reference = "run_created_at"
+    if attempt_count > 1:
+        meta = attempts[-1].get("metadata", {}) if attempts else {}
+        explicit_start = stamp(meta.get("run_started_at"))
+        # Only trust metadata for the current attempt when its number matches.
+        meta_number = meta.get("run_attempt", meta.get("attempt"))
+        if meta_number is not None and int(meta_number) != attempt_count:
+            explicit_start = None
+        if (explicit_start is not None and first_created is not None and
+                explicit_start <= min(starts or [first_created])):
+            attempt_start = explicit_start
+            wait_reference = "last_attempt_run_started_at"
+        elif first_created is not None:
+            attempt_start = first_created
+            wait_reference = "last_attempt_job_created_at_fallback"
+        else:
+            attempt_start = None
+            wait_reference = "last_attempt_start_unknown"
+    workflow_wait = (max(0, min(starts) - attempt_start)
+                     if starts and attempt_start is not None else None)
     return dict(wall_seconds=wall, workflow_wait_seconds=workflow_wait,
+                workflow_wait_reference=wait_reference,
                 job_queue_seconds=stats(queue), job_execution_seconds=stats(execution),
                 jobs_seen=None if jobs is None else len(jobs),
-                attempt_count=len(attempts) if attempts else (run.get("run_attempt") or 1),
+                attempt_count=attempt_count,
                 conclusion=conclusion(run),
                 anomalous_no_jobs=(jobs == [] and wall is not None and
                                    wall > ANOMALY_SECONDS),
@@ -293,14 +320,18 @@ def fetch_live(client, *, max_pages, cutoff=CUTOFF, through=None, with_jobs=True
             attempt_count = r.get("run_attempt") or 1
             hist = []
             for n in range(1, attempt_count + 1):
-                if n < attempt_count:
-                    try:
-                        meta = client.get(f"/actions/runs/{r['id']}/attempts/{n}")
-                    except RuntimeError:
-                        meta = {"attempt": n, "metadata_unavailable": True}
-                else:
-                    meta = {"attempt": n, "status": r.get("status"),
-                            "conclusion": r.get("conclusion")}
+                try:
+                    meta = client.get(f"/actions/runs/{r['id']}/attempts/{n}")
+                    # Preserve attempt identity; run-level created_at belongs
+                    # to the original run, not the re-run's runner queue.
+                    meta["attempt"] = n
+                except RuntimeError:
+                    meta = {"attempt": n, "metadata_unavailable": True}
+                    if n == attempt_count:
+                        # run_started_at may refer to the latest attempt, but
+                        # we do not trust it without attempt-scoped evidence.
+                        meta.update(status=r.get("status"),
+                                    conclusion=r.get("conclusion"))
                 jobs = []
                 for batch in client.pages(f"/actions/runs/{r['id']}/attempts/{n}/jobs", limit=10):
                     jobs.extend(batch)
@@ -376,6 +407,11 @@ def report(snapshot):
         "", f"**Origine :** `{snapshot['source']}` ; **coupure UTC :** `{snapshot.get('cutoff', CUTOFF)}` ; **fin fenêtre :** `{snapshot.get('through') or 'non fixée'}`.",
         "", "**Percentiles :** nearest-rank `sorted[ceil(p*n)-1]` sur secondes entières ;"
         " durées en minutes, sans somme des workflows parallèles.",
+        "", "**Date de verdict par run :** fin du dernier job de la dernière tentative si disponible ;"
+        " à défaut, `updated_at` comme proxy explicitement signalé. Le HEAD finit au dernier verdict"
+        " des couloirs en parallèle. `run.created_at` reste le départ du HEAD, y compris si rerun ;"
+        " **l'attente du rerun** part de son propre `run_started_at` ou, en absence de preuve,"
+        " du premier `job.created_at` de cette tentative (borne conservatrice).",
         "", "| Population | N | P50 min | P95 min | Max min |",
         "|---|---:|---:|---:|---:|",
     ]
@@ -409,8 +445,8 @@ def report(snapshot):
         lines.append(f"| {prs} | {href} | {h['diff_class']} | {h['run_count']} ([runs]({base}/actions?query={sha[:12]}), {links}) | {h['verdict']}"
                      f" | {minutes(h['wall_seconds'])} | {'OLD_HEAD_CANCELLED' if h.get('old_head_cancelled') else 'OLD_HEAD' if h['old_head'] else 'non/unknown'} | {'NO_JOBS_LONG' if h['anomaly'] else '—'} |")
     lines += ["", "## Attente jobs, tentatives, reruns et incident no-jobs", "",
-              "| HEAD SHA | Run | Famille | Tentatives | Conclusion finale | Run (min) | Attente workflow (s) | Queue jobs P95 (s) | Exécution jobs P95 (s) | Jobs | Source fin |",
-              "|---|---|---|---:|---|---:|---:|---:|---:|---:|---|"]
+              "| HEAD SHA | Run | Famille | Tentatives | Conclusion finale | Run (min) | Attente workflow (s) | Référence attente | Queue jobs P95 (s) | Exécution jobs P95 (s) | Jobs | Source fin |",
+              "|---|---|---|---:|---|---:|---:|---|---:|---:|---:|---:|---|"]
     for h in heads:
         for r in h["runs"]:
             d = analyze_run(r)
@@ -421,6 +457,7 @@ def report(snapshot):
                 url = f"{base}/actions/runs/{r['id']}"
                 lines.append(f"| `{h['sha'][:12]}` | [{r['id']}]({url}) | {family(r.get('path'))} | {d['attempt_count']} | {d['conclusion']} | {minutes(d['wall_seconds'])} | "
                              f"{d['workflow_wait_seconds'] if d['workflow_wait_seconds'] is not None else 'N/A'} | "
+                             f"{d['workflow_wait_reference']} | "
                              f"{d['job_queue_seconds']['p95'] if d['job_queue_seconds']['n'] else 'N/A'} | "
                              f"{d['job_execution_seconds']['p95'] if d['job_execution_seconds']['n'] else 'N/A'} | "
                              f"{d['jobs_seen'] if d['jobs_seen'] is not None else 'UNKNOWN'} | {d['completion_source']} |")

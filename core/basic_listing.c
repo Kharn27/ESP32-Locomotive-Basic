@@ -269,6 +269,8 @@ static BLStatus abs_expression(const uint8_t *b, size_t len,
     st = append_word(out, "ABS(");
     if (st != BL_OK) return st;
     if (*at == len) return BL_TRUNCATED;
+    /* The assignment witness has only a CPC explicit A% argument. */
+    if (!in_print && b[*at] != 0x02u) return BL_BAD_SEQUENCE;
     token = b[(*at)++];
     if (token == (uint8_t)')') {
         if (!in_print) return BL_BAD_SEQUENCE;

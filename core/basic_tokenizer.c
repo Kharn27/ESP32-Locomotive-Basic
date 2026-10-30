@@ -270,6 +270,11 @@ static BTStatus abs_expression(const uint8_t *src, size_t n, size_t *at,
     if (st != BT_OK) return st;
     ++*at;
     origin = *at;
+    /* CPC B%=ABS(A%) is the sole sealed assignment: no B%=ABS(n). */
+    if (!in_print &&
+        !(n - *at >= 2u && ascii_upper(src[*at]) == (uint8_t)'A' &&
+          src[*at + 1u] == (uint8_t)'%'))
+        return BT_UNSUPPORTED_CONSTRUCT;
     if (*at == n) return BT_UNSUPPORTED_CONSTRUCT;
     if (src[*at] == (uint8_t)')') {
         if (!in_print) return BT_UNSUPPORTED_CONSTRUCT;

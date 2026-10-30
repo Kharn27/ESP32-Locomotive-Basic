@@ -75,6 +75,83 @@ Le **mot-clé ROM n'est pas automatiquement un mot-clé reconnu par le tokenizer
 | `GOTO` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | cible constante L1..65535, formes GOTO uniquement; [FL] |
 | `IF` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | INTEGER condition bornée THEN/ELSE; pas IF général; [F10][F13][F14] |
 | `LINE` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `LET` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | INTEGER `%` explicite et STRING `# Matrice de compatibilité Locomotive BASIC 1.1 — DOC-CAT-A
+
+**Version de lecture : 31 octobre 2026. Base d'audit : [`main@9d4131ef4847b6e6bb324bc7c3a2baddc3851ac3`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/9d4131ef4847b6e6bb324bc7c3a2baddc3851ac3). Mandat : [#212](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/212).** Cette page est un **instantané du code à ce SHA**. La documentation historique et les rapports restent des archives à date, pas des propriétés automatiquement transférables au HEAD.
+
+## Lire les statuts sans les fusionner
+
+- `NOT_IMPLEMENTED` : pas de prise en charge de cette forme dans le composant cité, **pas** « syntaxe CPC invalide ». Pour le tokenizer actuel, la table des mots-clés est une liste blanche ; les autres mots ROM ne deviennent pas des tokens C99 par leur présence ici.
+- `TOKEN_ONLY` : encodage démontré sans LIST ni exécution garantis. **Ne jamais** promouvoir seul ce statut vers LIST ou RUN ; aucun cas courant de la table n'est classé `TOKEN_ONLY` isolément faute de besoin de fausse promotion.
+- `LIST_ONLY` : encodage **et** reconstruction LIST dans un corpus borné, sans RUN pour cette forme. Pour les directives directes `LIST/RUN/NEW`, ce statut vise leur **forme stockée**, et non leur exécution directe.
+- `C99_NATIVE_BOUNDED` : traitement effectif par les chemins C99 précisés, **avec les seuls opérandes, données, contexts et actions mesurés** ; ne garantit pas toute la grammaire CPC.
+- `CYD_CONNECTED` : passage effectivement câblé via BSR/firmware et éventuellement événement/rendu vidéo pour la forme indiquée. Ce n'est **pas** un flash réussi ni un oracle matériel.
+- `CPC_ORACLE_VERIFIED` : source BASIC et RAM/printer/PNG CPC réellement acquises et scellées, pour le corpus lié ; ce n'est ni une exécution C99 ni une preuve CYD.
+- `ON_DEVICE_PO_REPORTED_PASS` : retour de test sur **un SHA firmware identifié dans un rapport ou une PR** et sur un scénario ciblé. Cette qualification ne valide ni toutes les formes de l'entrée ni le HEAD documentaire présent.
+- `UNVERIFIED` : absence de preuve pertinente pour **cette dimension et cette forme**. Ne signifie pas « invalide », ni même « impossible » sur CPC.
+- `HOST_ONLY` : commande ou convention firmware/outil **hors langage BASIC**. `HOST_ONLY` et `CYD_CONNECTED` n'impliquent pas tokenisation CPC.
+
+**Dimensions de la table :** « forme native » indique l'entrée reconnue et utilisée aujourd'hui, pas la liste complète de toutes ses formes CPC. La colonne Token/LIST + RUN est la situation du *moteur* C99 ; les colonnes CYD, oracle CPC et PO sont indépendantes. Quand la table indique `UNVERIFIED` pour l'oracle, la présence du nom dans la ROM reste une **preuve statique de vocabulaire**, **pas** une session d'observation. Les entrées sans implémentation portent volontairement `NOT_IMPLEMENTED` malgré la présence de fonctions de bas niveau ailleurs.
+
+## Sources figées et méthode
+
+- **ROM** : [désassemblage `basic.asm`](http://cpctech.cpc-live.com/docs/basic.asm), table de recherche lexicale **E418 / E44C–E720**, table des opérateurs **E736** et entrée `CLS` **C280**. Les noms du tableau ci-dessous sont les graphies lues dans la table (y compris `ON ERROR GOTO` et `ON BREAK`) ; cela **ne démontre ni la syntaxe complète, ni toutes les variantes directes**, ni les commandes RSX `|…`, périphériques/disquettes/extensions ou toutes les séquences d'échappement. **Inventaire global CPC : INCOMPLET / UNVERIFIED**, inventaire des mots-clés ROM montrés : vérifié statiquement, sans garantie de toutes leurs constructions.
+- **Native** : [`core/basic_tokenizer.c`](../core/basic_tokenizer.c) (`keywords[]`, grammaires locales), [`core/basic_listing.c`](../core/basic_listing.c) (`decode`), [`core/basic_executor.c`](../core/basic_executor.c) (`execute_line`, `pen_argument`, `ink_arguments`), [`core/basic_session.c`](../core/basic_session.c) (direct `LIST/NEW` seulement), [`core/basic_session_runtime.c`](../core/basic_session_runtime.c) (`RUN` direct / `bsr_step_events`). Aucun parseur générique pour tous les mots ROM.
+- **Cible** : [`integration/hw4_pen_bridge.c`](../integration/hw4_pen_bridge.c), [`firmware/esp32_display_probe/main/hw4_c2_console.c`](../firmware/esp32_display_probe/main/hw4_c2_console.c), [`io/cpc_uart_console.c`](../io/cpc_uart_console.c) et [`video/cpc_video.c`](../video/cpc_video.c). Une API graphique peut exister **sans** prise en charge d'une commande BASIC correspondante.
+- **Tests** : [`tests/test_basic_session.c`](../tests/test_basic_session.c), [`tests/test_basic_session_runtime.c`](../tests/test_basic_session_runtime.c), [`tests/test_basic_executor.c`](../tests/test_basic_executor.c), [`tests/test_basic_pen_events.c`](../tests/test_basic_pen_events.c), [`tests/test_basic_ink_events.c`](../tests/test_basic_ink_events.c), [`tests/test_basic_abs_token_list.c`](../tests/test_basic_abs_token_list.c), [`tests/test_hw4_pen_a.c`](../tests/test_hw4_pen_a.c) et [CI du dépôt](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions). Les tests C99 ne sont pas un oracle CPC.
+
+## Repères de preuve / statut de mission
+
+| Repère | Source primaire | Couverture pertinente et limites |
+|---|---|---|
+| [HW4] | [HW4-C2 UART](HW4-C2-uart-interactive-console.md), [HW4-PEN-A](HW4-PEN-A-native-pen-mode1.md), [#91](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/91) | `RUN/LIST/NEW` et `PRINT` de programmes ciblés ont des rapports PO sur leurs SHA, sans généralisation ; quelques cas PEN/HW4 restent distincts. |
+| [PEN] | [J1.17-A](J1.17-A-pen-cpc-oracle.md), [J1.17-C-A](J1.17-C-A-pen-5-14-cpc-oracle.md), [issue B #210](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/210) | CPC accepte `PEN 5..14` (`ERR=0/ERL=0`, deux palettes, 52 acquisitions) ; au **SHA audité**, C99 renvoie encore `BE_UNSUPPORTED` ; jalon B indépendant non fusionné à cet instant. `PEN 8/12` invisibles dans leurs contextes RGB, sans indice général prouvé. |
+| [INK] | [J1.18-A](J1.18-A-ink-cpc-oracle.md), [J1.18-B](J1.18-B-ink-native.md) | 13 formes scellées ; certains couples C99 émettent `SET_INK` ; le pont CYD rejette tout événement INK (`HW4_PEN_SET_INK_UNSUPPORTED`). La forme clignotante `INK 1,26,6` est LIST-only / unsupported RUN. |
+| [ABS] | [J1.20-A](J1.20-A-abs-integer-cpc-oracle.md), [J1.20-B1](J1.20-B1-abs-token-list-native.md) | 16 sources exactes `FF 00`, 2 archives chaque ; `TOKEN/LIST` natifs sur cas bornés **sans calcul `ABS` en RUN**, y compris témoins d'erreurs à l'exécution CPC. |
+| [F10] / [F13] / [F14] | [IF/THEN](J1.10-B-if-then-integer-native.md), [comparaisons](J1.13-B-integer-relational-if-native.md), [ELSE](J1.14-B-if-inline-else-native.md) | IF INTEGER, opérateurs relationnels et ELSE inline dans les corpus jalonnés ; pas de langage booléen général. |
+| [F11] / [F12] | [GOSUB/RETURN](J1.11-B-gosub-return-native.md), [FOR/NEXT](J1.12-B2-for-next-integer-native.md) | Formes de contrôle de flux INTEGER et piles bornées, oracles indépendants dans les rapports A correspondants. |
+| [MATH] / [VAR] / [P15] / [FL] / [EX] / [TOK] | [Rapports J1](PROJECT_STATUS.md), [J1.9](J1.9-B-integer-binary-family-native.md), [J1.15](J1.15-B-string-scalar-native.md), [J0.7](J0.7-basic-executor.md), [J0.4](J0.4-basic-tokenizer.md) | Opérateurs entiers bornés, affectation INTEGER et chaîne scalaire, PRINT de valeurs et de chaînes limitées ; pas d'évaluateur BASIC universel. [FL] vise le saut GOTO, [EX] le chemin END, [TOK] la grammaire native. |
+| [VIDEO] / [CLS] | [`cpc_video.c`](../video/cpc_video.c), [`cpc_uart_console.c`](../io/cpc_uart_console.c), [source ROM CLS C280](http://cpctech.cpc-live.com/docs/basic.asm) | API MODE1 / encres / clear de console **sans** commandes BASIC `MODE/PAPER/CLS`. Oracle CLS à constituer séparément. |
+
+## Vue rapide pour utiliser le projet
+
+| Famille | Ce qui fonctionne aujourd'hui, dans ses bornes | Ce qui manque |
+|---|---|---|
+| Éditeur/stockage | Lignes numérotées, remplacement/suppression, `LIST`, `NEW` direct, `RUN` séquencé, `END` | Editeur CPC complet, commandes directes générales, `AUTO/RENUM/EDIT/DELETE`, gestion fichiers |
+| Sortie et variables | `PRINT` de chaînes/entiers/scalaires limités, INTEGER `%`, STRING `$` et trois témoins REAL5 ; colon et commentaires bornés | Fonctions, tableaux, expression générales, imprimerie CPC `#` réelle |
+| Flux | `GOTO/GOSUB/RETURN`, `IF/THEN/ELSE` INTEGER, `FOR/TO/STEP/NEXT` INTEGER bornés | Conditions/expressions générales, `WHILE/WEND`, `ON`, `STOP/CONT` |
+| Opérateurs/fonctions | Comparaisons INTEGER et `+/-/*/\`/`MOD` bornés ; `ABS` uniquement token/LIST | Réel mathématique général, opérateurs logiques/bitwise, `ABS` exécutable |
+| CPC affichage | `PEN 0..4,15` C99, pont MODE1 borné ; `INK` événement natif C99 borné | `PEN 5..14` C99 (issue #210), `INK` raccord CYD, `CLS/MODE/PAPER`, autres dessins |
+| Périphériques | UART/écran hôte pour les tests indiqués | BASIC `SOUND`, fichiers, imprimante/flux CPC, mémoire/ports, RSX, graphisme complet |
+
+## Catalogue ROM : une entrée par mot-clé
+
+Le **mot-clé ROM n'est pas automatiquement un mot-clé reconnu par le tokenizer natif**. `NOT_IMPLEMENTED` correspond au code *à cette base* et `UNVERIFIED` dans les colonnes CPC/PO ne nie pas la fonction sur Amstrad. Les instructions `PRINT`, `PEN`, `INK`, etc. ne sont dites exécutables que pour les formes bornées signalées. Pour toute ligne marquée « non planifié », aucun jalon n'est auto-décrété : le Pilotage doit d'abord mandater l'oracle puis, le cas échéant, le natif.
+
+### Programme / flux / édition
+
+| Entrée ROM 1.1 | Forme **native** | Token/LIST + RUN C99 | Pont CYD BASIC | Oracle CPC indépendant | Essai physique PO | Écart et suite |
+|---|---|---|---|---|---|---|
+| `AUTO` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `AFTER` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `CAT` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `CHAIN` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `CLEAR` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `CLOSEIN` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `CLOSEOUT` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `CONT` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `DATA` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `DELETE` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `EDIT` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `END` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | UNVERIFIED | UNVERIFIED | END en RUN borné, pas STOP/CONT; [EX] |
+| `ERASE` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `ERROR` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `EVERY` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
+| `FOR` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | INTEGER avec bornes et STEP, pile et overflow host limités; [F12] |
+| `GOSUB` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | cible constante, pile bornée, RETURN associé; [F11] |
+| `GOTO` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | cible constante L1..65535, formes GOTO uniquement; [FL] |
+| `IF` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | INTEGER condition bornée THEN/ELSE; pas IF général; [F10][F13][F14] |
+ scalaire; LET implicite sans jeton A5; [VAR] |
 | `LIST` | direct | LIST_ONLY (stocké) / C99_NATIVE_BOUNDED (direct) | HOST_ONLY | UNVERIFIED | ON_DEVICE_PO_REPORTED_PASS | commande directe; L10 LIST tokenisable, RUN non exécuté; [HW4] |
 | `LOAD` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
 | `MERGE` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |

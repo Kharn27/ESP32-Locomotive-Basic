@@ -254,6 +254,75 @@ static BLStatus ink_literal(const uint8_t *body, size_t length,
     return append_decimal(out, n);
 }
 
+
+/* Only the sealed J1.20-A FF 00 ABS operands, without RUN decoding. */
+static BLStatus abs_expression(const uint8_t *b, size_t len,
+                               size_t *at, BLEmitter *out, int in_print)
+{
+    BLStatus st;
+    uint8_t token;
+    if (len - *at < 4u) return BL_TRUNCATED;
+    if (b[*at] != 0xffu || b[*at + 1u] != 0u ||
+        b[*at + 2u] != (uint8_t)'(')
+        return BL_BAD_SEQUENCE;
+    *at += 3u;
+    st = append_word(out, "ABS(");
+    if (st != BL_OK) return st;
+    if (*at == len) return BL_TRUNCATED;
+    /* The assignment witness has only a CPC explicit A% argument. */
+    if (!in_print && b[*at] != 0x02u) return BL_BAD_SEQUENCE;
+    token = b[(*at)++];
+    if (token == (uint8_t)')') {
+        if (!in_print) return BL_BAD_SEQUENCE;
+        return append_byte(out, (uint8_t)')');
+    }
+    if (token == 0x0eu || token == 0x0fu) {
+        st = append_decimal(out, (unsigned int)(token - 0x0eu));
+        if (st != BL_OK) return st;
+        if (*at < len && b[*at] == (uint8_t)',') {
+            if (!in_print || token != 0x0fu) return BL_BAD_SEQUENCE;
+            ++*at;
+            if (*at >= len) return BL_TRUNCATED;
+            if (b[(*at)++] != 0x10u) return BL_BAD_SEQUENCE;
+            st = append_word(out, ",2");
+        }
+    } else if (token == 0xf5u) {
+        if (*at == len) return BL_TRUNCATED;
+        token = b[(*at)++];
+        if (token == 0x0fu) {
+            st = append_word(out, "-1");
+        } else if (token == 0x1fu) {
+            static const uint8_t min_bits[5] = {0u,0u,0u,0u,0x90u};
+            if (len - *at < sizeof(min_bits)) return BL_TRUNCATED;
+            if (memcmp(b + *at, min_bits, sizeof(min_bits)) != 0)
+                return BL_BAD_SEQUENCE;
+            *at += sizeof(min_bits);
+            st = append_word(out, "-32768");
+        } else return BL_BAD_SEQUENCE;
+    } else if (token == 0x02u) {
+        BasicVariableRef ref;
+        BVRStatus status = bvr_decode(b, len, *at - 1u, &ref);
+        if (status == BVR_TRUNCATED) return BL_TRUNCATED;
+        if (status != BVR_OK || ref.family != BVR_FAMILY_EXPLICIT ||
+            ref.explicit_type != BVR_TYPE_INTEGER ||
+            ref.name_length != 1u || b[ref.name_offset] != 0xc1u)
+            return BL_BAD_SEQUENCE;
+        *at = ref.reference_offset + ref.consumed;
+        st = append_word(out, "A%");
+    } else if (token == (uint8_t)'"') {
+        if (!in_print || len - *at < 2u) return BL_BAD_SEQUENCE;
+        if (b[*at] != (uint8_t)'X' ||
+            b[*at + 1u] != (uint8_t)'"')
+            return BL_BAD_SEQUENCE;
+        *at += 2u;
+        st = append_word(out, "\"X\"");
+    } else return BL_BAD_SEQUENCE;
+    if (st != BL_OK) return st;
+    if (*at == len) return BL_TRUNCATED;
+    if (b[(*at)++] != (uint8_t)')') return BL_BAD_SEQUENCE;
+    return append_byte(out, (uint8_t)')');
+}
+
 static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
 {
     size_t pos = 0;
@@ -441,6 +510,16 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (pos != length) return BL_BAD_SEQUENCE;
                 return BL_OK; /* Autonomous STRING line: no suffix. */
             }
+            if (t == 0xffu) {
+                /* B%=ABS(A%) is the only sealed ABS assignment stream. */
+                if (ref.name_length != 1u ||
+                    body[ref.name_offset] != 0xc2u)
+                    return BL_BAD_SEQUENCE;
+                --pos;
+                status = abs_expression(body, length, &pos, out, 0);
+                if (status != BL_OK) return status;
+                return pos == length ? BL_OK : BL_BAD_SEQUENCE;
+            }
             if (t == 0xf5u) {
                 negative = 1;
                 /* CPC unary minus is an operator before the magnitude;
@@ -596,8 +675,28 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 return status;
             }
         } else if (statement == BL_ST_PRINT && pos < length && body[pos] != 0x01u) {
-            uint8_t t = body[pos++];
-            if (t == (uint8_t)'"') {
+            uint8_t t;
+            int stream8 = 0;
+            if (body[pos] == (uint8_t)'#') {
+                if (length - pos < 4u) return BL_TRUNCATED;
+                if (body[pos + 1u] != 0x16u ||
+                    body[pos + 2u] != (uint8_t)',')
+                    return BL_BAD_SEQUENCE;
+                status = append_word(out, "#8,");
+                if (status != BL_OK) return status;
+                stream8 = 1;
+                pos += 3u;
+            }
+            if (pos == length) return BL_TRUNCATED;
+            t = body[pos++];
+            if (t == 0xffu) {
+                --pos;
+                status = abs_expression(body, length, &pos, out, 1);
+                if (status != BL_OK) return status;
+                if (pos != length) return BL_BAD_SEQUENCE;
+            } else if (stream8 && !(t == 0x02u || t == 0x19u))
+                return BL_BAD_SEQUENCE;
+            else if (t == (uint8_t)'"') {
                 status = append_byte(out, t);
                 if (status != BL_OK) {
                     return status;

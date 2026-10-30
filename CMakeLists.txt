@@ -452,6 +452,14 @@ if(BUILD_TESTING)
     # RED/GREEN: feed the actual production CONSOLE source to the test.
     set_tests_properties(hw4_pen_a_typed_events_mode1 PROPERTIES
         ENVIRONMENT "HW4_PEN_C2_CONSOLE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main/hw4_c2_console.c")
+    # C3: source-level boot gate for production CONSOLE with negative mutants.
+    # The gate exercises the actual app_main/prompt/repaint_dirty return
+    # contracts, without claiming on-device LCD/boot execution.
+    add_test(NAME hw4_pen_c3_console_boot_contract COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/hw4_pen_c3_boot_contract.py"
+        "${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main/hw4_c2_console.c"
+        --self-test)
 endif()
 
 # J1.7-B: F4 explicit INTEGER+INTEGER. Original J1.7-A captures are READ ONLY.

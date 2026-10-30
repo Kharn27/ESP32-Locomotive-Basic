@@ -332,7 +332,7 @@ static bool repaint_dirty(void)
                (unsigned)s_text.scrolls);
         s_scroll_reported=s_text.scrolls;
     }
-    return true;
+    return HW4_PEN_DISPLAY_OK;
 }
 static bool display_error(void); /* host-only diagnostics, below */
 static void log_bytes(const char *kind,const uint8_t *data,size_t size)
@@ -356,7 +356,7 @@ static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
 }
 /* Preflight ALL typed events before changing ANY pixel or sink counter.
  * One original PRINT_BYTES log is retained, not fragments/escape codes. */
-static bool display_print_events(size_t event_count)
+static Hw4PenDisplayResult display_print_events(size_t event_count)
 {
     Hw4PenStatus validation=hw4_pen_preflight(&s_text,s_basic.output,
                             s_basic.written,s_basic.scratch.events,event_count);
@@ -365,7 +365,8 @@ static bool display_print_events(size_t event_count)
                validation==HW4_PEN_SET_INK_UNSUPPORTED ?
                "SET_INK_UNSUPPORTED" : "PEN_PREFLIGHT", (int)validation);
         (void)bsr_stop(&s_basic.runtime);
-        return display_error();
+        return display_error() ? HW4_PEN_DISPLAY_REJECT_DIAGNOSED :
+                                 HW4_PEN_DISPLAY_FATAL;
     }
     if(s_basic.written>0U)
         log_bytes("PRINT_BYTES",s_basic.output,s_basic.written);
@@ -374,12 +375,16 @@ static bool display_print_events(size_t event_count)
                              s_basic.written,s_basic.scratch.events,event_count);
     if(replay!=HW4_PEN_OK) {
         printf("HW4-PEN-A VIDEO_REPLAY_FAILURE status=%d\n",(int)replay);
-        return fail("PEN_REPLAY",(int)replay);
+        (void)fail("PEN_REPLAY",(int)replay);
+        return HW4_PEN_DISPLAY_FATAL;
     }
     for(size_t i=0U;i<event_count;++i) {
         uint8_t mapped=0U;
         if(hw4_pen_pixel_index(&s_video,s_basic.scratch.events[i].pen,&mapped)
-           !=HW4_PEN_OK) return fail("PEN_CONTEXT_CHANGED",-1);
+           !=HW4_PEN_OK) {
+            (void)fail("PEN_CONTEXT_CHANGED",-1);
+            return HW4_PEN_DISPLAY_FATAL;
+        }
         printf("HW4-PEN-A VIDEO_EVENT type=SET_TEXT_PEN logical=%u "
                "pixel=%u print_offset=%u order=%u/%u "
                "renderer=MODE1\n",
@@ -490,7 +495,11 @@ static bool basic_run(void)
             return display_error();
         }
         if(event_count!=0U) {
-            if(!display_print_events(event_count)) return false;
+            /* Shared pure C99 decision: diagnosed reject exits RUN to Ready. */
+            Hw4PenRunAction next=hw4_pen_run_after_display(
+                display_print_events(event_count));
+            if(next==HW4_PEN_RUN_DONE) return true;
+            if(next==HW4_PEN_RUN_FATAL) return false;
         } else if(s_basic.written>0U &&
                   !display_bytes("PRINT_BYTES",s_basic.output,s_basic.written))
             return false;

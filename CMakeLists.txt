@@ -446,7 +446,8 @@ target_include_directories(hw4_pen_bridge PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/int
 target_link_libraries(hw4_pen_bridge PUBLIC basic_session_runtime cpc_text cpc_uart_console)
 if(BUILD_TESTING)
     add_executable(test_hw4_pen_a tests/test_hw4_pen_a.c)
-    target_link_libraries(test_hw4_pen_a PRIVATE hw4_pen_bridge)
+    target_link_libraries(test_hw4_pen_a PRIVATE hw4_pen_bridge
+                          cpc_diag_policy cpc_ready_policy)
     add_test(NAME hw4_pen_a_typed_events_mode1 COMMAND test_hw4_pen_a)
 endif()
 

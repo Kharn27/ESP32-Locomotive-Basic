@@ -108,3 +108,13 @@ bool hw4_pen_console_clear(CpcText *text)
     return cpc_video_set_ink(text->video, 2U, 6U) &&
            cpc_video_set_ink(text->video, 3U, 18U);
 }
+
+/* Shared production/host decision. RED version intentionally retains the
+ * observed C1-RUN-STOP defect: the diagnosed reject is treated as success. */
+Hw4PenRunAction hw4_pen_run_after_display(Hw4PenDisplayResult result)
+{
+    if(result == HW4_PEN_DISPLAY_FATAL) return HW4_PEN_RUN_FATAL;
+    if(result == HW4_PEN_DISPLAY_REJECT_DIAGNOSED)
+        return HW4_PEN_RUN_CONTINUE; /* RED: wrong, must be DONE */
+    return HW4_PEN_RUN_CONTINUE;
+}

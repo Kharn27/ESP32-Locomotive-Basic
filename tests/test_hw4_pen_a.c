@@ -2,6 +2,8 @@
  * Does not simulate TFT hardware. Oracle A defines only 0..4 and 15. */
 #include "hw4_pen_bridge.h"
 #include "cpc_uart_console.h"
+#include "cpc_diag_policy.h"
+#include "cpc_ready_policy.h"
 #include "basic_session_runtime.h"
 #include <assert.h>
 #include <stdint.h>
@@ -431,6 +433,88 @@ static void test_j118b_ink_explicit_reject_no_partial_replay(void)
                            HW4_PEN_SET_INK_UNSUPPORTED);
 }
 
+
+/* C1-RUN-STOP: the production RUN-loop transition is shared with this host
+ * harness; actual bsr_step_events, bridge preflight, diagnostic renderer,
+ * Ready policy and real !CLS are exercised. The RED version reproduces
+ * BSR_NOT_RUNNING + a second ERROR after a diagnosed SET_INK rejection. */
+static void test_c1_run_stop_case(bool ink_only)
+{
+    unsigned run_index;
+    setup();
+    assert(submit(ink_only ? "10 INK 1,26" :
+          "10 PEN 2:PRINT \"A\":INK 1,26:PRINT \"B\":PEN 3:PRINT \"C\"").status==BSR_OK);
+    assert(submit("20 PRINT \"NEXT_STEP_NEVER\"").status==BSR_OK);
+    const size_t original_size=f.program.size;
+    for(run_index=0U;run_index<2U;++run_index) {
+        unsigned attempts=0U,video_rejects=0U,errors=0U;
+        unsigned step_fails=0U,prints=0U,ready=0U;
+        bool ready_emitted=false,cleared=false;
+        if(run_index==1U) {
+            assert(hw4_pen_console_clear(&f.text)); /* real C1 !CLS */
+            assert(f.program.size==original_size);
+            assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+        }
+        assert(submit("RUN").status==BSR_OK);
+        for(unsigned i=0U;i<4U;++i) {
+            ++attempts;
+            BSRResult r=step(OUT_CAP,3U);
+            if(r.status==BSR_END) break;
+            if(r.status!=BSR_OK || r.executor_status!=BE_OK) {
+                ++step_fails;
+                assert(r.status==BSR_NOT_RUNNING); /* RED second step */
+                assert(cpc_diag_policy_write(&f.text,CPC_DIAG_HOST_GENERIC));
+                ++errors;
+                (void)bsr_stop(&f.runtime);
+                break;
+            }
+            if(f.event_written!=0U) {
+                Hw4PenStatus validation=hw4_pen_preflight(&f.text,f.output,
+                                              f.written,f.events,f.event_written);
+                Hw4PenDisplayResult render_result=HW4_PEN_DISPLAY_OK;
+                if(validation!=HW4_PEN_OK) {
+                    assert(validation==HW4_PEN_SET_INK_UNSUPPORTED);
+                    ++video_rejects;
+                    (void)bsr_stop(&f.runtime);
+                    assert(cpc_diag_policy_write(&f.text,CPC_DIAG_HOST_GENERIC));
+                    ++errors;
+                    render_result=HW4_PEN_DISPLAY_REJECT_DIAGNOSED;
+                } else {
+                    assert(hw4_pen_replay(&f.text,f.output,f.written,
+                                           f.events,f.event_written)==HW4_PEN_OK);
+                    ++prints;
+                }
+                Hw4PenRunAction next=hw4_pen_run_after_display(render_result);
+                if(next==HW4_PEN_RUN_DONE) break;
+                if(next==HW4_PEN_RUN_FATAL) assert(false);
+            } else if(f.written!=0U) {
+                assert(cpc_text_write(&f.text,f.output,f.written));
+                ++prints;
+            }
+        }
+        assert(cpc_ready_policy_apply(&f.text,CPC_READY_RUN_RETURN,
+                                      &ready_emitted));
+        assert(ready_emitted);
+        assert(cpc_uart_console_prompt(&f.text,&cleared) && !cleared);
+        ++ready;
+        fprintf(stderr,"C1-RUN-STOP %s pass=%u VIDEO_REJECT=%u ERROR=%u "
+                       "BSR_NOT_RUNNING=%u PRINT_BYTES=%u Ready=%u attempts=%u\\n",
+                ink_only?"INK_ONLY":"MIXED",run_index,video_rejects,errors,
+                step_fails,prints,ready,attempts);
+        fflush(stderr);
+        assert(video_rejects==1U && errors==1U && step_fails==0U);
+        assert(prints==0U && ready==1U && attempts==1U);
+        assert(f.runtime.state!=BSR_RUNNING);
+        assert(f.program.size==original_size);
+        assert(f.video.pen==1U && f.video.ink[2]==6U && f.video.ink[3]==18U);
+    }
+}
+static void test_c1_run_stop(void)
+{
+    test_c1_run_stop_case(false);
+    test_c1_run_stop_case(true);
+}
+
 int main(void)
 {
     test_order_and_preserved_print();
@@ -440,6 +524,7 @@ int main(void)
     test_scrolling_preserves_text_counters();
     test_c1_real_console_cls_palette();
     test_j118b_ink_explicit_reject_no_partial_replay();
+    test_c1_run_stop();
     puts("HW4-PEN-A: typed events, native MODE1 pixels, scroll and atomicity PASS");
     return 0;
 }

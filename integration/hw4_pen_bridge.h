@@ -18,6 +18,21 @@ typedef enum {
     HW4_PEN_SET_INK_UNSUPPORTED /* J1.18-B: no renderer; whole step rejected */
 } Hw4PenStatus;
 
+/* C1-RUN-STOP: shared CONSOLE/host RUN-loop control.
+ * A renderer reject already displayed its one diagnostic; return to Ready,
+ * without calling bsr_step_events on a stopped runtime. */
+typedef enum {
+    HW4_PEN_DISPLAY_OK = 0,
+    HW4_PEN_DISPLAY_REJECT_DIAGNOSED,
+    HW4_PEN_DISPLAY_FATAL
+} Hw4PenDisplayResult;
+typedef enum {
+    HW4_PEN_RUN_CONTINUE = 0,
+    HW4_PEN_RUN_DONE,
+    HW4_PEN_RUN_FATAL
+} Hw4PenRunAction;
+Hw4PenRunAction hw4_pen_run_after_display(Hw4PenDisplayResult result);
+
 /* The mapping is deliberately bounded to the independently acquired
  * J1.17-A witnesses, NOT a general CPC palette algorithm:
  *   0..3 -> same MODE1 pixel index

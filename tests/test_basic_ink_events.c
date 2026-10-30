@@ -258,13 +258,12 @@ static int negative_tests(void)
 
 int main(void)
 {
-    /* ABI regression: adding ink/colour uses bytes historically occupied by
-     * padding after PEN, leaving print_offset and sizeof unchanged on the
-     * current GCC/Clang host and ESP32 Xtensa configurations. */
+    /* ABI regression: original field positions and positional initializers
+     * are stable. Extra logical INK fields are appended and caller-owned. */
     CHECK(offsetof(BEVideoEvent, type) == 0u);
     CHECK(offsetof(BEVideoEvent, pen) == sizeof(BEVideoEventType));
     CHECK(offsetof(BEVideoEvent, print_offset) == 8u);
-    CHECK(sizeof(BEVideoEvent) == (sizeof(size_t) == 8u ? 16u : 12u));
+    CHECK(sizeof(BEVideoEvent) == (sizeof(size_t) == 8u ? 24u : 16u));
     CHECK(oracle_13() == 0);
     CHECK(order_and_atomicity() == 0);
     CHECK(negative_tests() == 0);

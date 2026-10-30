@@ -124,6 +124,14 @@ class LatencyTests(unittest.TestCase):
         self.assertEqual(d["workflow_wait_reference"],
                          "last_attempt_job_created_at_fallback")
 
+    def test_rerun_unidentified_attempt_is_not_a_queue_reference(self):
+        run = copy.deepcopy(trace()["runs"][-1])
+        run["attempts"][-1]["metadata"].pop("attempt")
+        d = perf.analyze_run(run)
+        self.assertEqual(d["workflow_wait_seconds"], 8)
+        self.assertEqual(d["workflow_wait_reference"],
+                         "last_attempt_job_created_at_fallback")
+
     def test_missing_rerun_jobs_does_not_invent_queue(self):
         run = copy.deepcopy(trace()["runs"][-1])
         run["jobs"] = []

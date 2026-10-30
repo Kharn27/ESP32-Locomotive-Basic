@@ -4,6 +4,7 @@
  * Native MODE1 scroll added in HW4-C3-B2; no Z80 or second SPI driver.
  */
 #include "basic_session_runtime.h"
+#include "hw4_pen_bridge.h"
 #include "basic_variable_store.h"
 #include "j1_15_c_string_arena.h"
 #include "cpc_font.h"
@@ -47,10 +48,21 @@ enum {
     LCD_ROWS_PER_BAND = 8,
     CPC_ROWS = 25,
     RUN_STEP_BUDGET = 256,
+    PEN_EVENT_CAPACITY = 3, /* A0 DRAM guard: 3 typed events, no heap/VRAM */
     ECHO_IDLE_MS = 20,
     TOUCH_POLL_MS = 20,
     ECHO_MAX_BYTES = UART_LINE_CAPACITY
 };
+/* Submit and RUN are strictly sequential in sole CONSOLE app_main.
+ * Reuse static submission scratch for typed events: aligned C99 union,
+ * unchanged 2048-byte tokenizer and 3-event execution capacities. */
+typedef union {
+    uint8_t temporary[TEMP_CAPACITY];
+    BEVideoEvent events[PEN_EVENT_CAPACITY];
+} BasicScratch;
+typedef char HW4_PEN_SCRATCH_FITS[
+    (sizeof(((BasicScratch *)0)->temporary) >=
+     sizeof(((BasicScratch *)0)->events)) ? 1 : -1];
 typedef struct {
     BasicProgram program;
     BasicVariableStore variables;
@@ -58,7 +70,7 @@ typedef struct {
     uint8_t bytes[PROGRAM_CAPACITY];
     BasicVariableEntry entries[VARIABLES_CAPACITY];
     uint8_t string_arena[STRING_ARENA_CAPACITY]; /* s_basic-owned, no heap */
-    uint8_t temporary[TEMP_CAPACITY];
+    BasicScratch scratch;
     uint8_t output[OUTPUT_CAPACITY];
     size_t written;
 } BasicStorage;
@@ -322,13 +334,18 @@ static bool repaint_dirty(void)
     }
     return true;
 }
+static bool display_error(void); /* host-only diagnostics, below */
+static void log_bytes(const char *kind,const uint8_t *data,size_t size)
+{
+    printf("HW4-C2 %s length=%u hex=",kind,(unsigned)size);
+    for(size_t i=0U;i<size && i<32U;++i) printf("%02x",(unsigned)data[i]);
+    if(size>32U) printf("...");
+    printf("\n");
+}
 static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
 {
     size_t clipped_before=s_text.bytes_clipped;
-    printf("HW4-C2 %s length=%u hex=",kind,(unsigned)size);
-    for(size_t i=0U;i<size && i<32U;++i) printf("%02x",(unsigned)data[i]);
-    if(size>32U) printf("..."); /* bounded log, never invented bytes */
-    printf("\n");
+    log_bytes(kind,data,size);
     if(!cpc_text_write(&s_text,data,size))
         return fail("TEXT_ADAPTER",-1);
     if(s_text.bytes_clipped>clipped_before)
@@ -336,6 +353,50 @@ static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
                "policy=unexpected_clip\n",
                (unsigned)(s_text.bytes_clipped-clipped_before));
     return true; /* final frame is flushed by prompt */
+}
+/* Preflight ALL typed events before changing ANY pixel or sink counter.
+ * One original PRINT_BYTES log is retained, not fragments/escape codes. */
+static Hw4PenDisplayResult display_print_events(size_t event_count)
+{
+    Hw4PenStatus validation=hw4_pen_preflight(&s_text,s_basic.output,
+                            s_basic.written,s_basic.scratch.events,event_count);
+    if(validation!=HW4_PEN_OK) {
+        printf("HW4-PEN-A VIDEO_REJECT category=%s status=%d printed=0 event_applied=0 print_applied=0\n",
+               validation==HW4_PEN_SET_INK_UNSUPPORTED ?
+               "SET_INK_UNSUPPORTED" : "PEN_PREFLIGHT", (int)validation);
+        (void)bsr_stop(&s_basic.runtime);
+        return display_error() ? HW4_PEN_DISPLAY_REJECT_DIAGNOSED :
+                                 HW4_PEN_DISPLAY_FATAL;
+    }
+    if(s_basic.written>0U)
+        log_bytes("PRINT_BYTES",s_basic.output,s_basic.written);
+    const size_t clipped_before=s_text.bytes_clipped;
+    Hw4PenStatus replay=hw4_pen_replay(&s_text,s_basic.output,
+                             s_basic.written,s_basic.scratch.events,event_count);
+    if(replay!=HW4_PEN_OK) {
+        printf("HW4-PEN-A VIDEO_REPLAY_FAILURE status=%d\n",(int)replay);
+        (void)fail("PEN_REPLAY",(int)replay);
+        return HW4_PEN_DISPLAY_FATAL;
+    }
+    for(size_t i=0U;i<event_count;++i) {
+        uint8_t mapped=0U;
+        if(hw4_pen_pixel_index(&s_video,s_basic.scratch.events[i].pen,&mapped)
+           !=HW4_PEN_OK) {
+            (void)fail("PEN_CONTEXT_CHANGED",-1);
+            return HW4_PEN_DISPLAY_FATAL;
+        }
+        printf("HW4-PEN-A VIDEO_EVENT type=SET_TEXT_PEN logical=%u "
+               "pixel=%u print_offset=%u order=%u/%u "
+               "renderer=MODE1\n",
+               (unsigned)s_basic.scratch.events[i].pen,(unsigned)mapped,
+               (unsigned)s_basic.scratch.events[i].print_offset,
+               (unsigned)(i+1U),(unsigned)event_count);
+    }
+    if(s_text.bytes_clipped>clipped_before)
+        printf("HW4-C3-B2 SCREEN_OUTPUT_CLIPPED bytes=%u "
+               "policy=unexpected_clip\n",
+               (unsigned)(s_text.bytes_clipped-clipped_before));
+    return HW4_PEN_DISPLAY_OK;
 }
 static bool display_error(void)
 {
@@ -377,7 +438,7 @@ static bool basic_submit(const uint8_t *source,size_t length,
 {
     s_basic.written=0U;
     BSRResult r=bsr_submit(&s_basic.runtime,source,length,
-                          s_basic.temporary,sizeof(s_basic.temporary),
+                          s_basic.scratch.temporary,sizeof(s_basic.scratch.temporary),
                           s_basic.output,sizeof(s_basic.output),
                           &s_basic.written);
     printf("HW4-C2 BASIC_SUBMIT status=%d bs=%d bt=%d bp=%d bl=%d "
@@ -412,21 +473,35 @@ static bool basic_run(void)
     printf("HW4-C2 BSR_RUN state=%u budget=%u\n",
            (unsigned)s_basic.runtime.state,RUN_STEP_BUDGET);
     for(steps=0U;steps<RUN_STEP_BUDGET;++steps) {
+        size_t event_count=0U;
         s_basic.written=0U;
-        BSRResult r=bsr_step(&s_basic.runtime,s_basic.output,
-                             sizeof(s_basic.output),&s_basic.written);
+        BSRResult r=bsr_step_events(&s_basic.runtime,s_basic.output,
+                             sizeof(s_basic.output),&s_basic.written,
+                             s_basic.scratch.events,PEN_EVENT_CAPACITY,&event_count);
         if(r.status==BSR_END) {
             printf("HW4-C2 BSR_END status=BE_END steps=%u\n",steps);
             return true;
         }
         if(r.status!=BSR_OK || r.executor_status!=BE_OK) {
+            const char *pen_diag=r.executor_status==BE_INVALID_PEN ?
+                "INVALID_PEN" : r.executor_status==BE_UNSUPPORTED ?
+                "UNSUPPORTED_UNVERIFIED" : r.executor_status==BE_NO_EVENT_SPACE ?
+                "EVENT_CAPACITY" : "HOST_GENERIC";
             printf("HW4-C2 BSR_STEP_FAIL BSR=%d BE=%d step=%u\n",
                    (int)r.status,(int)r.executor_status,steps);
+            printf("HW4-PEN-A STEP_DIAG category=%s events_applied=0 "
+                   "print_applied=0 origin=HOST_NOT_CPC_ERR\n",pen_diag);
             (void)bsr_stop(&s_basic.runtime);
             return display_error();
         }
-        if(s_basic.written>0U &&
-           !display_bytes("PRINT_BYTES",s_basic.output,s_basic.written))
+        if(event_count!=0U) {
+            /* Shared pure C99 decision: diagnosed reject exits RUN to Ready. */
+            Hw4PenRunAction next=hw4_pen_run_after_display(
+                display_print_events(event_count));
+            if(next==HW4_PEN_RUN_DONE) return true;
+            if(next==HW4_PEN_RUN_FATAL) return false;
+        } else if(s_basic.written>0U &&
+                  !display_bytes("PRINT_BYTES",s_basic.output,s_basic.written))
             return false;
     }
     (void)bsr_stop(&s_basic.runtime);
@@ -472,7 +547,7 @@ static bool execute_line(void)
         printf("HW4-C2 DIAGNOSTIC_SCREEN_CLEAR source=!CLS "
                "program_preserved=1\n");
         hw4_scroll_observe_text(&s_scroll_metrics,(uint32_t)s_text.scrolls);
-        if(!cpc_uart_console_clear(&s_text)) return false;
+        if(!hw4_pen_console_clear(&s_text)) return false;
         hw4_scroll_clear(&s_scroll_metrics,(uint32_t)s_text.scrolls);
         s_scroll_reported=0U;
         transition=CPC_READY_HOST_CLS; /* screen-only, no CPC equivalent */
@@ -543,6 +618,8 @@ void app_main(void)
     if(!cpc_video_init(&s_video,s_vram,sizeof(s_vram),CPC_MODE_1) ||
        !cpc_video_set_ink(&s_video,0U,1U) ||
        !cpc_video_set_ink(&s_video,1U,24U) ||
+       !cpc_video_set_ink(&s_video,2U,6U) ||
+       !cpc_video_set_ink(&s_video,3U,18U) ||
        !cpc_video_set_border(&s_video,1U) ||
        !cpc_video_set_text_colors(&s_video,1U,0U) ||
        !cpc_text_init(&s_text,&s_video,hw3_glyph_callback,NULL)) {
@@ -551,6 +628,10 @@ void app_main(void)
     printf("HW4-C2 VIDEO_READY mode=1 logical=320x200 "
            "cols=40 rows=25 vram_bytes=%u ink_fg=24 ink_bg=1\n",
            CPC_VIDEO_BYTES);
+    printf("HW4-PEN-A INK_CONTEXT mode=1 paper=0 "
+           "ink0=1_blue ink1=24_yellow ink2=6_red ink3=18_green "
+           "pen4=background_only pen15=green_witness_only "
+           "events_capacity=%u\n",PEN_EVENT_CAPACITY);
     /* Startup in existing MODE1 VRAM: no second renderer or splash delay. */
     if(!cpc_boot_console(&s_text,true)) {
         (void)fail("BOOT_LAYOUT",-1); return;

@@ -590,3 +590,19 @@ Ouvert par le Pilotage seulement après succès des cinq CI de `main@6a3470ea3e7
 **Barrière de départ satisfaite** : les cinq workflows `push` de `main@855616b6af1709439377c780b76dad2ccfc43f17` sont effectivement SUCCESS, Xtensa compris ; `main@5ec280be85d47e330e8a917dc234a4d24fa49a80` a également ses cinq checks verts. [Mandat #192](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/192) exécutable sur branche dédiée [PR #193](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/193) **sans validation automatique**.
 
 Périmètre fermé : token `A2`, 13 RAM/LIST CPC scellés J1.18-A, huit valeurs `INK` natives mesurées, quatre cas invalides hôte atomiques, forme `INK 1,26,6` uniquement syntaxique, inconnus non extrapolés. Side channel `BE_VIDEO_SET_INK` ordonné par `print_offset`, sans rendu ni perte si récepteur absent. Tests Linux/CPC/CI-ARCH/OPT3/Xtensa 3/3 et surcoût ABI documentés sur le **HEAD final** avant remise. Aucun changement HW4-PEN-A #188, `video/`, `firmware/`, `hal/`, `io/` ni archives CPC ; aucune promesse d'écran ou d'acceptation. [Rapport technique](J1.18-B-ink-native.md). **Revue/fusion uniquement par Pilotage, CYD ON_DEVICE_UNVERIFIED.**
+
+
+### HW4-PEN-A — Gate matérielle PEN natif MODE1 (#188)
+
+Base prescrite `main@e857ce66fb28583361ab06cd0d6a642f7fc97a95`, cinq CI post-fusion J1.17-B SUCCESS. Contrôle C99 4 matrices + pont typé dans `CONSOLE` et 3 profils ESP-IDF 5.5.6, budgets mémoire/ABI et oracles scellés immuables. Projet CYD : alternance UART `PEN 2/1/3`, `PRINT` rouge/jaune/vert, curseur, scroll, `PEN 16` rejet hôte, photos/logs/mémoire PO, SHA flashé. Ordre obligatoire : **PR préliminaire Pilotage → autorisation test PO → essai CYD sur SHA exact → revue finale Pilotage → fusion par Pilotage uniquement**. [Protocole](HW4-PEN-A-native-pen-mode1.md). PR #184 rotation/GPIO36/reset : chemin parallèle avec fichiers communs à surveiller ; aucun pré-merge.
+
+### HW4-PEN-A-C1 — Barrière supplémentaire !CLS et synchronisation main
+
+PR #190 : conserver #184 fusionnée (rotation10/GPIO36/reset) et preuves J1.18-A scellées de `main@5ec280be85d47e330e8a917dc234a4d24fa49a80`. Preuve négative C99 du défaut INK2/INK3 perdus après le vrai `cpc_uart_console_clear()`, puis preuve positive avec le **même** test et correction seulement dans le propriétaire CONSOLE. Exiger GCC/Clang OFF/ON, sanitizers, CI-ARCH/OPT3/CPC, Xtensa 3 profils et comparaison DRAM contre **nouveau main** ; script PO `RUN → !CLS → RUN` sans reboot ni changement de programme, refus `PEN 16` avant/après. **Remise nouvelle revue contradictoire Pilotage**, pas d'essai CYD demandé directement et pas de fusion par Développeur.
+
+**Garde mémoire C1 :** union statique `BasicScratch` pour tokenisation et événements PEN non simultanés, trois événements conservés ; ne jamais réduire arbitrairement les capacités BASIC ni relâcher le budget DRAM +256. Attendre la comparaison vérifiée avec le `main` actuel.
+
+
+### HW4-PEN-A-C1-SYNC — J1.18-B, PR #190 (30 octobre 2026)
+
+Base `main@d29424699dbca3ffe0c20b7d3e4caef9d1ee8dfc` (5/5 CI post-fusion #193 SUCCESS). Passerelle PEN : `BE_VIDEO_SET_INK` rejeté explicitement avant tout replay des événements ou octets PRINT de la ligne, avec test mixte `PEN/PRINT/INK/PRINT/PEN`. Correctif réel `!CLS`, union statique C99 (2048 octets / 3 événements), boot/orientation 10 et témoins CPC scellés préservés. Différentiel mémoire Xtensa exigé sur cette base et CI du nouveau HEAD. Barrière matérielle Pilotage inchangée : `ON_DEVICE_UNVERIFIED`, PR non fusionnée, aucune autorisation autonome de flash.

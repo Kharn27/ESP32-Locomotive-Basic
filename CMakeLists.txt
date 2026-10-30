@@ -441,6 +441,27 @@ if(BUILD_TESTING)
     add_test(NAME hw4_c1_native_runtime_tft_bytes COMMAND test_hw4_c1_integration)
 endif()
 
+add_library(hw4_pen_bridge STATIC integration/hw4_pen_bridge.c)
+target_include_directories(hw4_pen_bridge PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/integration)
+target_link_libraries(hw4_pen_bridge PUBLIC basic_session_runtime cpc_text cpc_uart_console)
+if(BUILD_TESTING)
+    add_executable(test_hw4_pen_a tests/test_hw4_pen_a.c)
+    target_link_libraries(test_hw4_pen_a PRIVATE hw4_pen_bridge
+                          cpc_diag_policy cpc_ready_policy)
+    add_test(NAME hw4_pen_a_typed_events_mode1 COMMAND test_hw4_pen_a)
+    # RED/GREEN: feed the actual production CONSOLE source to the test.
+    set_tests_properties(hw4_pen_a_typed_events_mode1 PROPERTIES
+        ENVIRONMENT "HW4_PEN_C2_CONSOLE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main/hw4_c2_console.c")
+    # C3: source-level boot gate for production CONSOLE with negative mutants.
+    # The gate exercises the actual app_main/prompt/repaint_dirty return
+    # contracts, without claiming on-device LCD/boot execution.
+    add_test(NAME hw4_pen_c3_console_boot_contract COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/hw4_pen_c3_boot_contract.py"
+        "${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main/hw4_c2_console.c"
+        --self-test)
+endif()
+
 # J1.7-B: F4 explicit INTEGER+INTEGER. Original J1.7-A captures are READ ONLY.
 # Two portable suites added to 48 main suites, including HW4-C1.
 if(BUILD_TESTING)

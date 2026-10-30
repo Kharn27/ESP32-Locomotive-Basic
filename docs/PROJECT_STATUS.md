@@ -724,3 +724,19 @@ Après fusion J1.17-A [PR #179](https://github.com/Kharn27/ESP32-Locomotive-Basi
 **État vérifié postérieur au texte J1.18-A ci-dessus :** [PR #191](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/191) acceptée/fusionnée par Pilotage dans `main@855616b6af1709439377c780b76dad2ccfc43f17`, avec **cinq workflows post-fusion SUCCESS**, y compris Xtensa. Le HEAD `main@5ec280be85d47e330e8a917dc234a4d24fa49a80` (HW4-TOUCH-T1) a également ses cinq workflows `push` verts. Ces vérifications ont autorisé le seul mandat [#192](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/192), en [PR #193](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/193) **brouillon, non fusionnée**.
 
 Développement INK natif limité à huit couples scellés et événement `BE_VIDEO_SET_INK` sans rendu. Treize records RAM/LIST ciblés, quatre erreurs historiques via diagnostic hôte, triple syntaxique sans clignotement exécuté. Compatibilité PEN et atomicité préflight/commit visées ; mesures ABI/CI Xtensa du HEAD final **en attente de vérification**. [Rapport J1.18-B](J1.18-B-ink-native.md). HW4-PEN-A [#188](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/188) reste indépendant, validation physique PO requise de son côté. **J1.18-B : EN DÉVELOPPEMENT/REVUE CI — ON_DEVICE_UNVERIFIED — AUCUNE ACCEPTATION PILOTAGE PRÉSUMÉE.**
+
+
+### HW4-PEN-A — raccordement PEN au TFT MODE1 (#188, 30 octobre 2026)
+
+Mandat autorisé par Pilotage après J1.17-B PR #186 fusionnée et CI main 5/5. Pont portable `integration/hw4_pen_bridge` entre `bsr_step_events` et `CpcText/CpcVideo`, avec ordre PRINT et événements, encres MODE1 explicitement contrôlées (boot bleu/jaune préservé, rouge/vert nouveaux), refus atomiques et tests host. `PEN 4→0` et `15→3` sont **projections visuelles limitées et documentées**, pas une palette CPC générale. [Dossier / protocole PO](HW4-PEN-A-native-pen-mode1.md). Le jalon reste **EN REVUE PRÉLIMINAIRE PILOTAGE**, `ON_DEVICE_UNVERIFIED` jusqu'au test physique du PO sur HEAD fixé ; pas d'acceptation/fusion avant preuve.
+
+### HW4-PEN-A-C1 — Réinitialisation encres CONSOLE (!CLS), revue contradictoire
+
+[PR #190](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/190) synchronisée avec `main@5ec280be85d47e330e8a917dc234a4d24fa49a80`, oracles J1.18-A et rotation/GPIO36/reset #184 préservés. Test négatif `test_c1_real_console_cls_palette` reproduit la perte de INK2/INK3 en passant par `cpc_uart_console_clear()` réel ; [C99 RED 41079673659](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41079673659), échec explicite sur palette post-clear. Correctif circonscrit à la passerelle propriétaire CONSOLE : restauration INK2=6, INK3=18 après `!CLS`, sans nouveau framebuffer, mémoire statique ou comportement BASIC ajouté. [Protocole PO avant/après](HW4-PEN-A-native-pen-mode1.md). **ON_DEVICE_UNVERIFIED : aucune demande de flash avant nouvel accord explicite du Pilotage.**
+
+**C1 / mémoire :** réutilisation exclusive du scratch statique 2 048 octets lors de `bsr_step_events()` via `BasicScratch` (union C99 alignée) ; les trois événements typés restent disponibles, sorties PRINT distinctes. Aucune capacité historique diminuée, aucune RAM statique ajoutée. Mesure base-vers-HEAD Xtensa exigée.
+
+
+### HW4-PEN-A-C1-SYNC — J1.18-B, PR #190 (30 octobre 2026)
+
+Base `main@d29424699dbca3ffe0c20b7d3e4caef9d1ee8dfc` (5/5 CI post-fusion #193 SUCCESS). Passerelle PEN : `BE_VIDEO_SET_INK` rejeté explicitement avant tout replay des événements ou octets PRINT de la ligne, avec test mixte `PEN/PRINT/INK/PRINT/PEN`. Correctif réel `!CLS`, union statique C99 (2048 octets / 3 événements), boot/orientation 10 et témoins CPC scellés préservés. Différentiel mémoire Xtensa exigé sur cette base et CI du nouveau HEAD. Barrière matérielle Pilotage inchangée : `ON_DEVICE_UNVERIFIED`, PR non fusionnée, aucune autorisation autonome de flash.

@@ -1,0 +1,212 @@
+{
+  "source": "TEST_SYNTHETIC",
+  "cutoff": "2026-10-29T18:51:11Z",
+  "repo": "Kharn27/ESP32-Locomotive-Basic",
+  "description": "TEST ONLY: fabricated timestamps and SHA; never treat as real GitHub runs",
+  "pr_info": {},
+  "baseline_c99_runs": [],
+  "runs": [
+    {
+      "id": 1001,
+      "event": "pull_request",
+      "head_sha": "aaaa000000000000000000000000000000000001",
+      "path": ".github/workflows/basic-program.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-29T19:00:00Z",
+      "updated_at": "2026-10-29T19:02:00Z",
+      "pull_requests": [
+        {
+          "number": 10
+        }
+      ],
+      "jobs": [
+        {
+          "created_at": "2026-10-29T19:00:05Z",
+          "started_at": "2026-10-29T19:00:15Z",
+          "completed_at": "2026-10-29T19:02:00Z"
+        }
+      ]
+    },
+    {
+      "id": 1002,
+      "event": "pull_request",
+      "head_sha": "aaaa000000000000000000000000000000000001",
+      "path": ".github/workflows/ci-cpc-permanent.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-29T19:00:00Z",
+      "updated_at": "2026-10-29T19:01:00Z",
+      "pull_requests": [
+        {
+          "number": 10
+        }
+      ],
+      "jobs": []
+    },
+    {
+      "id": 1003,
+      "event": "pull_request",
+      "head_sha": "aaaa000000000000000000000000000000000001",
+      "path": ".github/workflows/ci-arch.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-29T19:00:00Z",
+      "updated_at": "2026-10-29T19:00:30Z",
+      "pull_requests": [
+        {
+          "number": 10
+        }
+      ],
+      "jobs": []
+    },
+    {
+      "id": 1004,
+      "event": "pull_request",
+      "head_sha": "aaaa000000000000000000000000000000000001",
+      "path": ".github/workflows/ci-opt3-routing.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-29T19:00:00Z",
+      "updated_at": "2026-10-29T19:00:25Z",
+      "pull_requests": [
+        {
+          "number": 10
+        }
+      ],
+      "jobs": []
+    },
+    {
+      "id": 1005,
+      "event": "pull_request",
+      "head_sha": "bbbb000000000000000000000000000000000002",
+      "path": ".github/workflows/basic-program.yml",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "created_at": "2026-10-29T19:04:00Z",
+      "updated_at": "2026-10-29T19:05:00Z",
+      "pull_requests": [
+        {
+          "number": 10
+        }
+      ],
+      "jobs": []
+    },
+    {
+      "id": 1006,
+      "event": "pull_request",
+      "head_sha": "bbbb000000000000000000000000000000000002",
+      "path": ".github/workflows/ci-cpc-permanent.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-29T19:04:00Z",
+      "updated_at": "2026-10-29T19:05:00Z",
+      "pull_requests": [
+        {
+          "number": 10
+        }
+      ],
+      "jobs": []
+    },
+    {
+      "id": 1007,
+      "event": "pull_request",
+      "head_sha": "bbbb000000000000000000000000000000000002",
+      "path": ".github/workflows/ci-arch.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-29T19:04:00Z",
+      "updated_at": "2026-10-29T19:05:00Z",
+      "pull_requests": [
+        {
+          "number": 10
+        }
+      ],
+      "jobs": []
+    },
+    {
+      "id": 1008,
+      "event": "pull_request",
+      "head_sha": "bbbb000000000000000000000000000000000002",
+      "path": ".github/workflows/ci-opt3-routing.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-29T19:04:00Z",
+      "updated_at": "2026-10-29T19:05:00Z",
+      "pull_requests": [
+        {
+          "number": 10
+        }
+      ],
+      "jobs": []
+    },
+    {
+      "id": 1009,
+      "event": "pull_request",
+      "head_sha": "cccc000000000000000000000000000000000003",
+      "path": ".github/workflows/basic-program.yml",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-10-29T19:07:00Z",
+      "updated_at": "2026-10-29T19:08:00Z",
+      "pull_requests": [
+        {
+          "number": 11
+        }
+      ],
+      "jobs": []
+    },
+    {
+      "id": 1010,
+      "event": "pull_request",
+      "head_sha": "dddd000000000000000000000000000000000004",
+      "path": ".github/workflows/basic-program.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-29T19:08:00Z",
+      "updated_at": "2026-10-29T20:13:13Z",
+      "pull_requests": [
+        {
+          "number": 12
+        }
+      ],
+      "run_attempt": 2,
+      "attempts": [
+        {
+          "number": 1,
+          "metadata": {
+            "conclusion": "failure"
+          },
+          "jobs": []
+        },
+        {
+          "number": 2,
+          "metadata": {
+            "conclusion": "success",
+            "run_started_at": "2026-10-29T20:13:00Z",
+            "attempt": 2
+          },
+          "jobs": [
+            {
+              "name": "rerun-last-attempt TEST",
+              "created_at": "2026-10-29T20:13:02Z",
+              "started_at": "2026-10-29T20:13:10Z",
+              "completed_at": "2026-10-29T20:13:13Z",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ],
+      "jobs": [
+        {
+          "name": "rerun-last-attempt TEST",
+          "created_at": "2026-10-29T20:13:02Z",
+          "started_at": "2026-10-29T20:13:10Z",
+          "completed_at": "2026-10-29T20:13:13Z",
+          "conclusion": "success"
+        }
+      ],
+      "run_started_at": "2026-10-29T20:13:00Z"
+    }
+  ]
+}

@@ -106,3 +106,27 @@ Attendu : au-delà de 25 lignes, `HW4-C3-B2 SCREEN_SCROLL rows=... total=...`, t
 ## États / décision
 
 `TARGET_BUILD_VERIFIED` seulement après trois compilations Xtensa sur le HEAD final. La suite C99, les cinq CI, les contrôles d'oracles et les budgets sont cités dans la PR sur son HEAD précis. Aucun test PO ne peut être **auto-validé** par le Développeur ; Pilotage décide après retour physique favorable sur ce HEAD.
+
+
+## HW4-PEN-A-C1-SYNC — synchronisation J1.18-B (30 octobre 2026)
+
+**Base :** `main@d29424699dbca3ffe0c20b7d3e4caef9d1ee8dfc` après fusion #193, cinq CI `push` SUCCESS. `BEVideoEvent` porte désormais les champs additionnels `ink` et `colour` ; `BE_VIDEO_SET_INK=2` est un événement logique du cœur **sans rendu CYD autorisé par cette mission**. La passerelle `hw4_pen_preflight` renvoie explicitement `HW4_PEN_SET_INK_UNSUPPORTED` dès qu'elle rencontre ce type. **Toute la ligne/étape est rejetée avant le premier octet PRINT, y compris les opérations PEN/PRINT qui précèdent INK**. La politique n'implémente ni table RGB, ni recoloration, ni fonction BASIC nouvelle. Les messages UART `VIDEO_REJECT category=SET_INK_UNSUPPORTED printed=0 event_applied=0 print_applied=0` décrivent le refus du rendu, pas une erreur CPC historique.
+
+**Test négatif hôte :** `test_j118b_ink_explicit_reject_no_partial_replay` appelle le véritable `bsr_step_events` avec `PEN 2:PRINT "A":INK 1,26:PRINT "B":PEN 3:PRINT "C"`, qui doit produire **3 événements** aux offsets 0/2/4 et les octets `A\nB\nC\n`. Le préflight ET le replay sont rejetés sans mutation de VRAM, de `CpcVideo`, de `CpcText` ou des octets PRINT ; une requête INK seule est également rejetée. Le test répète le refus après le vrai `hw4_pen_console_clear` et vérifie INK2/3=6/18. Les tests C1 existants préservent PEN, les trois événements au maximum, l'atomicité au quatrième et le comportement `RUN → !CLS → RUN`.
+
+**Mémoire et ABI :** `BasicScratch` demeure une union C99 alignée entre 2048 octets temporaires et trois `BEVideoEvent` ; l'augmentation de taille du type vient du cœur J1.18-B, pas d'une nouvelle allocation. Le workflow `HW4-SCROLL-A0` compare CONSOLE/HW3/BASIC_PROBE entre `main@d29424699dbca3ffe0c20b7d3e4caef9d1ee8dfc` et le HEAD de #190, avec garde IRAM inchangée et seuil DRAM différentiel maximum **+256 octets**. Les chiffres ne sont pas présumés avant les exécutions réelles. Boot MODE1 bleu/jaune, orientation **10** et GPIO36 préservés ; archives scellées jamais retouchées.
+
+### Protocole négatif PO supplémentaire — uniquement après autorisation Pilotage
+
+Après contrôle du SHA complet de la PR autorisé explicitement par Pilotage, et avant puis après `!CLS` sans `NEW`, saisir :
+
+```basic
+NEW
+10 PEN 2:PRINT "NEVER_BEFORE":INK 1,26:PRINT "NEVER_AFTER":PEN 3:PRINT "NEVER_END"
+20 PRINT "NEXT_STEP_NEVER"
+RUN
+```
+
+Attendus : `HW4-PEN-A VIDEO_REJECT category=SET_INK_UNSUPPORTED` avec `printed=0 event_applied=0 print_applied=0`, **aucune émission `HW4-C2 PRINT_BYTES` de la ligne rejetée**, aucun texte `NEVER_*` dessiné par l'exécution BASIC et aucun changement de PEN dû à cette ligne. L'écho de la source saisie reste distinct de la sortie PRINT et le diagnostic d'erreur hôte peut s'afficher. Faire `!CLS` suivi de `RUN` sans réécrire les lignes, avec les mêmes résultats ; ensuite rejouer le protocole PEN positif C1 déjà décrit pour vérifier l'alternance rouge/vert/jaune, le curseur et les encres conservées après clear. Retour requis : SHA flashé, log UART complet, photos, mesures `DEVICE_MEMORY`, PASS/FAIL par scénario. **Aucun flash n'est demandé sans la décision explicite du Pilotage.**
+
+**SHA à utiliser :** la remise GitHub officielle du Développeur indiquera le HEAD exact de la PR #190 synchronisée ; ne jamais flasher l'ancien `d165c375...`.

@@ -392,6 +392,45 @@ static void test_c1_real_console_cls_palette(void)
     run_c1_colour_cases(); /* colour and PEN16 still valid after !CLS */
 }
 
+
+/* HW4-PEN-A-C1-SYNC: true BASIC mixed PEN/INK/PRINT step.
+ * Even PRINT that precedes SET_INK must not reach VRAM or text counters.
+ * ABI J1.18-B adds ink/colour, but the three-event budget is preserved. */
+static void test_j118b_ink_explicit_reject_no_partial_replay(void)
+{
+    const uint8_t expected[]={'A','\n','B','\n','C','\n'};
+    uint8_t output_copy[OUT_CAP];
+    size_t original_program_size;
+    setup();
+    assert(submit("10 PEN 2:PRINT \"A\":INK 1,26:PRINT \"B\":PEN 3:PRINT \"C\"").status==BSR_OK);
+    original_program_size=f.program.size;
+    assert(submit("RUN").status==BSR_OK);
+    assert(step(OUT_CAP,3U).status==BSR_OK);
+    assert(f.written==sizeof(expected) && f.event_written==3U);
+    assert(memcmp(f.output,expected,sizeof(expected))==0);
+    assert(f.events[0].type==BE_VIDEO_SET_TEXT_PEN &&
+           f.events[0].pen==2U && f.events[0].print_offset==0U);
+    assert(f.events[1].type==BE_VIDEO_SET_INK &&
+           f.events[1].ink==1U && f.events[1].colour==26U &&
+           f.events[1].print_offset==2U);
+    assert(f.events[2].type==BE_VIDEO_SET_TEXT_PEN &&
+           f.events[2].pen==3U && f.events[2].print_offset==4U);
+    memcpy(output_copy,f.output,sizeof(output_copy));
+    assert_rejected_replay(f.events,3U,f.output,f.written,
+                           HW4_PEN_SET_INK_UNSUPPORTED);
+    assert(memcmp(f.output,output_copy,sizeof(output_copy))==0);
+    assert(f.text.bytes_received==0U && f.video.pen==1U);
+    assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+    assert(f.program.size==original_program_size);
+    assert(hw4_pen_console_clear(&f.text)); /* real C1 !CLS path */
+    assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+    assert_rejected_replay(f.events,3U,f.output,f.written,
+                           HW4_PEN_SET_INK_UNSUPPORTED);
+    assert(f.program.size==original_program_size);
+    assert_rejected_replay(&f.events[1],1U,f.output,f.written,
+                           HW4_PEN_SET_INK_UNSUPPORTED);
+}
+
 int main(void)
 {
     test_order_and_preserved_print();
@@ -400,6 +439,7 @@ int main(void)
     test_runtime_atomic_and_diagnostics();
     test_scrolling_preserves_text_counters();
     test_c1_real_console_cls_palette();
+    test_j118b_ink_explicit_reject_no_partial_replay();
     puts("HW4-PEN-A: typed events, native MODE1 pixels, scroll and atomicity PASS");
     return 0;
 }

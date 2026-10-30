@@ -55,6 +55,9 @@ Hw4PenStatus hw4_pen_preflight(const CpcText *sink,
     for (i = 0U; i < event_count; ++i) {
         uint8_t pixel = 0U;
         Hw4PenStatus status;
+        /* Reject J1.18-B INK before any PEN or PRINT slice is rendered. */
+        if (events[i].type == BE_VIDEO_SET_INK)
+            return HW4_PEN_SET_INK_UNSUPPORTED;
         if (events[i].type != BE_VIDEO_SET_TEXT_PEN)
             return HW4_PEN_INVALID_EVENT;
         if (events[i].print_offset < previous ||

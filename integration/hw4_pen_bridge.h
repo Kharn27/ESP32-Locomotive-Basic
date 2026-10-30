@@ -14,7 +14,8 @@ typedef enum {
     HW4_PEN_UNSUPPORTED_LOGICAL,
     HW4_PEN_UNVERIFIED_VISUAL,
     HW4_PEN_TEXT_PRECHECK_FAILED,
-    HW4_PEN_RENDER_FAILED
+    HW4_PEN_RENDER_FAILED,
+    HW4_PEN_SET_INK_UNSUPPORTED /* J1.18-B: no renderer; whole step rejected */
 } Hw4PenStatus;
 
 /* The mapping is deliberately bounded to the independently acquired
@@ -28,7 +29,9 @@ typedef enum {
 Hw4PenStatus hw4_pen_pixel_index(const CpcVideo *video, uint8_t logical,
                                   uint8_t *pixel);
 
-/* Pure preflight: event types, indices, monotonic byte offsets and the entire
+/* Pure preflight: explicitly reject SET_INK, including preceding PEN/PRINT;
+ * no pixels, counters or cursor may change during validation. Check event
+ * types, indices, monotonic byte offsets and the entire
  * CpcText stream. No output bytes, video pixels or sink counters are changed.
  * Repeat validation before replay if external code changes ink/sink state. */
 Hw4PenStatus hw4_pen_preflight(const CpcText *sink,

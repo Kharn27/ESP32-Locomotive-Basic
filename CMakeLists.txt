@@ -62,6 +62,10 @@ if(BUILD_TESTING)
     add_executable(test_basic_pen_events tests/test_basic_pen_events.c)
     target_link_libraries(test_basic_pen_events PRIVATE basic_session_runtime)
     add_test(NAME basic_pen_events COMMAND test_basic_pen_events)
+    # J1.18-B: 13 CPC A2 records, eight native logical palette events.
+    add_executable(test_basic_ink_events tests/test_basic_ink_events.c)
+    target_link_libraries(test_basic_ink_events PRIVATE basic_session_runtime)
+    add_test(NAME basic_ink_events COMMAND test_basic_ink_events)
 
     add_executable(test_basic_session_runtime tests/test_basic_session_runtime.c)
     target_link_libraries(test_basic_session_runtime PRIVATE basic_session_runtime)
@@ -437,7 +441,6 @@ if(BUILD_TESTING)
     add_test(NAME hw4_c1_native_runtime_tft_bytes COMMAND test_hw4_c1_integration)
 endif()
 
-# HW4-PEN-A: integration is downstream of CORE and VIDEO, never reverse.
 add_library(hw4_pen_bridge STATIC integration/hw4_pen_bridge.c)
 target_include_directories(hw4_pen_bridge PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/integration)
 target_link_libraries(hw4_pen_bridge PUBLIC basic_session_runtime cpc_text cpc_uart_console)

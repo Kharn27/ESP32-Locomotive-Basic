@@ -361,8 +361,9 @@ static bool display_print_events(size_t event_count)
     Hw4PenStatus validation=hw4_pen_preflight(&s_text,s_basic.output,
                             s_basic.written,s_basic.scratch.events,event_count);
     if(validation!=HW4_PEN_OK) {
-        printf("HW4-PEN-A VIDEO_REJECT status=%d printed=0 event_applied=0\n",
-               (int)validation);
+        printf("HW4-PEN-A VIDEO_REJECT category=%s status=%d printed=0 event_applied=0 print_applied=0\n",
+               validation==HW4_PEN_SET_INK_UNSUPPORTED ?
+               "SET_INK_UNSUPPORTED" : "PEN_PREFLIGHT", (int)validation);
         (void)bsr_stop(&s_basic.runtime);
         return display_error();
     }

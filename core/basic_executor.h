@@ -34,18 +34,30 @@ typedef enum {
     BE_FOR_WITHOUT_NEXT,
     BE_INVALID_PEN, /* host policy for CPC 16/-1, never CPC ERR=5 */
     BE_EVENT_RECEIVER_REQUIRED,
-    BE_NO_EVENT_SPACE
+    BE_NO_EVENT_SPACE,
+    BE_INVALID_INK /* only four measured CPC boundaries, host diagnostic */
 } BEStatus;
 
 /* Typed, caller-owned video event, never encoded in PRINT.
  * print_offset counts PRINT bytes preceding the event within this step;
  * the caller can replay ordered PRINT slices and events.
- * pen is a logical CPC argument, NOT a MODE renderer palette index. */
-typedef enum { BE_VIDEO_SET_TEXT_PEN = 1 } BEVideoEventType;
+ * pen is a logical CPC argument, NOT a MODE renderer palette index.
+ * SET_INK changes logical palette mapping; the renderer may need to
+ * recolour already-drawn pixels, not just future PRINT bytes.
+ * No RGB table, colour rendering, or blinking is provided by core.
+ * The three historical fields retain their offsets and initializer order.
+ * Appended ink/colour fields increase sizeof(BEVideoEvent); consumers
+ * must recompile and budgets must reflect the caller-owned array size. */
+typedef enum {
+    BE_VIDEO_SET_TEXT_PEN = 1,
+    BE_VIDEO_SET_INK = 2
+} BEVideoEventType;
 typedef struct {
     BEVideoEventType type;
-    uint8_t pen;
-    size_t print_offset;
+    uint8_t pen; /* historical PEN argument; zero for SET_INK */
+    size_t print_offset; /* original third field: preserve positional initializers */
+    uint8_t ink; /* CPC logical palette index, not MODE pixel index */
+    uint8_t colour; /* CPC colour code, NOT an RGB or renderer value */
 } BEVideoEvent;
 
 /* J1.11-B: fixed per-executor call stack, no heap and no C recursion.
@@ -139,7 +151,7 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
 
 /* Exactly one stored BASIC line per call. Explicit ordered video side channel,
  * fixed caller-owned capacity; no allocation or hardware dependency.
- * events=NULL is allowed only for capacity=0; a reached PEN then returns
+ * events=NULL is allowed only for capacity=0; a reached PEN or INK returns
  * BE_EVENT_RECEIVER_REQUIRED without consuming anything.
  * On BE_OK *written and *event_written report counts (including zeros).
  * On all errors and BE_END neither count, buffer, cursor nor store changes.

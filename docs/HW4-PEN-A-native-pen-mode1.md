@@ -130,3 +130,34 @@ RUN
 Attendus : `HW4-PEN-A VIDEO_REJECT category=SET_INK_UNSUPPORTED` avec `printed=0 event_applied=0 print_applied=0`, **aucune émission `HW4-C2 PRINT_BYTES` de la ligne rejetée**, aucun texte `NEVER_*` dessiné par l'exécution BASIC et aucun changement de PEN dû à cette ligne. L'écho de la source saisie reste distinct de la sortie PRINT et le diagnostic d'erreur hôte peut s'afficher. Faire `!CLS` suivi de `RUN` sans réécrire les lignes, avec les mêmes résultats ; ensuite rejouer le protocole PEN positif C1 déjà décrit pour vérifier l'alternance rouge/vert/jaune, le curseur et les encres conservées après clear. Retour requis : SHA flashé, log UART complet, photos, mesures `DEVICE_MEMORY`, PASS/FAIL par scénario. **Aucun flash n'est demandé sans la décision explicite du Pilotage.**
 
 **SHA à utiliser :** la remise GitHub officielle du Développeur indiquera le HEAD exact de la PR #190 synchronisée ; ne jamais flasher l'ancien `d165c375...`.
+
+
+## HW4-PEN-A-C1-RUN-STOP — fin de RUN après refus du rendu INK
+
+**Mandat Pilotage :** revue `#190 / C1-RUN-STOP`, correctif limité à la propagation du résultat `display_print_events() → basic_run()`. Sur un `SET_INK_UNSUPPORTED`, le préflight rejette toute la ligne sans sortie PRINT ni changement PEN/VRAM. Le CONSOLE appelle une seule fois `bsr_stop`, écrit un seul `ERROR`, puis transmet `HW4_PEN_DISPLAY_REJECT_DIAGNOSED` à `hw4_pen_run_after_display`, qui indique `HW4_PEN_RUN_DONE`. `basic_run()` retourne alors normalement vers `CPC_READY_RUN_RETURN` et le prompt : aucun second `bsr_step_events`, aucun `BSR_NOT_RUNNING`. En cas d'échec de l'affichage du diagnostic : `HW4_PEN_DISPLAY_FATAL`, sans faux retour réussi. Un replay PEN normal reste `HW4_PEN_DISPLAY_OK` et continue le RUN. Le pilote matériel, le moteur BASIC, la palette, les oracles, le rendu INK (absent) et le stockage statique restent inchangés.
+
+**Régression RED → GREEN :** un contrôle C99 de la transition **partagée entre le firmware et le test hôte** (même `hw4_pen_run_after_display`), sur le vrai `bsr_step_events`, `hw4_pen_preflight`, `cpc_diag_policy_write`, `cpc_ready_policy_apply` et `cpc_uart_console_prompt`. Scénarios : `PEN:PRINT:INK:PRINT:PEN:PRINT` et `INK` seul, chaque fois avant et après le vrai `!CLS` sans recharger le programme ; une ligne suivante `PRINT "NEXT_STEP_NEVER"` doit rester non exécutée. Compteurs attendus sur chaque RUN : `VIDEO_REJECT=1`, `ERROR=1`, `BSR_NOT_RUNNING=0`, `PRINT_BYTES=0`, `Ready=1`, pas exécutés=1. **RED :** commit `b73040b292e57e3a0149a618ba2abf996eeec75a`, C99 [41099340483](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41099340483), échec contrôlé sur `ERROR=2`, `BSR_NOT_RUNNING=1`, pas=2. **GREEN :** résultats CI du HEAD après correctif à reporter dans la remise GitHub, pas de validation présumée.
+
+### Protocole matériel PO ciblé — uniquement sur nouvelle autorisation du Pilotage
+
+L'ancienne autorisation de test `9f742420...` ne couvre **pas** ce HEAD. Après revue et feu vert du Pilotage, compiler/flasher le nouveau SHA complet et exécuter les deux programmes :
+
+```basic
+NEW
+10 PEN 2:PRINT "NEVER_BEFORE":INK 1,26:PRINT "NEVER_AFTER":PEN 3:PRINT "NEVER_END"
+20 PRINT "NEXT_STEP_NEVER"
+RUN
+!CLS
+RUN
+```
+
+```basic
+NEW
+10 INK 1,26
+20 PRINT "NEXT_STEP_NEVER"
+RUN
+!CLS
+RUN
+```
+
+Pour chaque `RUN` : exactement **un** `VIDEO_REJECT category=SET_INK_UNSUPPORTED`, **un** `DIAG_POLICY ... message=ERROR`, **aucun** `BSR_STEP_FAIL BSR=2`, **aucun** `HW4-C2 PRINT_BYTES` de la ligne refusée ni du pas suivant, **un seul** retour `Ready` avec éditeur/UART toujours utilisable ; programme conservé à travers `!CLS`. L'écho de saisie n'est pas une sortie PRINT. Fournir SHA flashé, logs UART avec compteurs par RUN, photos et mesures `DEVICE_MEMORY`, verdicts PO PASS/FAIL. **Aucun flash ni fusion par le Développeur.**

@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define CHECK(x) do { if (!(x)) { \
-    fprintf(stderr, "%s:%d: %s\\n", __FILE__, __LINE__, #x); \
+    fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #x); \
     return 1; } } while (0)
 
 typedef struct {
@@ -139,7 +139,7 @@ static int order_and_atomicity(void)
     Fixture f;
     BSRResult result;
     CHECK(init(&f) == 0);
-    CHECK(submit(&f, "10 PRINT \\"A\\":PEN 3:INK 1,26:PRINT \\"B\\"").status == BSR_OK);
+    CHECK(submit(&f, "10 PRINT \"A\":PEN 3:INK 1,26:PRINT \"B\"").status == BSR_OK);
     CHECK(submit(&f, "20 INK 1,6").status == BSR_OK);
     CHECK(submit(&f, "30 END").status == BSR_OK);
     CHECK(submit(&f, "RUN").status == BSR_OK);
@@ -158,7 +158,7 @@ static int order_and_atomicity(void)
     CHECK(failed(&f, BE_NO_SPACE, 3u, 5u, 0) == 0);
     result = step(&f, sizeof(f.output), 2u);
     CHECK(result.status == BSR_OK && f.written == 4u && f.events_written == 2u);
-    CHECK(memcmp(f.output, "A\\nB\\n", 4u) == 0 && f.output[4] == 0x63u);
+    CHECK(memcmp(f.output, "A\nB\n", 4u) == 0 && f.output[4] == 0x63u);
     CHECK(f.events[0].type == BE_VIDEO_SET_TEXT_PEN &&
           f.events[0].pen == 3u && f.events[0].ink == 0u &&
           f.events[0].colour == 0u && f.events[0].print_offset == 2u);
@@ -213,7 +213,7 @@ static int negative_tests(void)
     {
         Fixture f;
         CHECK(init(&f) == 0);
-        CHECK(submit(&f, "10 PRINT \\"X\\":INK 1,32").status == BSR_OK);
+        CHECK(submit(&f, "10 PRINT \"X\":INK 1,32").status == BSR_OK);
         CHECK(submit(&f, "RUN").status == BSR_OK);
         CHECK(failed(&f, BE_INVALID_INK, sizeof(f.output), 5u, 0) == 0);
     }
@@ -268,7 +268,7 @@ int main(void)
     CHECK(oracle_13() == 0);
     CHECK(order_and_atomicity() == 0);
     CHECK(negative_tests() == 0);
-    printf("basic_ink_events: OK, sizeof(BEVideoEvent)=%lu, print_offset=%lu\\n",
+    printf("basic_ink_events: OK, sizeof(BEVideoEvent)=%lu, print_offset=%lu\n",
            (unsigned long)sizeof(BEVideoEvent),
            (unsigned long)offsetof(BEVideoEvent, print_offset));
     return 0;

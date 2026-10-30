@@ -396,7 +396,7 @@ static Hw4PenDisplayResult display_print_events(size_t event_count)
         printf("HW4-C3-B2 SCREEN_OUTPUT_CLIPPED bytes=%u "
                "policy=unexpected_clip\n",
                (unsigned)(s_text.bytes_clipped-clipped_before));
-    return true;
+    return HW4_PEN_DISPLAY_OK;
 }
 static bool display_error(void)
 {

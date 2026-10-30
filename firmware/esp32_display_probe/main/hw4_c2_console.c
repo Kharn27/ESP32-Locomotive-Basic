@@ -332,7 +332,6 @@ static bool repaint_dirty(void)
                (unsigned)s_text.scrolls);
         s_scroll_reported=s_text.scrolls;
     }
-    /* Both the zero-dirty and successful-flush paths must return true. */
     return true;
 }
 static bool display_error(void); /* host-only diagnostics, below */

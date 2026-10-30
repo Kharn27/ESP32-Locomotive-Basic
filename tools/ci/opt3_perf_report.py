@@ -121,7 +121,7 @@ def analyze_run(run):
         explicit_start = stamp(meta.get("run_started_at"))
         # Only trust metadata for the current attempt when its number matches.
         meta_number = meta.get("run_attempt", meta.get("attempt"))
-        if meta_number is not None and int(meta_number) != attempt_count:
+        if meta_number is None or int(meta_number) != attempt_count:
             explicit_start = None
         # Large pre-job gaps may reflect stale metadata or controller delays;
         # report only evidenced queue, never label them runner waiting.

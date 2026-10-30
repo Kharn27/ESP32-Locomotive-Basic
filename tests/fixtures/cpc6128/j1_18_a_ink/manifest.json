@@ -1,0 +1,76 @@
+{
+  "acquisition_head": "6e9b17b8d545a57ef3942f217c9b4d3daeae8c38",
+  "cases": {
+    "I00": {
+      "original": "f5c2f7fe6018abb2a68fbde731a4a7489151a2c048d6812a2f6fe23cf084147a",
+      "repeat": "e7629f4492cf58c7f56d6ba7762aa963d780bab12828c22e7888715631efa99f"
+    },
+    "I106": {
+      "original": "f01ba3d5ff68ebd0cfeee47df448e1ee243b5eedcb8686f4dc3369d8ca5f2594",
+      "repeat": "c029a7ea2969504cc9e532f0efba00baf98193c1a3fc9498909bfa9f2e69633b"
+    },
+    "I126": {
+      "original": "2ce19b9a9582850e0977fe8e54e35eae83bf97bae9f47392839fd1fafe723f19",
+      "repeat": "12ba9c6634087d2697580d13eb958f48222c3a0272696f38c70198aa42a70a03"
+    },
+    "I1266": {
+      "original": "bcf80d6f1c562919a327d81b04a948b1e7ecff74a9b577e9af93b640b083a18d",
+      "repeat": "dc57af73cff7508b409a9830aaa446848fef2e69211b9e379e56fefbdd1eeaa2"
+    },
+    "I127": {
+      "original": "1fc53526d9dbe1f28e87f668e9adfb5352352b003378bb51fd630f50665e5723",
+      "repeat": "bd20ae0acdae19ec95853278ea715f0559ab8428422a8a60467baad7c7555541"
+    },
+    "I131": {
+      "original": "8130fef93db36dc5e4cd5ab308180136c5a5944a42b31de1c8cfa3353a8afb3b",
+      "repeat": "d231c02e734e3265593f938f5d59839842d51a97f4076b2c0352f807183315ba"
+    },
+    "I132": {
+      "original": "13be691862e79e4947751e1e74bbedc706128ee3161c152dbafdcb33ff2ac98e",
+      "repeat": "8d1623596b5bf60b431e16eb43719ec52df9991debcb3f24cfc9b63ece5f13cf"
+    },
+    "I1526": {
+      "original": "a27d31120fccf907276513938b9b03d378154faec05e5b1a036b7c2eeb866a18",
+      "repeat": "d9b1f38784657b0e92c75871a7ab284784addd7bfe795f125aac8326a91e4ecc"
+    },
+    "I1626": {
+      "original": "122f24f8571825d6ffecd667c674a13d4fb8de7b4593ccd5523b3bc9727ef1db",
+      "repeat": "52f82c7a498295fbd0693ce082fd3185fe0d93f91be3ccaa027e306e1e90e756"
+    },
+    "I1N1": {
+      "original": "396f09e5dec2da8d4cb4b69254721362fbbd63666b7ae3f93e86ac1fd96a9a74",
+      "repeat": "60c7d3f4747024c744ac342e100e5b2fc22e23d880922ad8386ca769f58d77a1"
+    },
+    "I206": {
+      "original": "f89809d1b3ffe7693ca7adb03c77c94c5786d905ed4f69a0c8d393da08c3220a",
+      "repeat": "70cf7ef0e9fba5709bc36d606351e4b17cfd5a712213c6417fd97d1e2c8708bf"
+    },
+    "I318": {
+      "original": "d609f3330a2d07753f0465c0931f045af60e80fe2f4d22b69e0af4b61ee346d5",
+      "repeat": "49019081c65539c5e01614a3e52bd0a704be69cf692cb2f5d70cb5863c999c4c"
+    },
+    "IN126": {
+      "original": "73a48207990119563f3e75cbdf83eb109ec1f571e8ce538c1eb0f3a87a4c5999",
+      "repeat": "5aa01c5e1784e3c599bc9dfe271e1e8ce23cb2aeed77dfd066c634a7c868ab87"
+    }
+  },
+  "chronology": {
+    "original": "8d1910fef9bc20e0bd50f7e96368f6da198d73393f22d1c1ab1cb2565e0de58f",
+    "repeat": "91d5610dee67757c3733a91ebd57ffcc838c9bfb4c5a09e0fa85c227de3aae2b"
+  },
+  "full_snapshots_archived": false,
+  "native_changes": false,
+  "oracle": {
+    "basic": "1.1",
+    "caprice": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "ghcr": "ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c",
+    "model": "CPC6128",
+    "rom": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "version": "Caprice32 v4.6.0-8c778bf072a06fb7c23b9cccd179041db7f79a52\nAPP_PATH: Not provided\nCompiled with:\nNumber of video plugins available: 11"
+  },
+  "phase": "J1.18-A",
+  "run_id": "40974044447",
+  "schema_version": 1,
+  "temporal_classification": "TEMPORAL_UNVERIFIED",
+  "visual_classification": "VISUAL_UNVERIFIED"
+}

@@ -13,7 +13,7 @@ endif()
 if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
     idf_component_register(
         SRCS
-            "hw4_c2_console.c" "cpc_font.c"
+            "hw4_c2_console.c" "hw4_touch_t1.c" "cpc_font.c"
             "../../../video/cpc_video.c" "../../../video/cpc_palette.c" "../../../video/cpc_boot.c"
             "../../../video/cpc_text.c" "../../../video/hw4_scroll_metrics.c"
             "../../../integration/hw4_pen_bridge.c"
@@ -21,8 +21,8 @@ if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
             "../../../io/uart_line.c" "../../../io/cpc_screen_nav.c"
             "../../../io/cpc_ready_policy.c" "../../../io/cpc_diag_policy.c"
         INCLUDE_DIRS "." "../../../video" "../../../io" "../../../integration"
-        REQUIRES loco_core cyd_ili9341 esp_driver_uart
-                 freertos heap esp_system esp_app_format
+        REQUIRES loco_core cyd_ili9341 esp_driver_uart esp_driver_gpio
+                 esp_timer freertos heap esp_system esp_app_format
     )
 elseif(LOCO_CYD_PROFILE STREQUAL "HW3")
     idf_component_register(

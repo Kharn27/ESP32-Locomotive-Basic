@@ -62,7 +62,8 @@ jobs:
           ! grep -F 'LCD_DMA_RETRY' "$src"
           grep -F 'LCD_FAIL_STOP' "$src"
           grep -F 'retry=0' "$src"
-          grep -F 'pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : 100U)' "$src"
+          grep -F 'pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : TOUCH_POLL_MS)' "$src"
+          grep -F 'TOUCH_POLL_MS = 20' "$src"
           # HW4-READY-A decouples Ready from prompt; keep terminal flush
           # and ensure dispatch comes from the tested portable policy.
           grep -F 'return apply_ready_policy(transition) && prompt();' "$src"

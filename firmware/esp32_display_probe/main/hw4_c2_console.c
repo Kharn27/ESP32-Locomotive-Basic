@@ -16,13 +16,17 @@
 #include "cpc_screen_nav.h"
 #include "cpc_video.h"
 #include "hw4_scroll_metrics.h"
+#include "hw4_touch_t1.h"
 #include "cyd_ili9341.h"
 #include "uart_line.h"
 #include "driver/uart.h"
+#include "driver/gpio.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_idf_version.h"
 #include "esp_cpu.h"
+#include "esp_timer.h"
+#include "esp_system.h"
 #include "sdkconfig.h"
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
@@ -46,6 +50,7 @@ enum {
     RUN_STEP_BUDGET = 256,
     PEN_EVENT_CAPACITY = 3, /* A0 DRAM guard: 3 typed events, no heap/VRAM */
     ECHO_IDLE_MS = 20,
+    TOUCH_POLL_MS = 20,
     ECHO_MAX_BYTES = UART_LINE_CAPACITY
 };
 typedef struct {
@@ -74,6 +79,7 @@ static size_t s_scroll_reported;
 /* A0: CONSOLE-only class counters; a scroll-associated dirty flush may
  * also contain cursor, text or !CLS writes. Never label it scroll-exclusive. */
 static Hw4ScrollMetrics s_scroll_metrics;
+static Hw4TouchT1 s_touch; /* CONSOLE only; 0 heap, 0 extra tasks */
 /* B2-C1 instrumentation: bounded histogram, never a second framebuffer. */
 static struct {
     uint32_t flushes, bands, max_us, histogram[12];
@@ -205,6 +211,67 @@ static bool repaint_full(void)
     (void)cpc_video_take_dirty(&s_video);
     return true;
 }
+/* /PENIRQ on classic CYD is GPIO36, active low; input-only, no
+ * internal pull-up. Do not configure SPI, I2C or touch coordinates here.
+ * BOOT is deliberately disarmed until 50 ms of stable released level. */
+static uint64_t touch_now_ms(void)
+{
+    return (uint64_t)esp_timer_get_time()/UINT64_C(1000);
+}
+static bool touch_init(void)
+{
+    gpio_config_t pin={
+        .pin_bit_mask=UINT64_C(1)<<GPIO_NUM_36,
+        .mode=GPIO_MODE_INPUT,
+        .pull_up_en=GPIO_PULLUP_DISABLE,
+        .pull_down_en=GPIO_PULLDOWN_DISABLE,
+        .intr_type=GPIO_INTR_DISABLE
+    };
+    esp_err_t e=gpio_config(&pin);
+    if(e!=ESP_OK) return fail("TOUCH_GPIO36",(int)e);
+    hw4_touch_t1_init(&s_touch,gpio_get_level(GPIO_NUM_36)==0,
+                      touch_now_ms());
+    printf("HW4-TOUCH-T1 BOOT_READY orientation=%u penirq_gpio=36 "
+           "active_low=1 debounce_ms=50 long_ms=3000 armed=0\n",
+           cyd_lcd_current_orientation());
+    return true;
+}
+static bool touch_poll(void)
+{
+    uint64_t elapsed=0U;
+    const uint64_t now=touch_now_ms();
+    const Hw4TouchEvent event=hw4_touch_t1_step(
+        &s_touch,gpio_get_level(GPIO_NUM_36)==0,now,&elapsed);
+    if(event==HW4_TOUCH_PRESS) {
+        printf("HW4-TOUCH-T1 PRESS at_ms=%llu\n",
+               (unsigned long long)now);
+    } else if(event==HW4_TOUCH_SHORT_ROTATE) {
+        const unsigned old=cyd_lcd_current_orientation();
+        if(old!=9U && old!=10U) return fail("TOUCH_ORIENTATION_STATE",(int)old);
+        const unsigned target=old==9U ? 10U : 9U;
+        /* Shared driver clears GRAM, applies both mirror bits, then the
+         * unchanged CPC VRAM receives one COMPLETE repaint. No framebuffer
+         * allocation and no mutation of BASIC, editor or dirty state. */
+        esp_err_t e=cyd_lcd_orientation(target,
+                                          cpc_video_palette_rgb565(1U));
+        if(e!=ESP_OK) return fail("TOUCH_ORIENTATION",(int)e);
+        if(!repaint_full()) return false; /* single DMA attempt per band */
+        printf("HW4-TOUCH-T1 SHORT_ROTATE orientation=%u elapsed_ms=%llu "
+               "program_preserved=1 repaint=full\n",
+               target,(unsigned long long)elapsed);
+    } else if(event==HW4_TOUCH_LONG_RESET) {
+        /* A full firmware restart, NOT NEW, NVS erase or hardware EN reset.
+         * The state machine emits LONG once; boot rearming needs release. */
+        printf("HW4-TOUCH-T1 LONG_RESET elapsed_ms=%llu "
+               "action=esp_restart orientation_before=%u\n",
+               (unsigned long long)elapsed,cyd_lcd_current_orientation());
+        fflush(stdout);
+        esp_restart();
+        return false; /* defensive: no second restart if platform returns */
+    }
+    return true;
+}
+
 static bool send_dirty_band(void *context, unsigned row)
 {
     unsigned *sent=(unsigned *)context;
@@ -525,7 +592,7 @@ void app_main(void)
     esp_err_t e=cyd_lcd_init();
     if(e!=ESP_OK) { (void)fail("LCD_INIT",(int)e); return; }
     printf("HW4-C2 LCD_INIT_PASS dma_bytes=%u\n",CYD_LCD_DMA_BYTES);
-    e=cyd_lcd_orientation(9U,cpc_video_palette_rgb565(1U));
+    e=cyd_lcd_orientation(10U,cpc_video_palette_rgb565(1U));
     if(e!=ESP_OK) { (void)fail("LCD_ORIENTATION",(int)e); return; }
     printf("HW4-C2 ORIENTATION_PASS case=%u\n",
            cyd_lcd_current_orientation());
@@ -571,13 +638,15 @@ void app_main(void)
     printf("HW4-C2 HELP submit_4_numbered_lines_then_RUN "
            "LIST_NEW=real_BSR !DEMO=HW4-C1 !CLS=screen_only\n");
     if(!prompt()) return;
+    if(!touch_init()) return;
     unsigned echo_pending=0U;
     printf("HW4-C3-B2-C1 ECHO_POLICY idle_ms=%u batch_max=%u "
            "command_flush=1 dma_fail_stop=1\n",ECHO_IDLE_MS,ECHO_MAX_BYTES);
     for(;;) {
+        if(!touch_poll()) return;
         uint8_t ch=0U;
         int got=uart_read_bytes(UART_NUM_0,&ch,1U,
-                                pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : 100U));
+                                pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : TOUCH_POLL_MS));
         if(got<0) { (void)fail("UART_READ",got); return; }
         if(got==0) {
             /* Echo within one idle interval. Fast paste coalesces into

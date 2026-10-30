@@ -1,0 +1,162 @@
+{
+  "baseline": {
+    "commands": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "LOCATE 1,15",
+      "PRINT \"J118INK\"",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-29T23:35:48.651576+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-29T23:35:47.649938+00:00"
+  },
+  "baseline_log_sha256": "79f89ab6a982f6e6594f7ed9f01e66c2a156aa7d38a2724de006db457535cdde",
+  "baseline_png_sha256": "19cb811c63d97aa5e8f74864418e6d38eb4a907867b5bd83e2a563634c0c513d",
+  "case": "I1266",
+  "erl": 0,
+  "err": 0,
+  "ink_opcode_observed": 162,
+  "ink_record_hex": "0D 00 0A 00 A2 20 0F 2C 19 1A 2C 14 00",
+  "line_numbers": [
+    10,
+    20,
+    30,
+    40
+  ],
+  "list": {
+    "commands": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "10 INK 1,26,6",
+      "20 LOCATE 1,15",
+      "30 PRINT \"J118INK\"",
+      "40 END",
+      "LIST",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-29T23:35:47.648584+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-29T23:35:46.401672+00:00"
+  },
+  "list_log_sha256": "5c36c87421e2e863295602b8434ab3adddeb0d05d2d7fdeeb9f4862b1a374e15",
+  "list_png_sha256": "1e443c7b9c6ea87028b5accca5ef8e3227c402ad3bfa7fcb8d34a5f1d6e80def",
+  "paper": 0,
+  "pen": 1,
+  "print_location": {
+    "column": 1,
+    "row": 15,
+    "text": "J118INK"
+  },
+  "printer_is_not_color_evidence": true,
+  "printer_sha256": "37945bf7b406cce0ad7c77718e3e66d128ac15f3f81d6f389d32c5f6aed664f9",
+  "program_hex": "0D 00 0A 00 A2 20 0F 2C 19 1A 2C 14 00 0B 00 14 00 A9 20 0F 2C 19 0F 00 10 00 1E 00 BF 20 22 4A 31 31 38 49 4E 4B 22 00 06 00 28 00 98 00 00 00",
+  "program_sha256": "627786c3816da29da184b7fa417b11c4608bf436a3909476ad3929f4df2c9c19",
+  "region": {
+    "bank": "physical bank 0, Gate Array RAM config 0",
+    "base_pointer_address": 44644,
+    "base_pointer_value": 367,
+    "end_exclusive": 416,
+    "end_pointer_address": 44646,
+    "length": 48,
+    "line_numbers": [
+      10,
+      20,
+      30,
+      40
+    ],
+    "records": [
+      {
+        "length": 13,
+        "line": 10,
+        "offset": 0,
+        "terminator_offset": 12
+      },
+      {
+        "length": 11,
+        "line": 20,
+        "offset": 13,
+        "terminator_offset": 23
+      },
+      {
+        "length": 16,
+        "line": 30,
+        "offset": 24,
+        "terminator_offset": 39
+      },
+      {
+        "length": 6,
+        "line": 40,
+        "offset": 40,
+        "terminator_offset": 45
+      }
+    ],
+    "sentinel_offset": 46,
+    "snapshot_data_offset": 256,
+    "snapshot_program_offset": 624,
+    "start_address": 368,
+    "terminator_hex": "0000"
+  },
+  "run": {
+    "commands": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "10 INK 1,26,6",
+      "20 LOCATE 1,15",
+      "30 PRINT \"J118INK\"",
+      "40 END",
+      "RUN",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "PRINT #8,ERR",
+      "PRINT #8,ERL",
+      "CAP32_DELAY CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-29T23:35:50.130498+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-29T23:35:48.652530+00:00"
+  },
+  "run_kind": "NO_ERROR",
+  "run_log_sha256": "9249c725f40c5f84b5bc8e8f4812cb7cfa889a386c1d62edc600f6252756981d",
+  "run_png_sha256": "af22bd563ed9169137aef505ba5a87888fc6ce927a131d324e20ac0b4541cd17",
+  "screen_is_not_token_evidence": true,
+  "session": "original",
+  "setup_commands": [
+    "MODE 1",
+    "INK 0,0",
+    "INK 1,26",
+    "INK 2,6",
+    "INK 3,18",
+    "PAPER 0",
+    "PEN 1",
+    "CLS",
+    "NEW"
+  ],
+  "setup_mode": 1,
+  "source_sha256": "e8d5a09b99aad84ffab945a15743a57c4e74f720cd10274cdaf1dfc429ab97bd",
+  "temporal_classification": "TEMPORAL_UNVERIFIED",
+  "visual_classification": "VISUAL_UNVERIFIED"
+}

@@ -31,6 +31,26 @@ static BEStatus emit_pen_event(BEEventEmitter *events, uint8_t pen,
         BEVideoEvent *event = &events->data[events->length];
         event->type = BE_VIDEO_SET_TEXT_PEN;
         event->pen = pen;
+        event->ink = 0u;
+        event->colour = 0u;
+        event->print_offset = print_offset;
+    }
+    ++events->length;
+    return BE_OK;
+}
+
+/* Logical CPC palette command: no PRINT bytes or renderer access.
+ * Pen field remains reserved for BE_VIDEO_SET_TEXT_PEN consumers. */
+static BEStatus emit_ink_event(BEEventEmitter *events, uint8_t ink,
+                               uint8_t colour, size_t print_offset)
+{
+    if (events->length == SIZE_MAX) return BE_NO_EVENT_SPACE;
+    if (events->data != NULL) {
+        BEVideoEvent *event = &events->data[events->length];
+        event->type = BE_VIDEO_SET_INK;
+        event->pen = 0u;
+        event->ink = ink;
+        event->colour = colour;
         event->print_offset = print_offset;
     }
     ++events->length;
@@ -635,6 +655,70 @@ static BEStatus pen_argument(const uint8_t *body, size_t length,
     return BE_OK;
 }
 
+/* CPC INK A2 numeric operands; these bounds define the *token*
+ * grammar only. Native execution is whitelisted by J1.18-A evidence. */
+static BEStatus ink_literal(const uint8_t *body, size_t length, size_t *pos,
+                            unsigned int maximum, int *value)
+{
+    uint8_t token;
+    unsigned int n;
+    if (*pos == length) return BE_TRUNCATED;
+    token = body[(*pos)++];
+    if (token == 0xf5u) {
+        if (*pos == length) return BE_TRUNCATED;
+        if (body[(*pos)++] != 0x0fu) return BE_BAD_SEQUENCE;
+        *value = -1;
+        return BE_OK;
+    }
+    if (token >= 0x0eu && token <= 0x17u)
+        n = (unsigned int)(token - 0x0eu);
+    else if (token == 0x19u) {
+        if (*pos == length) return BE_TRUNCATED;
+        n = (unsigned int)body[(*pos)++];
+        if (n < 10u) return BE_BAD_SEQUENCE;
+    } else
+        return unexpected(token);
+    if (n > maximum) return BE_BAD_SEQUENCE;
+    *value = (int)n;
+    return BE_OK;
+}
+
+static BEStatus ink_arguments(const uint8_t *body, size_t length,
+                              size_t *pos, uint8_t *ink, uint8_t *colour)
+{
+    int p, c, third;
+    BEStatus status;
+    skip_spaces(body, length, pos);
+    if (*pos == length || body[*pos] == 0x01u) return BE_BAD_SEQUENCE;
+    status = ink_literal(body, length, pos, 16u, &p);
+    if (status != BE_OK) return status;
+    if (*pos == length || body[(*pos)++] != (uint8_t)',')
+        return BE_BAD_SEQUENCE;
+    status = ink_literal(body, length, pos, 32u, &c);
+    if (status != BE_OK) return status;
+    if (*pos < length && body[*pos] == (uint8_t)',') {
+        ++*pos;
+        status = ink_literal(body, length, pos, 32u, &third);
+        if (status != BE_OK) return status;
+        if (p == 1 && c == 26 && third == 6)
+            return BE_UNSUPPORTED; /* Observed syntax, temporal effect unknown. */
+        return BE_BAD_SEQUENCE;
+    }
+    /* Only four measured ERR=5 cases have a dedicated HOST diagnostic.
+     * Do not infer errors or support for other unmeasured tuples. */
+    if ((p == 16 && c == 26) || (p == -1 && c == 26) ||
+        (p == 1 && c == 32) || (p == 1 && c == -1))
+        return BE_INVALID_INK;
+    if (!((p == 0 && c == 0) || (p == 1 && c == 26) ||
+          (p == 1 && c == 6) || (p == 2 && c == 6) ||
+          (p == 3 && c == 18) || (p == 15 && c == 26) ||
+          (p == 1 && c == 27) || (p == 1 && c == 31)))
+        return BE_UNSUPPORTED; /* CPC behaviour outside sealed samples. */
+    *ink = (uint8_t)p;
+    *colour = (uint8_t)c;
+    return BE_OK;
+}
+
 /* Parse/execute precisely the reached prefix of one numbered line.
  * A successful GOTO returns immediately; the suffix is not inspected.
  * next is written only on success. No output passes occur before validation. */
@@ -674,6 +758,12 @@ static BEStatus execute_line(const BasicProgram *program,
             status = pen_argument(body, length, &pos, &pen);
             if (status != BE_OK) return status;
             status = emit_pen_event(events, pen, out->length);
+            if (status != BE_OK) return status;
+        } else if (token == 0xa2u) { /* INK: logical palette, no rendering. */
+            uint8_t ink, colour;
+            status = ink_arguments(body, length, &pos, &ink, &colour);
+            if (status != BE_OK) return status;
+            status = emit_ink_event(events, ink, colour, out->length);
             if (status != BE_OK) return status;
         } else if (token == 0xbfu) { /* PRINT */
             argument_start = pos;

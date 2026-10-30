@@ -449,6 +449,9 @@ if(BUILD_TESTING)
     target_link_libraries(test_hw4_pen_a PRIVATE hw4_pen_bridge
                           cpc_diag_policy cpc_ready_policy)
     add_test(NAME hw4_pen_a_typed_events_mode1 COMMAND test_hw4_pen_a)
+    # RED/GREEN: feed the actual production CONSOLE source to the test.
+    set_tests_properties(hw4_pen_a_typed_events_mode1 PROPERTIES
+        ENVIRONMENT "HW4_PEN_C2_CONSOLE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main/hw4_c2_console.c")
 endif()
 
 # J1.7-B: F4 explicit INTEGER+INTEGER. Original J1.7-A captures are READ ONLY.

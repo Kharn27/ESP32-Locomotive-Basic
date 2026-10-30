@@ -26,10 +26,18 @@ typedef struct {
     uint8_t vram[CPC_VIDEO_BYTES];
 } Fixture;
 static Fixture f;
+/* Observe actual glyphs emitted by the production CpcText sink. */
+static bool capture_diag;
+static char diagnostic_glyphs[96];
+static size_t diagnostic_glyph_count;
 
 static uint8_t glyph(void *ctx, uint8_t ch, unsigned row)
 {
     (void)ctx;
+    if(capture_diag && row==0U) {
+        assert(diagnostic_glyph_count<sizeof(diagnostic_glyphs));
+        diagnostic_glyphs[diagnostic_glyph_count++]=(char)ch;
+    }
     return row == 0U && ch != (uint8_t)' ' ? 0x80U : 0U;
 }
 
@@ -611,8 +619,162 @@ static void test_c1_c2_successive_pen_lines_reach_end(void)
     }
 }
 
+
+/* HW4-DIAG-PEN-A: actual runtime errors, real record numbers and text/Ready
+ * sink. This catches the previous ERROR fallback and a hardcoded "in 10". */
+static void test_diag_pen_run_case(const char *line10, const char *line20,
+                                   uint16_t bad_line, bool repeat_after_cls)
+{
+    const char *expected=bad_line==10U ?
+        "Improper argument in 10\\n" : "Improper argument in 20\\n";
+    const char *expected_painted=bad_line==10U ?
+        "Improper argument in 10Ready" : "Improper argument in 20Ready";
+    const size_t expected_length=strlen(expected);
+    uint8_t saved_program[sizeof(f.program_bytes)];
+    setup();
+    assert(submit(line10).status==BSR_OK);
+    assert(submit(line20).status==BSR_OK);
+    assert(submit("30 PRINT \\"NEVER\\"").status==BSR_OK);
+    const size_t stored_size=f.program.size;
+    memcpy(saved_program,f.program_bytes,sizeof(saved_program));
+    for(unsigned pass=0U;pass<(repeat_after_cls?2U:1U);++pass) {
+        uint8_t vram_before[CPC_VIDEO_BYTES];
+        uint8_t output_before[OUT_CAP];
+        BEVideoEvent events_before[EVENT_CAP];
+        BasicSessionRuntime runtime_before;
+        uint8_t buffer[48];
+        size_t size=99U;
+        bool ready=false;
+        CpcStepDiagnostic diag;
+        if(pass!=0U) {
+            assert(hw4_pen_console_clear(&f.text)); /* production !CLS */
+            assert(f.program.size==stored_size);
+        }
+        assert(submit("RUN").status==BSR_OK);
+        if(bad_line==20U) {
+            BSRResult first=step(OUT_CAP,3U);
+            assert(first.status==BSR_OK && f.written==0U &&
+                   f.event_written==1U);
+            assert(hw4_pen_replay(&f.text,f.output,f.written,
+                                  f.events,f.event_written)==HW4_PEN_OK);
+        }
+        memcpy(vram_before,f.vram,sizeof(vram_before));
+        memset(f.output,0x5a,sizeof(f.output));
+        memset(f.events,0x66,sizeof(f.events));
+        f.written=41U;
+        f.event_written=43U;
+        memcpy(output_before,f.output,sizeof(output_before));
+        memcpy(events_before,f.events,sizeof(events_before));
+        runtime_before=f.runtime;
+        BSRResult r=step(OUT_CAP,3U);
+        assert(r.status==BSR_EXECUTOR_ERROR &&
+               r.executor_status==BE_INVALID_PEN);
+        assert(memcmp(&f.runtime,&runtime_before,sizeof(runtime_before))==0);
+        assert(memcmp(f.output,output_before,sizeof(output_before))==0);
+        assert(memcmp(f.events,events_before,sizeof(events_before))==0);
+        assert(f.written==41U && f.event_written==43U);
+        assert(memcmp(f.vram,vram_before,sizeof(vram_before))==0);
+        assert(f.program.size==stored_size);
+        assert(memcmp(f.program_bytes,saved_program,sizeof(saved_program))==0);
+        diag=cpc_diag_policy_step(r,&f.runtime); /* BEFORE stop */
+        assert(diag.category==CPC_DIAG_PEN_IMPROPER_ARGUMENT);
+        assert(diag.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE);
+        assert(diag.line_number==bad_line);
+        assert(cpc_diag_policy_format_step(diag,buffer,sizeof(buffer),&size));
+        assert(size==expected_length && memcmp(buffer,expected,size)==0);
+        memset(buffer,0x6c,sizeof(buffer));
+        size=71U;
+        assert(!cpc_diag_policy_format_step(diag,buffer,expected_length-1U,&size));
+        assert(size==71U && buffer[0]==0x6cU);
+        assert(bsr_stop(&f.runtime).status==BSR_OK);
+        assert(f.runtime.state==BSR_IDLE);
+        assert(cpc_diag_policy_step(r,&f.runtime).category==CPC_DIAG_HOST_GENERIC);
+        /* Same two production writers and RUN_RETURN transition as CONSOLE. */
+        capture_diag=true;
+        diagnostic_glyph_count=0U;
+        assert(cpc_diag_policy_write_step(&f.text,diag));
+        assert(cpc_ready_policy_apply(&f.text,CPC_READY_RUN_RETURN,&ready));
+        assert(ready);
+        capture_diag=false;
+        assert(diagnostic_glyph_count==strlen(expected_painted));
+        assert(memcmp(diagnostic_glyphs,expected_painted,
+                      diagnostic_glyph_count)==0);
+        assert(strstr(expected_painted,"NEVER")==NULL);
+        assert(f.text.bytes_clipped==0U);
+    }
+    capture_diag=false;
+}
+static void test_diag_pen_native_and_host_guards(void)
+{
+    uint8_t message[48];
+    size_t size=0U;
+    CpcStepDiagnostic host={CPC_DIAG_HOST_GENERIC,CPC_DIAG_ORIGIN_HOST,0U};
+    CpcStepDiagnostic forged={CPC_DIAG_PEN_IMPROPER_ARGUMENT,
+                             CPC_DIAG_ORIGIN_HOST,10U};
+    assert(cpc_diag_policy_format_step(host,message,sizeof(message),&size));
+    assert(size==6U && memcmp(message,"ERROR\\n",size)==0);
+    assert(!cpc_diag_policy_format_step(forged,message,sizeof(message),&size));
+    forged.origin=CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE;
+    forged.line_number=0U;
+    assert(!cpc_diag_policy_format_step(forged,message,sizeof(message),&size));
+
+    test_diag_pen_run_case("10 PEN 16","20 PRINT \\"NEVER_BEFORE\\"",10U,true);
+    test_diag_pen_run_case("10 PEN -1","20 END",10U,false);
+    test_diag_pen_run_case("10 PEN 2","20 PEN 16",20U,true);
+    test_diag_pen_run_case("10 PEN 2","20 PEN -1",20U,false);
+    test_diag_pen_run_case("10 PEN 2:PRINT \\"NEVER_BEFORE\\":PEN 16",
+                           "20 END",10U,false);
+
+    /* Host-only failures never acquire a false CPC line or ERR/ERL. */
+    for(unsigned n=5U;n<=14U;n+=9U) {
+        char cmd[32];
+        BSRResult r;
+        setup();
+        assert(snprintf(cmd,sizeof(cmd),"10 PEN %u",n)>0);
+        assert(submit(cmd).status==BSR_OK);
+        assert(submit("RUN").status==BSR_OK);
+        r=step(OUT_CAP,3U);
+        assert(r.status==BSR_EXECUTOR_ERROR &&
+               r.executor_status==BE_UNSUPPORTED);
+        assert(cpc_diag_policy_step(r,&f.runtime).category==CPC_DIAG_HOST_GENERIC);
+    }
+    setup();
+    assert(submit("10 PEN 2:PEN 1:PEN 3:PEN 2").status==BSR_OK);
+    assert(submit("RUN").status==BSR_OK);
+    {
+        BSRResult r=step(OUT_CAP,3U);
+        assert(r.executor_status==BE_NO_EVENT_SPACE);
+        assert(cpc_diag_policy_step(r,&f.runtime).category==CPC_DIAG_HOST_GENERIC);
+    }
+    setup();
+    assert(submit("10 INK 1,26").status==BSR_OK);
+    assert(submit("RUN").status==BSR_OK);
+    {
+        BSRResult r=step(OUT_CAP,3U);
+        assert(r.status==BSR_OK && f.event_written==1U);
+        assert(hw4_pen_preflight(&f.text,f.output,f.written,
+                    f.events,f.event_written)==HW4_PEN_SET_INK_UNSUPPORTED);
+        assert(cpc_diag_policy_step(r,&f.runtime).category==CPC_DIAG_HOST_GENERIC);
+    }
+    setup();
+    {
+        BSRResult r=submit("RUN+");
+        assert(r.status!=BSR_OK);
+        assert(cpc_diag_policy_select((const uint8_t *)"RUN+",4U,r)
+               ==CPC_DIAG_HOST_GENERIC);
+        assert(cpc_diag_policy_step(r,&f.runtime).category==CPC_DIAG_HOST_GENERIC);
+    }
+    setup();
+    {
+        BSRResult r=submit("PEN 16"); /* no native direct PEN RUN context */
+        assert(r.status!=BSR_OK);
+        assert(cpc_diag_policy_step(r,&f.runtime).category==CPC_DIAG_HOST_GENERIC);
+    }
+}
+
 int main(void)
 {
+    test_diag_pen_native_and_host_guards();
     test_order_and_preserved_print();
     test_pen_only_and_oracle_bounds();
     test_bridge_preflight_atomic();

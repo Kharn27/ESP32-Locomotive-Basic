@@ -1,0 +1,160 @@
+{
+  "case": "C13",
+  "erl": 0,
+  "err": 0,
+  "inks": {
+    "0": 0,
+    "1": 26,
+    "2": 6,
+    "3": 18
+  },
+  "line_numbers": [
+    10,
+    20,
+    30,
+    40
+  ],
+  "list": {
+    "commands": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "10 PEN 13",
+      "20 LOCATE 1,15",
+      "30 PRINT \"J117PEN\"",
+      "40 END",
+      "LIST",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-30T22:20:29.389628+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-30T22:20:28.548872+00:00"
+  },
+  "list_log_sha256": "57ae9e2aa018c3e27e50fa063277849ed9f6d29d934d6e2ba1a08d56931b2458",
+  "list_png_sha256": "22d917a65efb6668785432b50fc046d34075abf9ec941b7e3535f05eb77540f1",
+  "logical_pen": 13,
+  "palette_context": "explicit",
+  "paper": 0,
+  "pen_opcode_observed": 187,
+  "pen_record_hex": "09 00 0A 00 BB 20 19 0D 00",
+  "print_location": {
+    "column": 1,
+    "row": 15,
+    "text": "J117PEN"
+  },
+  "printer_is_not_color_evidence": true,
+  "printer_sha256": "37945bf7b406cce0ad7c77718e3e66d128ac15f3f81d6f389d32c5f6aed664f9",
+  "program_hex": "09 00 0A 00 BB 20 19 0D 00 0B 00 14 00 A9 20 0F 2C 19 0F 00 10 00 1E 00 BF 20 22 4A 31 31 37 50 45 4E 22 00 06 00 28 00 98 00 00 00",
+  "program_sha256": "aa24ba496030dba076cf13b7c22b7c2ecdb2a76a7c351dad8ac2d315ec2cfcce",
+  "region": {
+    "bank": "physical bank 0, Gate Array RAM config 0",
+    "base_pointer_address": 44644,
+    "base_pointer_value": 367,
+    "end_exclusive": 412,
+    "end_pointer_address": 44646,
+    "length": 44,
+    "line_numbers": [
+      10,
+      20,
+      30,
+      40
+    ],
+    "records": [
+      {
+        "length": 9,
+        "line": 10,
+        "offset": 0,
+        "terminator_offset": 8
+      },
+      {
+        "length": 11,
+        "line": 20,
+        "offset": 9,
+        "terminator_offset": 19
+      },
+      {
+        "length": 16,
+        "line": 30,
+        "offset": 20,
+        "terminator_offset": 35
+      },
+      {
+        "length": 6,
+        "line": 40,
+        "offset": 36,
+        "terminator_offset": 41
+      }
+    ],
+    "sentinel_offset": 42,
+    "snapshot_data_offset": 256,
+    "snapshot_program_offset": 624,
+    "start_address": 368,
+    "terminator_hex": "0000"
+  },
+  "rgb_roi": {
+    "pixels": {
+      "0,0,0": 1332,
+      "255,255,255": 684
+    },
+    "roi": [
+      64,
+      305,
+      190,
+      321
+    ],
+    "sha256": "3a5b254b492e135a56a9c42d08b51663dde335a0497b0dca690c764615a0c734"
+  },
+  "run": {
+    "commands": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "10 PEN 13",
+      "20 LOCATE 1,15",
+      "30 PRINT \"J117PEN\"",
+      "40 END",
+      "RUN",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "PRINT #8,ERR",
+      "PRINT #8,ERL",
+      "CAP32_DELAY CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-30T22:20:30.408685+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-30T22:20:29.390579+00:00"
+  },
+  "run_kind": "NO_ERROR",
+  "run_log_sha256": "e5e87e9b28509a9e315d94488b663d68347b82d098233de9cd75fac7ff1ec28e",
+  "run_png_sha256": "3a5b254b492e135a56a9c42d08b51663dde335a0497b0dca690c764615a0c734",
+  "screen_is_not_token_evidence": true,
+  "session": "original",
+  "setup_commands": [
+    "MODE 1",
+    "INK 0,0",
+    "INK 1,26",
+    "INK 2,6",
+    "INK 3,18",
+    "PAPER 0",
+    "PEN 1",
+    "CLS",
+    "NEW"
+  ],
+  "setup_mode": 1,
+  "source_sha256": "2f1666611e11703390a2edf6838a6a2bcf6c5a2b59d05953b1f4d46918ae03a5",
+  "visual_classification": "RGB_ROI_MEASURED",
+  "visual_reason": "ROI histogram; no inferred logical-to-pixel mapping"
+}

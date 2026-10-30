@@ -5,6 +5,16 @@
 #include <stdint.h>
 #include <string.h>
 
+/* Compile-time layout proof in every ESP-IDF profile, C99-compatible.
+ * A mismatch is a build failure instead of an inferred ABI size. */
+#if defined(ESP_PLATFORM)
+typedef char BEInkXtensaLayoutCheck[
+    (sizeof(BEVideoEvent) == 16u &&
+     offsetof(BEVideoEvent, print_offset) == 8u &&
+     offsetof(BEVideoEvent, ink) == 12u &&
+     offsetof(BEVideoEvent, colour) == 13u) ? 1 : -1];
+#endif
+
 typedef struct {
     int present;
     BasicVariableKey key;

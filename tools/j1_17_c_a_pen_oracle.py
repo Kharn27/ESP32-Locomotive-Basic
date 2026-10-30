@@ -36,8 +36,113 @@ CONTROLLED = ["MODE 1", "INK 0,0", "INK 1,26", "INK 2,6",
 DEFAULT = ["MODE 1", "PAPER 0", "PEN 1", "CLS", "NEW"]
 # Filled in a separate, audited commit AFTER acquiring authentic GHCR records.
 # External seals MUST NOT be inferred from the archive under verification.
-EXTERNAL_MANIFEST_SHA256 = ""
-EXTERNAL_RECORD_SHA256 = {}
+EXTERNAL_MANIFEST_SHA256 = "1907f9203333c43c0a840e5b36f0aca6c792ab76bcc60a91937047cf68964be9"
+EXTERNAL_RECORD_SHA256 = {
+    "C05": {
+        "original": "bac1fc830f8772b5f08014ddafcff3019816016d5afd5ff4874d1f3f1036001a",
+        "repeat": "93570abb7c91990476a72cc1108e55f18486242f97bf2dcb177b0305fadc8042"
+    },
+    "C06": {
+        "original": "b83dd9fe53dabe62e18fcf6aa40d825a525e213b1703fc62d3163046285d0441",
+        "repeat": "d03be698cb7032349605828870df03dfd383d81c867eb1a655cc7a785bb8a6a9"
+    },
+    "C07": {
+        "original": "d86b6baf236c373c6bce0f5098fa94302155c6f23d0a385a0382c4d6ec521ec4",
+        "repeat": "78ed3960f324d9b9af864dbb5b77ee7af6ce5993030396002ba5de20b50fb61c"
+    },
+    "C08": {
+        "original": "4f50e1def516240e010b10687dd6d9954858212fc472821be3a65e80ea4dc976",
+        "repeat": "a9b3c2ea1fd3cbe35283abc5886ed90831b710657dcd0100cd13a825ee9a6173"
+    },
+    "C09": {
+        "original": "8115435f1e9b3ed63dacaed2650bed2b0a3946f993a43528b1288e16f4f5fa5f",
+        "repeat": "d854497468b517d61fd5753af99c87182ec9e5fef3082dd3ad13228a3b1afc68"
+    },
+    "C10": {
+        "original": "592da56a96aaee86c4874523a214531d61bbb79058bc25557bd03dde37c95293",
+        "repeat": "51d7eb3e70ec0fe968ef1730d1ba390b184ccdd521b92f466b66fab8f5fe4ae1"
+    },
+    "C11": {
+        "original": "495b81c6cbfb8c8e42c676c85d0252b17fed158bcfd579ee41e5ead64a00bdf4",
+        "repeat": "63a3477c20ec684ac2a256bf04491f77460a64d388e2c8fb600ce834c1df0764"
+    },
+    "C12": {
+        "original": "e8236444be862f8202912369164927d570998ea05f4281501b792fa04503f9d8",
+        "repeat": "b16f15216cdf549d191b89ce9ab03dd63c63c05e5740a06975ddb4dec8e3fb74"
+    },
+    "C13": {
+        "original": "0a6fea0e3755bd0e0a3a06fce97566b6284853669da75d29caae0a8706e3b7fa",
+        "repeat": "8a103a91f815fb6f7c174d031f8af22a40477f18d154493f795ff6c549a431fd"
+    },
+    "C14": {
+        "original": "5a84f6453c5b4b8739cd16923ec465e6127f0699adffaa5cd499b881a5ae100b",
+        "repeat": "3632259c867a75b84d8a26b8a2047f80948153fd91d0f8f226530406931ccc08"
+    },
+    "C00": {
+        "original": "efa57c79df7c9105ae4ec395e03088b27f2f8e41cd53446da40ff7a60f8ac075",
+        "repeat": "da9e870701f6701afc6149e4fa364d2700a15e18b985f8e54b2236f896c986e7"
+    },
+    "C02": {
+        "original": "a7f24167a4ecf7bb21b4fc8e7455473e8adc0c6816e00682260aeacd04553870",
+        "repeat": "9a70ed32f0ef41f5dc7e177162903a4942004d61ab3f4a400b4b520b366e159c"
+    },
+    "C03": {
+        "original": "28d6a07f9920b0a85218359d09f8d8b90e289c8ce869015279b1e729299bf8f5",
+        "repeat": "512801ccefb8427104cf9637d25a5c79b3acc70da0e48ed73828cc0c8255ed61"
+    },
+    "D05": {
+        "original": "aa7d7a164ce1eb65c1bb3e30e2dd8922aee2bc7213060d313e0696e665e4c294",
+        "repeat": "6cdd7696209b01f7f9665696e62231734badf36650acdfac6d2f6a72b282aa7e"
+    },
+    "D06": {
+        "original": "36429d4c62deb736e51293c4afd983c6f1065e722de25fdbe99de5a184fe0881",
+        "repeat": "e82891f88daa85569168b5fdf226636334e8f0738bf2cc2f935e564429a019d1"
+    },
+    "D07": {
+        "original": "aa408d08199a9ee9ec89814186947c684116a7fd6c6f7a6625559e2a44c07a8b",
+        "repeat": "df91c02fc49ddeacbff45b7405696f870f915d3a8e922753b967dbaacd6ee1ac"
+    },
+    "D08": {
+        "original": "9cc292684fa5172fc45cb7eab325ac3cce9551a1dd658f582bf1c266fdb5391b",
+        "repeat": "bedebbf55a03ceb73d73d01fb66fe8d87e25a53bf9101f873a66a6d9d049b4b6"
+    },
+    "D09": {
+        "original": "b1581360f247c69e14682684ede5b871c402390949650177b4d173bbc29a2193",
+        "repeat": "4200ef3840ca6ffa83f54043f1d153314d30f98be5cfb761daebe20c57a9f767"
+    },
+    "D10": {
+        "original": "3fd86e5cca567f366b6c1c164d18427a5f60749a9a40ef7d6c68735dcc763de1",
+        "repeat": "e8d8e2db387c9ab9a3f7a967e29d06a61a4fb537469e480f3934e062982313a3"
+    },
+    "D11": {
+        "original": "cef1bba6f8e7edfab2d6170ed3c493e37b4f759fcc940d95f085b46e74a137fc",
+        "repeat": "7acb14e49b73d05ef608cadc12e4ba5bb373d7e774b5cbeb4b218fe6bbd62f88"
+    },
+    "D12": {
+        "original": "5d74d540b1bfcfc52be183e2160a266533fe8d017ae456deee47c7933a11a374",
+        "repeat": "60680db365efa244e1da908b569d050a0eb1eeb30167585e236df001d1796a10"
+    },
+    "D13": {
+        "original": "58f03d8ede3d06748ef81bfc8486c2d529f7193391007f35f25589ffa97b30a6",
+        "repeat": "592720a6fff966fe46bba877178088642f7d6eeae830b165ee573b254fd6ace6"
+    },
+    "D14": {
+        "original": "c01f0dd6ce4553919865080c5e0abb817a6577965cab2c378d5eb172e7a6804d",
+        "repeat": "6cf1bb2295b4b87c0a452f17692d1d4a1ecda9adbd9d4893b7d748d387b1f4d2"
+    },
+    "D00": {
+        "original": "a273dced1078849a12fa347375d7c4f83ea2bf8b410fa7408c689e1c1a00ed12",
+        "repeat": "62f3aeadaaf47b60e69c99632c1c47cac99c5ad92b35c8bfd5f1df14de1bc1c6"
+    },
+    "D02": {
+        "original": "33f46564f3fbe9055040b60fa6174a132dc43dd55a77b2847081f0fc0ab8111c",
+        "repeat": "7eb623f04580a483dfb6e57259fde3e858d80b4d7caa43a823b41987ae71f0d2"
+    },
+    "D03": {
+        "original": "7fcb3f8a003b925ff54bb7821fd098605d4ef0a2abc88eb85d3e3720966c0291",
+        "repeat": "8c830d7d4a8163b7d10968d6c140048a4ea91eb251a4921f172822b809dfcc27"
+    }
+}
 
 class Invalid(ValueError):
     pass

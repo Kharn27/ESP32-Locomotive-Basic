@@ -62,6 +62,10 @@ if(BUILD_TESTING)
     add_executable(test_basic_pen_events tests/test_basic_pen_events.c)
     target_link_libraries(test_basic_pen_events PRIVATE basic_session_runtime)
     add_test(NAME basic_pen_events COMMAND test_basic_pen_events)
+    # J1.18-B: 13 CPC A2 records, eight native logical palette events.
+    add_executable(test_basic_ink_events tests/test_basic_ink_events.c)
+    target_link_libraries(test_basic_ink_events PRIVATE basic_session_runtime)
+    add_test(NAME basic_ink_events COMMAND test_basic_ink_events)
 
     add_executable(test_basic_session_runtime tests/test_basic_session_runtime.c)
     target_link_libraries(test_basic_session_runtime PRIVATE basic_session_runtime)

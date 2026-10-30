@@ -583,3 +583,10 @@ Ouvert par le Pilotage seulement après succès des cinq CI de `main@6a3470ea3e7
 ### J1.18-A — INK oracle CPC indépendant (PR #191, décision Pilotage attendue)
 
 [#189](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/189) : 13 cas INK × 2 sessions indépendantes CPC6128/BASIC1.1 avec RAM/LIST/RUN, ERR/ERL, contrôle PNG RGB, recoloration à deux instants sans nouveau PRINT, 243 fichiers bruts archivés et SHA externes. Provenance initiale `6e9b17b8d545a57ef3942f217c9b4d3daeae8c38`, archivage `0d4214fdc4670dcdaa36f7704fe692b92d43d963` ; 113 preuves PEN antérieures non modifiées. [Rapport INK](J1.18-A-ink-cpc-oracle.md). **Statut : EN REVUE PILOTAGE / NON FUSIONNÉE**, pas de code INK natif, pas de raccordement CYD, `ON_DEVICE_UNVERIFIED`. La forme triple reste `TEMPORAL_UNVERIFIED` ; les mesures RGB sont propres aux captures. Aucun jalon J1.18-B autorisé par cette livraison.
+
+
+### Gate J1.18-B — INK natif C99, palette logique typée (mandat #192)
+
+**Barrière de départ satisfaite** : les cinq workflows `push` de `main@855616b6af1709439377c780b76dad2ccfc43f17` sont effectivement SUCCESS, Xtensa compris ; `main@5ec280be85d47e330e8a917dc234a4d24fa49a80` a également ses cinq checks verts. [Mandat #192](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/192) exécutable sur branche dédiée [PR #193](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/193) **sans validation automatique**.
+
+Périmètre fermé : token `A2`, 13 RAM/LIST CPC scellés J1.18-A, huit valeurs `INK` natives mesurées, quatre cas invalides hôte atomiques, forme `INK 1,26,6` uniquement syntaxique, inconnus non extrapolés. Side channel `BE_VIDEO_SET_INK` ordonné par `print_offset`, sans rendu ni perte si récepteur absent. Tests Linux/CPC/CI-ARCH/OPT3/Xtensa 3/3 et surcoût ABI documentés sur le **HEAD final** avant remise. Aucun changement HW4-PEN-A #188, `video/`, `firmware/`, `hal/`, `io/` ni archives CPC ; aucune promesse d'écran ou d'acceptation. [Rapport technique](J1.18-B-ink-native.md). **Revue/fusion uniquement par Pilotage, CYD ON_DEVICE_UNVERIFIED.**

@@ -18,6 +18,7 @@ typedef enum {
     BL_ST_FOR,
     BL_ST_NEXT,
     BL_ST_PEN,
+    BL_ST_INK,
     BL_ST_EMPTY
 } BLStatement;
 
@@ -219,6 +220,40 @@ static BLStatus inline_if_assignment(const uint8_t *body, size_t length,
     return append_decimal(out, number);
 }
 
+/* Strict inverse of the CPC A2 numeric immediate encodings.
+ * The decoder preserves the measured -1 (F5 0F) syntax without inferring
+ * arithmetic, blinking, or broader palette semantics. */
+static BLStatus ink_literal(const uint8_t *body, size_t length,
+                            size_t *pos, BLEmitter *out,
+                            unsigned int maximum, int *value)
+{
+    uint8_t token;
+    unsigned int n;
+    BLStatus status;
+    if (*pos == length) return BL_TRUNCATED;
+    token = body[(*pos)++];
+    if (token == 0xf5u) {
+        if (*pos == length) return BL_TRUNCATED;
+        if (body[(*pos)++] != 0x0fu) return BL_BAD_SEQUENCE;
+        *value = -1;
+        status = append_byte(out, (uint8_t)'-');
+        if (status != BL_OK) return status;
+        return append_byte(out, (uint8_t)'1');
+    }
+    if (token >= 0x0eu && token <= 0x17u)
+        n = (unsigned int)(token - 0x0eu);
+    else if (token == 0x19u) {
+        if (*pos == length) return BL_TRUNCATED;
+        n = (unsigned int)body[(*pos)++];
+        if (n < 10u) return BL_BAD_SEQUENCE;
+    } else
+        return token >= 0x80u || (token >= 0x0eu && token <= 0x1fu) ?
+               BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
+    if (n > maximum) return BL_BAD_SEQUENCE;
+    *value = (int)n;
+    return append_decimal(out, n);
+}
+
 static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
 {
     size_t pos = 0;
@@ -278,6 +313,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0xa5u: statement = BL_ST_ASSIGN; status = append_word(out, "LET"); break;
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
         case 0xbbu: statement = BL_ST_PEN; status = append_word(out, "PEN"); break;
+        case 0xa2u: statement = BL_ST_INK; status = append_word(out, "INK"); break;
         case 0xa0u: statement = BL_ST_GOTO; status = append_word(out, "GOTO"); break;
         case 0x9fu: statement = BL_ST_GOSUB; status = append_word(out, "GOSUB"); break;
         case 0xc9u: status = append_word(out, "RETURN"); break;
@@ -867,6 +903,31 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (status != BL_OK) return status;
             } else {
                 return BL_BAD_SEQUENCE;
+            }
+        } else if (statement == BL_ST_INK) {
+            int pen_index, colour, third;
+            if (pos == length || body[pos] == 0x01u)
+                return BL_BAD_SEQUENCE;
+            if (pos == space_start) {
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) return status;
+            }
+            status = ink_literal(body, length, &pos, out, 16u, &pen_index);
+            if (status != BL_OK) return status;
+            if (pos == length || body[pos++] != (uint8_t)',')
+                return BL_BAD_SEQUENCE;
+            status = append_byte(out, (uint8_t)',');
+            if (status != BL_OK) return status;
+            status = ink_literal(body, length, &pos, out, 32u, &colour);
+            if (status != BL_OK) return status;
+            if (pos < length && body[pos] == (uint8_t)',') {
+                if (pen_index != 1 || colour != 26) return BL_BAD_SEQUENCE;
+                ++pos;
+                status = append_byte(out, (uint8_t)',');
+                if (status != BL_OK) return status;
+                status = ink_literal(body, length, &pos, out, 32u, &third);
+                if (status != BL_OK) return status;
+                if (third != 6) return BL_BAD_SEQUENCE;
             }
         } else if (statement == BL_ST_PEN) {
             unsigned int pen;

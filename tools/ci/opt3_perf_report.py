@@ -123,8 +123,10 @@ def analyze_run(run):
         meta_number = meta.get("run_attempt", meta.get("attempt"))
         if meta_number is not None and int(meta_number) != attempt_count:
             explicit_start = None
+        # Large pre-job gaps may reflect stale metadata or controller delays;
+        # report only evidenced queue, never label them runner waiting.
         if (explicit_start is not None and first_created is not None and
-                explicit_start <= min(starts or [first_created])):
+                first_created - 120 <= explicit_start <= min(starts or [first_created])):
             attempt_start = explicit_start
             wait_reference = "last_attempt_run_started_at"
         elif first_created is not None:

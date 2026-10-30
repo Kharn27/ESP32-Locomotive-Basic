@@ -47,6 +47,17 @@ EXPECTED_ROUTES = {
     "j1-16-e-a-small-store.yml": ("tools/j1_16_e_a_store.py", "tests/fixtures/cpc6128/j1_16_e_a_small_store/**"),
 }
 HISTORICAL = {x for x in FAMILIES["CPC_ACQUISITION"] if x.startswith("j1-")}
+
+# J1.19-A C1: a specifically audited existing-workflow job, never a wildcard.
+PAPER_TOOL = "tools/j1_19_a_paper_oracle.py"
+PAPER_WORKFLOW = "ci-cpc-permanent.yml"
+PAPER_BRANCH = "oracle/j1-19-a-paper-cpc"
+PAPER_JOB = "paper-cpc-acquisition"
+PAPER_IMAGE = ("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
+               "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c")
+PAPER_ROM = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
+PAPER_CAPRICE = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+
 # Explicit HW4-SCROLL-OPT-A0 trigger contract from PR #168, not a generic
 # "tools/**" or "docs/**" wildcard that would wake unrelated jobs.
 HW4_A0 = "hw4-scroll-opt-a0-memory.yml"
@@ -166,6 +177,7 @@ def audit(sources):
            "tools/j1_16_d_a_store.py --evidence" in permanent and
            "--permanent --self-test" in permanent,
            "SEALED_STORES_PERMANENT_LOST")
+    audit_paper_route(sources)
     ea = (ROOT / "tools/j1_16_e_a_store.py").read_text()
     da = (ROOT / "tools/j1_16_d_a_store.py").read_text()
     demand("SEALED_E_A_ARCHIVE_MISMATCH" in ea and
@@ -174,7 +186,111 @@ def audit(sources):
            "E_A_C1_OR_D_A_SEAL_LOST")
 
 
+
+def audit_paper_route(sources):
+    """Check the real job, exact branch, GHCR/ROM/HEAD and publishing safeguards."""
+    yml = sources[PAPER_WORKFLOW]
+    marker = "\n  " + PAPER_JOB + ":"
+    demand(yml.count(marker) == 1, "PAPER_JOB_MISSING")
+    header, job = yml.split(marker, 1)
+    demand("github.head_ref != '" + PAPER_BRANCH + "'" in header and
+           "cancel-in-progress: " in header, "PAPER_ARCHIVE_CANCEL_RISK")
+    guard = ("if: (github.event_name == 'pull_request' && "
+             "github.head_ref == 'oracle/j1-19-a-paper-cpc' && "
+             "github.event.pull_request.head.repo.full_name == github.repository) || "
+             "(github.event_name == 'workflow_dispatch' && "
+             "github.ref_name == 'oracle/j1-19-a-paper-cpc')")
+    demand(guard in job, "PAPER_BRANCH_AND_FORK_GUARD")
+    demand("    permissions:\n      contents: write\n      packages: read" in job,
+           "PAPER_PERMISSIONS")
+    demand("      image: " + PAPER_IMAGE in job, "PAPER_GHCR")
+    demand('test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = ' + PAPER_CAPRICE in job and
+           'test "$(cat /usr/local/share/loco-caprice32-source.sha)" = ' + PAPER_CAPRICE in job,
+           "PAPER_CAPRICE_PIN")
+    demand('test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' +
+           "' ' -f 1)\" = " + PAPER_ROM in job, "PAPER_ROM_PIN")
+    demand('test "$(git rev-parse HEAD)" = "$GITHUB_HEAD_SHA"' in job and
+           "github.event.pull_request.head.sha || github.sha" in job and
+           "submodules: recursive" in job and
+           "test -x /usr/local/bin/cap32" in job and
+           "cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32" in job,
+           "PAPER_HEAD_OR_BIN")
+    demand("git diff origin/main...HEAD --name-only" in job and
+           "J1.19-A FORBIDDEN_DIFF_PATH" in job and
+           "tests/fixtures/cpc6128/j1_18_" in job,
+           "PAPER_SCOPE_GUARD")
+    demand("python3 " + PAPER_TOOL + " --acquire tests/oracles/caprice32" in job and
+           '--head "$GITHUB_HEAD_SHA"' in job and
+           "python3 " + PAPER_TOOL + ' --evidence "$RUNNER_TEMP/j119-paper"' in job,
+           "PAPER_TOOL_JOB_LINK")
+    demand("git ls-remote --exit-code origin refs/heads/" + PAPER_BRANCH in job and
+           'test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA"' in job and
+           "git push origin HEAD:refs/heads/" + PAPER_BRANCH in job and
+           "ARCHIVE_PENDING_EXTERNAL_SEAL" in job and
+           "--permanent --self-test" in job and
+           "EXTERNALLY_SEALED_PASS" in job,
+           "PAPER_ARCHIVE_SEAL_GUARD")
+    demand("actions/upload-artifact@v4" in job and
+           "j119-paper-origin-sha256.txt" in job and
+           "j119-paper-origin.txt" in job,
+           "PAPER_ORIGINAL_ARTIFACT")
+    return True
+
+
+def paper_negative_tests(sources):
+    """Mutate the in-memory workflow only; every weakened contract must fail."""
+    original = sources[PAPER_WORKFLOW]
+    cases = {
+        "MISSING_JOB": (original.split("\n  " + PAPER_JOB + ":", 1)[0],
+                        "PAPER_JOB_MISSING"),
+        "WIDE_BRANCH": (original.replace(
+            "github.head_ref == '" + PAPER_BRANCH + "'",
+            "github.head_ref != 'other'"), "PAPER_BRANCH_AND_FORK_GUARD"),
+        "FORK_ALLOWED": (original.replace(
+            "github.event.pull_request.head.repo.full_name == github.repository",
+            "github.event.pull_request.head.repo.full_name != github.repository"),
+            "PAPER_BRANCH_AND_FORK_GUARD"),
+        "FAKE_HEAD": (original.replace(
+            'test "$(git rev-parse HEAD)" = "$GITHUB_HEAD_SHA"',
+            'test "$(git rev-parse HEAD)" != "$GITHUB_HEAD_SHA"'), "PAPER_HEAD_OR_BIN"),
+        "IMAGE_UNPINNED": (original.replace(PAPER_IMAGE, "ubuntu:latest"),
+                            "PAPER_GHCR"),
+        "ROM_UNPINNED": (original.replace(PAPER_ROM, "0"*64),
+                          "PAPER_ROM_PIN"),
+        "CAPRICE_UNPINNED": (original.replace(PAPER_CAPRICE, "0"*40),
+                              "PAPER_CAPRICE_PIN"),
+        "LINK_MISSING": (original.replace(PAPER_TOOL + " --acquire",
+                                           "tools/unknown.py --acquire"),
+                         "PAPER_TOOL_JOB_LINK"),
+        "WEAK_PERMISSIONS": (original.replace("      contents: write",
+                                                "      contents: read"),
+                              "PAPER_PERMISSIONS"),
+        "NO_REMOTE_LEASE": (original.replace(
+            'test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA"',
+            'test "$REMOTE_HEAD" != "$GITHUB_HEAD_SHA"'),
+                             "PAPER_ARCHIVE_SEAL_GUARD"),
+        "CANCEL_ARCHIVE": (original.replace(
+            "github.head_ref != '" + PAPER_BRANCH + "'",
+            "github.head_ref == '" + PAPER_BRANCH + "'"),
+                           "PAPER_ARCHIVE_CANCEL_RISK"),
+        "NO_SHA_ARTIFACT": (original.replace(
+            "j119-paper-origin-sha256.txt", "not-original.txt"),
+                            "PAPER_ORIGINAL_ARTIFACT"),
+    }
+    for label, (bad, reason) in cases.items():
+        demand(bad != original, "PAPER_NEGATIVE_INERT_" + label)
+        try:
+            audit_paper_route({**sources, PAPER_WORKFLOW: bad})
+        except UnsafeRoute as exc:
+            demand(str(exc) == reason,
+                   "PAPER_NEGATIVE_WRONG_REASON_" + label + ":" + str(exc))
+        else:
+            raise UnsafeRoute("PAPER_NEGATIVE_ACCEPTED_" + label)
+        print("CI-OPT3 PAPER_FALSIFICATION_REJECTED", label, reason)
+
+
 def negative_tests(sources):
+    paper_negative_tests(sources)
     essential = {"C99", "CPC_PERMANENT"}
     scenarios = {
         "DOC_ONLY": (["docs/ROADMAP_GATES.md"], essential,
@@ -254,8 +370,13 @@ def check_diff(base, sources):
     demand(bool(paths), "PR_DIFF_EMPTY")
     for path in paths:
         if re.fullmatch(r"(?:tools|tests/oracles)/j1_[\w]+_oracle\.py", path):
-            demand(bool(HISTORICAL.intersection(triggered_names([path], sources))),
-                   "UNREGISTERED_NEW_ORACLE_" + path)
+            if path == PAPER_TOOL:
+                audit_paper_route(sources)
+                demand(PAPER_WORKFLOW in triggered_names([path], sources),
+                       "PAPER_WORKFLOW_UNROUTED")
+            else:
+                demand(bool(HISTORICAL.intersection(triggered_names([path], sources))),
+                       "UNREGISTERED_NEW_ORACLE_" + path)
     print("CI-OPT3 PR_DIFF_PATHS", len(paths),
           "FAMILIES", ",".join(sorted(family_routes(paths, sources))))
 

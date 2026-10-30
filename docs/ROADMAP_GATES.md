@@ -579,3 +579,7 @@ Mission strictement **preuve CPC** : `PEN 0/1/2/3/4/15/16/-1`, deux sessions Cap
 ### Gate J1.17-B — commande PEN logique et événements portable (Pilotage #185)
 
 Ouvert par le Pilotage seulement après succès des cinq CI de `main@6a3470ea3e7dc595c0470f4a5dcb00ab93d50292`. C99 natif `PEN 0,1,2,3,4,15` : un `SET_TEXT_PEN(n)` typé, sans octets PRINT, sans rendu et avec consommation atomique ; `PEN 16,-1` rejetés par diagnostic hôte, `PEN 5..14` non vérifiés par l'oracle A. Prouver les huit tokens/listings, tests de capacité/overlap/rejeu et 31 workflows/five-family CI-OPT3 fail-closed, C99 OFF/ON, Xtensa trois profils. [Dossier](J1.17-B-pen-native.md). Gate d'acceptation et fusion réservés au Pilotage ; aucun jalon matériel CYD, INK, MODE ou PAPER engagé.
+
+### J1.18-A — INK oracle CPC indépendant (PR #191, décision Pilotage attendue)
+
+[#189](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/189) : 13 cas INK × 2 sessions indépendantes CPC6128/BASIC1.1 avec RAM/LIST/RUN, ERR/ERL, contrôle PNG RGB, recoloration à deux instants sans nouveau PRINT, 243 fichiers bruts archivés et SHA externes. Provenance initiale `6e9b17b8d545a57ef3942f217c9b4d3daeae8c38`, archivage `0d4214fdc4670dcdaa36f7704fe692b92d43d963` ; 113 preuves PEN antérieures non modifiées. [Rapport INK](J1.18-A-ink-cpc-oracle.md). **Statut : EN REVUE PILOTAGE / NON FUSIONNÉE**, pas de code INK natif, pas de raccordement CYD, `ON_DEVICE_UNVERIFIED`. La forme triple reste `TEMPORAL_UNVERIFIED` ; les mesures RGB sont propres aux captures. Aucun jalon J1.18-B autorisé par cette livraison.

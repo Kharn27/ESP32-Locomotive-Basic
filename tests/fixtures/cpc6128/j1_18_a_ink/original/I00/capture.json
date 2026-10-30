@@ -1,0 +1,162 @@
+{
+  "baseline": {
+    "commands": [
+      "MODE 1",
+      "INK 0,6",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "LOCATE 1,15",
+      "PRINT \"J118INK\"",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-29T23:34:49.331181+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-29T23:34:48.323069+00:00"
+  },
+  "baseline_log_sha256": "35930c64469c507de985075191ee133322f71803a543368eba7bcf179c4aa272",
+  "baseline_png_sha256": "4ca1a83879978a4e682b039b418168382cb5e8cec3f149a63d1c786650ba8a0f",
+  "case": "I00",
+  "erl": 0,
+  "err": 0,
+  "ink_opcode_observed": 162,
+  "ink_record_hex": "0A 00 0A 00 A2 20 0E 2C 0E 00",
+  "line_numbers": [
+    10,
+    20,
+    30,
+    40
+  ],
+  "list": {
+    "commands": [
+      "MODE 1",
+      "INK 0,6",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "10 INK 0,0",
+      "20 LOCATE 1,15",
+      "30 PRINT \"J118INK\"",
+      "40 END",
+      "LIST",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-29T23:34:48.321557+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-29T23:34:47.015820+00:00"
+  },
+  "list_log_sha256": "a5d178dd4393a054efbd8442a58e165d528f6cfb87e1d186ae946cebd9574f5c",
+  "list_png_sha256": "9904dec17dca441aba5c26edb75b40e0977a9bee973ef303ab573f2145b4c1d6",
+  "paper": 0,
+  "pen": 1,
+  "print_location": {
+    "column": 1,
+    "row": 15,
+    "text": "J118INK"
+  },
+  "printer_is_not_color_evidence": true,
+  "printer_sha256": "37945bf7b406cce0ad7c77718e3e66d128ac15f3f81d6f389d32c5f6aed664f9",
+  "program_hex": "0A 00 0A 00 A2 20 0E 2C 0E 00 0B 00 14 00 A9 20 0F 2C 19 0F 00 10 00 1E 00 BF 20 22 4A 31 31 38 49 4E 4B 22 00 06 00 28 00 98 00 00 00",
+  "program_sha256": "5c28723541029bc2c54a7f368f6b7c70d34626ec11f6c0293462742b24dfc787",
+  "region": {
+    "bank": "physical bank 0, Gate Array RAM config 0",
+    "base_pointer_address": 44644,
+    "base_pointer_value": 367,
+    "end_exclusive": 413,
+    "end_pointer_address": 44646,
+    "length": 45,
+    "line_numbers": [
+      10,
+      20,
+      30,
+      40
+    ],
+    "records": [
+      {
+        "length": 10,
+        "line": 10,
+        "offset": 0,
+        "terminator_offset": 9
+      },
+      {
+        "length": 11,
+        "line": 20,
+        "offset": 10,
+        "terminator_offset": 20
+      },
+      {
+        "length": 16,
+        "line": 30,
+        "offset": 21,
+        "terminator_offset": 36
+      },
+      {
+        "length": 6,
+        "line": 40,
+        "offset": 37,
+        "terminator_offset": 42
+      }
+    ],
+    "sentinel_offset": 43,
+    "snapshot_data_offset": 256,
+    "snapshot_program_offset": 624,
+    "start_address": 368,
+    "terminator_hex": "0000"
+  },
+  "run": {
+    "commands": [
+      "MODE 1",
+      "INK 0,6",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "10 INK 0,0",
+      "20 LOCATE 1,15",
+      "30 PRINT \"J118INK\"",
+      "40 END",
+      "RUN",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "PRINT #8,ERR",
+      "PRINT #8,ERL",
+      "CAP32_DELAY CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-29T23:34:50.781147+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-29T23:34:49.332436+00:00"
+  },
+  "run_kind": "NO_ERROR",
+  "run_log_sha256": "0e657fc0a0c2938d970ed63ccfc753da5f95870d6fa00df144969fc997c325b9",
+  "run_png_sha256": "019539c14210f1f87a795f9d5965540b3818e7e7dc848aa9fc5908f27166b897",
+  "screen_is_not_token_evidence": true,
+  "session": "original",
+  "setup_commands": [
+    "MODE 1",
+    "INK 0,6",
+    "INK 1,26",
+    "INK 2,6",
+    "INK 3,18",
+    "PAPER 0",
+    "PEN 1",
+    "CLS",
+    "NEW"
+  ],
+  "setup_mode": 1,
+  "source_sha256": "4e712cea2c655fe332d1d3c9faf41639c9d9fdde5618d6889b9604991b1fdff4",
+  "temporal_classification": "NOT_APPLICABLE",
+  "visual_classification": "VISUAL_UNVERIFIED"
+}

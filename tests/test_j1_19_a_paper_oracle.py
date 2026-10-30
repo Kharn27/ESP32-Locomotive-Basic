@@ -69,8 +69,8 @@ class TestCorpus(TestCase):
         self.assertEqual(len(paper.file_map()),264)
 
     def test_static_hypotheses_are_not_observations(self):
-        self.assertIsNone(paper.SEALED_MANIFEST_SHA256)
-        self.assertFalse(paper.SEALED_FILE_SHA256)
+        self.assertEqual(paper.SEALED_MANIFEST_SHA256, '1c43f4aac125b8213ae878944a9940d13741adc74e32692a2914a6b83bb532b2')
+        self.assertEqual(len(paper.SEALED_FILE_SHA256), 264)
         self.assertNotIn(b'BA 20',paper.source('P01'))
 
     def test_roi_histogram_real_bytes_not_colour_guess(self):
@@ -124,7 +124,7 @@ class TestFailClosed(TestCase):
         with tempfile.TemporaryDirectory() as t:
             root,_=blank_archive(t)
             with mock.patch.object(paper,'is_ancestor',return_value=True):
-                with self.assertRaisesRegex(paper.Invalid,'EXTERNAL_SEAL_NOT_ACQUIRED'):
+                with self.assertRaisesRegex(paper.Invalid,'FALSE_SEALED_HEAD_OR_MANIFEST'):
                     paper.verify(root,permanent=True)
 
     def test_coordinated_fake_archive_and_updated_manifest_rejected(self):
@@ -135,7 +135,7 @@ class TestFailClosed(TestCase):
             m['files'][name]=paper.digest((root/name).read_bytes())
             (root/'manifest.json').write_bytes(paper.canonical(m))
             with mock.patch.object(paper,'is_ancestor',return_value=True):
-                with self.assertRaisesRegex(paper.Invalid,'EXTERNAL_SEAL_NOT_ACQUIRED'):
+                with self.assertRaisesRegex(paper.Invalid,'FALSE_SEALED_HEAD_OR_MANIFEST'):
                     paper.verify(root,permanent=True)
 
     def test_unsealed_mutation_rejected_by_manifest(self):

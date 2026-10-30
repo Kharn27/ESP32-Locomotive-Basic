@@ -183,8 +183,8 @@ static void assert_rejected_replay(const BEVideoEvent *events, size_t count,
 static void test_bridge_preflight_atomic(void)
 {
     const uint8_t print_bytes[]={'X','\n','Y','\n'};
-    BEVideoEvent events[2]={{BE_VIDEO_SET_TEXT_PEN,2U,0U},
-                             {BE_VIDEO_SET_TEXT_PEN,1U,2U}};
+    BEVideoEvent events[2]={{BE_VIDEO_SET_TEXT_PEN,2U,0U,0U,0U},
+                             {BE_VIDEO_SET_TEXT_PEN,1U,2U,0U,0U}};
     setup();
     events[1].type=(BEVideoEventType)99;
     assert_rejected_replay(events,2U,print_bytes,sizeof(print_bytes),

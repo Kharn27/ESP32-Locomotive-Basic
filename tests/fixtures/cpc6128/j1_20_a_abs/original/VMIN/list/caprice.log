@@ -1,0 +1,8 @@
+exit code: 0
+Using configuration file: /__w/_temp/j120-abs/original/VMIN/list/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j120-abs/original/VMIN/list/screenshot_20261030_215552.png
+INFO    src/cap32.cpp:2212 - Dumping machine snapshot to /tmp/j120-abs-sna-xbo3f0mq/VMIN-original/snapshot_20261030_215552.sna
+
+[stderr]

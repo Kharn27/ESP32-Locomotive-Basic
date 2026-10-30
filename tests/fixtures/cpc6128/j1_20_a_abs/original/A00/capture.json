@@ -1,0 +1,131 @@
+{
+  "case": "A00",
+  "diagnostic_classification": "DIAG_CPC_UNVERIFIED",
+  "erl": 0,
+  "err": 0,
+  "full_snapshot_archived": false,
+  "input_classification": "OBSERVED",
+  "line_numbers_observed": [
+    10,
+    20,
+    30
+  ],
+  "line_numbers_requested": [
+    10,
+    20,
+    30
+  ],
+  "list": {
+    "commands": [
+      "MODE 1",
+      "NEW",
+      "10 PRINT ABS(0)",
+      "20 PRINT #8,ABS(0)",
+      "30 END",
+      "LIST",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-30T21:54:58.303590+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-30T21:54:57.169601+00:00"
+  },
+  "list_commands": [
+    "MODE 1",
+    "NEW",
+    "10 PRINT ABS(0)",
+    "20 PRINT #8,ABS(0)",
+    "30 END",
+    "LIST",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT CAP32_EXIT"
+  ],
+  "list_image_sha256": "4b32ae64f19d8689f23d8e66dcd76b4177a2d22a4684012073b863601535092f",
+  "printer_is_not_screen_evidence": true,
+  "program_hex": "0C 00 0A 00 BF 20 FF 00 28 0E 29 00 0F 00 14 00 BF 20 23 16 2C FF 00 28 0E 29 00 06 00 1E 00 98 00 00 00",
+  "program_sha256": "741e735e23b2274faa29265bf846ef6cba5cd335384f05897307a89457555efd",
+  "region": {
+    "bank": "physical bank 0, Gate Array RAM config 0",
+    "base_pointer_address": 44644,
+    "base_pointer_value": 367,
+    "end_exclusive": 403,
+    "end_pointer_address": 44646,
+    "length": 35,
+    "line_numbers": [
+      10,
+      20,
+      30
+    ],
+    "records": [
+      {
+        "length": 12,
+        "line": 10,
+        "offset": 0,
+        "terminator_offset": 11
+      },
+      {
+        "length": 15,
+        "line": 20,
+        "offset": 12,
+        "terminator_offset": 26
+      },
+      {
+        "length": 6,
+        "line": 30,
+        "offset": 27,
+        "terminator_offset": 32
+      }
+    ],
+    "sentinel_offset": 33,
+    "snapshot_data_offset": 256,
+    "snapshot_program_offset": 624,
+    "start_address": 368,
+    "terminator_hex": "0000"
+  },
+  "result_printer_hex": "20 30 20 0D 0A",
+  "run": {
+    "commands": [
+      "MODE 1",
+      "NEW",
+      "10 PRINT ABS(0)",
+      "20 PRINT #8,ABS(0)",
+      "30 END",
+      "RUN",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "PRINT #8,\"@@ABS-ERR@@\";ERR;\",\";ERL",
+      "PRINT #8,\"@@ABS-SCREEN@@\"",
+      "FOR YY=1 TO 25:FOR XX=1 TO 40:LOCATE XX,YY:PRINT #8,COPYCHR$(#0);:NEXT XX:PRINT #8:NEXT YY",
+      "CAP32_DELAY CAP32_EXIT"
+    ],
+    "finished_utc": "2026-10-30T21:55:00.938170+00:00",
+    "screenshot_height": 540,
+    "screenshot_width": 768,
+    "started_utc": "2026-10-30T21:54:58.305484+00:00"
+  },
+  "run_commands": [
+    "MODE 1",
+    "NEW",
+    "10 PRINT ABS(0)",
+    "20 PRINT #8,ABS(0)",
+    "30 END",
+    "RUN",
+    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+    "PRINT #8,\"@@ABS-ERR@@\";ERR;\",\";ERL",
+    "PRINT #8,\"@@ABS-SCREEN@@\"",
+    "FOR YY=1 TO 25:FOR XX=1 TO 40:LOCATE XX,YY:PRINT #8,COPYCHR$(#0);:NEXT XX:PRINT #8:NEXT YY",
+    "CAP32_DELAY CAP32_EXIT"
+  ],
+  "run_image_sha256": "2a2283f46a9bc862ca1d568c63f45d72111839d4c6ee1a7f73093f206aeed214",
+  "run_printer_sha256": "14d4074ee78cd7806ef6dabf9a3f876207fd8891513675535c9751e55678e649",
+  "screen_rows": 3,
+  "screen_text_classification": "DIAG_CPC_UNVERIFIED",
+  "screen_text_hex": "0D 0A 52 65 61 64 79 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A 4E 45 57 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20",
+  "session": "original",
+  "setup_commands": [
+    "MODE 1",
+    "NEW"
+  ],
+  "snapshot_before_run": true,
+  "source_sha256": "474d4fe00bbf19a37bf744ce813120ad99beca9e6225ed15b85a6ce109f2b1bf",
+  "token_classification": "OBSERVED",
+  "type_classification": "TYPE_UNVERIFIED"
+}

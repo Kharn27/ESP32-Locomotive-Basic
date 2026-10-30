@@ -1,0 +1,82 @@
+{
+  "acquisition_head": "a37b27befe5a6b66aa0bfd4b68abdd26c429c07f",
+  "cases": {
+    "A00": {
+      "original": "3defc6ea8718e814c5e283a5348c4e4786194ac0badc79d8d142ed2f4980ccb6",
+      "repeat": "b3ccf89526101f48f15029ef3e1f1b432ecf56fe6651b9712306f5f7e3ee8649"
+    },
+    "A01": {
+      "original": "cf2ba55d3c5fc39297f7cda79192dc1713fce2174487a34ea6b0602ab14234f1",
+      "repeat": "a2f625d54df333835cefc7d12487785a6295bf1c90597185fcd1518c4ec89408"
+    },
+    "AN1": {
+      "original": "08c6aaaefb78d206ec828c821c2a59dc1a176541e4b7bf038df14914c4b3601a",
+      "repeat": "f71ba4895f7b386c27bb0b8198a2db51fd66dc02b70985ece80a5dc81d98d9fa"
+    },
+    "B07": {
+      "original": "665f5d71d3b47b96bb4b684d0b40dd7e4deff3c25dbcaee2bfe6deb09d370718",
+      "repeat": "9e6a168ee2460d536ea3255a49d2151c91b7e6dcf42ab8c985aa8d486416d733"
+    },
+    "BMIN": {
+      "original": "ad98095ad6b0d0e13c4236d92f9bcf2ed24ddf7fb535a7e1045c857bb3c29d6d",
+      "repeat": "1be0162a36c5fa797fa902eef682b84b693cf8ac200216e8e9d0f873ae624f6f"
+    },
+    "BN7": {
+      "original": "d1e9c11b9d1121a97578843e915c62f8558729ab16bce90c516453f60d79ff74",
+      "repeat": "47fb4e3d80ba147d20a4be30046616e5a912b081feeca1849a5d6912854fd5ea"
+    },
+    "EMPTY": {
+      "original": "3cd02735f61318eac0f9c1e24c85f93896b32d9772a0f733bbe2d923df94a28e",
+      "repeat": "a2c2fece95d8117a28f898b942afdf18ffb83077ee49899121ac4ac3d50617e1"
+    },
+    "IMIN": {
+      "original": "d9d72bf29e2bbee761d18dc87d9d7d1060d31449296686b247f25d9e145e1fe7",
+      "repeat": "9ac2d30eb3549e353e58405c4945689fbc58795ceea6f61b89db8665085f5fa5"
+    },
+    "L20": {
+      "original": "69097a83e6f818245283bc305324def94d27dfff17cc90268d610a1f534fe50b",
+      "repeat": "2c912f56d6748e5583b0a9bda23331ad5d1b8b31b42d2638aaefc462e9dc6103"
+    },
+    "MULTI": {
+      "original": "3415d9fbb5f43bf06596f224bc44521a89ec9242272cb525744e67efdd3dde48",
+      "repeat": "2f423a300432a7afa64087a3130466feec210b9c52322a4638d6509d9ec0b71c"
+    },
+    "STRING": {
+      "original": "d7c409c1a2c0fe2a9fe63d576245e1614106da26ce1d3b205126215e1114996f",
+      "repeat": "1e5cb95acd013745b5c4ca48710716c5d3a5f8f9c0038b084989eebd1faf44d6"
+    },
+    "V07": {
+      "original": "6d07c2f0a4fefdedc61ad5e720c90a382912b555281c63bda7c803a41f3b32a2",
+      "repeat": "391dd2ec8d4b3a46082858bdbb57f30cdbee1d143172bbd48bba501d553f15b3"
+    },
+    "VMAX": {
+      "original": "96d80d51aa9ea20de3e0e35699b30d90686287ff60a08682d2545254442423aa",
+      "repeat": "4219c1d013ee2f7a2276c837eab305ed450c98d6f9d29a88ed4053696eb7d412"
+    },
+    "VMIN": {
+      "original": "a7ff1066fb368fc598df492aef39a2ac5da185e8d81f51db3c3d82ee6fd175b3",
+      "repeat": "88cd3d9666e7f010c281b9d2c9a12db18402b8e9780887125accf8b18cf6d6b7"
+    },
+    "VN7": {
+      "original": "389dad229c0afff9c9408cebc949dc0ec7eec9bb835b89d20f6511835ca81b66",
+      "repeat": "3c9651abc25d40174c5660a1f936f2909c2dd25db8bff92a5b96fc01e8f44e5a"
+    },
+    "VNMAX": {
+      "original": "c0018b08bad7b6c9591a089e028f6dc7d136ffee20e08d5d486d78bfd1ce719c",
+      "repeat": "d8472c730d2b6e8686bb3048dd710a579d703dd393b1b45a6cc376fab85a062d"
+    }
+  },
+  "full_snapshots_archived": false,
+  "native_changes": false,
+  "oracle": {
+    "basic": "1.1",
+    "caprice": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "ghcr": "ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c",
+    "model": "CPC6128",
+    "rom": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "version": "Caprice32 v4.6.0-8c778bf072a06fb7c23b9cccd179041db7f79a52\nAPP_PATH: Not provided\nCompiled with:\nNumber of video plugins available: 11"
+  },
+  "phase": "J1.20-A",
+  "run_id": "41134446955",
+  "schema_version": 1
+}

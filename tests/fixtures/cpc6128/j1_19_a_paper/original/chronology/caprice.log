@@ -1,0 +1,8 @@
+exit code: 0
+Using configuration file: /__w/_temp/j119-paper/original/chronology/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j119-paper/original/chronology/screenshot_20261030_221924.png
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j119-paper/original/chronology/screenshot_20261030_221934.png
+
+[stderr]

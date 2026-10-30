@@ -332,7 +332,8 @@ static bool repaint_dirty(void)
                (unsigned)s_text.scrolls);
         s_scroll_reported=s_text.scrolls;
     }
-    return true; /* bool success: with or without dirty bands */
+    /* Both the zero-dirty and successful-flush paths must return true. */
+    return true;
 }
 static bool display_error(void); /* host-only diagnostics, below */
 static void log_bytes(const char *kind,const uint8_t *data,size_t size)

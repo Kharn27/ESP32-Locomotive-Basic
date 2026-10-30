@@ -124,12 +124,6 @@ static int each_oracle(const char *root, const char *name)
     }
     CHECK(load(path, original, sizeof(original), &n_original) == 0);
     {
-        char *at = strstr(path, "/original/");
-        CHECK(at != NULL);
-        memcpy(at+1, "repeat  ", 8u); /* Replace original/ by repeat/ + slash. */
-        /* Rebuild path instead, to avoid silently accepting a bad separator. */
-    }
-    {
         char case_id[16];
         size_t i;
         CHECK(strlen(name) < sizeof(case_id));
@@ -197,8 +191,11 @@ static int negatives(void)
         size_t written=97u;
         memset(out,0xa5,sizeof(out));
         memcpy(saved,out,sizeof(out));
-        CHECK(bt_tokenize((const uint8_t *)invalid[i],strlen(invalid[i]),
-                          out,sizeof(out),&written) != BT_OK);
+        if (bt_tokenize((const uint8_t *)invalid[i],strlen(invalid[i]),
+                        out,sizeof(out),&written) == BT_OK) {
+            fprintf(stderr, "Unsealed ABS lexical form accepted: %s\n", invalid[i]);
+            return 1;
+        }
         CHECK(written==97u && memcmp(out,saved,sizeof(out))==0);
     }
     {
@@ -235,6 +232,54 @@ static int negatives(void)
     return 0;
 }
 
+/* A failed line must never partially mutate the existing BASIC program,
+ * its exported bytes, output region, nor the caller's count. */
+static int program_atomicity(void)
+{
+    BasicProgram p, tiny;
+    uint8_t storage[128], saved[128], tiny_storage[8], tiny_saved[8];
+    uint8_t temporary[128], output[128], out_saved[128];
+    size_t count = 74u;
+    BSResult result;
+    static const uint8_t body[] = {0xbfu,' ',0xffu,0u,'(',0x0fu,')'};
+    static const char invalid[] = "20 PRINT ABS(2)";
+    static const char valid[] = "10 PRINT ABS(1)";
+    CHECK(bp_init(&p, storage, sizeof(storage)) == BP_OK);
+    CHECK(bp_put(&p, 10u, body, sizeof(body)) == BP_OK);
+    memcpy(saved, storage, sizeof(saved));
+    memset(output, 0x5cu, sizeof(output));
+    memcpy(out_saved, output, sizeof(output));
+    result = bs_process_line(&p, (const uint8_t *)invalid, strlen(invalid),
+                             temporary, sizeof(temporary), output,
+                             sizeof(output), &count);
+    CHECK(result.status == BS_TOKENIZER_ERROR);
+    CHECK(count == 74u && p.size == sizeof(body)+7u);
+    CHECK(memcmp(saved, storage, sizeof(saved)) == 0);
+    CHECK(memcmp(output, out_saved, sizeof(output)) == 0);
+    CHECK(bp_put(&p, 0u, body, sizeof(body)) == BP_INVALID_LINE_NUMBER);
+    CHECK(memcmp(saved, storage, sizeof(saved)) == 0);
+
+    CHECK(bp_init(&tiny, tiny_storage, sizeof(tiny_storage)) == BP_OK);
+    memcpy(tiny_saved, tiny_storage, sizeof(tiny_saved));
+    result = bs_process_line(&tiny, (const uint8_t *)valid, strlen(valid),
+                             temporary, sizeof(temporary), output,
+                             sizeof(output), &count);
+    CHECK(result.status == BS_PROGRAM_ERROR &&
+          result.program_status == BP_NO_SPACE);
+    CHECK(tiny.size == 2u && memcmp(tiny_storage,tiny_saved,
+                                    sizeof(tiny_storage)) == 0);
+    CHECK(count == 74u && memcmp(output, out_saved, sizeof(output)) == 0);
+    /* No truncation or magic wrapping of BASIC line numbers. */
+    result = bs_process_line(&p,(const uint8_t *)"65536 PRINT ABS(1)",
+                             strlen("65536 PRINT ABS(1)"),
+                             temporary,sizeof(temporary),output,
+                             sizeof(output),&count);
+    CHECK(result.status != BS_OK);
+    CHECK(memcmp(saved,storage,sizeof(saved)) == 0);
+    CHECK(memcmp(output,out_saved,sizeof(output)) == 0 && count == 74u);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     size_t i;
@@ -242,6 +287,7 @@ int main(int argc, char **argv)
     for (i=0u;i<sizeof(names)/sizeof(names[0]);++i)
         CHECK(each_oracle(argv[1],names[i])==0);
     CHECK(negatives()==0);
+    CHECK(program_atomicity()==0);
     puts("J1.20-B1 16/16 MATCH_EXACT_RAM, LIST source-semantic, RUN unsupported");
     return 0;
 }

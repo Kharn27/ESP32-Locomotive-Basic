@@ -152,10 +152,10 @@ Le **mot-clé ROM n'est pas automatiquement un mot-clé reconnu par le tokenizer
 | `GOTO` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | cible constante L1..65535, formes GOTO uniquement; [FL] |
 | `IF` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | INTEGER condition bornée THEN/ELSE; pas IF général; [F10][F13][F14] |
  scalaire; LET implicite sans jeton A5; [VAR] |
-| `LIST` | direct | LIST_ONLY (stocké) / C99_NATIVE_BOUNDED (direct) | HOST_ONLY | UNVERIFIED | ON_DEVICE_PO_REPORTED_PASS | commande directe; L10 LIST tokenisable, RUN non exécuté; [HW4] |
+| `LIST` | direct | LIST_ONLY (stocké) / C99_NATIVE_BOUNDED (direct) | CYD_CONNECTED | UNVERIFIED | ON_DEVICE_PO_REPORTED_PASS | commande directe; L10 LIST tokenisable, RUN non exécuté; [HW4] |
 | `LOAD` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
 | `MERGE` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
-| `NEW` | direct | LIST_ONLY (stocké) / C99_NATIVE_BOUNDED (direct) | HOST_ONLY | UNVERIFIED | ON_DEVICE_PO_REPORTED_PASS | efface programme par session, pas par !CLS; NEW stocké non exécuté; [HW4] |
+| `NEW` | direct | LIST_ONLY (stocké) / C99_NATIVE_BOUNDED (direct) | CYD_CONNECTED | UNVERIFIED | ON_DEVICE_PO_REPORTED_PASS | efface programme par session, pas par !CLS; NEW stocké non exécuté; [HW4] |
 | `NEXT` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | NEXT avec ou sans variable % selon sous-ensemble; [F12] |
 | `ON` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
 | `ON BREAK` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
@@ -171,7 +171,7 @@ Le **mot-clé ROM n'est pas automatiquement un mot-clé reconnu par le tokenizer
 | `RESTORE` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
 | `RESUME` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
 | `RETURN` | numérotée | LIST_ONLY + C99_NATIVE_BOUNDED | CYD_CONNECTED | CPC_ORACLE_VERIFIED | UNVERIFIED | pile GOSUB, RETURN sans appel refusé; [F11] |
-| `RUN` | direct | LIST_ONLY (stocké) / C99_NATIVE_BOUNDED (direct) | HOST_ONLY | UNVERIFIED | ON_DEVICE_PO_REPORTED_PASS | RUN direct par BSR avec limite firmware 256 pas; RUN stocké non exécuté; [HW4] |
+| `RUN` | direct | LIST_ONLY (stocké) / C99_NATIVE_BOUNDED (direct) | CYD_CONNECTED | UNVERIFIED | ON_DEVICE_PO_REPORTED_PASS | RUN direct par BSR avec limite firmware 256 pas; RUN stocké non exécuté; [HW4] |
 | `SAVE` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
 | `STOP` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |
 | `TRON` | UNVERIFIED | NOT_IMPLEMENTED | NOT_IMPLEMENTED | UNVERIFIED | UNVERIFIED | non planifié; oracle + tokenisation + C99 + CYD par mandats distincts |

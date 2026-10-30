@@ -690,6 +690,14 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             if (pos == length) return BL_TRUNCATED;
             t = body[pos++];
             if (t == 0xffu) {
+                /* '?' can encode BF FF00 with no separating space.
+                 * LIST expands BF to PRINT: emit the same operand boundary
+                 * used for numeric and explicit-variable PRINT operands.
+                 * #8,ABS and already-spaced PRINT must stay unchanged. */
+                if (space_start == pos - 1u) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) return status;
+                }
                 --pos;
                 status = abs_expression(body, length, &pos, out, 1);
                 if (status != BL_OK) return status;

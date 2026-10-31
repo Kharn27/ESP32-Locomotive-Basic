@@ -168,6 +168,7 @@ static int infinite_run_and_fragmented_break(void)
             } else CHECK(ev==HW4_BREAK_INPUT_NONE);
         }
     }
+    CHECK(hw4_run_scheduler_request_break(&f.scheduler)); /* duplicate request */
     {
         size_t prev=f.prints;
         state=advance(8u);

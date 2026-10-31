@@ -33,6 +33,12 @@ Ready
 
 Le manifeste indépendant enregistre `ERR=8`, `ERL=20`, canal imprimante de `printer.dat` distinct de l'écran et paires de processus CPC originaux/repeat. ROM CPC6128 `31c3668c...`, Caprice32 `8c778bf...`, exactement comme identifiés ci-dessous. Ce témoin **démontre une formulation pour l'IF numérique pris avec cible 90 absente et ligne 20**, mais **ne couvre pas encore** le nouveau cas `IF A% THEN 999`, la renumérotation `IF`, ni surtout `GOTO`. Les authentiques nouvelles paires O2 restent `CPC_ORACLE_UNVERIFIED` et ne doivent pas être simulées par recopie de ce PNG. Les archives J1.10-A ne sont ni modifiées, ni dupliquées, ni baptisées « nouvelles captures O2 ».
 
+### Contrôle historique supplémentaire, branche IF non prise
+
+Le Développeur a également examiné le PNG ROM-backed existant de `F_FALSE_MISSING` (`10 A%=0 / 20 IF A% THEN 90 / 30 PRINT #8,31 / 40 END`) : **après RUN, seul Ready apparaît, sans erreur écran**. Son repeat indépendant possède la même empreinte PNG `bbcc08378bb3dfb0bbe65256e92b83e79ca69fff43557c3e60651ec9d15cf48e` et son manifeste atteste `ERR=0, ERL=0` dans les deux processus. La sortie de programme `31` est imprimée via `#8`, **pas** affichée sur le screen. Il s'agit d'une corroboration historique de non-résolution de cible lorsque IF est faux, **pas** de la nouvelle preuve `PRINT "AFTER"` O2.
+
+Le contrôle positif historique distinct `J1.11-A/F_MISSING_TARGET` montre `Line does not exist in 10` puis `Ready` à l'écran après `10 GOSUB 999`. Il reste en lecture seule et ne justifie aucun mapping GOTO. **La formulation de GOTO demeure entièrement non vérifiée par ces archives.**
+
 ## Six programmes à exécuter
 
 Les fichiers sous tests/fixtures/cpc6128/j1_diag_goto_if_missing/sources/ sont les **sources seulement**.

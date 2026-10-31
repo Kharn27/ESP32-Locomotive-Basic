@@ -59,6 +59,18 @@ PAPER_IMAGE = ("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
 PAPER_ROM = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
 PAPER_CAPRICE = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
 
+
+# Exact in-job command contract. Never accept a grep match in an acquisition job.
+PAPER_PERMANENT_STEP = """      - name: J1.19-A PAPER 264 external seals (permanent, no Caprice32)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_19_a_paper_oracle.py --check-sources
+          python3 tools/j1_19_a_paper_oracle.py \\
+            --evidence tests/fixtures/cpc6128/j1_19_a_paper \\
+            --permanent --self-test"""
+PAPER_ARCHIVE = "tests/fixtures/cpc6128/j1_19_a_paper"
+
 # Explicit HW4-SCROLL-OPT-A0 trigger contract from PR #168, not a generic
 # "tools/**" or "docs/**" wildcard that would wake unrelated jobs.
 HW4_A0 = "hw4-scroll-opt-a0-memory.yml"
@@ -179,6 +191,7 @@ def audit(sources):
            "--permanent --self-test" in permanent,
            "SEALED_STORES_PERMANENT_LOST")
     audit_paper_route(sources)
+    audit_paper_permanent(sources)
     ea = (ROOT / "tools/j1_16_e_a_store.py").read_text()
     da = (ROOT / "tools/j1_16_d_a_store.py").read_text()
     demand("SEALED_E_A_ARCHIVE_MISMATCH" in ea and
@@ -237,6 +250,170 @@ def audit_paper_route(sources):
     return True
 
 
+
+def audit_paper_permanent(sources):
+    """Protect unfiltered PR/main events and an unconditional sealed-evidence step."""
+    yml = sources[PAPER_WORKFLOW]
+    on = re.findall(r"(?ms)^on:\n(.*?)(?=^[A-Za-z][\w-]*:|\Z)", yml)
+    expected = ("  pull_request:\n  push:\n"
+                "    branches: [main]\n  workflow_dispatch:")
+    demand(len(on) == 1 and on[0].strip() == expected.strip(),
+           "PAPER_PERMANENT_TRIGGER")
+    demand(yml.count("\njobs:\n") == 1, "PAPER_PERMANENT_JOBS")
+    matches = list(re.finditer(r"(?m)^  sealed-evidence:[ \t]*$", yml))
+    demand(len(matches) == 1, "PAPER_SEALED_JOB_MISSING")
+    tail = yml[matches[0].end():]
+    next_job = re.search(r"(?m)^  [a-zA-Z][\w-]*:[ \t]*$", tail)
+    job = tail[:next_job.start()] if next_job else tail
+    head, separator, steps = job.partition("\n    steps:\n")
+    demand(bool(separator) and
+           re.search(r"(?m)^    runs-on: ubuntu-24\.04\s*$", head),
+           "PAPER_SEALED_JOB_SHAPE")
+    demand(not re.search(r"(?m)^    (?:if|needs|continue-on-error|strategy):",
+                         head), "PAPER_SEALED_JOB_CONDITIONAL")
+    header = PAPER_PERMANENT_STEP.split("\n", 1)[0]
+    matches = list(re.finditer(r"(?m)^" + re.escape(header) + r"$", steps))
+    demand(len(matches) == 1, "PAPER_PERMANENT_STEP_MISSING")
+    following = steps[matches[0].end():]
+    boundary = re.search(r"(?m)^      - ", following)
+    actual = steps[matches[0].start():
+                   matches[0].end() + boundary.start() if boundary else len(steps)]
+    demand(actual.rstrip() == PAPER_PERMANENT_STEP,
+           "PAPER_PERMANENT_STEP_ALTERED")
+    return True
+
+
+def paper_permanent_negative_tests(sources):
+    """Mutate workflow strings only; negative controls never change tracked files."""
+    original = sources[PAPER_WORKFLOW]
+
+    def change(old, new):
+        demand(original.count(old) == 1, "PAPER_GATE_NEGATIVE_INERT")
+        return original.replace(old, new, 1)
+
+    step = PAPER_PERMANENT_STEP
+    moved = change(step + "\n", "")
+    acquisition = "      - name: Acquire 24 independent PAPER cases plus direct and chronology checks from real CPC"
+    demand(acquisition in moved, "PAPER_ACQUISITION_STEP_NOT_FOUND")
+    moved = moved.replace(acquisition, step + "\n" + acquisition, 1)
+    cases = {
+        "STEP_REMOVED": (change(step + "\n", ""), "PAPER_PERMANENT_STEP_MISSING"),
+        "ONLY_IN_SPECIALIZED_JOB": (moved, "PAPER_PERMANENT_STEP_MISSING"),
+        "JOB_CONDITIONAL": (change("  sealed-evidence:\n    runs-on:",
+                                   "  sealed-evidence:\n    if: false\n    runs-on:"),
+                             "PAPER_SEALED_JOB_CONDITIONAL"),
+        "JOB_DEPENDENCY": (change("  sealed-evidence:\n    runs-on:",
+                                  "  sealed-evidence:\n    needs: paper-cpc-acquisition\n    runs-on:"),
+                            "PAPER_SEALED_JOB_CONDITIONAL"),
+        "STEP_IF_FALSE": (change(step, step.replace(
+            "        shell: bash", "        if: false\n        shell: bash")),
+            "PAPER_PERMANENT_STEP_ALTERED"),
+        "STEP_CONTINUE_ON_ERROR": (change(step, step.replace(
+            "        shell: bash", "        continue-on-error: true\n        shell: bash")),
+            "PAPER_PERMANENT_STEP_ALTERED"),
+        "SKIP_ARCHIVE": (change(step, step.replace(
+            "          python3 tools/j1_19_a_paper_oracle.py --check-sources",
+            "          if test -f tests/fixtures/cpc6128/j1_19_a_paper/manifest.json; then\n"
+            "            python3 tools/j1_19_a_paper_oracle.py --check-sources\n"
+            "          fi")), "PAPER_PERMANENT_STEP_ALTERED"),
+        "SWALLOW_FAILURE": (change(step, step.replace(
+            "--permanent --self-test", "--permanent --self-test || true")),
+            "PAPER_PERMANENT_STEP_ALTERED"),
+        "NO_CHECK_SOURCES": (change(step, step.replace(
+            "          python3 tools/j1_19_a_paper_oracle.py --check-sources\n", "")),
+            "PAPER_PERMANENT_STEP_ALTERED"),
+        "NO_PERMANENT": (change(step, step.replace(
+            "--permanent --self-test", "--self-test")), "PAPER_PERMANENT_STEP_ALTERED"),
+        "NO_SELF_TEST": (change(step, step.replace(
+            "--permanent --self-test", "--permanent")), "PAPER_PERMANENT_STEP_ALTERED"),
+        "WRONG_ARCHIVE": (change(step, step.replace(
+            PAPER_ARCHIVE, "tests/fixtures/cpc6128/j1_18_a_ink")),
+            "PAPER_PERMANENT_STEP_ALTERED"),
+        "UNKNOWN_ORACLE": (change(step, step.replace(
+            PAPER_TOOL, "tools/unknown_oracle.py")), "PAPER_PERMANENT_STEP_ALTERED"),
+        "PR_DOC_SKIP": (change("  pull_request:\n",
+                               "  pull_request:\n    paths-ignore: ['docs/**']\n"),
+                        "PAPER_PERMANENT_TRIGGER"),
+        "PR_BRANCH_SKIP": (change("  pull_request:\n",
+                                  "  pull_request:\n    branches: [oracle/j1-19-a-paper-cpc]\n"),
+                           "PAPER_PERMANENT_TRIGGER"),
+        "PUSH_MAIN_LOST": (change("    branches: [main]\n",
+                                  "    branches: [oracle/j1-19-a-paper-cpc]\n"),
+                           "PAPER_PERMANENT_TRIGGER"),
+    }
+    for label, (bad, reason) in cases.items():
+        demand(bad != original, "PAPER_GATE_INERT_" + label)
+        try:
+            audit_paper_permanent({**sources, PAPER_WORKFLOW: bad})
+        except UnsafeRoute as exc:
+            demand(str(exc) == reason,
+                   "PAPER_GATE_WRONG_REJECTION_" + label + ":" + str(exc))
+        else:
+            raise UnsafeRoute("PAPER_GATE_BYPASS_" + label)
+        print("CI-OPT3 PAPER_PERMANENT_FALSIFICATION_REJECTED", label, reason)
+
+
+def paper_archive_negative_tests():
+    """Check real archive attacks using temporary copies; no Caprice32 acquisition."""
+    import hashlib
+    import importlib
+    import json
+    import os
+    import shutil
+    import tempfile
+    from unittest.mock import patch
+
+    sys.path.insert(0, str(ROOT / "tools"))
+    oracle = importlib.import_module("j1_19_a_paper_oracle")
+    archive = ROOT / PAPER_ARCHIVE
+    demand(archive.is_dir(), "PAPER_NEGATIVE_ARCHIVE_ABSENT")
+    demand(len(oracle.SEALED_FILE_SHA256) == 264,
+           "PAPER_NEGATIVE_SEAL_COUNT")
+
+    def must_fail(label, expected, path):
+        try:
+            oracle.verify(path, permanent=True)
+        except oracle.Invalid as exc:
+            demand(str(exc).startswith(expected),
+                   "PAPER_ARCHIVE_WRONG_REJECTION_" + label + ":" + str(exc))
+        else:
+            raise UnsafeRoute("PAPER_ARCHIVE_BYPASS_" + label)
+        print("CI-OPT3 PAPER_ARCHIVE_FALSIFICATION_REJECTED", label, expected)
+
+    with tempfile.TemporaryDirectory(prefix="opt3-paper-") as temp:
+        must_fail("ARCHIVE_ABSENT", "ARCHIVE_ABSENT", Path(temp) / "missing")
+        # File hardlinks are read-only test inputs: unlink before every write.
+        copy = Path(temp) / "copy"
+        shutil.copytree(archive, copy, copy_function=os.link)
+        manifest_file = copy / "manifest.json"
+        original = manifest_file.read_bytes()
+        manifest_file.unlink()
+        manifest_file.write_bytes(original + b" ")
+        must_fail("MANIFEST_ALTERED", "FALSE_SEALED_HEAD_OR_MANIFEST", copy)
+
+        manifest = json.loads(original)
+        manifest["acquisition_head"] = "0" * 40
+        manifest_file.write_text(json.dumps(manifest))
+        must_fail("FAKE_ACQUISITION_HEAD", "FALSE_HEAD_OR_ANCESTRY", copy)
+
+        # Coordinated file+manifest changes cannot forge the external seal.
+        name = sorted(oracle.SEALED_FILE_SHA256)[0]
+        evidence_file = copy / name
+        raw = evidence_file.read_bytes()
+        evidence_file.unlink()
+        corrupted = raw + b"\x00"
+        evidence_file.write_bytes(corrupted)
+        manifest["acquisition_head"] = oracle.SEALED_ACQUISITION_PARENT
+        manifest["files"][name] = hashlib.sha256(corrupted).hexdigest()
+        manifest_file.write_text(json.dumps(manifest))
+        must_fail("COORDINATED_FILE_AND_MANIFEST",
+                  "FALSE_SEALED_HEAD_OR_MANIFEST", copy)
+
+    # Wrong independent digest, patched in memory only: source tool untouched.
+    name = sorted(oracle.SEALED_FILE_SHA256)[0]
+    with patch.dict(oracle.SEALED_FILE_SHA256, {name: "0" * 64}):
+        must_fail("INCORRECT_EXTERNAL_SEAL", "EXTERNAL_SHA_" + name, archive)
+
 def paper_negative_tests(sources):
     """Mutate the in-memory workflow only; every weakened contract must fail."""
     original = sources[PAPER_WORKFLOW]
@@ -291,6 +468,8 @@ def paper_negative_tests(sources):
 
 def negative_tests(sources):
     paper_negative_tests(sources)
+    paper_permanent_negative_tests(sources)
+    paper_archive_negative_tests()
     essential = {"C99", "CPC_PERMANENT"}
     scenarios = {
         "DOC_ONLY": (["docs/ROADMAP_GATES.md"], essential,

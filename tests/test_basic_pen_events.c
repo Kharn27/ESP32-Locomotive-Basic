@@ -178,8 +178,8 @@ static int new_pen_values_and_atomic_errors(void)
     }
     {
         static const char *const rejected[] = {
-            "10 PEN 5:PRINT \\"X\\":PEN 16",
-            "10 PEN 14:PRINT \\"X\\":PEN -1"
+            "10 PEN 5:PRINT \"X\":PEN 16",
+            "10 PEN 14:PRINT \"X\":PEN -1"
         };
         size_t i;
         for (i = 0u; i < sizeof(rejected)/sizeof(rejected[0]); ++i) {
@@ -195,7 +195,7 @@ static int new_pen_values_and_atomic_errors(void)
     {
         Fixture f;
         CHECK(setup(&f) == 0);
-        CHECK(submit(&f, "10 PEN 5:PRINT \\"X\\":PEN 14").status == BSR_OK);
+        CHECK(submit(&f, "10 PEN 5:PRINT \"X\":PEN 14").status == BSR_OK);
         CHECK(submit(&f, "RUN").status == BSR_OK);
         CHECK(failed(&f, BE_NO_EVENT_SPACE, sizeof(f.output), 1u, 0) == 0);
         CHECK(failed(&f, BE_NO_SPACE, 1u, 4u, 0) == 0);
@@ -345,6 +345,46 @@ static int event_order_capacity_and_legacy(void)
     return 0;
 }
 
+/* Event values stay logical even when MODE1 render would repeat colours. */
+static int new_pen_mixed_print_event_order(void)
+{
+    Fixture f;
+    BSRResult result;
+    CHECK(setup(&f) == 0);
+    CHECK(submit(&f, "10 PEN 5:PRINT \"X\":PEN 14:PRINT \"Y\":PEN 8").status == BSR_OK);
+    CHECK(submit(&f, "20 PEN 12:PRINT \"Z\"").status == BSR_OK);
+    CHECK(submit(&f, "30 END").status == BSR_OK);
+    CHECK(submit(&f, "RUN").status == BSR_OK);
+    memset(f.output, 0x61, sizeof(f.output));
+    memset(f.events, 0x71, sizeof(f.events));
+    f.written = 81u;
+    f.event_written = 82u;
+    CHECK(failed(&f, BE_EVENT_RECEIVER_REQUIRED, sizeof(f.output), 0u, 1) == 0);
+    CHECK(failed(&f, BE_NO_EVENT_SPACE, sizeof(f.output), 2u, 0) == 0);
+    CHECK(failed(&f, BE_NO_SPACE, 3u, 4u, 0) == 0);
+    result = step(&f, sizeof(f.output), 3u);
+    CHECK(result.status == BSR_OK);
+    CHECK(f.written == 4u && f.event_written == 3u);
+    CHECK(memcmp(f.output, "X\nY\n", 4u) == 0 && f.output[4] == 0x61u);
+    CHECK(f.events[0].type == BE_VIDEO_SET_TEXT_PEN &&
+          f.events[0].pen == 5u && f.events[0].print_offset == 0u);
+    CHECK(f.events[1].type == BE_VIDEO_SET_TEXT_PEN &&
+          f.events[1].pen == 14u && f.events[1].print_offset == 2u);
+    CHECK(f.events[2].type == BE_VIDEO_SET_TEXT_PEN &&
+          f.events[2].pen == 8u && f.events[2].print_offset == 4u);
+    CHECK(f.events[0].ink == 0u && f.events[1].colour == 0u);
+    result = step(&f, sizeof(f.output), 1u);
+    CHECK(result.status == BSR_OK);
+    CHECK(f.written == 2u && f.event_written == 1u);
+    CHECK(memcmp(f.output, "Z\n", 2u) == 0);
+    CHECK(f.events[0].type == BE_VIDEO_SET_TEXT_PEN &&
+          f.events[0].pen == 12u && f.events[0].print_offset == 0u);
+    result = step(&f, sizeof(f.output), 1u);
+    CHECK(result.status == BSR_OK && f.written == 0u && f.event_written == 0u);
+    CHECK(step(&f, sizeof(f.output), 1u).status == BSR_END);
+    return 0;
+}
+
 static int direct_runtime_and_bad_tokens(void)
 {
     static const struct {
@@ -398,6 +438,7 @@ int main(int argc, char **argv)
     CHECK(new_pen_values_and_atomic_errors() == 0);
     CHECK(compare_sealed_pen_images(argv[1]) == 0);
     CHECK(event_order_capacity_and_legacy() == 0);
+    CHECK(new_pen_mixed_print_event_order() == 0);
     CHECK(direct_runtime_and_bad_tokens() == 0);
     puts("basic_pen_events: OK");
     return 0;

@@ -28,7 +28,6 @@
 #include "esp_cpu.h"
 #include "esp_timer.h"
 #include "esp_system.h"
-#include "esp_random.h"
 #include "sdkconfig.h"
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
@@ -722,7 +721,8 @@ void app_main(void)
            "allocation=static\n", VARIABLES_CAPACITY,STRING_SLOT_BYTES,
            STRING_ARENA_CAPACITY);
     uart_line_init(&s_line);
-    s_shot_boot_tag=esp_random();
+    /* Non-secret boot discriminator with zero added RNG/IRAM linkage. */
+    s_shot_boot_tag=esp_cpu_get_cycle_count() ^ (uint32_t)esp_timer_get_time();
     if(!uart_init()) return;
     e=cyd_lcd_backlight(true);
     if(e!=ESP_OK) { (void)fail("BACKLIGHT",(int)e); return; }

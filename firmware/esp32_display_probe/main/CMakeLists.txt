@@ -86,6 +86,6 @@ if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
             "HW4-SHOT-A needs a tracked Git HEAD for UART sha provenance")
     endif()
     target_compile_definitions(${COMPONENT_LIB} PRIVATE
-        HW4_SHOT_GIT_SHA="${HW4_SHOT_GIT_SHA}")
+        HW4_SHOT_GIT_SHA=\"${HW4_SHOT_GIT_SHA}\")
 endif()
 

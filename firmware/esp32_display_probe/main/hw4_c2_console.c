@@ -28,6 +28,7 @@
 #include "esp_cpu.h"
 #include "esp_timer.h"
 #include "esp_system.h"
+#include "esp_random.h"
 #include "sdkconfig.h"
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"

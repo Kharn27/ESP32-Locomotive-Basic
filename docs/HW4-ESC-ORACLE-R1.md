@@ -98,3 +98,63 @@ Sinon **CPC_ESC_ORACLE_UNVERIFIED**, même lorsque CI/outillage ont réussi.
 **CPC_BREAK_ON_DEVICE_UNVERIFIED** demeure : aucun test CYD n'est demandé en R1.
 La décision d'acceptation/fusion et de déblocage éventuel de B appartient
 exclusivement au Pilotage après revue séparée de #226.
+
+## R1 — preuves réellement acquises et inspectées, 1er novembre 2026
+
+**[Run de capture #41254339354](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41254339354) SUCCESS.**
+Huit démarrages CPC6128 indépendants, **29 PNG originaux** désormais versionnés dans
+[tests/fixtures/cpc6128/hw4_esc_r1](../tests/fixtures/cpc6128/hw4_esc_r1).
+Manifeste original `manifest.json`, SHA-256
+**5eff0daedd5d41d37f05848c02913de3bf8aa4b47009a43a6986095d54b3e850**.
+SHA ROM **31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562**,
+Caprice32 commit **8c778bf072a06fb7c23b9cccd179041db7f79a52**,
+version annoncée **v4.6.0**. Archive poussée sur **branche PR** sous garde de SHA du
+HEAD, et non sur main. Les empreintes des PNG, journaux, événements et configurations
+sont vérifiées par `tests/oracles/hw4_esc_r1_verify.py --self-test` ;
+la modification d'un octet dans une **copie temporaire** d'un PNG déclenche
+**R1_MUTATED_PNG_REJECTED**.
+
+### Contrôle négatif et authenticité de l'injection
+
+Le log du contrôle montre **octet brut 0x1B** → `SDLK_UNKNOWN`,
+`CPC_POUND`, scancode 304, alors que l'injection authentique
+`BEL + CPC_ESC` produit deux événements `CPC_ESC`, scancode 130,
+via `SDLK_ESCAPE`. Les images `running` et `raw_host_byte`
+sont **identiques bit-à-bit** (SHA
+**06c54e7ebea7db648a5b2fe3e9cd6044d8b8afeacc3b6f268308fd87c09190f8**).
+La touche `CPC_ESC` change l'image au premier appui puis donne
+**Break in 10 / Ready** au second. Le contrôle exclut l'assimilation de
+l'**octet brut de cette injection** à l'ESC CPC ; il ne prétend pas qu'une
+touche hôte physique SDL Escape ne puisse être mappée à CPC ESC.
+
+### Résultats visuels des vrais PNG originaux
+
+| Cas | Observation effective à l'écran | SHA-256 PNG original du checkpoint | Statut |
+|---|---|---|---|
+| E01 | `10 GOTO 10`, ESC #1 : curseur jaune, **ni Break ni Ready**, écran stable entre deux captures ; GOTO muet non probant seul pour pause CPU | E01/paused : **93a01fb87da6ed48c64e9cc285cbcdeafe3584a835dacae7b40f375641ff1f72** | OBSERVÉ |
+| E02 | Après ESC #1, touche `x` : disparition du curseur de pause, puis nouvel ESC ESC → **Break in 10** | E02/after_x : **b3582443e340450e497d163d7c1f80503b2c89d4517664aab62d570e2f11fe87** | OBSERVÉ |
+| E03 | Double ESC distinct sur `10 GOTO 10` → **Break in 10**, ligne suivante **Ready** | E03/after_second : **89d5c62b833cf1e8de675001e356a04658b1992193485a6c1f43eb5a8375f516** | OBSERVÉ |
+| E04 | Après BREAK, `CONT` reprend la boucle ; nouveau double ESC → **Break in 10**, Ready | E04/break_after_CONT : **533a7bb141acce6e42a6ce8be513c1903e37f3e95624cee85cd5255c681247ef** | OBSERVÉ |
+| E05 | RUN A/B sur lignes 10/20, ESC #1 fige visiblement la sortie ; deux PNG de pause **identiques**, ESC #2 → **Break in 20**, Ready | E05/break : **fd1638ac9581c80f601a4a20536c69c14839cc04a8b405248dac3876f119d1cf** | OBSERVÉ |
+| E10 | Boot froid, aucun RUN/STOP ; `CONT` direct → libellé exact **Cannot CONTinue**, puis Ready | E10/without_context : **a02aeae936d4662744374020ef1ec335a268f91612313df892cd3f222a7b4828** | OBSERVÉ |
+| E07 | Programme exact `10 A%=A%+1:GOTO 10`, BREAK → `PRINT A%` donne **2632** ; `CONT` et nouveau BREAK → `PRINT A%` donne **5271** | E07_candidate/variable_after_cont : **0d08ab8cf048d46e9275c4c9afe132df5a4d0a7c4229178ff51e17e6c2b42225** | OBSERVÉ |
+
+E05/paused et E05/pause_persistent ont le **même SHA de fichier entier**
+**3a6e90faebffe459c4d28870f1e46f345d2d6262c6e240d88c58d6a4fca028e4**,
+à plusieurs secondes d'écart. C'est une preuve discriminante de suspension
+de l'activité écran A/B. Les captures E01 ont le même contenu CPC hors
+bandeau FPS (l'image totale peut différer). Pour chaque cas, chemins PNG originaux,
+ordre de frappe et hexadécimal exact, configuration et journal SDL sont dans
+le manifeste et les fichiers `events.json` correspondants.
+
+**Portée du résultat :** attribution de la ligne 10 pour E03 et 20 pour
+E05 **dans ces sessions seulement**, pas de numéro reconstitué ; `CONT`
+prouvé sur E04 et E07, pas après modification de programme ni END/STOP.
+Les cas E00, E06, E09, E11–E14 demeurent **UNVERIFIED**, E08 demeure
+le précédent témoin **STOP distinct d'ESC**.
+
+**Statuts proposés au Pilotage :**
+`CPC_ESC_ORACLE_ROM_BACKED_VERIFIED` pour les faits observés E01–E05,
+E07, E10 ; `CPC_BREAK_ON_DEVICE_UNVERIFIED`.
+Pas d'essai CPC physique ni CYD et aucune modification firmware ou PR #226.
+**Tranche B toujours bloquée, aucune auto-approbation/fusion.**

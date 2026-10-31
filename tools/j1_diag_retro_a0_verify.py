@@ -84,6 +84,29 @@ def verify_matrix(m):
     header = ROOT / "core/basic_executor.h"
     expected = actual_statuses(header, "BEStatus", "BE_") - {"BE_OK", "BE_END"}
     require(set(statuses) == expected, "BE_STATUS_INVENTORY_DRIFT")
+    # Native, session, tokenizer, storage and LIST namespaces are disjoint:
+    # enumerate all host statuses but never map them to ROM codes.
+    outside = m["non_executor_status_inventory"]
+    host_enums = (
+        ("core/basic_session_runtime.h", "BSRStatus", "BSR_"),
+        ("core/basic_session.h", "BSStatus", "BS_"),
+        ("core/basic_tokenizer.h", "BTStatus", "BT_"),
+        ("core/basic_program.h", "BPStatus", "BP_"),
+        ("core/basic_listing.h", "BLStatus", "BL_"),
+    )
+    expected_non_be = set()
+    for path, name, prefix in host_enums:
+        expected_non_be |= {(name, s) for s in actual_statuses(
+            ROOT / path, name, prefix)}
+    found_non_be = [(r["layer"], r["status"]) for r in outside]
+    require(len(found_non_be) == len(set(found_non_be)) and
+            set(found_non_be) == expected_non_be,
+            "NON_EXECUTOR_STATUS_INVENTORY_DRIFT")
+    require(all(r["cpc_text"] is None and
+                r["semantics"] in ("CONTROL_NOT_ERROR",
+                                    "HOST_STATUS_NOT_CPC_CODE") and
+                r["positive"] and r["negative"] for r in outside),
+            "UNANCHORED_HOST_STATUS_CPC_MAPPING")
     rows = m["witnesses"]
     require(len(rows) == len(ANCHORS) and
             {w["id"] for w in rows} == set(ANCHORS),
@@ -175,10 +198,11 @@ def main():
     for row in rows:
         verify_archive(row)
     n = self_test(matrix) if args.self_test else 0
-    print("J1-DIAG-RETRO-A0 PASS: {} BE statuses; {} preserved PNG "
+    print("J1-DIAG-RETRO-A0 PASS: {} BE statuses; {} host statuses; {} preserved PNG "
           "screen witnesses; {} original/repeat pairs; {} negative "
           "in-memory mutations. No CPC execution or new physical test."
-          .format(len(matrix["status_inventory"]), len(rows),
+          .format(len(matrix["status_inventory"]),
+                  len(matrix["non_executor_status_inventory"]), len(rows),
                   sum(x["double_capture"] for x in rows), n))
 
 

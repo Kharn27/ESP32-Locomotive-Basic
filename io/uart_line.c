@@ -135,6 +135,13 @@ static UartLineEvent feed_impl(UartLine *line, uint8_t ch, bool screen_enabled)
                 line->screen_navigation = false;
                 return UART_LINE_RETURN_HOME;
             }
+            /* HW4-SHOT-A: plain CSI H in E3 requests a read-only snapshot;
+             * never alter the source, cursor, or BASIC state. This comes
+             * AFTER the existing SCREEN HOME branch above. */
+            if (simple && n == 0U && ch == (uint8_t)'H' &&
+                screen_enabled && !line->screen_navigation &&
+                !line->poisoned)
+                return UART_LINE_SCREENSHOT;
             /* All remaining CSI, especially Delete-under, are inert in
              * SCREEN focus. Never run an E3 edit from a historic cell. */
             if (screen_enabled && line->screen_navigation) {

@@ -154,6 +154,20 @@ def acquire(cap, image_cli, out):
     verify(out)
 
 
+def printer_probes(raw):
+    # Parse only what the separate CPC printer actually wrote, not BEStatus.
+    rows = raw.splitlines(keepends=True)
+    if len(rows) != 2:
+        return (None, None)
+    values = []
+    for row in rows:
+        match = re.fullmatch(rb" *([+-]?[0-9]+) *(?:\\r\\n|\\r|\\n)", row)
+        if match is None:
+            return (None, None)
+        values.append(int(match.group(1)))
+    return (values[0], values[1])
+
+
 def review_one(review, case, png_hash):
     require(isinstance(review, dict), "REVIEW_INVALID_"+case)
     require(review.get("case") == case and
@@ -236,6 +250,12 @@ def verify(root):
         require(ram[0] == ram[1], "O2_CPC_RAM_ORIGINAL_REPEAT_DIFFER_"+case)
         require(printer[0] == printer[1] and probes[0] == probes[1],
                 "O2_PRINTER_ORIGINAL_REPEAT_DIFFER_"+case)
+        for index, phase in enumerate(("original", "repeat")):
+            run = obj[phase]["run"]
+            raw = printer[index]
+            require(probes[index] == printer_probes(raw) and
+                    run.get("printer_raw_hex") == raw.hex(" ").upper(),
+                    "O2_PROBES_NOT_GENUINE_PRINTER_BYTES_"+case)
         require(png[0] == png[1], "O2_PNG_ORIGINAL_REPEAT_DIFFER_"+case)
         if case in reviews:
             review_one(reviews[case], case, png[0])

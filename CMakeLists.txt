@@ -136,6 +136,14 @@ if(BUILD_TESTING)
 endif()
 
 
+# J1.21-B1: CLS 8A lexical-only, exact sealed CPC RAM/LIST read-only.
+if(BUILD_TESTING)
+    add_executable(test_basic_cls_token_list tests/test_basic_cls_token_list.c)
+    target_link_libraries(test_basic_cls_token_list PRIVATE basic_session_runtime)
+    add_test(NAME basic_cls_token_list COMMAND test_basic_cls_token_list
+             "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
 # J1.20-B1: ABS token FF00, 16 CPC original/repeat RAM images and semantic LIST.
 # No ABS runtime executable is registered or linked beyond the legacy engine.
 if(BUILD_TESTING)
@@ -497,6 +505,21 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/j1_8_b_native_verify.py"
         --cli "$<TARGET_FILE:loco_basic_cli>"
         --image-cli "$<TARGET_FILE:basic_program_image_cli>" --self-test)
+endif()
+
+# HW4-SHOT-A: portable bounded encoder and two host gates (C99 + real
+# PNG reconstruction using the already-approved P0 Python decoder).
+add_library(hw4_shot_uart STATIC io/hw4_shot_uart.c)
+target_include_directories(hw4_shot_uart PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/io)
+if(BUILD_TESTING)
+    add_executable(test_hw4_shot_uart tests/test_hw4_shot_uart.c)
+    target_link_libraries(test_hw4_shot_uart PRIVATE hw4_shot_uart cpc_video uart_line)
+    add_test(NAME hw4_shot_a_uart_emitter COMMAND test_hw4_shot_uart)
+    add_test(NAME hw4_shot_a_png_roundtrip COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_hw4_shot_uart_png.py"
+        "$<TARGET_FILE:test_hw4_shot_uart>"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/hw4_shot_decode.py")
 endif()
 
 # HW4-C2: independent portable UART collection and screen echo/paging.

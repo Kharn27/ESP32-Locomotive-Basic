@@ -261,7 +261,7 @@ static bool next_scan_from_for(const BasicProgram *program,
     return false; /* includes missing NEXT or malformed program */
 }
 
-static bool next_fault_locus(const BasicExecutor *executor, BEStatus reason,
+bool cpc_diag_policy_next_locus(const BasicExecutor *executor, BEStatus reason,
                              uint16_t *line_number)
 {
     const BasicProgram *program;
@@ -369,7 +369,7 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
         /* Reproduce the exact failed probe against the unchanged executor,
          * including for_match's real offending NEXT record. No guessing
          * from the FOR cursor, no raw token scan or status-only mapping. */
-        if(!next_fault_locus(&runtime->executor,
+        if(!cpc_diag_policy_next_locus(&runtime->executor,
                              result.executor_status,&next_line))
             return diagnostic;
         diagnostic.category=CPC_DIAG_NEXT_UNEXPECTED;

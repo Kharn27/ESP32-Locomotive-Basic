@@ -934,3 +934,14 @@ if(BUILD_TESTING)
         -Wextra -Wpedantic -Wconversion -Werror)
     add_test(NAME hw4_touch_t1_gestures COMMAND test_hw4_touch_t1)
 endif()
+
+# HW4-ESC-BREAK-A: host C99 UART framing experiment only (no firmware linkage).
+if(BUILD_TESTING)
+    add_executable(test_hw4_cpc_escape_contract
+        tests/test_hw4_cpc_escape_contract.c
+        integration/hw4_cpc_escape_contract.c)
+    target_include_directories(test_hw4_cpc_escape_contract PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/integration)
+    add_test(NAME hw4_esc_break_a_transport_contract
+             COMMAND test_hw4_cpc_escape_contract)
+endif()

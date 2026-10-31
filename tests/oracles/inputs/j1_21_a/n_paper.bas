@@ -1,0 +1,3 @@
+10 PAPER 2
+20 CLS
+30 END

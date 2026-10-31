@@ -259,7 +259,7 @@ static int production_wiring(const char *path)
         "hw4_pen_replay(&s_text",
         "if(slice.state==HW4_RUN_YIELDED)",
         "vTaskDelay(1)",
-        "uart_flush_input(UART_NUM_0)",
+        "RUN_UART_DRAIN_BYTES",
         "s_run_skip_crlf_lf",
         "capture_screen(\"PROMPT\")"
     };

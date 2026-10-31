@@ -41,6 +41,7 @@ const char *cpc_diag_policy_category(CpcDiagCategory category)
         case CPC_DIAG_PEN_IMPROPER_ARGUMENT: return "PEN_IMPROPER_ARGUMENT_CPC";
         case CPC_DIAG_GOSUB_MISSING_TARGET: return "GOSUB_MISSING_TARGET_CPC";
         case CPC_DIAG_RETURN_UNEXPECTED: return "RETURN_UNEXPECTED_CPC";
+        case CPC_DIAG_NEXT_UNEXPECTED: return "NEXT_UNEXPECTED_CPC";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -54,6 +55,7 @@ const char *cpc_diag_policy_message(CpcDiagCategory category)
         case CPC_DIAG_PEN_IMPROPER_ARGUMENT: return "Improper argument";
         case CPC_DIAG_GOSUB_MISSING_TARGET: return "Line does not exist";
         case CPC_DIAG_RETURN_UNEXPECTED: return "Unexpected RETURN";
+        case CPC_DIAG_NEXT_UNEXPECTED: return "Unexpected NEXT";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -141,6 +143,7 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
     BasicProgramLine line;
     size_t cursor;
     uint8_t flow;
+    uint16_t next_line = 0u;
     if(result.status!=BSR_EXECUTOR_ERROR ||
        runtime==NULL || runtime->state!=BSR_RUNNING ||
        runtime->program==NULL || runtime->executor.program!=runtime->program)
@@ -148,7 +151,9 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
     /* Never treat an arbitrary executor rejection as a ROM diagnostic. */
     if(result.executor_status!=BE_INVALID_PEN &&
        result.executor_status!=BE_MISSING_TARGET &&
-       result.executor_status!=BE_RETURN_WITHOUT_GOSUB)
+       result.executor_status!=BE_RETURN_WITHOUT_GOSUB &&
+       result.executor_status!=BE_NEXT_WITHOUT_FOR &&
+       result.executor_status!=BE_NEXT_VARIABLE_MISMATCH)
         return diagnostic;
 
     cursor=runtime->executor.cursor;
@@ -156,6 +161,19 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
        line.offset!=runtime->executor.cursor || line.number==0U ||
        runtime->executor.statement_offset>=line.body_length)
         return diagnostic;
+    if(result.executor_status==BE_NEXT_WITHOUT_FOR ||
+       result.executor_status==BE_NEXT_VARIABLE_MISMATCH) {
+        /* Reproduce the exact failed probe against the unchanged executor,
+         * including for_match's real offending NEXT record. No guessing
+         * from the FOR cursor, no raw token scan or status-only mapping. */
+        if(!be_next_fault_line(&runtime->executor,
+                               result.executor_status,&next_line))
+            return diagnostic;
+        diagnostic.category=CPC_DIAG_NEXT_UNEXPECTED;
+        diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE;
+        diagnostic.line_number=next_line;
+        return diagnostic;
+    }
     if(result.executor_status==BE_INVALID_PEN) {
         diagnostic.category=CPC_DIAG_PEN_IMPROPER_ARGUMENT;
         diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE;
@@ -187,6 +205,7 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
     static const uint8_t pen_prefix[]="Improper argument in ";
     static const uint8_t gosub_prefix[]="Line does not exist in ";
     static const uint8_t return_prefix[]="Unexpected RETURN in ";
+    static const uint8_t next_prefix[]="Unexpected NEXT in ";
     const uint8_t *prefix=NULL;
     size_t prefix_length=0U;
     uint8_t digits[5];
@@ -214,6 +233,10 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE) {
         prefix=return_prefix;
         prefix_length=sizeof(return_prefix)-1U;
+    } else if(diagnostic.category==CPC_DIAG_NEXT_UNEXPECTED &&
+              diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE) {
+        prefix=next_prefix;
+        prefix_length=sizeof(next_prefix)-1U;
     } else {
         return false;
     }

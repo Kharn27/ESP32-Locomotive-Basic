@@ -69,6 +69,7 @@ CASE_FILES = ("program.bin", "capture.json", "list/caprice.log",
               "run/screen_0.png", "run/screen_1.png", "run/printer.dat")
 # Rectangles are Caprice32 screenshot pixels, not the CYD's 320x240.
 # Bounds are deliberately broad; only differential ROI data are reported.
+CHRONO_DELAY = " ".join(["CAP32_DELAY"] * 96)  # same wall-clock guard as J1.18-A INK
 ROIS = {
     "text_area": (64, 81, 704, 481),
     "upper_left": (64, 81, 200, 161),
@@ -179,7 +180,7 @@ def command_run(case):
             preparation(case) + [
                 "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
                 CASES[case][1],
-                "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+                CHRONO_DELAY + " CAP32_SCRNSHOT",
                 "PRINT #8,ERR", "PRINT #8,ERL",
                 "LIST #8", "CAP32_DELAY CAP32_EXIT"])
 

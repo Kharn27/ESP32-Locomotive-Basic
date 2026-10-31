@@ -5,6 +5,8 @@
  */
 #include "basic_session_runtime.h"
 #include "hw4_pen_bridge.h"
+#include "hw4_run_scheduler.h"
+#include "hw4_run_break_input.h"
 #include "basic_variable_store.h"
 #include "j1_15_c_string_arena.h"
 #include "cpc_font.h"
@@ -48,7 +50,9 @@ enum {
     LCD_HEIGHT = 240,
     LCD_ROWS_PER_BAND = 8,
     CPC_ROWS = 25,
-    RUN_STEP_BUDGET = 256,
+    RUN_QUANTUM = 8, /* eight BASIC steps max per app_main iteration */
+    RUN_UART_POLL_BYTES = 16,
+    RUN_LOG_QUANTA = 64,
     PEN_EVENT_CAPACITY = 3, /* A0 DRAM guard: 3 typed events, no heap/VRAM */
     ECHO_IDLE_MS = 20,
     TOUCH_POLL_MS = 20,
@@ -93,6 +97,15 @@ static uint32_t s_shot_seq;
  * also contain cursor, text or !CLS writes. Never label it scroll-exclusive. */
 static Hw4ScrollMetrics s_scroll_metrics;
 static Hw4TouchT1 s_touch; /* CONSOLE only; 0 heap, 0 extra tasks */
+static Hw4RunScheduler s_run_scheduler;
+static Hw4RunBreakInput s_run_input;
+static bool s_run_active;
+static bool s_run_skip_crlf_lf;
+static size_t s_run_quanta;
+static uint64_t s_run_break_requested_us;
+static const char *s_run_break_source;
+static CpcReadyTransition s_run_ready_transition;
+static Hw4PenStatus s_run_video_failure;
 /* B2-C1 instrumentation: bounded histogram, never a second framebuffer. */
 static struct {
     uint32_t flushes, bands, max_us, histogram[12];
@@ -405,47 +418,20 @@ static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
 }
 /* Preflight ALL typed events before changing ANY pixel or sink counter.
  * One original PRINT_BYTES log is retained, not fragments/escape codes. */
-static Hw4PenDisplayResult display_print_events(size_t event_count)
+/* Exact PEN/INK whole-step preflight and ordered replay; no per-step logs. */
+static bool run_preflight(void *ctx,const uint8_t *bytes,size_t length,
+                          const BEVideoEvent *events,size_t count)
 {
-    Hw4PenStatus validation=hw4_pen_preflight(&s_text,s_basic.output,
-                            s_basic.written,s_basic.scratch.events,event_count);
-    if(validation!=HW4_PEN_OK) {
-        printf("HW4-PEN-A VIDEO_REJECT category=%s status=%d printed=0 event_applied=0 print_applied=0\n",
-               validation==HW4_PEN_SET_INK_UNSUPPORTED ?
-               "SET_INK_UNSUPPORTED" : "PEN_PREFLIGHT", (int)validation);
-        (void)bsr_stop(&s_basic.runtime);
-        return display_error() ? HW4_PEN_DISPLAY_REJECT_DIAGNOSED :
-                                 HW4_PEN_DISPLAY_FATAL;
-    }
-    if(s_basic.written>0U)
-        log_bytes("PRINT_BYTES",s_basic.output,s_basic.written);
-    const size_t clipped_before=s_text.bytes_clipped;
-    Hw4PenStatus replay=hw4_pen_replay(&s_text,s_basic.output,
-                             s_basic.written,s_basic.scratch.events,event_count);
-    if(replay!=HW4_PEN_OK) {
-        printf("HW4-PEN-A VIDEO_REPLAY_FAILURE status=%d\n",(int)replay);
-        (void)fail("PEN_REPLAY",(int)replay);
-        return HW4_PEN_DISPLAY_FATAL;
-    }
-    for(size_t i=0U;i<event_count;++i) {
-        uint8_t mapped=0U;
-        if(hw4_pen_pixel_index(&s_video,s_basic.scratch.events[i].pen,&mapped)
-           !=HW4_PEN_OK) {
-            (void)fail("PEN_CONTEXT_CHANGED",-1);
-            return HW4_PEN_DISPLAY_FATAL;
-        }
-        printf("HW4-PEN-A VIDEO_EVENT type=SET_TEXT_PEN logical=%u "
-               "pixel=%u print_offset=%u order=%u/%u "
-               "renderer=MODE1\n",
-               (unsigned)s_basic.scratch.events[i].pen,(unsigned)mapped,
-               (unsigned)s_basic.scratch.events[i].print_offset,
-               (unsigned)(i+1U),(unsigned)event_count);
-    }
-    if(s_text.bytes_clipped>clipped_before)
-        printf("HW4-C3-B2 SCREEN_OUTPUT_CLIPPED bytes=%u "
-               "policy=unexpected_clip\n",
-               (unsigned)(s_text.bytes_clipped-clipped_before));
-    return HW4_PEN_DISPLAY_OK;
+    (void)ctx;
+    s_run_video_failure=hw4_pen_preflight(&s_text,bytes,length,events,count);
+    return s_run_video_failure==HW4_PEN_OK;
+}
+static bool run_replay(void *ctx,const uint8_t *bytes,size_t length,
+                       const BEVideoEvent *events,size_t count)
+{
+    (void)ctx;
+    s_run_video_failure=hw4_pen_replay(&s_text,bytes,length,events,count);
+    return s_run_video_failure==HW4_PEN_OK;
 }
 static bool display_error(void)
 {

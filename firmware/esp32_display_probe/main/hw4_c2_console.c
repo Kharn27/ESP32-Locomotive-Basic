@@ -548,7 +548,9 @@ static bool basic_run(void)
                 diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE ?
                     "CPC_GOSUB_ORACLE" :
                 diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE ?
-                    "CPC_RETURN_ORACLE" : "HOST_NOT_CPC_ERR";
+                    "CPC_RETURN_ORACLE" :
+                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE ?
+                    "CPC_NEXT_ORACLE" : "HOST_NOT_CPC_ERR";
             printf("HW4-PEN-A STEP_DIAG category=%s events_applied=0 "
                    "print_applied=0 origin=%s basic_line=%u host_cpc_err=none\n",
                    pen_diag,diag_origin,(unsigned)diagnostic.line_number);

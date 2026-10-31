@@ -116,6 +116,20 @@ python3 tools/j1_diag_retro_o2_verify.py --verify \
   tests/fixtures/cpc6128/j1_diag_goto_if_missing/capture
 ~~~
 
+## Preuves hôte réellement exécutées (1er novembre 2026)
+
+Le fichier `tools/j1_diag_retro_o2_verify.py` de cette PR a été **reconstitué octet pour octet depuis GitHub dans l'environnement de test local** : `git hash-object` = `d90b6ea4260ecf887959969f29b36c96082cd709`, identique au blob GitHub. Les six `.bas` ont également leurs six hashes Git identiques à ceux des six blobs de la branche. Il ne s'agit pas d'une autre version du code ni d'une transcription manuelle différente.
+
+Résultats exécutés avec Python 3 (hôte, pas CPC) :
+
+- `python3 -m py_compile tools/j1_diag_retro_o2_verify.py` : **PASS**.
+- `python3 tools/j1_diag_retro_o2_verify.py --check-sources --self-test` : `O2_SOURCES=PASS CASES=6`, `O2_NEGATIVE_MUTATIONS=11/11 PASS`.
+- Mutation isolée `10 GOTO 999` en `10 GOTO 998` sur **copie temporaire locale** puis restauration : `SOURCE_DRIFT`, exit 1 attendu.
+- `--verify <capture-absente>` : `CPC_CAPTURE_MISSING`, exit 1 attendu, **aucune preuve fabriquée**.
+- `--acquire --caprice /does/not/exist --image-cli /does/not/exist --output <capture-absente>` : `PINNED_CAPRICE32_UNAVAILABLE`, exit 1 attendu ; **aucun répertoire de capture créé**.
+
+Ces tests ne valident **ni la création effective d'une archive CPC**, ni la lecture d'un écran O2 réel, ni le comportement final de l'émulateur sur les six nouveaux scénarios. Les contrôles d'acquisition réel original+repeat et de validation complète d'une archive restent à exécuter sur la ROM authentifiée. `CPC_ORACLE_UNVERIFIED` reste le statut obligatoire jusqu'à ce résultat.
+
 ## Critères et exclusions
 
 Le statut CPC_ORACLE_VERIFIED demande 6 paires originale/repeat réelles, soit **12 exécutions RUN et 12 pré-RUN LIST/SNA**, les sorties brutes, hashes, provenance et transcriptions humaines; ERR/ERL doivent rester UNVERIFIED si aucune sonde utilisable. Les vérifications CI Linux/CPC/ARCH/OPT3 applicables seront consignées sur le HEAD de livraison. O2 ne demande ni firmware Xtensa ni tests CYD (ON_DEVICE_NOT_APPLICABLE).

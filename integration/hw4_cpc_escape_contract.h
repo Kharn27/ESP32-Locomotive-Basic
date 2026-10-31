@@ -35,7 +35,9 @@ size_t hw4_esc_decoder_feed(Hw4EscDecoder *decoder, uint8_t byte,
 /* Call ONLY when the UART ESC/CSI prefix ambiguity has actually expired;
  * never simply at an arbitrary uart_read_bytes() chunk boundary. */
 Hw4EscKey hw4_esc_decoder_release_pending(Hw4EscDecoder *decoder);
-/* A true end-of-input/reset, not the end of a UART read. */
+/* A true end-of-input/reset, not the end of a UART read.
+ * Truncated CSI/SS3 -> REJECTED; already rejected CSI in DISCARD -> NONE
+ * (no duplicate event). Both clear state and rearm the next independent key. */
 Hw4EscKey hw4_esc_decoder_finish(Hw4EscDecoder *decoder);
 
 typedef enum {

@@ -11,6 +11,11 @@ permissions:
   contents: read
   packages: read
 
+# An archive-producing acquisition must not be cancelled by the next PR commit.
+concurrency:
+  group: hw4-esc-r1-cpc-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   acquire:
     if: >-

@@ -76,7 +76,7 @@ Le manifeste de l'archive capturée est sous capture/manifest.json, avec deux ar
 - reviewer : identité du relecteur réel ;
 - screen_text : texte authentique recopié sans interpolation ;
 - ready_count : nombre observé après RUN ;
-- post_error_print_absent : constat réel de sortie interdite, selon le cas.
+- forbidden_print_absent : constat réel de sortie interdite, selon le cas.
 
 Le vérificateur contrôle le couple revue/SHA, mais **ne remplace pas** l'examen humain des pixels. Sans revue, il peut éventuellement attester une archive brute cohérente, **pas** l'exactitude du texte écran. Le self-test refuse **11 falsifications en mémoire** : six incohérences de revue (mauvais SHA, faux repeat, origine non ROM, relecteur absent, texte absent, compteur Ready négatif) et cinq altérations de structure RAM (tronquage, sentinelle, fin d'enregistrement, numéro nul, longueur incohérente). Les valeurs de test sont synthétiques et ne sont jamais archivées comme observations CPC. Aucun faux PNG n'est écrit.
 

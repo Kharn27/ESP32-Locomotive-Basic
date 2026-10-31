@@ -131,13 +131,13 @@ def main():
         tail, checkpoints = make_tail(steps, cpc_esc)
         # Each -a automatically appends ENTER. The tail is ONE -a to avoid
         # injected ENTER between checkpoint screenshots and CPC ESC events.
-        argv = ['xvfb-run', '-a', str(exe), '-c', str(work / 'cap32.cfg')]
+        argv = ['xvfb-run', '-a', str(exe), '-v', '-c', str(work / 'cap32.cfg')]
         for line in program:
             argv += ['-a', line]
         if name != 'E10':
             argv += ['-a', 'RUN']
-        argv += ['-a', tail]
-        steps_json = {'program': program, 'steps': steps, 'tail_hex': tail.encode().hex(),
+        argv += ['-a', tail.encode('latin1')]
+        steps_json = {'program': program, 'steps': steps, 'tail_hex': tail.encode('latin1').hex(),
                       'checkpoint_labels': checkpoints, 'command_provenance':
                       'Caprice32 argv -a, macro BEL+CPC_ESC enum; no host UART'}
         (work / 'events.json').write_text(json.dumps(steps_json, indent=2) + '\n')

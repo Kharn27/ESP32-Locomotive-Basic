@@ -161,7 +161,7 @@ def printer_probes(raw):
         return (None, None)
     values = []
     for row in rows:
-        match = re.fullmatch(rb" *([+-]?[0-9]+) *(?:\\r\\n|\\r|\\n)", row)
+        match = re.fullmatch(rb" *([+-]?[0-9]+) *(?:\r\n|\r|\n)", row)
         if match is None:
             return (None, None)
         values.append(int(match.group(1)))

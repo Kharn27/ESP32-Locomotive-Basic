@@ -93,8 +93,9 @@ git show c04a86b965fbcb843c11171d37ba68aaa459af92:integration/hw4_cpc_escape_con
 gcc -std=c99 -Wall -Wextra -Wpedantic -Wconversion -Werror -Iintegration \
   /tmp/hw4-esc-old.c tests/test_hw4_cpc_escape_contract.c -o /tmp/hw4-esc-old
 /tmp/hw4-esc-old
-# exit=1 : FAIL tests/test_hw4_cpc_escape_contract.c:161: count == expected_count
-#          FAIL tests/test_hw4_cpc_escape_contract.c:183: quarantined_byte(&d, &phase, (uint8_t)'D', 0u, HW4_ESC_KEY_NONE) == 0
+# exit=1 : FAIL tests/test_hw4_cpc_escape_contract.c:164: hw4_esc_route(phase, keys[i]) == HW4_ESC_ACTION_NONE
+#          FAIL tests/test_hw4_cpc_escape_contract.c:185: quarantined_byte(&d, &phase, (uint8_t)'D', 0u, HW4_ESC_KEY_NONE) == 0
+#          The old D triggers RESUME while PAUSED (false control event).
 ```
 L'ancien source original et le nouveau fichier de tests furent effectivement compilés et exécutés
 sur hôte ; **ce RED est un test C99, non une nouvelle observation CPC**.

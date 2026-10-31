@@ -19,6 +19,7 @@
 #include "hw4_touch_t1.h"
 #include "cyd_ili9341.h"
 #include "uart_line.h"
+#include "hw4_shot_uart.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
@@ -85,6 +86,9 @@ static CpcUartEditor s_edit;
 static CpcScreenNavigation s_nav;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
 static size_t s_scroll_reported;
+/* Boot-specific tag plus monotonic seq: unique captures in a monitor session. */
+static uint32_t s_shot_boot_tag;
+static uint32_t s_shot_seq;
 /* A0: CONSOLE-only class counters; a scroll-associated dirty flush may
  * also contain cursor, text or !CLS writes. Never label it scroll-exclusive. */
 static Hw4ScrollMetrics s_scroll_metrics;
@@ -212,6 +216,51 @@ static bool render_band(unsigned top)
     esp_err_t e=cyd_lcd_send(0,(int)top,LCD_WIDTH,LCD_ROWS_PER_BAND);
     if(e!=ESP_OK) return fail("LCD_DMA",(int)e);
     return true;
+}
+/* The only LCD owner renders the same logical RGB565 rows used by DMA.
+ * Read-only: not a GRAM readback or a second framebuffer. The P0 decoder
+ * deliberately preserves logical orientation; physical overlays are PO gate. */
+static bool shot_render(void *ignored, unsigned y, uint16_t *scan, size_t pixels)
+{
+    (void)ignored;
+    return cpc_video_render_row(&s_video,y,scan,pixels);
+}
+static bool shot_send(void *ignored, const char *bytes, size_t length)
+{
+    (void)ignored;
+    return length <= (size_t)INT32_MAX &&
+           uart_write_bytes(UART_NUM_0,bytes,length)==(int)length;
+}
+static void shot_yield(void *ignored)
+{
+    (void)ignored;
+    vTaskDelay(1); /* feed FreeRTOS and task watchdog during >18s UART */
+}
+static bool capture_screen(const char *origin)
+{
+    char id[32];
+    const esp_app_desc_t *desc=esp_app_get_description();
+    unsigned orient=cyd_lcd_current_orientation();
+    const char *label=orient==10U ? "LCD10_UNVERIFIED" :
+                      orient==9U ? "LCD9_UNVERIFIED" : "LCD_UNKNOWN";
+    Hw4ShotStatus status;
+    uint32_t seq;
+    if(s_shot_seq==UINT32_MAX) {
+        printf("HW4-SHOT-A CAPTURE_REJECT reason=SEQ_EXHAUSTED\n");
+        return true; /* no application or editor mutation */
+    }
+    seq=s_shot_seq++;
+    (void)snprintf(id,sizeof(id),"CYD_%08lX_%lu",
+                   (unsigned long)s_shot_boot_tag,(unsigned long)seq);
+    status=hw4_shot_emit(NULL,shot_render,shot_send,shot_yield,
+                          id,seq,label,desc->version,HW4_SHOT_GIT_SHA);
+    printf("HW4-SHOT-A CAPTURE_%s trigger=%s id=%s seq=%lu "
+           "orientation=%u source=LOGICAL_RGB565LE version=%s sha=%s "
+           "tft_equivalence=ON_DEVICE_UNVERIFIED\n",
+           status==HW4_SHOT_OK ? "DONE" : "FAIL",origin,id,
+           (unsigned long)seq,orient,desc->version,HW4_SHOT_GIT_SHA);
+    memory_report("after_shot");
+    return true; /* a transport failure must not discard the BASIC program */
 }
 static bool repaint_full(void)
 {
@@ -560,7 +609,10 @@ static bool execute_line(void)
     if(!cpc_uart_console_end_line(&s_text))
         return fail("INPUT_EOL",-1);
     CpcReadyTransition transition=CPC_READY_UNCHARACTERIZED_DIRECT;
-    if(is_command(source,length,"!CLS")) {
+    const bool shot=is_command(source,length,"!SHOT");
+    if(shot) {
+        printf("HW4-SHOT-A HOST_COMMAND command=!SHOT basic_preserved=1\n");
+    } else if(is_command(source,length,"!CLS")) {
         printf("HW4-C2 DIAGNOSTIC_SCREEN_CLEAR source=!CLS "
                "program_preserved=1\n");
         hw4_scroll_observe_text(&s_scroll_metrics,(uint32_t)s_text.scrolls);
@@ -596,7 +648,9 @@ static bool execute_line(void)
     }
     /* A prompt is always available, but Ready depends on the transition.
      * Boot Ready remains painted solely by cpc_boot_console(). */
-    return apply_ready_policy(transition) && prompt();
+    if(!shot) return apply_ready_policy(transition) && prompt();
+    if(!apply_ready_policy(transition) || !prompt()) return false;
+    return capture_screen("PROMPT");
 }
 static bool uart_init(void)
 {
@@ -667,6 +721,8 @@ void app_main(void)
            "allocation=static\n", VARIABLES_CAPACITY,STRING_SLOT_BYTES,
            STRING_ARENA_CAPACITY);
     uart_line_init(&s_line);
+    /* Non-secret boot discriminator with zero added RNG/IRAM linkage. */
+    s_shot_boot_tag=esp_cpu_get_cycle_count() ^ (uint32_t)esp_timer_get_time();
     if(!uart_init()) return;
     e=cyd_lcd_backlight(true);
     if(e!=ESP_OK) { (void)fail("BACKLIGHT",(int)e); return; }
@@ -695,7 +751,17 @@ void app_main(void)
             continue;
         }
         UartLineEvent event=uart_line_feed_screen(&s_line,ch);
-        if(event==UART_LINE_E1_START_EDIT) {
+        if(event==UART_LINE_SCREENSHOT) {
+            /* HOME from E3 never submits or changes the partial editor.
+             * Finish pending TFT echo first so logical and visible frames
+             * match at the instant of the capture request. */
+            if(echo_pending) {
+                if(!repaint_dirty()) return;
+                echo_batch_record(echo_pending,false);
+                echo_pending=0U;
+            }
+            if(!capture_screen("HOME_E3")) return;
+        } else if(event==UART_LINE_E1_START_EDIT) {
             /* The router already inserted ch into empty E3. Rebase to the
              * physical E1 cursor BEFORE rendering; never feed ch again. */
             const unsigned row=s_video.cursor_row, col=s_video.cursor_column;

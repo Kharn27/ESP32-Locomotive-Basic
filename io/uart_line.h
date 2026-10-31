@@ -22,6 +22,7 @@ typedef enum {
     UART_LINE_E1_START_EDIT, /* E1 empty: first ASCII opens new E3, already inserted */
     UART_LINE_RETURN_EDIT, /* E1 ENTER: CR to next visible row, no submit */
     UART_LINE_RETURN_HOME, /* E1 CSI Home: restore E3 anchor, no CR */
+    UART_LINE_SCREENSHOT, /* CONSOLE E3 only: CSI H, editor/program untouched */
     UART_LINE_READY,
     UART_LINE_REJECTED,
     UART_LINE_IGNORED,

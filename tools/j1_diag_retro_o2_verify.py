@@ -325,9 +325,28 @@ def self_test():
         except ValueError:
             continue
         raise AssertionError("NEGATIVE_MUTANT_NOT_REJECTED_"+label)
+    # Synthetic in-memory parser unit fixtures, never stored as CPC evidence.
+    test_record = bytes.fromhex("06 00 0a 00 0e 00 00 00")
+    require(cpc_record_lines(test_record) == [10], "CPC_RAM_PARSER_FIXTURE")
+    raw_numeric = b" 12\r\n -7\r\n"
+    require(printer_probes(raw_numeric) == (12, -7),
+            "PRINTER_PARSER_FIXTURE")
+    ram_mutants = [
+        bytes.fromhex("06 00 0a 00 0e 00 00"),
+        bytes.fromhex("06 00 0a 00 0e 00 00 01"),
+        bytes.fromhex("06 00 0a 00 0e 01 00 00"),
+        bytes.fromhex("06 00 00 00 0e 00 00 00"),
+        bytes.fromhex("07 00 0a 00 0e 00 00 00")
+    ]
+    for mutant in ram_mutants:
+        try:
+            cpc_record_lines(mutant)
+        except ValueError:
+            continue
+        raise AssertionError("NEGATIVE_RAM_MUTANT_NOT_REJECTED")
     require(not (SOURCES / "manifest.json").exists(),
             "SOURCE_DIR_MUST_NOT_IMPERSONATE_ORACLE")
-    print("O2_NEGATIVE_MUTATIONS=6/6 PASS NO_GENERATED_CPC_EVIDENCE")
+    print("O2_NEGATIVE_MUTATIONS=11/11 PASS NO_GENERATED_CPC_EVIDENCE")
 
 
 def main():

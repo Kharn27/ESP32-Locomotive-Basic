@@ -230,6 +230,76 @@ static int ink_rejects_whole_step(void) {
     CHECK(f.scheduler.stop_calls==0u);
     return 0;
 }
+
+/* Pilotage #5722431501: END inside a numbered line is BSR_OK once,
+ * commits the prefix, then returns BSR_END on the following step. */
+static int inline_end_preserves_prior_print(void) {
+    CHECK(setup()==0);
+    CHECK(submit("10 PRINT \"AVANT\":END:PRINT \"INVISIBLE\"").status==BSR_OK);
+    CHECK(submit("20 PRINT \"UNREACHABLE\"").status==BSR_OK);
+    CHECK(run()==0);
+    {
+        Hw4RunSlice r=step(1u,OUTPUT,EVENTS);
+        CHECK(r.state==HW4_RUN_YIELDED && r.steps==1u);
+        CHECK(s.calls==1u && s.bytes==6u && s.pens==0u);
+        CHECK(s.order_len==6u && memcmp(s.order,"AVANT\n",6u)==0);
+    }
+    CHECK(step(2u,OUTPUT,EVENTS).state==HW4_RUN_ENDED);
+    CHECK(f.scheduler.last_result.status==BSR_END);
+    CHECK(s.calls==1u && s.bytes==6u);
+    CHECK(f.scheduler.total_steps==1u && f.scheduler.stop_calls==0u);
+    CHECK(f.runtime.state==BSR_IDLE);
+    return 0;
+}
+static int inline_end_preserves_prior_pen(void) {
+    CHECK(setup()==0);
+    CHECK(submit("10 PEN 2:PRINT \"AVANT\":END:PEN 3:PRINT \"INVISIBLE\"").status==BSR_OK);
+    CHECK(submit("20 PRINT \"UNREACHABLE\"").status==BSR_OK);
+    CHECK(run()==0);
+    CHECK(step(1u,OUTPUT,EVENTS).state==HW4_RUN_YIELDED);
+    CHECK(s.calls==1u && s.bytes==6u && s.pens==1u);
+    CHECK(s.order_len==7u && memcmp(s.order,"2AVANT\n",7u)==0);
+    CHECK(step(2u,OUTPUT,EVENTS).state==HW4_RUN_ENDED);
+    CHECK(s.pens==1u && s.bytes==6u && s.calls==1u);
+    CHECK(f.scheduler.last_result.executor_status==BE_END);
+    return 0;
+}
+/* BSR contract failure is never a CPC error. A rejected overlapping
+ * region must not consume a step or emit a single video/PRINT byte. */
+static int overlap_is_host_contract_failure(void) {
+    uint8_t image[STORAGE];
+    uint8_t output[OUTPUT];
+    BasicSessionRuntime before;
+    size_t before_written;
+    Hw4RunReceiver receiver={preflight,replay,poll,&s};
+    Hw4RunSlice result;
+    CHECK(setup()==0);
+    CHECK(submit("10 PEN 3:PRINT \"NO\"").status==BSR_OK);
+    CHECK(run()==0);
+    memcpy(image,f.image,sizeof(image));
+    memcpy(output,f.output,sizeof(output));
+    before=f.runtime;
+    f.written=42u; f.event_written=77u;
+    before_written=f.written;
+    result=hw4_run_scheduler_slice(&f.scheduler,1u,&receiver,
+             f.image,16u,&f.written,f.events,EVENTS,&f.event_written);
+    CHECK(result.state==HW4_RUN_INVALID_ARGUMENT && result.steps==0u);
+    CHECK(f.scheduler.state==HW4_RUN_INVALID_ARGUMENT);
+    CHECK(f.scheduler.last_result.status==BSR_OVERLAP);
+    CHECK(f.scheduler.last_result.executor_status==BE_OK);
+    CHECK(f.scheduler.total_steps==0u && f.scheduler.stop_calls==0u);
+    CHECK(f.runtime.state==BSR_RUNNING);
+    CHECK(memcmp(&f.runtime,&before,sizeof(before))==0);
+    CHECK(memcmp(f.image,image,sizeof(image))==0);
+    CHECK(memcmp(f.output,output,sizeof(output))==0);
+    CHECK(f.written==before_written && f.event_written==77u);
+    CHECK(s.calls==0u && s.pens==0u && s.bytes==0u && s.preflights==0u);
+    CHECK(step(1u,OUTPUT,EVENTS).state==HW4_RUN_INVALID_ARGUMENT);
+    CHECK(memcmp(f.image,image,sizeof(image))==0);
+    CHECK(bsr_stop(&f.runtime).status==BSR_OK);
+    return 0;
+}
+
 int main(void) {
     CHECK(unbounded_loop_and_break()==0);
     CHECK(break_during_callback_and_poll()==0);
@@ -238,6 +308,9 @@ int main(void) {
     CHECK(negative_arguments_and_limits()==0);
     CHECK(display_fail_stop()==0);
     CHECK(ink_rejects_whole_step()==0);
+    CHECK(inline_end_preserves_prior_print()==0);
+    CHECK(inline_end_preserves_prior_pen()==0);
+    CHECK(overlap_is_host_contract_failure()==0);
     puts("HW4-RUN-BREAK-A: 4160 real BSR steps + BREAK/END/errors PASS");
     return 0;
 }

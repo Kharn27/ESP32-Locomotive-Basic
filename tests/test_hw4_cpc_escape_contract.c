@@ -158,11 +158,13 @@ static int quarantined_byte(Hw4EscDecoder *d, Hw4EscPhase *phase,
 {
     Hw4EscKey keys[2] = { HW4_ESC_KEY_NONE, HW4_ESC_KEY_NONE };
     size_t i, count = hw4_esc_decoder_feed(d, byte, keys);
-    CHECK(count == expected_count);
-    if (count != 0u) CHECK(keys[0] == expected_first);
+    /* Route actual events BEFORE judging their number: regression on the
+     * old HEAD must expose the spurious RESUME, not only an output count. */
     for (i = 0u; i < count; ++i) {
         CHECK(hw4_esc_route(phase, keys[i]) == HW4_ESC_ACTION_NONE);
     }
+    CHECK(count == expected_count);
+    if (count != 0u) CHECK(keys[0] == expected_first);
     CHECK(*phase == HW4_ESC_PAUSED);
     return 0;
 }

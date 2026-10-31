@@ -88,7 +88,15 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
             return outcome(HW4_RUN_ENDED, steps);
         }
         if (step.status != BSR_OK) {
-            /* Preserve BSR RUNNING + cursor for #195 CPC diagnostics. */
+            /* BSR_INVALID_ARGUMENT and BSR_OVERLAP are host contracts,
+             * never BASIC faults or CPC ERR/ERL. Keep original BSRResult
+             * intact and never stop/reset: caller owns diagnosis/recovery. */
+            if (step.status == BSR_INVALID_ARGUMENT ||
+                step.status == BSR_OVERLAP) {
+                scheduler->state = HW4_RUN_INVALID_ARGUMENT;
+                return outcome(HW4_RUN_INVALID_ARGUMENT, steps);
+            }
+            /* Genuine executor failure: retain RUNNING + cursor for #195. */
             scheduler->state = HW4_RUN_EXECUTOR_ERROR;
             return outcome(HW4_RUN_EXECUTOR_ERROR, steps);
         }

@@ -1,0 +1,27 @@
+name: HW4-RUN-BREAK-A standalone C99
+on:
+  push:
+    branches:
+      - feat/hw4-run-break-a-quantum-c99
+  pull_request:
+    paths:
+      - 'integration/hw4_run_scheduler.*'
+      - 'tests/test_hw4_run_scheduler.c'
+      - 'tests/run_hw4_run_scheduler.sh'
+      - '.github/workflows/hw4-run-break-a.yml'
+  workflow_dispatch:
+jobs:
+  portable-runtime:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        sanitize: ['off', 'on']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real BSR 4160-step BREAK tests
+        env:
+          CC: ${{ matrix.compiler }}
+          SANITIZERS: ${{ matrix.sanitize == 'on' && '1' || '' }}
+        run: sh tests/run_hw4_run_scheduler.sh

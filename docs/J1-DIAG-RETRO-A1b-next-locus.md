@@ -23,7 +23,7 @@ Au `FOR` ligne 10, `for_match()` examine structurellement les enregistrements su
 
 **Politique centrale :** `io/cpc_diag_policy_step()` exige `BSR_EXECUTOR_ERROR`, RUNNING, programme cohérent, record courant valide, cause NEXT sélectionnée et résultat de relecture identique ; assigne alors catégorie et provenance typées `CPC_DIAG_NEXT_UNEXPECTED / CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE`. Aucune extension à `BE_FOR_WITHOUT_NEXT`, `BE_INTEGER_OVERFLOW` ou autre erreur. `format_step()` produit **exactement** `Unexpected NEXT in <n>\n`, formatage décimal borné sans allocation, préflight de capacité et sans écriture partielle. `CPC_DIAG_HOST_GENERIC` conserve `ERROR\n` lorsqu'une origine ne correspond pas ; une combinaison fabriquée catégorie/provenance est rejetée.
 
-**CONSOLE :** seule la chaîne de provenance des logs `CPC_NEXT_ORACLE` est ajoutée au raccord A1a **existant**, avant `bsr_stop()`. Le diagnostic de l'écran vient toujours de `cpc_diag_policy_write_step` ; ni double `Ready`, ni nouveau routeur/scheduler/quantum/BREAK/DMA/UART. C'est un chevauchement de **une ligne logique** avec #226 dans `hw4_c2_console.c`, à résoudre contradictoirement par Pilotage en cas d'évolution de main.
+**CONSOLE :** le raccord A1a **déjà fusionné** appelle `cpc_diag_policy_step()` avant `bsr_stop()`, puis `cpc_diag_policy_write_step()` ; ce chemin imprime le texte CPC de NEXT sans modifier le firmware. Son log de provenance A1a conserve le libellé générique (`HOST_NOT_CPC_ERR`) pour NEXT, tandis que la catégorie/provenance **typées exactes** sont disponibles dans la politique ; cette limite de télémétrie n'affecte pas le rendu. **CI-ARCH interdit CORE+HW4 dans une même PR** : un premier commit de log a été annulé, différence firmware finale nulle. Aucun nouveau scheduler, Ready, quantum, BREAK, DMA, UART.
 
 ## Tests RED→GREEN et preuves à relever sur HEAD final
 
@@ -104,4 +104,4 @@ Attendus **par scénario** : (1) `BEFORE`, puis **`Unexpected NEXT in 20`** et *
 
 ## Exclusions et barrières
 
-Aucune modification des oracles historiques, `CMakeLists.txt`, entrées BASIC, exécution FOR/NEXT, registre ERR/ERL, A1a GOSUB/RETURN, PEN #203, scheduler RUN-BREAK #226, ESC-BREAK #232, vidéo ou firmware au-delà de la seule étiquette de provenance au raccord A1a. Aucun A2 ni PAPER B2. Après PR : revue et décision exclusivement Pilotage.
+Aucune modification des oracles historiques, `CMakeLists.txt`, firmware, entrées BASIC, exécution FOR/NEXT, registre ERR/ERL, A1a GOSUB/RETURN, PEN #203, scheduler RUN-BREAK #226, ESC-BREAK #232 ou vidéo. Aucun A2 ni PAPER B2. Après PR : revue et décision exclusivement Pilotage.

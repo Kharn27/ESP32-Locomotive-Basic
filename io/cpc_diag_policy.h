@@ -36,6 +36,10 @@ typedef struct {
  * the real stored line BEFORE bsr_stop(). A standalone BEStatus or a renderer
  * rejection is never sufficient evidence for a CPC diagnostic.
  * Only PEN 16 and PEN -1 have an independent CPC error witness. */
+/* Read-only provenance query, no BASIC execution/ERR state mutation.
+ * On failure *line_number is unchanged. Bounded lexical FOR/NEXT scan. */
+bool cpc_diag_policy_next_locus(const BasicExecutor *executor, BEStatus reason,
+                                 uint16_t *line_number);
 CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
                                         const BasicSessionRuntime *runtime);
 /* One LF-terminated diagnostic. Host fallback is ERROR\n, with no fabricated

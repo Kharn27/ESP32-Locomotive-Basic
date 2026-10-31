@@ -260,10 +260,10 @@ def audit_paper_permanent(sources):
     demand(len(on) == 1 and on[0].strip() == expected.strip(),
            "PAPER_PERMANENT_TRIGGER")
     demand(yml.count("\njobs:\n") == 1, "PAPER_PERMANENT_JOBS")
-    matches = list(re.finditer(r"(?m)^  sealed-evidence:\s*$", yml))
+    matches = list(re.finditer(r"(?m)^  sealed-evidence:[ \t]*$", yml))
     demand(len(matches) == 1, "PAPER_SEALED_JOB_MISSING")
     tail = yml[matches[0].end():]
-    next_job = re.search(r"(?m)^  [a-zA-Z][\w-]*:\s*$", tail)
+    next_job = re.search(r"(?m)^  [a-zA-Z][\w-]*:[ \t]*$", tail)
     job = tail[:next_job.start()] if next_job else tail
     head, separator, steps = job.partition("\n    steps:\n")
     demand(bool(separator) and

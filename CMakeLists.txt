@@ -554,6 +554,13 @@ if(BUILD_TESTING)
     target_link_libraries(test_cpc_uart_console PRIVATE cpc_uart_console uart_line)
     add_test(NAME hw4_c2_screen_paging COMMAND test_cpc_uart_console)
 
+    # J1-DIAG-RETRO-A1a: screen-oracled GOSUB/RETURN, negative GOTO/IF/PEN.
+    add_executable(test_j1_diag_retro_a1a tests/test_j1_diag_retro_a1a.c)
+    target_link_libraries(test_j1_diag_retro_a1a PRIVATE
+                          cpc_diag_policy cpc_ready_policy basic_session_runtime)
+    add_test(NAME j1_diag_retro_a1a_gosub_return
+             COMMAND test_j1_diag_retro_a1a)
+
     add_executable(test_hw4_diag_a tests/test_hw4_diag_a.c)
     target_link_libraries(test_hw4_diag_a PRIVATE
                           cpc_diag_policy cpc_ready_policy cpc_uart_console

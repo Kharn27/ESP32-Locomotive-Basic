@@ -82,6 +82,8 @@ docker run --rm --network none -v "$PWD:/project" -w /project \
   ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c \
   bash -lc '
     set -euo pipefail
+    git config --global --add safe.directory /project
+    git config --global --add safe.directory /project/tests/oracles/caprice32
     cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
     cmake -S . -B /tmp/o2-c99 -DBP_SANITIZERS=OFF
     cmake --build /tmp/o2-c99 --target basic_program_image_cli -j2

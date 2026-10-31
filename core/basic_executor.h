@@ -1,7 +1,6 @@
 #ifndef BASIC_EXECUTOR_H
 #define BASIC_EXECUTOR_H
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include "basic_program.h"
@@ -161,13 +160,5 @@ BEStatus be_step_events(BasicExecutor *executor, uint8_t *output,
                         size_t output_capacity, size_t *written,
                         BEVideoEvent *events, size_t event_capacity,
                         size_t *event_written);
-
-/* J1-DIAG-RETRO-A1b: consult the exact NEXT record that caused a failed
- * BE_NEXT_* step. Re-evaluates only the read-only validation pass, including
- * FOR's structural scan; does not advance, commit or cache error state.
- * Returns false without modifying *line_number if provenance diverges.
- * This is NOT a CPC numeric ERR/ERL interface. */
-bool be_next_fault_line(const BasicExecutor *executor, BEStatus reason,
-                        uint16_t *line_number);
 
 #endif

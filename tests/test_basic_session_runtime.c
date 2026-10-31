@@ -365,6 +365,41 @@ static int test_preserved_session_error(void)
     return 0;
 }
 
+
+/* J1.19-B1 deliberately adds no PAPER execution or CYD event. Even the
+ * lexically accepted out-of-range CPC forms remain unknown to the executor.
+ * A failed RUN step must keep the program, cursor and output unchanged. */
+static int test_paper_b1_run_unsupported(void)
+{
+    static const char *const sources[] = {
+        "20 PAPER 0", "20 PAPER 1", "20 PAPER 2", "20 PAPER 3",
+        "20 PAPER 4", "20 PAPER 15", "20 PAPER 16", "20 PAPER -1"
+    };
+    size_t i;
+    for (i = 0u; i < sizeof(sources)/sizeof(sources[0]); ++i) {
+        Fixture f;
+        Snapshot previous;
+        BSRResult r;
+        CHECK(setup(&f) == 0);
+        CHECK(submit(&f, "10 PRINT \"BEFORE\"").status == BSR_OK);
+        CHECK(submit(&f, sources[i]).status == BSR_OK);
+        CHECK(submit(&f, "30 END").status == BSR_OK);
+        CHECK(submit(&f, "RUN").status == BSR_OK);
+        CHECK(advance(&f, sizeof(f.output)).status == BSR_OK);
+        f.written = 888u;
+        memset(f.output, 0x5a, sizeof(f.output));
+        save(&f, &previous);
+        r = advance(&f, sizeof(f.output));
+        CHECK(r.status == BSR_EXECUTOR_ERROR);
+        CHECK(r.executor_status == BE_UNKNOWN_TOKEN);
+        CHECK(same(&f, &previous) == 0);
+        CHECK(bsr_stop(&f.runtime).status == BSR_OK);
+        CHECK(submit(&f, "LIST").status == BSR_OK);
+        CHECK(f.written != 0u);
+    }
+    return 0;
+}
+
 int main(void)
 {
     CHECK(test_end_to_end() == 0);
@@ -372,6 +407,7 @@ int main(void)
     CHECK(test_list_and_new_while_running() == 0);
     CHECK(test_stop_and_infinite_loop() == 0);
     CHECK(test_executor_errors() == 0);
+    CHECK(test_paper_b1_run_unsupported() == 0);
     CHECK(test_invalid_arguments_and_aliasing() == 0);
     CHECK(test_preserved_session_error() == 0);
     puts("basic_session_runtime: OK");

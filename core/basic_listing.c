@@ -19,6 +19,7 @@ typedef enum {
     BL_ST_NEXT,
     BL_ST_PEN,
     BL_ST_INK,
+    BL_ST_PAPER,
     BL_ST_EMPTY
 } BLStatement;
 
@@ -383,6 +384,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
         case 0xbbu: statement = BL_ST_PEN; status = append_word(out, "PEN"); break;
         case 0xa2u: statement = BL_ST_INK; status = append_word(out, "INK"); break;
+        case 0xbau: statement = BL_ST_PAPER; status = append_word(out, "PAPER"); break;
         case 0xa0u: statement = BL_ST_GOTO; status = append_word(out, "GOTO"); break;
         case 0x9fu: statement = BL_ST_GOSUB; status = append_word(out, "GOSUB"); break;
         case 0xc9u: status = append_word(out, "RETURN"); break;
@@ -1012,6 +1014,20 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             } else {
                 return BL_BAD_SEQUENCE;
             }
+        } else if (statement == BL_ST_PAPER) {
+            int paper;
+            if (pos == length || body[pos] == 0x01u)
+                return BL_BAD_SEQUENCE;
+            if (pos == space_start) {
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) return status;
+            }
+            status = ink_literal(body, length, &pos, out, 16u, &paper);
+            if (status != BL_OK) return status;
+            /* Inverse restricted to the eight independently sealed CPC
+             * L20 records; never accept unmeasured colour literals. */
+            if (!(paper == -1 || (paper >= 0 && paper <= 4) ||
+                  paper == 15 || paper == 16)) return BL_BAD_SEQUENCE;
         } else if (statement == BL_ST_INK) {
             int pen_index, colour, third;
             if (pos == length || body[pos] == 0x01u)

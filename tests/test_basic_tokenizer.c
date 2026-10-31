@@ -252,12 +252,77 @@ static int test_program_integration(void)
     return 0;
 }
 
+
+/* J1.19-B1: independent CPC6128 PAPER L20 records, original/repeat J1.19-A.
+ * Numeric 16 and -1 are lexical positives, never runtime validation. */
+static int test_paper_b1(void)
+{
+    static const struct {
+        const char *source;
+        uint8_t body[4];
+        size_t length;
+    } records[] = {
+        {"PAPER 0",  {0xbau, ' ', 0x0eu},         3u},
+        {"PAPER 1",  {0xbau, ' ', 0x0fu},         3u},
+        {"PAPER 2",  {0xbau, ' ', 0x10u},         3u},
+        {"PAPER 3",  {0xbau, ' ', 0x11u},         3u},
+        {"PAPER 4",  {0xbau, ' ', 0x12u},         3u},
+        {"PAPER 15", {0xbau, ' ', 0x19u, 0x0fu}, 4u},
+        {"PAPER 16", {0xbau, ' ', 0x19u, 0x10u}, 4u},
+        {"PAPER -1", {0xbau, ' ', 0xf5u, 0x0fu}, 4u}
+    };
+    static const uint8_t spaced[] = {' ', ' ', 0xbau, ' ', ' ', 0x10u, ' ', ' '};
+    static const uint8_t sequence[] = {0xbau, ' ', 0x10u, 0x01u,
+                                       0xbfu, ' ', 0x0fu};
+    static const uint8_t rem[] = {0xc5u, ' ', 'P','A','P','E','R',' ', '2'};
+    static const uint8_t quoted[] = {0xbfu, ' ', '"',
+                                     'P','A','P','E','R',' ', '2','"'};
+    static const uint8_t apostrophe[] = {0x01u, 0xc0u, ' ',
+                                         'P','A','P','E','R',' ', '2'};
+    uint8_t out[16], snapshot[16];
+    size_t i, written = 99u;
+    for (i = 0u; i < sizeof(records)/sizeof(records[0]); ++i) {
+        CHECK(expect_bytes((const uint8_t *)records[i].source,
+                           strlen(records[i].source), records[i].body,
+                           records[i].length) == 0);
+    }
+    CHECK(expect_bytes((const uint8_t *)"  paper  2  ", 12u,
+                       spaced, sizeof(spaced)) == 0);
+    TEXT("PAPER 2:PRINT 1", sequence);
+    TEXT("REM PAPER 2", rem);
+    TEXT("PRINT \"PAPER 2\"", quoted);
+    TEXT("' PAPER 2", apostrophe);
+    REJECT("PAPER", BT_MALFORMED_INPUT);
+    REJECT("PAPER  ", BT_MALFORMED_INPUT);
+    REJECT("PAPER 5", BT_UNSUPPORTED_CONSTRUCT);
+    REJECT("PAPER 14", BT_UNSUPPORTED_CONSTRUCT);
+    REJECT("PAPER 17", BT_NUMBER_OUT_OF_RANGE);
+    REJECT("PAPER -2", BT_UNSUPPORTED_CONSTRUCT);
+    REJECT("PAPER -", BT_UNSUPPORTED_CONSTRUCT);
+    REJECT("PAPER A%", BT_MALFORMED_INPUT);
+    REJECT("PAPER 1+1", BT_UNSUPPORTED_CONSTRUCT);
+    REJECT("PAPER #8,2", BT_MALFORMED_INPUT);
+    REJECT("PAPER2", BT_UNSUPPORTED_CONSTRUCT);
+    REJECT("PAPERX 2", BT_UNSUPPORTED_CONSTRUCT);
+    REJECT("PAPER 2.0", BT_UNSUPPORTED_CONSTRUCT);
+    memset(out, 0x5a, sizeof(out));
+    memcpy(snapshot, out, sizeof(out));
+    CHECK(bt_tokenize((const uint8_t *)"PAPER 16", 8u,
+                      out, 3u, &written) == BT_NO_SPACE);
+    CHECK(written == 99u && memcmp(out, snapshot, sizeof(out)) == 0);
+    CHECK(bt_tokenize((const uint8_t *)"PAPER 16", 8u,
+                      out, 4u, &written) == BT_OK);
+    CHECK(written == 4u && memcmp(out, records[6].body, 4u) == 0);
+    return 0;
+}
+
 int main(void)
 {
     CHECK(test_vectors() == 0);
     CHECK(test_rejections() == 0);
     CHECK(test_capacity_and_arguments() == 0);
     CHECK(test_program_integration() == 0);
+    CHECK(test_paper_b1() == 0);
     puts("basic_tokenizer: all tests passed");
     return 0;
 }

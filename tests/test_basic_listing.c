@@ -283,6 +283,184 @@ static int test_bad_images(void)
     return 0;
 }
 
+
+/* J1.19-B1: load the *existing* J1.19-A original and repeat capture.json,
+ * not an invented CPC dump. Test lives in the existing basic_listing CTest,
+ * leaving the root CMake file untouched while HW4-RUN-BREAK-B owns it. */
+static int paper_hex_digit(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return -1;
+}
+
+static int paper_hex_field(const char *line, const char *key,
+                           uint8_t *data, size_t capacity, size_t *length)
+{
+    const char *p = strstr(line, key);
+    size_t n = 0u;
+    if (p == NULL) return 0;
+    p += strlen(key);
+    while (*p != '\0' && *p != '"') {
+        int high, low;
+        if (*p == ' ') { ++p; continue; }
+        if (p[1] == '\0' || p[1] == '"' || n == capacity)
+            return -1;
+        high = paper_hex_digit(p[0]);
+        low = paper_hex_digit(p[1]);
+        if (high < 0 || low < 0) return -1;
+        data[n++] = (uint8_t)((high << 4) | low);
+        p += 2;
+    }
+    if (*p != '"' || n == 0u) return -1;
+    *length = n;
+    return 1;
+}
+
+static int paper_capture(const char *session, const char *name,
+                         uint8_t *record, size_t *record_len,
+                         uint8_t *printer, size_t *printer_len)
+{
+    char path[1024], line[4096];
+    const char *marker = strstr(__FILE__, "tests/test_basic_listing.c");
+    FILE *f;
+    int got_record = 0, got_printer = 0;
+    if (marker != NULL) {
+        size_t prefix = (size_t)(marker - __FILE__);
+        if (prefix > 900u) return 1;
+        if (snprintf(path, sizeof(path),
+                     "%.*stests/fixtures/cpc6128/j1_19_a_paper/%s/%s/capture.json",
+                     (int)prefix, __FILE__, session, name) < 0) return 1;
+    } else {
+        if (snprintf(path, sizeof(path),
+                     "../tests/fixtures/cpc6128/j1_19_a_paper/%s/%s/capture.json",
+                     session, name) < 0) return 1;
+    }
+    f = fopen(path, "rb");
+    if (f == NULL) {
+        fprintf(stderr, "J1.19-B1 fixture absent: %s\n", path);
+        return 1; /* no skip or substitute oracle */
+    }
+    while (fgets(line, sizeof(line), f) != NULL) {
+        int rc = paper_hex_field(line, "\"20\": \"", record, 16u, record_len);
+        int pc = paper_hex_field(line, "\"list_printer_hex\": \"",
+                                 printer, 1024u, printer_len);
+        if (rc < 0 || pc < 0) { fclose(f); return 1; }
+        if (rc == 1) ++got_record;
+        if (pc == 1) ++got_printer;
+    }
+    if (ferror(f)) { fclose(f); return 1; }
+    fclose(f);
+    return got_record == 1 && got_printer == 1 ? 0 : 1;
+}
+
+static int test_paper_b1_oracle(void)
+{
+    static const struct {
+        const char *case_id;
+        const char *value;
+        uint8_t encoded[2];
+        size_t encoded_length;
+    } samples[] = {
+        {"P00", "0",  {0x0eu},         1u},
+        {"P01", "1",  {0x0fu},         1u},
+        {"P02", "2",  {0x10u},         1u},
+        {"P03", "3",  {0x11u},         1u},
+        {"P04", "4",  {0x12u},         1u},
+        {"P15", "15", {0x19u, 0x0fu}, 2u},
+        {"P16", "16", {0x19u, 0x10u}, 2u},
+        {"PN1", "-1", {0xf5u, 0x0fu}, 2u}
+    };
+    static const char *const sessions[] = {"original", "repeat"};
+    size_t i, session;
+    for (i = 0u; i < sizeof(samples)/sizeof(samples[0]); ++i) {
+        char source[32], expected_list[40], expected_printer[40];
+        uint8_t body[16], roundtrip[16], output[64], exported[64];
+        uint8_t storage[64], record[16], printer[1024], listed[64];
+        size_t body_len = 99u, round_len = 0u, out_len = 0u, exported_len = 0u;
+        size_t n, record_len, printer_len, j, expected_n;
+        BasicProgram program;
+        CHECK(snprintf(source, sizeof(source), "PAPER %s", samples[i].value) > 0);
+        CHECK(snprintf(expected_list, sizeof(expected_list),
+                       "20 PAPER %s\n", samples[i].value) > 0);
+        CHECK(snprintf(expected_printer, sizeof(expected_printer),
+                       "20 PAPER %s\r\n", samples[i].value) > 0);
+        CHECK(bt_tokenize((const uint8_t *)source, strlen(source),
+                          body, sizeof(body), &body_len) == BT_OK);
+        CHECK(body_len == 2u + samples[i].encoded_length);
+        CHECK(body[0] == 0xbau && body[1] == (uint8_t)' ');
+        CHECK(memcmp(body + 2u, samples[i].encoded,
+                     samples[i].encoded_length) == 0);
+        CHECK(bp_init(&program, storage, sizeof(storage)) == BP_OK);
+        CHECK(bp_put(&program, 20u, body, body_len) == BP_OK);
+        CHECK(bp_export(&program, exported, sizeof(exported), &exported_len) == BP_OK);
+        CHECK(bl_list_program(&program, listed, sizeof(listed), &out_len) == BL_OK);
+        CHECK(out_len == strlen(expected_list));
+        CHECK(memcmp(listed, expected_list, out_len) == 0);
+        CHECK(bl_detokenize(body, body_len, output, sizeof(output), &n) == BL_OK);
+        CHECK(n == strlen(source) && memcmp(output, source, n) == 0);
+        CHECK(bt_tokenize(listed + 3u, out_len - 4u, roundtrip,
+                          sizeof(roundtrip), &round_len) == BT_OK);
+        CHECK(round_len == body_len && memcmp(roundtrip, body, body_len) == 0);
+        for (session = 0u; session < 2u; ++session) {
+            int saw_listing = 0;
+            CHECK(paper_capture(sessions[session], samples[i].case_id,
+                                record, &record_len, printer, &printer_len) == 0);
+            CHECK(record_len == body_len + 5u);
+            CHECK(record[0] == (uint8_t)record_len && record[1] == 0u);
+            CHECK(record[2] == 20u && record[3] == 0u);
+            CHECK(record[record_len - 1u] == 0u);
+            CHECK(exported_len == record_len + 2u);
+            CHECK(memcmp(record, exported, record_len) == 0);
+            CHECK(exported[record_len] == 0u && exported[record_len+1u] == 0u);
+            expected_n = strlen(expected_printer);
+            for (j = 0u; j + expected_n <= printer_len; ++j) {
+                if ((j == 0u || printer[j-1u] == (uint8_t)'\n') &&
+                    memcmp(printer + j, expected_printer, expected_n) == 0)
+                    saw_listing = 1;
+            }
+            CHECK(saw_listing);
+        }
+    }
+    return 0;
+}
+
+static int test_paper_b1_rejections(void)
+{
+    static const struct {
+        uint8_t body[5];
+        size_t length;
+        BLStatus expected;
+    } cases[] = {
+        {{0xbau, ' ', 0x19u},          3u, BL_TRUNCATED},
+        {{0xbau, ' ', 0xf5u},          3u, BL_TRUNCATED},
+        {{0xbau, ' ', 0x88u},          3u, BL_UNKNOWN_TOKEN},
+        {{0xbau, ' ', 0x13u},          3u, BL_BAD_SEQUENCE},
+        {{0xbau, ' ', 0x19u, 0x11u},   4u, BL_BAD_SEQUENCE},
+        {{0xbau, ' ', 0x19u, 0x09u},   4u, BL_BAD_SEQUENCE},
+        {{0xbau, ' ', 0xf5u, 0x10u},   4u, BL_BAD_SEQUENCE},
+        {{0xbau},                      1u, BL_BAD_SEQUENCE}
+    };
+    uint8_t out[64], original[64], storage[8], body[] = {0xbau,' ',0x19u,0x10u};
+    BasicProgram small;
+    size_t n = 222u, i;
+    for (i = 0u; i < sizeof(cases)/sizeof(cases[0]); ++i) {
+        memset(out, 0x57, sizeof(out));
+        memcpy(original, out, sizeof(out));
+        CHECK(bl_detokenize(cases[i].body, cases[i].length,
+                            out, sizeof(out), &n) == cases[i].expected);
+        CHECK(n == 222u && memcmp(out, original, sizeof(out)) == 0);
+    }
+    CHECK(bl_detokenize(body, sizeof(body), out, 7u, &n) == BL_NO_SPACE);
+    CHECK(n == 222u && memcmp(out, original, sizeof(out)) == 0);
+    CHECK(bp_init(&small, storage, sizeof(storage)) == BP_OK);
+    memcpy(original, storage, sizeof(storage));
+    CHECK(bp_put(&small, 20u, body, sizeof(body)) == BP_NO_SPACE);
+    CHECK(small.size == 2u && memcmp(storage, original, sizeof(storage)) == 0);
+    return 0;
+}
+
 int main(void)
 {
     CHECK(test_keywords_and_numbers() == 0);
@@ -292,6 +470,8 @@ int main(void)
     CHECK(test_round_trip() == 0);
     CHECK(test_listing() == 0);
     CHECK(test_bad_images() == 0);
+    CHECK(test_paper_b1_oracle() == 0);
+    CHECK(test_paper_b1_rejections() == 0);
     puts("basic_listing: OK");
     return 0;
 }

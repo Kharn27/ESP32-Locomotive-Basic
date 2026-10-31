@@ -12,7 +12,7 @@ typedef struct {
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
     ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT, ST_PEN, ST_INK,
-    ST_CLS
+    ST_PAPER, ST_CLS
 } BTStatement;
 
 typedef struct {
@@ -27,6 +27,7 @@ static const BTKeyword keywords[] = {
     {"CLS",   0x8au, ST_CLS}, /* J1.21-A CPC6128 RAM oracle */
     {"PEN",   0xbbu, ST_PEN},
     {"INK",   0xa2u, ST_INK},
+    {"PAPER", 0xbau, ST_PAPER}, /* J1.19-A sealed CPC L20 */
     {"LIST",  0xa7u, ST_LIST},
     {"RUN",   0xcau, ST_RUN},
     {"NEW",   0xb1u, ST_NEW},
@@ -596,6 +597,15 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             } else {
                 return BT_UNSUPPORTED_CONSTRUCT;
             }
+        } else if (statement == ST_PAPER) {
+            int paper;
+            /* J1.19-B1: lexical only. CPC stores 16 and -1 even though
+             * executing either fails. Do not infer colour/runtime support. */
+            status = ink_literal(source, length, &index, out, 16u, &paper);
+            if (status != BT_OK) return status;
+            if (!(paper == -1 || (paper >= 0 && paper <= 4) ||
+                  paper == 15 || paper == 16))
+                return BT_UNSUPPORTED_CONSTRUCT;
         } else if (statement == ST_INK) {
             int pen_index, colour, third;
             /* Only standalone literal A2 forms; the third literal is a

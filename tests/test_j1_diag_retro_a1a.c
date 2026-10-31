@@ -294,7 +294,7 @@ static void test_next_provenance(void)
     memcpy(saved_program, f.storage, sizeof saved_program);
     memcpy(saved_output, f.output, sizeof saved_output);
     memcpy(saved_events, f.events, sizeof saved_events);
-    assert(be_next_fault_line(&f.runtime.executor,
+    assert(cpc_diag_policy_next_locus(&f.runtime.executor,
                               result.executor_status, &locus));
     assert(locus == 30U);
     assert(memcmp(&saved_runtime, &f.runtime, sizeof saved_runtime) == 0);
@@ -304,7 +304,7 @@ static void test_next_provenance(void)
     assert(memcmp(saved_output, f.output, sizeof saved_output) == 0);
     assert(memcmp(saved_events, f.events, sizeof saved_events) == 0);
     locus = 991U;
-    assert(!be_next_fault_line(&f.runtime.executor, BE_MISSING_TARGET, &locus));
+    assert(!cpc_diag_policy_next_locus(&f.runtime.executor, BE_MISSING_TARGET, &locus));
     assert(locus == 991U);
     fabricated = result;
     fabricated.executor_status = BE_NEXT_WITHOUT_FOR;

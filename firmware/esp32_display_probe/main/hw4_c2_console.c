@@ -542,18 +542,20 @@ static bool basic_run(void)
              * authentic numbered BASIC record. Resolve BEFORE bsr_stop(). */
             CpcStepDiagnostic diagnostic=cpc_diag_policy_step(
                 r,&s_basic.runtime);
+            const char *diag_origin=
+                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE ?
+                    "CPC_PEN_ORACLE" :
+                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE ?
+                    "CPC_GOSUB_ORACLE" :
+                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE ?
+                    "CPC_RETURN_ORACLE" : "HOST_NOT_CPC_ERR";
             printf("HW4-PEN-A STEP_DIAG category=%s events_applied=0 "
                    "print_applied=0 origin=%s basic_line=%u host_cpc_err=none\n",
-                   pen_diag,
-                   diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE ?
-                       "CPC_PEN_ORACLE" : "HOST_NOT_CPC_ERR",
-                   (unsigned)diagnostic.line_number);
+                   pen_diag,diag_origin,(unsigned)diagnostic.line_number);
             printf("HW4-DIAG-PEN-A DIAG_POLICY category=%s line=%u "
                    "source=%s message=%s\n",
                    cpc_diag_policy_category(diagnostic.category),
-                   (unsigned)diagnostic.line_number,
-                   diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE ?
-                       "NATIVE_PEN_ORACLE" : "HOST",
+                   (unsigned)diagnostic.line_number,diag_origin,
                    cpc_diag_policy_message(diagnostic.category));
             (void)bsr_stop(&s_basic.runtime);
             if(!cpc_diag_policy_write_step(&s_text,diagnostic))

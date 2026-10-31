@@ -635,8 +635,8 @@ static BEStatus comment_end(const uint8_t *body, size_t length, size_t pos,
     return BE_OK;
 }
 
-/* A ROM-colour limit and a renderer-mode palette limit are NOT equivalent.
- * Only 0..4 and 15 have positive oracle A measurements. */
+/* J1.17-A and C-A attest PEN 0..15 as logical CPC operands.
+ * A renderer-mode palette index is a different, unmeasured contract. */
 static BEStatus pen_argument(const uint8_t *body, size_t length,
                              size_t *pos, uint8_t *pen)
 {
@@ -660,7 +660,6 @@ static BEStatus pen_argument(const uint8_t *body, size_t length,
         return unexpected(token);
     }
     if (value == 16u) return BE_INVALID_PEN;
-    if (value >= 5u && value <= 14u) return BE_UNSUPPORTED; /* UNVERIFIED */
     *pen = (uint8_t)value;
     return BE_OK;
 }

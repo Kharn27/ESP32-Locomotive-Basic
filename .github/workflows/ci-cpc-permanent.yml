@@ -160,6 +160,15 @@ jobs:
             echo 'J1.20-A ABS_ARCHIVE_PENDING — NO CPC ORACLE PASS CLAIM'
           fi
 
+      - name: J1.19-A PAPER 264 external seals (permanent, no Caprice32)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_19_a_paper_oracle.py --check-sources
+          python3 tools/j1_19_a_paper_oracle.py \
+            --evidence tests/fixtures/cpc6128/j1_19_a_paper \
+            --permanent --self-test
+
   pen-cpc-acquisition:
     if: (github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-17-a-pen-cpc' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref_name == 'oracle/j1-17-a-pen-cpc')
     runs-on: ubuntu-24.04

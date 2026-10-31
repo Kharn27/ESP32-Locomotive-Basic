@@ -1,0 +1,23 @@
+name: J1-DIAG-RETRO-A0 exact-SHA proof PR224
+on:
+  push:
+    branches:
+      - ci/proof-j1-diag-retro-a0-224
+permissions:
+  contents: read
+jobs:
+  exact-head-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c737ee1ca56a5fb58935772b3a20b48f5f4c6ae3
+          persist-credentials: false
+      - name: Run precisely the requested commands on PR224 HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "c737ee1ca56a5fb58935772b3a20b48f5f4c6ae3"
+          python3 tools/j1_diag_retro_a0_verify.py --self-test

@@ -23,7 +23,7 @@ CASES = {
     'E04': (['10 GOTO 10'], ['cpc', 'cpc', 'shot:break', 'text:CONT\n', 'shot:after_CONT', 'cpc', 'cpc', 'shot:break_after_CONT']),
     'E05': (['10 PRINT "A":GOTO 20', '20 PRINT "B":GOTO 10'], ['shot:running', 'cpc', 'shot:paused', 'shot:pause_persistent', 'cpc', 'shot:break']),
     'E10': ([], ['shot:boot', 'text:CONT\n', 'shot:without_context']),
-    'E07_candidate': (['10 A%=A%+1:LOCATE 1,1:PRINT A%;:GOTO 10'], ['shot:running', 'cpc', 'shot:paused', 'cpc', 'shot:break', 'text:PRINT A%\n', 'shot:variable', 'text:CONT\n', 'shot:after_CONT', 'cpc', 'cpc', 'shot:after_second_break']),
+    'E07_candidate': (['10 A%=A%+1:GOTO 10'], ['shot:running', 'cpc', 'shot:paused', 'cpc', 'shot:break', 'text:PRINT A%\n', 'shot:variable', 'text:CONT\n', 'shot:after_CONT', 'cpc', 'cpc', 'shot:after_second_break', 'text:PRINT A%\n', 'shot:variable_after_cont']),
 }
 
 

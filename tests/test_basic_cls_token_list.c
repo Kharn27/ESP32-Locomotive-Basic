@@ -135,7 +135,7 @@ static int oracle_case(const char *root,const char *name,int paper)
 }
 static int lexical_cases(void)
 {
-    static const struct {
+    const struct {
         const char *input;
         const uint8_t *expected;
         size_t count;

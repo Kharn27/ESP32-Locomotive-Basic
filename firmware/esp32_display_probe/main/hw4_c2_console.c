@@ -633,7 +633,14 @@ static bool execute_line(void)
         transition=CPC_READY_HOST_CLS; /* screen-only, no CPC equivalent */
     } else if(is_command(source,length,"!DEMO")) {
         if(!diagnostic_demo()) return false;
-        transition=CPC_READY_HOST_DEMO; /* retain existing host behavior */
+        if(s_run_active) {
+            s_run_ready_transition=CPC_READY_HOST_DEMO;
+            return true;
+        }
+        transition=CPC_READY_HOST_DEMO;
+    } else if(is_command(source,length,"!BREAK")) {
+        printf("HW4-RUN-B HOST_BREAK_NOOP reason=NOT_RUNNING\n");
+        transition=CPC_READY_UNCHARACTERIZED_DIRECT;
     } else {
         size_t a=0U,b=length;
         while(a<b && source[a]==' ') ++a;
@@ -647,8 +654,10 @@ static bool execute_line(void)
         if(had_diagnostic) {
             transition=CPC_READY_BASIC_DIAGNOSTIC;
         } else {
-            if(run && s_basic.runtime.state==BSR_RUNNING)
+            if(run && s_basic.runtime.state==BSR_RUNNING) {
                 if(!basic_run()) return false;
+                return true; /* RUN yields, no Ready/prompt until terminal */
+            }
             transition=run ? CPC_READY_RUN_RETURN :
                        list ? CPC_READY_LIST_RETURN :
                        new_program ? CPC_READY_NEW_RETURN :

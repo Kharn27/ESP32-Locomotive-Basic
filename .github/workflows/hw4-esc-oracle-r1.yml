@@ -1,0 +1,63 @@
+name: HW4-ESC-ORACLE-R1 independent CPC keyboard candidate
+on:
+  pull_request:
+    paths:
+      - 'tests/oracles/hw4_esc_r1_capture.py'
+      - 'docs/HW4-ESC-ORACLE-R1.md'
+      - '.github/workflows/hw4-esc-oracle-r1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  acquire:
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.head_ref == 'oracle/hw4-esc-r1-cpc' &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref_name == 'oracle/hw4-esc-r1-cpc')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+      - name: Pin CPC source, ROM, interpreter and PR HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          python3 -m py_compile tests/oracles/hw4_esc_r1_capture.py
+      - name: Acquire each ROM-backed ESC session and original PNGs (candidates only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/hw4_esc_r1_capture.py \
+            --caprice tests/oracles/caprice32 \
+            --output /tmp/hw4-esc-r1-captures
+      - name: Archive candidate original PNGs, source stamps and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hw4-esc-oracle-r1-candidate-${{ github.run_id }}
+          path: /tmp/hw4-esc-r1-captures/
+          if-no-files-found: warn
+          retention-days: 30

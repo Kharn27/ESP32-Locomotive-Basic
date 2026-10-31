@@ -455,6 +455,24 @@
       "priority": "AUDIT",
       "gap": "pas de diagnostic ROM déductible du seul statut",
       "locator": "core/basic_executor.c;core/basic_executor.h"
+    },
+    {
+      "id": "BE-26",
+      "layer": "BE_EXECUTOR",
+      "status": "BE_INVALID_INK",
+      "form": "INK index/colour invalides dans les sous-ensembles natifs",
+      "positive": "10 INK 1,26",
+      "negative": "10 INK 16,26",
+      "provenance": "CPC_ERR_ONLY",
+      "cpc_err": null,
+      "cpc_erl": null,
+      "cpc_text": null,
+      "cpc_ready": null,
+      "evidence": "SOURCE_STATIC",
+      "current_console": "ERROR\\n puis Ready\\n sur échec RUN",
+      "priority": "A2",
+      "gap": "ERR=5/ERL=10 dans J1.18-A pour 4 bornes; texte exact encore non relu dans A0",
+      "locator": "core/basic_executor.c;core/basic_executor.h"
     }
   ],
   "witnesses": [

@@ -462,7 +462,8 @@ static size_t for_next_continuation(const uint8_t *body, size_t length,
 static BEStatus for_match(const BasicProgram *program,
                           const BasicProgramLine *first, size_t start,
                           const BasicVariableKey *wanted,
-                          size_t *exit_cursor, size_t *exit_statement)
+                          size_t *exit_cursor, size_t *exit_statement,
+                           uint16_t *fault_line)
 {
     BasicProgramLine line;
     BasicVariableKey nested[BE_FOR_STACK_CAPACITY];
@@ -506,8 +507,10 @@ static BEStatus for_match(const BasicProgram *program,
                                                                &key, &count);
                     if (resolved != BVB_OK) return binding_error(resolved);
                     if (key.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
-                    if (!for_same_key(&key, expected))
+                    if (!for_same_key(&key, expected)) {
+                        if (fault_line != NULL) *fault_line = line.number;
                         return BE_NEXT_VARIABLE_MISMATCH;
+                    }
                     pos += count;
                 }
                 skip_spaces(body, n, &pos);
@@ -737,7 +740,8 @@ static BEStatus execute_line(const BasicProgram *program,
                              BEEmitter *out, BEEventEmitter *events,
                              size_t *next, BEFlow *flow,
                              BasicVariableStore *variables,
-                             BEAssignment *assignment)
+                             BEAssignment *assignment,
+                             uint16_t *next_fault_line)
 {
     const uint8_t *body = program->data + line->body_offset;
     size_t length = line->body_length;
@@ -1342,7 +1346,8 @@ static BEStatus execute_line(const BasicProgram *program,
             /* Resolve paired NEXT before any PRINT in the loop is reached.
              * The sealed WRONG_VAR case requires this anticipatory check. */
             status = for_match(program, line, pos, &key,
-                               &exit_cursor, &exit_statement);
+                               &exit_cursor, &exit_statement,
+                               next_fault_line);
             if (status != BE_OK) return status;
             if (pos < length) {
                 body_cursor = line->offset;
@@ -1381,7 +1386,10 @@ static BEStatus execute_line(const BasicProgram *program,
             int keep_loop;
             size_t consumed = 0u;
             if (variables == NULL) return BE_UNSUPPORTED;
-            if (executor->for_depth == 0u) return BE_NEXT_WITHOUT_FOR;
+            if (executor->for_depth == 0u) {
+                if (next_fault_line != NULL) *next_fault_line = line->number;
+                return BE_NEXT_WITHOUT_FOR;
+            }
             frame = &executor->for_stack[executor->for_depth - 1u];
             skip_spaces(body, length, &pos);
             if (pos < length && body[pos] == 0x02u) {
@@ -1389,8 +1397,10 @@ static BEStatus execute_line(const BasicProgram *program,
                                                           &named, &consumed);
                 if (parsed != BVB_OK) return binding_error(parsed);
                 if (named.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
-                if (!for_same_key(&named, &frame->key))
+                if (!for_same_key(&named, &frame->key)) {
+                    if (next_fault_line != NULL) *next_fault_line = line->number;
                     return BE_NEXT_VARIABLE_MISMATCH;
+                }
                 pos += consumed;
             }
             skip_spaces(body, length, &pos);
@@ -1614,7 +1624,7 @@ BEStatus be_step_events(BasicExecutor *executor, uint8_t *output,
     }
     status = execute_line(program, &line, start_pos, executor,
                           &probe, &event_probe, &next, &transition,
-                          variables, &assignment);
+                          variables, &assignment, NULL);
     if (status != BE_OK) {
         return status;
     }
@@ -1649,7 +1659,7 @@ BEStatus be_step_events(BasicExecutor *executor, uint8_t *output,
     writer.length = 0u;
     status = execute_line(program, &line, start_pos, executor,
                           &writer, &event_writer, &check_next,
-                          &second_transition, variables, &second);
+                          &second_transition, variables, &second, NULL);
     if (status != BE_OK || writer.length != probe.length ||
         event_writer.length != event_probe.length || check_next != next ||
         transition.action != second_transition.action ||
@@ -1725,4 +1735,44 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
     size_t ignored_events = 0u;
     return be_step_events(executor, output, output_capacity, written,
                           NULL, 0u, &ignored_events);
+}
+
+/* Diagnostic-only read: replay the same non-mutating validation probe.
+ * On a FOR mismatch, for_match() supplies the actual NEXT record, not the
+ * current FOR line. Fail closed if state/source or reported status diverges.
+ * O(program bytes) on error only; fixed local nesting stack, no heap. */
+bool be_next_fault_line(const BasicExecutor *executor, BEStatus reason,
+                        uint16_t *line_number)
+{
+    BasicProgramLine line;
+    const BasicProgram *program;
+    BEEmitter output = {NULL, 0u};
+    BEEventEmitter events = {NULL, 0u};
+    BEAssignment assignment = {0};
+    BEFlow flow = {0};
+    size_t current, next = 0u;
+    uint16_t fault = 0u;
+    if (executor == NULL || line_number == NULL ||
+        (reason != BE_NEXT_WITHOUT_FOR &&
+         reason != BE_NEXT_VARIABLE_MISMATCH))
+        return false;
+    program = executor->program;
+    if (program == NULL || bp_validate(program) != BP_OK ||
+        executor->for_depth > BE_FOR_STACK_CAPACITY ||
+        executor->call_depth > BE_GOSUB_STACK_CAPACITY ||
+        (executor->variables != NULL &&
+         bvs_validate(executor->variables) != BVS_OK))
+        return false;
+    current = executor->cursor;
+    if (bp_next(program, &current, &line) != BP_OK ||
+        line.offset != executor->cursor || line.number == 0u ||
+        (executor->statement_offset != 0u &&
+         executor->statement_offset >= line.body_length))
+        return false;
+    if (execute_line(program, &line, executor->statement_offset, executor,
+                     &output, &events, &next, &flow, executor->variables,
+                     &assignment, &fault) != reason || fault == 0u)
+        return false;
+    *line_number = fault;
+    return true;
 }

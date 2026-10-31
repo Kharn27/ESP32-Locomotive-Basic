@@ -58,6 +58,14 @@ CLS_TOOL = "tools/j1_21_a_cls_oracle.py"
 CLS_JOB = "cls-cpc-acquisition"
 CLS_BRANCH = "oracle/j1-21-a-cls-cpc"
 CLS_ARCHIVE = "tests/fixtures/cpc6128/j1_21_a_cls"
+CLS_PERMANENT_STEP = """      - name: J1.21-A CLS 252 external SHA seals (permanent, no Caprice32)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_21_a_cls_oracle.py --check-sources
+          python3 tools/j1_21_a_cls_oracle.py \\
+            --evidence tests/fixtures/cpc6128/j1_21_a_cls \\
+            --permanent --self-test"""
 PAPER_IMAGE = ("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
                "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c")
 PAPER_ROM = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
@@ -197,12 +205,72 @@ def audit(sources):
     audit_paper_route(sources)
     audit_paper_permanent(sources)
     audit_cls_route(sources)
+    audit_cls_permanent(sources)
     ea = (ROOT / "tools/j1_16_e_a_store.py").read_text()
     da = (ROOT / "tools/j1_16_d_a_store.py").read_text()
     demand("SEALED_E_A_ARCHIVE_MISMATCH" in ea and
            "UNVERIFIED_SCALAR_RETAINED" in ea and
            "SEALED_D_A_ARCHIVE_MISMATCH" in da,
            "E_A_C1_OR_D_A_SEAL_LOST")
+
+
+
+def audit_cls_permanent(sources):
+    """The CLS SHA chain is mandatory on all PRs and main, not only branch CLS."""
+    yml=sources[PAPER_WORKFLOW]
+    # Existing PAPER audit enforces unfiltered PR/push, exact sealed-evidence shape.
+    audit_paper_permanent(sources)
+    marker="\n  sealed-evidence:"
+    demand(yml.count(marker)==1,"CLS_SEALED_JOB_MISSING")
+    tail=yml.split(marker,1)[1]
+    boundary=re.search(r"(?m)^  [a-zA-Z][\w-]*:[ \t]*$",tail)
+    job=tail[:boundary.start()] if boundary else tail
+    header=CLS_PERMANENT_STEP.split("\n",1)[0]
+    matches=list(re.finditer(r"(?m)^"+re.escape(header)+r"$",job))
+    demand(len(matches)==1,"CLS_PERMANENT_STEP_MISSING")
+    rest=job[matches[0].end():]
+    next_step=re.search(r"(?m)^      - ",rest)
+    actual=job[matches[0].start():
+               matches[0].end()+next_step.start() if next_step else len(job)]
+    demand(actual.rstrip()==CLS_PERMANENT_STEP,"CLS_PERMANENT_STEP_ALTERED")
+    return True
+
+
+def cls_permanent_negative_tests(sources):
+    original=sources[PAPER_WORKFLOW]
+    step=CLS_PERMANENT_STEP
+    demand(original.count(step)==1,"CLS_PERMANENT_NEGATIVE_INERT")
+    def mutate(a,b):
+        demand(original.count(a)==1,"CLS_PERMANENT_NEGATIVE_INERT")
+        return original.replace(a,b,1)
+    failures={
+       "REMOVED":(mutate(step+"\n",""),"CLS_PERMANENT_STEP_MISSING"),
+       "NOT_PERMANENT":(mutate(step,step.replace("--permanent --self-test","--self-test")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "NO_SELF_TEST":(mutate(step,step.replace("--permanent --self-test","--permanent")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "WRONG_ARCHIVE":(mutate(step,step.replace(CLS_ARCHIVE,
+                          "tests/fixtures/cpc6128/j1_19_a_paper")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "FAKE_ORACLE":(mutate(step,step.replace(CLS_TOOL,"tools/not_cls_oracle.py")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "SKIP_ON_FAILURE":(mutate(step,step.replace("        shell: bash",
+                          "        continue-on-error: true\n        shell: bash")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "IF_FALSE":(mutate(step,step.replace("        shell: bash",
+                          "        if: false\n        shell: bash")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "NO_STRICT_SHELL":(mutate(step,step.replace("set -euo pipefail","set +e")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+    }
+    for name,(damaged,expected) in failures.items():
+        try:
+            audit_cls_permanent({**sources,PAPER_WORKFLOW:damaged})
+        except UnsafeRoute as ex:
+            demand(str(ex)==expected,"CLS_PERMANENT_WRONG_REJECTION_"+name+":"+str(ex))
+        else:
+            raise UnsafeRoute("CLS_PERMANENT_BYPASS_"+name)
+        print("CI-OPT3 CLS_PERMANENT_FALSIFICATION_REJECTED",name,expected)
 
 
 def audit_cls_route(sources):
@@ -567,6 +635,7 @@ def paper_negative_tests(sources):
 
 def negative_tests(sources):
     cls_route_negative_tests(sources)
+    cls_permanent_negative_tests(sources)
     paper_negative_tests(sources)
     paper_permanent_negative_tests(sources)
     paper_archive_negative_tests()

@@ -9,6 +9,30 @@
 
 L'oracle antérieur J1.10-A (docs/J1.10-A-if-then-cpc-oracle.md) a bien observé par **imprimante CPC** un IF vrai vers ligne manquante avec ERR=8, ERL=20. Cette mesure en lecture seule n'établit pas le texte écran exigé par O2 et ne remplace pas la répétition nouvelle. L'audit A0 #224 prouve le message GOSUB, **pas** sa transposition à GOTO/IF.
 
+## Observation historique ROM-backed contrôlée par lecture visuelle (J1.10-A, pas une acquisition O2)
+
+Le 1er novembre 2026, le Développeur a relu visuellement **les deux PNG existants** du corpus scellé J1.10-A, sous les chemins :
+- `tests/fixtures/cpc6128/j1_10_if_then/original/F_TRUE_MISSING/run/run.png`
+- `tests/fixtures/cpc6128/j1_10_if_then/repeat/F_TRUE_MISSING/run/run.png`
+
+Leur hash SHA-256 brut **identique**, reporté dans le manifeste historique J1.10-A, est `d8a5d254452faedef7586632ecf54cc43d5143d70fc997651a856105985dbf31` ; le programme original archivé, en lecture seule, est :
+
+```basic
+10 A%=1
+20 IF A% THEN 90
+30 PRINT #8,31
+40 END
+```
+
+Les deux captures montrent, **mot pour mot**, après `RUN` :
+
+```text
+Line does not exist in 20
+Ready
+```
+
+Le manifeste indépendant enregistre `ERR=8`, `ERL=20`, canal imprimante de `printer.dat` distinct de l'écran et paires de processus CPC originaux/repeat. ROM CPC6128 `31c3668c...`, Caprice32 `8c778bf...`, exactement comme identifiés ci-dessous. Ce témoin **démontre une formulation pour l'IF numérique pris avec cible 90 absente et ligne 20**, mais **ne couvre pas encore** le nouveau cas `IF A% THEN 999`, la renumérotation `IF`, ni surtout `GOTO`. Les authentiques nouvelles paires O2 restent `CPC_ORACLE_UNVERIFIED` et ne doivent pas être simulées par recopie de ce PNG. Les archives J1.10-A ne sont ni modifiées, ni dupliquées, ni baptisées « nouvelles captures O2 ».
+
 ## Six programmes à exécuter
 
 Les fichiers sous tests/fixtures/cpc6128/j1_diag_goto_if_missing/sources/ sont les **sources seulement**.

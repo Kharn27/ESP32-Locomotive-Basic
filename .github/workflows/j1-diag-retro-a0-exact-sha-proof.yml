@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - ci/proof-j1-diag-retro-a0-224
+  pull_request:
+    branches:
+      - main
 permissions:
   contents: read
 jobs:

@@ -562,10 +562,12 @@ static bool basic_run_slice(void)
             return fail("RUN_STEP_DIAG",-1);
     } else if(slice.state==HW4_RUN_DISPLAY_ERROR) {
         printf("HW4-PEN-A VIDEO_REJECT status=%d phase=%d "
-               "printed=0 preflight_atomic=%u\n",
+               "preflight_atomic=%u pixel_rollback=%s\n",
                (int)s_run_video_failure,(int)s_run_scheduler.display_failure,
                (unsigned)(s_run_scheduler.display_failure==
-                          HW4_RUN_DISPLAY_PREFLIGHT_FAILED));
+                          HW4_RUN_DISPLAY_PREFLIGHT_FAILED),
+               s_run_scheduler.display_failure==HW4_RUN_DISPLAY_PREFLIGHT_FAILED ?
+                   "NO_PIXELS_APPLIED" : "PARTIAL_UNVERIFIED");
         /* Fail-stop: cannot roll back an already partly replayed video step. */
         (void)bsr_stop(&s_basic.runtime);
         if(!display_error()) return false;

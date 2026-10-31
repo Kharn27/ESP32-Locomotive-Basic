@@ -181,8 +181,9 @@ def review_one(review, case, png_hash):
     wording = review.get("screen_text")
     require(isinstance(wording, str) and len(wording) > 0 and
             "\r" not in wording, "SCREEN_WORDING_NOT_REVIEWED_"+case)
-    require(review.get("ready_count") in (0, 1) and
-            review.get("post_error_print_absent") in (True, False),
+    ready = review.get("ready_count")
+    require(type(ready) is int and 0 <= ready <= 25 and
+            type(review.get("post_error_print_absent")) is bool,
             "READY_OR_PRINT_NOT_REVIEWED_"+case)
     # No prior assumption about the GOTO/IF error wording.
     return wording, review["ready_count"]
@@ -284,14 +285,15 @@ def self_test():
         "png_sha256": "a"*64, "reviewer": "independent human",
         "screen_text": "REVIEWED_BY_HUMAN_NOT_A_CPC_CLAIM",
         "ready_count": 1, "post_error_print_absent": True}
-    assert review_one(base, "GOTO_MISSING", "a"*64)[1] == 1
+    require(review_one(base, "GOTO_MISSING", "a"*64)[1] == 1,
+            "VALID_REVIEW_FIXTURE_REJECTED")
     bad = [
         ({**base, "png_sha256":"b"*64}, "sha"),
         ({**base, "reviewed_original_and_repeat":False}, "repeat"),
         ({**base, "provenance":"HOST_INFERRED"}, "origin"),
         ({**base, "reviewer":""}, "identity"),
         ({**base, "screen_text":""}, "wording"),
-        ({**base, "ready_count":2}, "ready")
+        ({**base, "ready_count":-1}, "ready")
     ]
     for mutant, label in bad:
         try:

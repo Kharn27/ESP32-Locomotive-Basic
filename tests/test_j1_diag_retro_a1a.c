@@ -65,6 +65,9 @@ static void expect_diagnostic(const char *const *sources, size_t count,
     uint8_t saved_program[PROGRAM_CAP], saved_output[OUTPUT_CAP];
     BEVideoEvent saved_events[EVENT_CAP];
     BasicSessionRuntime before;
+    BasicProgram before_program;
+    BasicVariableStore before_store;
+    BasicVariableEntry before_entries[32];
     CpcStepDiagnostic diag;
     BSRResult r;
     uint8_t formatted[80];
@@ -83,6 +86,9 @@ static void expect_diagnostic(const char *const *sources, size_t count,
             assert(cpc_text_write(&f.text, f.output, f.written));
     }
     memcpy(saved_program, f.storage, sizeof saved_program);
+    before_program = f.program;
+    before_store = f.store;
+    memcpy(before_entries, f.entries, sizeof before_entries);
     memset(f.output, 0x57, sizeof f.output);
     memset(f.events, 0x63, sizeof f.events);
     memcpy(saved_output, f.output, sizeof saved_output);
@@ -99,6 +105,9 @@ static void expect_diagnostic(const char *const *sources, size_t count,
     assert(memcmp(saved_output, f.output, sizeof saved_output) == 0);
     assert(memcmp(saved_events, f.events, sizeof saved_events) == 0);
     assert(memcmp(saved_program, f.storage, sizeof saved_program) == 0);
+    assert(memcmp(&before_program, &f.program, sizeof before_program) == 0);
+    assert(memcmp(&before_store, &f.store, sizeof before_store) == 0);
+    assert(memcmp(before_entries, f.entries, sizeof before_entries) == 0);
     assert(f.written == 71U && f.event_written == 73U);
     assert(f.text.bytes_received == bytes_before);
     diag = cpc_diag_policy_step(r, &f.runtime); /* MUST precede stop */
@@ -123,6 +132,9 @@ static void expect_diagnostic(const char *const *sources, size_t count,
     assert(ready);
     assert(f.text.bytes_received == bytes_before + length + sizeof("Ready\n") - 1U);
     assert(memcmp(saved_program, f.storage, sizeof saved_program) == 0);
+    assert(memcmp(&before_program, &f.program, sizeof before_program) == 0);
+    assert(memcmp(&before_store, &f.store, sizeof before_store) == 0);
+    assert(memcmp(before_entries, f.entries, sizeof before_entries) == 0);
     /* Exactly one Ready, after one diagnostic. No post-error PRINT. */
     assert(painted_length < sizeof painted);
     painted[painted_length] = '\0';
@@ -137,6 +149,9 @@ static void tests(void)
     };
     static const char *gosub370[] = {
         "370 GOSUB 999", "400 PRINT \"NEVER\""
+    };
+    static const char *gosub65535[] = {
+        "65535 GOSUB 999"
     };
     static const char *return10[] = {
         "10 RETURN", "20 PRINT \"NEVER\""
@@ -174,6 +189,8 @@ static void tests(void)
                "Line does not exist in 10\n", 1);
     CHECK_CASE(gosub370, 0U, BE_MISSING_TARGET,
                "Line does not exist in 370\n", 1);
+    CHECK_CASE(gosub65535, 0U, BE_MISSING_TARGET,
+               "Line does not exist in 65535\n", 1);
     CHECK_CASE(return10, 0U, BE_RETURN_WITHOUT_GOSUB,
                "Unexpected RETURN in 10\n", 1);
     CHECK_CASE(return620, 0U, BE_RETURN_WITHOUT_GOSUB,

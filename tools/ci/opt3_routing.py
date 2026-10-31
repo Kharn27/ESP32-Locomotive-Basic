@@ -17,7 +17,7 @@ FAMILIES = {
     "C99": ("basic-program.yml", "ci-arch.yml", "ci-opt3-routing.yml"),
     "CPC_PERMANENT": ("ci-cpc-permanent.yml", "cpc-oracle.yml"),
     "CPC_ACQUISITION": (
-        "cpc-oracle-image.yml",
+        "cpc-oracle-image.yml", "hw4-esc-oracle-r1.yml",
         "j1-2-a-boundaries.yml", "j1-3-a-subtraction.yml",
         "j1-4-a-multiplication.yml", "j1-5-a-division.yml",
         "j1-6-a-mod.yml", "j1-7-a-add-vars.yml",
@@ -34,6 +34,8 @@ FAMILIES = {
     "XTENSA": ("ci-xtensa.yml",),
 }
 EXPECTED_ROUTES = {
+    "hw4-esc-oracle-r1.yml": ("tests/oracles/hw4_esc_r1_capture.py",
+                                   ".github/workflows/hw4-esc-oracle-r1.yml"),
     "j1-6-a-mod.yml": ("tools/j1_6_mod_verify.py", "tests/fixtures/cpc6128/j1_integer_mod/**"),
     "j1-7-a-add-vars.yml": ("tools/j1_7_add_vars_verify.py", "tests/fixtures/cpc6128/j1_integer_add_vars/**"),
     "j1-8-a-sub-vars.yml": ("tools/j1_8_sub_vars_verify.py", "tests/fixtures/cpc6128/j1_integer_sub_vars/**"),
@@ -160,7 +162,7 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(expected) == 32 and len(set(expected)) == 32,
+    demand(len(expected) == 33 and len(set(expected)) == 33,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(set(sources) == set(expected), "UNKNOWN_OR_MISSING_WORKFLOW")
     a0_paths = filters(sources[HW4_A0])
@@ -755,7 +757,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=32 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=33 FAMILIES=5")
 
 
 if __name__ == "__main__":

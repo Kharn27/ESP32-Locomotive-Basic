@@ -233,11 +233,11 @@ static void test_bridge_preflight_atomic(void)
 
 static void test_runtime_atomic_and_diagnostics(void)
 {
-    static const char *bad[]={"PEN 16","PEN -1","PEN 5","PEN 14"};
-    static const BEStatus expected[]={BE_INVALID_PEN,BE_INVALID_PEN,
-                                       BE_UNSUPPORTED,BE_UNSUPPORTED};
+    /* Host ERR=5 operands remain rejected; 5/14 now emit native events. */
+    static const char *bad[]={"PEN 16","PEN -1"};
+    static const BEStatus expected[]={BE_INVALID_PEN,BE_INVALID_PEN};
     size_t i;
-    for(i=0U;i<4U;++i) {
+    for(i=0U;i<2U;++i) {
         BasicSessionRuntime original;
         uint8_t out_copy[OUT_CAP];
         BEVideoEvent events_copy[EVENT_CAP];
@@ -725,7 +725,9 @@ static void test_diag_pen_native_and_host_guards(void)
     test_diag_pen_run_case("10 PEN 2:PRINT \"NEVER_BEFORE\":PEN 16",
                            "20 END",10U,false);
 
-    /* Host-only failures never acquire a false CPC line or ERR/ERL. */
+    /* J1.17-C-B: 5/14 are now valid logical CPC events.
+     * HW4 bridge still rejects unverified physical mapping, independently
+     * of native BASIC execution. Never claim a false CPC diagnostic. */
     for(unsigned n=5U;n<=14U;n+=9U) {
         char cmd[32];
         BSRResult r;
@@ -734,9 +736,12 @@ static void test_diag_pen_native_and_host_guards(void)
         assert(submit(cmd).status==BSR_OK);
         assert(submit("RUN").status==BSR_OK);
         r=step(OUT_CAP,3U);
-        assert(r.status==BSR_EXECUTOR_ERROR &&
-               r.executor_status==BE_UNSUPPORTED);
-        assert(cpc_diag_policy_step(r,&f.runtime).category==CPC_DIAG_HOST_GENERIC);
+        assert(r.status==BSR_OK && f.written==0U && f.event_written==1U);
+        assert(f.events[0].type==BE_VIDEO_SET_TEXT_PEN &&
+               f.events[0].pen==(uint8_t)n &&
+               f.events[0].print_offset==0U);
+        assert(hw4_pen_preflight(&f.text,f.output,f.written,
+                   f.events,f.event_written)==HW4_PEN_UNSUPPORTED_LOGICAL);
     }
     setup();
     assert(submit("10 PEN 2:PEN 1:PEN 3:PEN 2").status==BSR_OK);

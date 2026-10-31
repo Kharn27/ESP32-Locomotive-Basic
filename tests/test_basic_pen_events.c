@@ -81,6 +81,16 @@ static int oracle_token_and_listing(void)
         {"PEN 2",  {0xbbu,' ',0x10u,0u}, 3u, BE_EVENT_RECEIVER_REQUIRED},
         {"PEN 3",  {0xbbu,' ',0x11u,0u}, 3u, BE_EVENT_RECEIVER_REQUIRED},
         {"PEN 4",  {0xbbu,' ',0x12u,0u}, 3u, BE_EVENT_RECEIVER_REQUIRED},
+        {"PEN 5", {0xbbu,' ',0x13u,0u}, 3u, BE_EVENT_RECEIVER_REQUIRED},
+        {"PEN 6", {0xbbu,' ',0x14u,0u}, 3u, BE_EVENT_RECEIVER_REQUIRED},
+        {"PEN 7", {0xbbu,' ',0x15u,0u}, 3u, BE_EVENT_RECEIVER_REQUIRED},
+        {"PEN 8", {0xbbu,' ',0x16u,0u}, 3u, BE_EVENT_RECEIVER_REQUIRED},
+        {"PEN 9", {0xbbu,' ',0x17u,0u}, 3u, BE_EVENT_RECEIVER_REQUIRED},
+        {"PEN 10", {0xbbu,' ',0x19u,0x0au}, 4u, BE_EVENT_RECEIVER_REQUIRED},
+        {"PEN 11", {0xbbu,' ',0x19u,0x0bu}, 4u, BE_EVENT_RECEIVER_REQUIRED},
+        {"PEN 12", {0xbbu,' ',0x19u,0x0cu}, 4u, BE_EVENT_RECEIVER_REQUIRED},
+        {"PEN 13", {0xbbu,' ',0x19u,0x0du}, 4u, BE_EVENT_RECEIVER_REQUIRED},
+        {"PEN 14", {0xbbu,' ',0x19u,0x0eu}, 4u, BE_EVENT_RECEIVER_REQUIRED},
         {"PEN 15", {0xbbu,' ',0x19u,0x0fu}, 4u, BE_EVENT_RECEIVER_REQUIRED},
         {"PEN 16", {0xbbu,' ',0x19u,0x10u}, 4u, BE_INVALID_PEN},
         {"PEN -1", {0xbbu,' ',0xf5u,0x0fu}, 4u, BE_INVALID_PEN}
@@ -113,11 +123,11 @@ static int oracle_token_and_listing(void)
         f.runtime.state = BSR_RUNNING;
         CHECK(failed(&f, cases[i].legacy_status,
                      sizeof(f.output), 0u, 1) == 0);
-        if (i < 6u) {
+        if (i < 16u) {
             CHECK(step(&f, sizeof(f.output), 1u).status == BSR_OK);
             CHECK(f.written == 0u && f.event_written == 1u);
             CHECK(f.events[0].type == BE_VIDEO_SET_TEXT_PEN);
-            CHECK(f.events[0].pen == (i == 5u ? 15u : (uint8_t)i));
+            CHECK(f.events[0].pen == (uint8_t)i);
             CHECK(f.events[0].print_offset == 0u);
         } else {
             CHECK(failed(&f, BE_INVALID_PEN, sizeof(f.output), 4u, 0) == 0);
@@ -136,34 +146,160 @@ static int oracle_token_and_listing(void)
     return 0;
 }
 
-static int unmeasured_and_atomic_errors(void)
+/* J1.17-C-B: each of the ten independently acquired native PEN values. */
+static int new_pen_values_and_atomic_errors(void)
 {
     unsigned int value;
     for (value = 5u; value <= 14u; ++value) {
         Fixture f;
-        char source[32];
+        BSRResult result;
+        char source[32], listed[32];
+        size_t expected_length;
         CHECK(setup(&f) == 0);
         CHECK(snprintf(source, sizeof(source), "10 PEN %u", value) > 0);
+        CHECK(snprintf(listed, sizeof(listed), "10 PEN %u\n", value) > 0);
+        expected_length = strlen(listed);
         CHECK(submit(&f, source).status == BSR_OK);
+        CHECK(submit(&f, "LIST").status == BSR_OK);
+        CHECK(f.written == expected_length);
+        CHECK(memcmp(f.output, listed, expected_length) == 0);
         CHECK(submit(&f, "RUN").status == BSR_OK);
-        CHECK(failed(&f, BE_UNSUPPORTED, sizeof(f.output), 4u, 0) == 0);
+        CHECK(failed(&f, BE_EVENT_RECEIVER_REQUIRED,
+                     sizeof(f.output), 0u, 1) == 0);
+        CHECK(failed(&f, BE_NO_EVENT_SPACE, sizeof(f.output), 0u, 0) == 0);
+        result = step(&f, sizeof(f.output), 1u);
+        CHECK(result.status == BSR_OK);
+        CHECK(f.written == 0u && f.event_written == 1u);
+        CHECK(f.events[0].type == BE_VIDEO_SET_TEXT_PEN);
+        CHECK(f.events[0].pen == (uint8_t)value);
+        CHECK(f.events[0].ink == 0u && f.events[0].colour == 0u);
+        CHECK(f.events[0].print_offset == 0u);
+        CHECK(step(&f, sizeof(f.output), 1u).status == BSR_END);
+    }
+    {
+        static const char *const rejected[] = {
+            "10 PEN 5:PRINT \"X\":PEN 16",
+            "10 PEN 14:PRINT \"X\":PEN -1"
+        };
+        size_t i;
+        for (i = 0u; i < sizeof(rejected)/sizeof(rejected[0]); ++i) {
+            Fixture f;
+            CHECK(setup(&f) == 0);
+            CHECK(submit(&f, rejected[i]).status == BSR_OK);
+            CHECK(submit(&f, "RUN").status == BSR_OK);
+            CHECK(failed(&f, BE_INVALID_PEN, sizeof(f.output), 4u, 0) == 0);
+            CHECK(submit(&f, "RUN").status == BSR_OK);
+            CHECK(f.runtime.executor.cursor == 0u);
+        }
     }
     {
         Fixture f;
         CHECK(setup(&f) == 0);
-        CHECK(submit(&f, "10 PEN 4:PRINT \"X\":PEN 16").status == BSR_OK);
+        CHECK(submit(&f, "10 PEN 5:PRINT \"X\":PEN 14").status == BSR_OK);
         CHECK(submit(&f, "RUN").status == BSR_OK);
-        CHECK(failed(&f, BE_INVALID_PEN, sizeof(f.output), 4u, 0) == 0);
-        CHECK(submit(&f, "RUN").status == BSR_OK);
-        CHECK(f.runtime.executor.cursor == 0u);
+        CHECK(failed(&f, BE_NO_EVENT_SPACE, sizeof(f.output), 1u, 0) == 0);
+        CHECK(failed(&f, BE_NO_SPACE, 1u, 4u, 0) == 0);
     }
-    {
-        Fixture f;
-        CHECK(setup(&f) == 0);
-        CHECK(submit(&f, "10 PEN 4:PRINT \"X\":PEN 5").status == BSR_OK);
-        CHECK(submit(&f, "RUN").status == BSR_OK);
-        CHECK(failed(&f, BE_UNSUPPORTED, sizeof(f.output), 4u, 0) == 0);
+    return 0;
+}
+
+/* CPC immutable image check. Only the first complete L10 record is
+ * compared with the native L10 record: later LOCATE (not native) and
+ * screenshots are deliberately outside this executable test. */
+static int load_oracle(const char *root, const char *era,
+                       const char *round, const char *id,
+                       uint8_t *data, size_t capacity, size_t *length)
+{
+    char path[512];
+    FILE *file;
+    size_t got;
+    int extra;
+    CHECK(snprintf(path, sizeof(path),
+                   "%s/tests/fixtures/cpc6128/%s/%s/%s/program.bin",
+                   root, era, round, id) > 0);
+    file = fopen(path, "rb");
+    if (file == NULL) {
+        fprintf(stderr, "Cannot open sealed CPC image: %s\n", path);
+        return 1;
     }
+    got = fread(data, 1u, capacity, file);
+    extra = fgetc(file);
+    CHECK(!ferror(file) && extra == EOF);
+    CHECK(fclose(file) == 0 && got > 8u);
+    *length = got;
+    return 0;
+}
+
+static int one_sealed_pen(const char *root, const char *era,
+                          const char *id, const char *statement)
+{
+    Fixture f;
+    uint8_t original[256], repeat[256], native[256];
+    uint8_t tokens[32], again[32], list[32];
+    size_t original_len, repeat_len, native_len, encoded = 88u;
+    size_t relisted = 77u, count = 66u, line_length;
+    char line[32], expected_list[32];
+    CHECK(load_oracle(root, era, "original", id,
+                      original, sizeof(original), &original_len) == 0);
+    CHECK(load_oracle(root, era, "repeat", id,
+                      repeat, sizeof(repeat), &repeat_len) == 0);
+    CHECK(original_len == repeat_len &&
+          memcmp(original, repeat, original_len) == 0);
+    CHECK(setup(&f) == 0);
+    CHECK(snprintf(line, sizeof(line), "10 %s", statement) > 0);
+    CHECK(snprintf(expected_list, sizeof(expected_list), "10 %s\n",
+                   statement) > 0);
+    CHECK(bt_tokenize((const uint8_t *)statement, strlen(statement),
+                      tokens, sizeof(tokens), &encoded) == BT_OK);
+    CHECK(bl_detokenize(tokens, encoded, list, sizeof(list), &relisted) == BL_OK);
+    CHECK(relisted == strlen(statement) &&
+          memcmp(list, statement, relisted) == 0);
+    CHECK(bt_tokenize(list, relisted, again, sizeof(again), &count) == BT_OK);
+    CHECK(encoded == count && memcmp(tokens, again, count) == 0);
+    CHECK(submit(&f, line).status == BSR_OK);
+    CHECK(bp_export(&f.program, native, sizeof(native), &native_len) == BP_OK);
+    line_length = (size_t)original[0] | ((size_t)original[1] << 8);
+    CHECK(line_length == encoded + 5u && original_len >= line_length + 2u);
+    CHECK(original[2] == 10u && original[3] == 0u);
+    CHECK(native_len >= line_length + 2u);
+    CHECK(memcmp(native, original, line_length) == 0);
+    CHECK(submit(&f, "LIST").status == BSR_OK);
+    CHECK(f.written == strlen(expected_list) &&
+          memcmp(f.output, expected_list, f.written) == 0);
+    return 0;
+}
+
+/* Historical J1.17-A (8 values) and J1.17-C-A (26 palette-context cases)
+ * are consulted read-only, including original/repeat complete-image pairs. */
+static int compare_sealed_pen_images(const char *root)
+{
+    static const struct { const char *id; const char *source; } old[] = {
+        {"P00", "PEN 0"}, {"P01", "PEN 1"},
+        {"P02", "PEN 2"}, {"P03", "PEN 3"},
+        {"P04", "PEN 4"}, {"P15", "PEN 15"},
+        {"P16", "PEN 16"}, {"PN1", "PEN -1"}
+    };
+    static const unsigned int values[] = {
+        0u, 2u, 3u, 5u, 6u, 7u, 8u, 9u,
+        10u, 11u, 12u, 13u, 14u
+    };
+    size_t i;
+    for (i = 0u; i < sizeof(old)/sizeof(old[0]); ++i)
+        CHECK(one_sealed_pen(root, "j1_17_a_pen",
+                             old[i].id, old[i].source) == 0);
+    for (i = 0u; i < sizeof(values)/sizeof(values[0]); ++i) {
+        char name[4], statement[16];
+        unsigned int context;
+        CHECK(snprintf(statement, sizeof(statement),
+                       "PEN %u", values[i]) > 0);
+        for (context = 0u; context < 2u; ++context) {
+            CHECK(snprintf(name, sizeof(name), "%c%02u",
+                           context == 0u ? 'C' : 'D', values[i]) > 0);
+            CHECK(one_sealed_pen(root, "j1_17_c_a_pen",
+                                 name, statement) == 0);
+        }
+    }
+    puts("J1.17-C-B CPC L10 RAM 8/8 A + 26/26 C-A original/repeat");
     return 0;
 }
 
@@ -206,6 +342,46 @@ static int event_order_capacity_and_legacy(void)
     CHECK(result.status == BSR_OK && f.written == 0u && f.event_written == 0u);
     result = step(&f, sizeof(f.output), 2u);
     CHECK(result.status == BSR_END && result.executor_status == BE_END);
+    return 0;
+}
+
+/* Event values stay logical even when MODE1 render would repeat colours. */
+static int new_pen_mixed_print_event_order(void)
+{
+    Fixture f;
+    BSRResult result;
+    CHECK(setup(&f) == 0);
+    CHECK(submit(&f, "10 PEN 5:PRINT \"X\":PEN 14:PRINT \"Y\":PEN 8").status == BSR_OK);
+    CHECK(submit(&f, "20 PEN 12:PRINT \"Z\"").status == BSR_OK);
+    CHECK(submit(&f, "30 END").status == BSR_OK);
+    CHECK(submit(&f, "RUN").status == BSR_OK);
+    memset(f.output, 0x61, sizeof(f.output));
+    memset(f.events, 0x71, sizeof(f.events));
+    f.written = 81u;
+    f.event_written = 82u;
+    CHECK(failed(&f, BE_EVENT_RECEIVER_REQUIRED, sizeof(f.output), 0u, 1) == 0);
+    CHECK(failed(&f, BE_NO_EVENT_SPACE, sizeof(f.output), 2u, 0) == 0);
+    CHECK(failed(&f, BE_NO_SPACE, 3u, 4u, 0) == 0);
+    result = step(&f, sizeof(f.output), 3u);
+    CHECK(result.status == BSR_OK);
+    CHECK(f.written == 4u && f.event_written == 3u);
+    CHECK(memcmp(f.output, "X\nY\n", 4u) == 0 && f.output[4] == 0x61u);
+    CHECK(f.events[0].type == BE_VIDEO_SET_TEXT_PEN &&
+          f.events[0].pen == 5u && f.events[0].print_offset == 0u);
+    CHECK(f.events[1].type == BE_VIDEO_SET_TEXT_PEN &&
+          f.events[1].pen == 14u && f.events[1].print_offset == 2u);
+    CHECK(f.events[2].type == BE_VIDEO_SET_TEXT_PEN &&
+          f.events[2].pen == 8u && f.events[2].print_offset == 4u);
+    CHECK(f.events[0].ink == 0u && f.events[1].colour == 0u);
+    result = step(&f, sizeof(f.output), 1u);
+    CHECK(result.status == BSR_OK);
+    CHECK(f.written == 2u && f.event_written == 1u);
+    CHECK(memcmp(f.output, "Z\n", 2u) == 0);
+    CHECK(f.events[0].type == BE_VIDEO_SET_TEXT_PEN &&
+          f.events[0].pen == 12u && f.events[0].print_offset == 0u);
+    result = step(&f, sizeof(f.output), 1u);
+    CHECK(result.status == BSR_OK && f.written == 0u && f.event_written == 0u);
+    CHECK(step(&f, sizeof(f.output), 1u).status == BSR_END);
     return 0;
 }
 
@@ -255,11 +431,14 @@ static int direct_runtime_and_bad_tokens(void)
     return 0;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    CHECK(argc == 2);
     CHECK(oracle_token_and_listing() == 0);
-    CHECK(unmeasured_and_atomic_errors() == 0);
+    CHECK(new_pen_values_and_atomic_errors() == 0);
+    CHECK(compare_sealed_pen_images(argv[1]) == 0);
     CHECK(event_order_capacity_and_legacy() == 0);
+    CHECK(new_pen_mixed_print_event_order() == 0);
     CHECK(direct_runtime_and_bad_tokens() == 0);
     puts("basic_pen_events: OK");
     return 0;

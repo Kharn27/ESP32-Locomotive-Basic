@@ -21,7 +21,7 @@ CC=gcc   SANITIZERS=1 sh tests/run_hw4_run_scheduler.sh
 CC=clang SANITIZERS=1 sh tests/run_hw4_run_scheduler.sh
 ```
 
-Le shell compile **tous les fichiers core/*.c réels** avec le nouveau module et `tests/test_hw4_run_scheduler.c`. La matrice GitHub Actions dédiée utilise ces quatre combinaisons. Tests :
+Le shell compile **tous les fichiers core/*.c réels** avec le nouveau module et `tests/test_hw4_run_scheduler.c`. Quatre exécutions GitHub Actions GCC/Clang × sanitizers OFF/ON sur les sources réelles ont été obtenues par un workflow éphémère, au SHA f338cf86e45455a4368b2a31b3f839609b606e46 (SUCCESS : https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41160632831). Le workflow éphémère a ensuite été **retiré du diff**, car le garde-fou CI-OPT3 refuse toute famille de workflows non déclarée (UNKNOWN_OR_MISSING_WORKFLOW). Le script autonome reste exécutable. Cela ne constitue pas un CTest intégré à la CI historique. Tests :
 
 - `10 PEN 3:PRINT "SCROLL GREEN" / 20 GOTO 10` : **4160 pas** répartis en 130 quanta de 32, sans `ERROR` artificiel, sans `bsr_stop`, programme inchangé, ordre PEN/PRINT et octets vérifiés.
 - BREAK externe sur `YIELDED`, demande pendant callback au troisième pas, BREAK par poll avant exécution, absence de PRINT après interruption, `bsr_stop` une fois, reprise par nouveau `RUN` seulement.

@@ -149,9 +149,115 @@ static int run_negative(void)
     return 0;
 }
 
+
+/* C1: Route *every* decoder output, never hand-filter REJECTED/OTHER.
+ * This catches a leaked D/ESC after malformed CSI while RUN is paused. */
+static int quarantined_byte(Hw4EscDecoder *d, Hw4EscPhase *phase,
+                            uint8_t byte, size_t expected_count,
+                            Hw4EscKey expected_first)
+{
+    Hw4EscKey keys[2] = { HW4_ESC_KEY_NONE, HW4_ESC_KEY_NONE };
+    size_t i, count = hw4_esc_decoder_feed(d, byte, keys);
+    CHECK(count == expected_count);
+    if (count != 0u) CHECK(keys[0] == expected_first);
+    for (i = 0u; i < count; ++i) {
+        CHECK(hw4_esc_route(phase, keys[i]) == HW4_ESC_ACTION_NONE);
+    }
+    CHECK(*phase == HW4_ESC_PAUSED);
+    return 0;
+}
+
+static int run_c1_quarantine(void)
+{
+    Hw4EscDecoder d;
+    Hw4EscPhase phase = HW4_ESC_PAUSED;
+    size_t i;
+    hw4_esc_decoder_init(&d);
+
+    /* P0 (negative against HEAD c04a86b): ESC [ 1 NUL D.
+     * Old decoder emits OTHER('D'), spuriously RESUMING a paused RUN. */
+    CHECK(quarantined_byte(&d, &phase, 0x1bu, 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'[', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'1', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, 0x00u, 1u, HW4_ESC_KEY_REJECTED) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'D', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(d.state == HW4_ESC_TEXT);
+    CHECK(hw4_esc_decoder_finish(&d) == HW4_ESC_KEY_NONE);
+    /* A *new* ordinary key after final must still resume: not permanently stuck. */
+    CHECK(feed_expect(&d, (uint8_t)'x', 1u, HW4_ESC_KEY_OTHER, 0) == 0);
+    CHECK(hw4_esc_route(&phase, HW4_ESC_KEY_OTHER) == HW4_ESC_ACTION_RESUME);
+    CHECK(phase == HW4_ESC_RUNNING);
+
+    /* P1: NUL and ESC within rejected CSI may not become a BREAK. */
+    hw4_esc_decoder_init(&d);
+    phase = HW4_ESC_PAUSED;
+    CHECK(quarantined_byte(&d, &phase, 0x1bu, 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'[', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'1', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, 0x00u, 1u, HW4_ESC_KEY_REJECTED) == 0);
+    CHECK(quarantined_byte(&d, &phase, 0x1bu, 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(d.state == HW4_ESC_CSI_DISCARD);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'1', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'D', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(d.state == HW4_ESC_TEXT && phase == HW4_ESC_PAUSED);
+
+    /* P2: overlength + control + ESC + final; no second reject or stray key. */
+    CHECK(quarantined_byte(&d, &phase, 0x1bu, 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'[', 0u, HW4_ESC_KEY_NONE) == 0);
+    for (i = 0u; i < 16u; ++i) {
+        CHECK(quarantined_byte(&d, &phase, (uint8_t)'1', 0u, HW4_ESC_KEY_NONE) == 0);
+    }
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'2', 1u, HW4_ESC_KEY_REJECTED) == 0);
+    CHECK(quarantined_byte(&d, &phase, 0x0au, 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, 0x1bu, 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'2', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(hw4_esc_decoder_release_pending(&d) == HW4_ESC_KEY_NONE);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'D', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(d.state == HW4_ESC_TEXT && phase == HW4_ESC_PAUSED);
+
+    /* P3: fragmented rejected CSI, read boundaries never release quarantine. */
+    CHECK(quarantined_byte(&d, &phase, 0x1bu, 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'[', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, 0x7fu, 1u, HW4_ESC_KEY_REJECTED) == 0);
+    CHECK(hw4_esc_decoder_release_pending(&d) == HW4_ESC_KEY_NONE);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'2', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, 0x1bu, 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'~', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(d.state == HW4_ESC_TEXT);
+    /* Next *valid* ANSI is separately decoded, and can legitimately resume. */
+    CHECK(feed_expect(&d, 0x1bu, 0u, 0, 0) == 0);
+    CHECK(feed_expect(&d, (uint8_t)'[', 0u, 0, 0) == 0);
+    CHECK(hw4_esc_decoder_release_pending(&d) == HW4_ESC_KEY_NONE);
+    CHECK(feed_expect(&d, (uint8_t)'D', 1u, HW4_ESC_KEY_ANSI, 0) == 0);
+    CHECK(hw4_esc_route(&phase, HW4_ESC_KEY_ANSI) == HW4_ESC_ACTION_RESUME);
+    CHECK(phase == HW4_ESC_RUNNING);
+
+    /* P4: a truly truncated valid CSI emits one REJECTED at finish/reset. */
+    hw4_esc_decoder_init(&d);
+    phase = HW4_ESC_PAUSED;
+    CHECK(quarantined_byte(&d, &phase, 0x1bu, 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'[', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'1', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(hw4_esc_route(&phase, hw4_esc_decoder_finish(&d)) == HW4_ESC_ACTION_NONE);
+    CHECK(phase == HW4_ESC_PAUSED && d.state == HW4_ESC_TEXT);
+    /* An already-rejected truncated CSI is NOT reported a second time. */
+    CHECK(quarantined_byte(&d, &phase, 0x1bu, 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, (uint8_t)'[', 0u, HW4_ESC_KEY_NONE) == 0);
+    CHECK(quarantined_byte(&d, &phase, 0x00u, 1u, HW4_ESC_KEY_REJECTED) == 0);
+    CHECK(d.state == HW4_ESC_CSI_DISCARD);
+    CHECK(hw4_esc_decoder_finish(&d) == HW4_ESC_KEY_NONE);
+    CHECK(d.state == HW4_ESC_TEXT && phase == HW4_ESC_PAUSED);
+    CHECK(feed_expect(&d, (uint8_t)'q', 1u, HW4_ESC_KEY_OTHER, 0) == 0);
+    CHECK(hw4_esc_route(&phase, HW4_ESC_KEY_OTHER) == HW4_ESC_ACTION_RESUME);
+    CHECK(phase == HW4_ESC_RUNNING);
+    CHECK(hw4_esc_decoder_finish(&d) == HW4_ESC_KEY_NONE);
+    return 0;
+}
+
 int main(void)
 {
-    if (run_scenarios() != 0 || run_negative() != 0) return 1;
-    puts("HW4-ESC-BREAK-A transport C99 scenarios + negative differential PASS (NOT CPC oracle)");
+    if (run_scenarios() != 0 || run_negative() != 0 ||
+        run_c1_quarantine() != 0) return 1;
+    puts("HW4-ESC-BREAK-A/C1 transport + CSI quarantine PASS (NOT CPC oracle)");
     return 0;
 }

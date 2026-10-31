@@ -648,8 +648,9 @@ static bool execute_line(void)
     }
     /* A prompt is always available, but Ready depends on the transition.
      * Boot Ready remains painted solely by cpc_boot_console(). */
+    if(!shot) return apply_ready_policy(transition) && prompt();
     if(!apply_ready_policy(transition) || !prompt()) return false;
-    return !shot || capture_screen("PROMPT");
+    return capture_screen("PROMPT");
 }
 static bool uart_init(void)
 {

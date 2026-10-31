@@ -502,64 +502,89 @@ static bool basic_submit(const uint8_t *source,size_t length,
                                           s_basic.written)) return false;
     return true;
 }
+/* RUN submitted by the real BSR; this starts, but does not execute, it. */
 static bool basic_run(void)
 {
-    unsigned steps=0U;
-    printf("HW4-C2 BSR_RUN state=%u budget=%u\n",
-           (unsigned)s_basic.runtime.state,RUN_STEP_BUDGET);
-    for(steps=0U;steps<RUN_STEP_BUDGET;++steps) {
-        size_t event_count=0U;
-        s_basic.written=0U;
-        BSRResult r=bsr_step_events(&s_basic.runtime,s_basic.output,
-                             sizeof(s_basic.output),&s_basic.written,
-                             s_basic.scratch.events,PEN_EVENT_CAPACITY,&event_count);
-        if(r.status==BSR_END) {
-            printf("HW4-C2 BSR_END status=BE_END steps=%u\n",steps);
-            return true;
+    hw4_run_break_input_init(&s_run_input);
+    if(!hw4_run_scheduler_init(&s_run_scheduler,&s_basic.runtime))
+        return fail("RUN_SCHEDULER_INIT",-1);
+    s_run_active=true;
+    s_run_quanta=0U;
+    s_run_break_requested_us=0U;
+    s_run_break_source="none";
+    s_run_video_failure=HW4_PEN_OK;
+    s_run_ready_transition=CPC_READY_RUN_RETURN;
+    printf("HW4-RUN-B RUN_START quantum=%u uart_poll_max=%u "
+           "budget=none sha=%s\n",RUN_QUANTUM,RUN_UART_POLL_BYTES,
+           HW4_SHOT_GIT_SHA);
+    return true;
+}
+static bool basic_run_slice(void)
+{
+    Hw4RunReceiver receiver={run_preflight,run_replay,NULL,NULL};
+    size_t event_count=0U;
+    Hw4RunSlice slice;
+    s_basic.written=0U;
+    slice=hw4_run_scheduler_slice(&s_run_scheduler,RUN_QUANTUM,&receiver,
+                       s_basic.output,sizeof(s_basic.output),&s_basic.written,
+                       s_basic.scratch.events,PEN_EVENT_CAPACITY,&event_count);
+    if(s_run_quanta!=SIZE_MAX) ++s_run_quanta;
+    if(slice.state==HW4_RUN_YIELDED) {
+        /* NO Ready, prompt, stop or restart at a quantum boundary. */
+        if(!repaint_dirty()) return false;
+        if(s_run_quanta%RUN_LOG_QUANTA==0U) {
+            printf("HW4-RUN-B YIELD quanta=%u steps=%u state=RUNNING "
+                   "program_preserved=1 sha=%s\n",
+                   (unsigned)s_run_quanta,
+                   (unsigned)s_run_scheduler.total_steps,HW4_SHOT_GIT_SHA);
+            if(s_run_quanta%(RUN_LOG_QUANTA*8U)==0U)
+                memory_report("run_running");
         }
-        if(r.status!=BSR_OK || r.executor_status!=BE_OK) {
-            const char *pen_diag=r.executor_status==BE_INVALID_PEN ?
-                "INVALID_PEN" : r.executor_status==BE_UNSUPPORTED ?
-                "UNSUPPORTED_UNVERIFIED" : r.executor_status==BE_NO_EVENT_SPACE ?
-                "EVENT_CAPACITY" : "HOST_GENERIC";
-            printf("HW4-C2 BSR_STEP_FAIL BSR=%d BE=%d step=%u\n",
-                   (int)r.status,(int)r.executor_status,steps);
-            /* The failed step is atomic; the executor still points to the
-             * authentic numbered BASIC record. Resolve BEFORE bsr_stop(). */
-            CpcStepDiagnostic diagnostic=cpc_diag_policy_step(
-                r,&s_basic.runtime);
-            printf("HW4-PEN-A STEP_DIAG category=%s events_applied=0 "
-                   "print_applied=0 origin=%s basic_line=%u host_cpc_err=none\n",
-                   pen_diag,
-                   diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE ?
-                       "CPC_PEN_ORACLE" : "HOST_NOT_CPC_ERR",
-                   (unsigned)diagnostic.line_number);
-            printf("HW4-DIAG-PEN-A DIAG_POLICY category=%s line=%u "
-                   "source=%s message=%s\n",
-                   cpc_diag_policy_category(diagnostic.category),
-                   (unsigned)diagnostic.line_number,
-                   diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE ?
-                       "NATIVE_PEN_ORACLE" : "HOST",
-                   cpc_diag_policy_message(diagnostic.category));
-            (void)bsr_stop(&s_basic.runtime);
-            if(!cpc_diag_policy_write_step(&s_text,diagnostic))
-                return fail("STEP_DIAG_TEXT",-1);
-            return true;
-        }
-        if(event_count!=0U) {
-            /* Shared pure C99 decision: diagnosed reject exits RUN to Ready. */
-            Hw4PenRunAction next=hw4_pen_run_after_display(
-                display_print_events(event_count));
-            if(next==HW4_PEN_RUN_DONE) return true;
-            if(next==HW4_PEN_RUN_FATAL) return false;
-        } else if(s_basic.written>0U &&
-                  !display_bytes("PRINT_BYTES",s_basic.output,s_basic.written))
-            return false;
+        return true;
     }
-    (void)bsr_stop(&s_basic.runtime);
-    printf("HW4-C2 BSR_STEP_BUDGET_EXCEEDED limit=%u "
-           "runtime_stopped=1\n",RUN_STEP_BUDGET);
-    return display_error();
+    s_run_active=false;
+    if(slice.state==HW4_RUN_EXECUTOR_ERROR) {
+        const BSRResult r=s_run_scheduler.last_result;
+        /* Resolve authentic PEN 16/L20 cursor BEFORE the only error stop. */
+        const CpcStepDiagnostic diag=cpc_diag_policy_step(r,&s_basic.runtime);
+        printf("HW4-DIAG-PEN-A DIAG_POLICY category=%s line=%u "
+               "source=%s message=%s\n",
+               cpc_diag_policy_category(diag.category),
+               (unsigned)diag.line_number,
+               diag.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE ?
+                   "NATIVE_PEN_ORACLE" : "HOST",
+               cpc_diag_policy_message(diag.category));
+        (void)bsr_stop(&s_basic.runtime);
+        if(!cpc_diag_policy_write_step(&s_text,diag))
+            return fail("RUN_STEP_DIAG",-1);
+    } else if(slice.state==HW4_RUN_DISPLAY_ERROR) {
+        printf("HW4-PEN-A VIDEO_REJECT status=%d phase=%d "
+               "printed=0 preflight_atomic=%u\n",
+               (int)s_run_video_failure,(int)s_run_scheduler.display_failure,
+               (unsigned)(s_run_scheduler.display_failure==
+                          HW4_RUN_DISPLAY_PREFLIGHT_FAILED));
+        /* Fail-stop: cannot roll back an already partly replayed video step. */
+        (void)bsr_stop(&s_basic.runtime);
+        if(!display_error()) return false;
+    } else if(slice.state==HW4_RUN_INVALID_ARGUMENT) {
+        printf("HW4-RUN-B CONTRACT_REJECT bsr=%d "
+               "policy=host_not_cpc\n",(int)s_run_scheduler.last_result.status);
+        (void)bsr_stop(&s_basic.runtime);
+        if(!display_error()) return false;
+    } else if(slice.state!=HW4_RUN_ENDED && slice.state!=HW4_RUN_BROKEN) {
+        return fail("RUN_STATE",(int)slice.state);
+    }
+    printf("HW4-RUN-B RUN_TERMINAL state=%u quanta=%u steps=%u "
+           "break_source=%s stop_calls=%u latency_us=%llu "
+           "sha=%s program_preserved=1\n",
+           (unsigned)slice.state,(unsigned)s_run_quanta,
+           (unsigned)s_run_scheduler.total_steps,s_run_break_source,
+           s_run_scheduler.stop_calls,
+           (unsigned long long)(s_run_break_requested_us ?
+               (uint64_t)esp_timer_get_time()-s_run_break_requested_us : 0U),
+           HW4_SHOT_GIT_SHA);
+    memory_report("run_terminal");
+    return apply_ready_policy(s_run_ready_transition) && prompt();
 }
 static bool is_command(const uint8_t *source,size_t n,const char *word)
 {

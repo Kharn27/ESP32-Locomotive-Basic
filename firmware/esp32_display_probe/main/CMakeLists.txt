@@ -23,7 +23,7 @@ if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
             "../../../io/cpc_ready_policy.c" "../../../io/cpc_diag_policy.c"
         INCLUDE_DIRS "." "../../../video" "../../../io" "../../../integration"
         REQUIRES loco_core cyd_ili9341 esp_driver_uart esp_driver_gpio
-                 esp_timer freertos heap esp_system esp_hw_support esp_app_format
+                 esp_timer freertos heap esp_system esp_app_format
     )
 elseif(LOCO_CYD_PROFILE STREQUAL "HW3")
     idf_component_register(

@@ -1,0 +1,2 @@
+10 CLS:CLS
+20 END

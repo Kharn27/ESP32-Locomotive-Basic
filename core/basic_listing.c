@@ -389,6 +389,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0xa1u: statement = BL_ST_IF; status = append_word(out, "IF"); break;
         case 0x9eu: statement = BL_ST_FOR; status = append_word(out, "FOR"); break;
         case 0xb0u: statement = BL_ST_NEXT; status = append_word(out, "NEXT"); break;
+        case 0x8au: status = append_word(out, "CLS"); break; /* J1.21-B1 */
         case 0x98u: status = append_word(out, "END"); break;
         case 0xa7u: status = append_word(out, "LIST"); break;
         case 0xcau: status = append_word(out, "RUN"); break;

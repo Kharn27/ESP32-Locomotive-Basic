@@ -11,7 +11,8 @@ typedef struct {
 
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
-    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT, ST_PEN, ST_INK
+    ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT, ST_PEN, ST_INK,
+    ST_CLS
 } BTStatement;
 
 typedef struct {
@@ -23,6 +24,7 @@ typedef struct {
 /* CPC keyword codes checked against basic.asm: E54A, E5DB, E4FF, E5A6, E63A, E663. */
 static const BTKeyword keywords[] = {
     {"PRINT", 0xbfu, ST_PRINT},
+    {"CLS",   0x8au, ST_CLS}, /* J1.21-A CPC6128 RAM oracle */
     {"PEN",   0xbbu, ST_PEN},
     {"INK",   0xa2u, ST_INK},
     {"LIST",  0xa7u, ST_LIST},
@@ -934,7 +936,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 }
             }
         } else {
-            status = BT_OK; /* LIST, RUN, NEW, END: no arguments in this subset. */
+            status = BT_OK; /* CLS lexical only; LIST, RUN, NEW, END: no arguments. */
         }
         if (status != BT_OK) {
             return status;

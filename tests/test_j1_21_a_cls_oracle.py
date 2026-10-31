@@ -35,13 +35,14 @@ class TestOfflineCLSOracle(unittest.TestCase):
         for case,(_mode,action,_screen,_shape) in cls.CASES.items():
             run=cls.command_run(case)
             shot="CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT"
-            self.assertEqual(run.count(shot),2)
+            self.assertEqual(sum(x.count("CAP32_SCRNSHOT") for x in run),2)
             before=run.index(shot)
             target=run.index(action,before+1)  # skip the setup's own CLS
-            after=run.index(shot,target+1)
+            after=run.index(cls.CHRONO_DELAY+" CAP32_SCRNSHOT",target+1)
             self.assertLess(before,target)
             self.assertLess(target,after)
             self.assertLess(after,run.index("PRINT #8,ERR"))
+            self.assertEqual(cls.CHRONO_DELAY.split().count("CAP32_DELAY"),96)
             self.assertLess(run.index("PRINT #8,ERL"),run.index("LIST #8"))
 
     def test_mode_and_paper_controls(self):

@@ -94,7 +94,7 @@ docker run --rm --network none -v "$PWD:/project" -w /project \
   '
 ~~~
 
-La sortie doit être **absente** avant toute acquisition : refus automatique d'écraser des témoins. Le manifeste brut ne peut être produit que par des processus Caprice32 réels. En cas d'indisponibilité de l'environnement ou d'une capture : **CPC_ORACLE_UNVERIFIED**.
+La sortie doit être **absente** avant toute acquisition : refus automatique d'écraser des témoins. Le manifeste brut ne peut être produit que par des processus Caprice32 réels. Si le processus CPC ne produit pas de fichier imprimante, le vérificateur n'en crée **aucun** et note les sondes `ERR`/`ERL` `UNVERIFIED` plutôt que fabriquer des octets. L'image écran reste une observation distincte. En cas d'indisponibilité de l'environnement ou d'une capture : **CPC_ORACLE_UNVERIFIED**.
 
 ## Revue humaine, archivage et garde négatif
 

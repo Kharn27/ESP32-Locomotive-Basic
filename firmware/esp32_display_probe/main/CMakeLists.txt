@@ -17,6 +17,7 @@ if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
             "../../../video/cpc_video.c" "../../../video/cpc_palette.c" "../../../video/cpc_boot.c"
             "../../../video/cpc_text.c" "../../../video/hw4_scroll_metrics.c"
             "../../../integration/hw4_pen_bridge.c"
+            "../../../integration/hw4_run_scheduler.c" # A: compile-only, never invoke from CONSOLE
             "../../../io/cpc_uart_console.c"
             "../../../io/uart_line.c" "../../../io/hw4_shot_uart.c"
             "../../../io/cpc_screen_nav.c"

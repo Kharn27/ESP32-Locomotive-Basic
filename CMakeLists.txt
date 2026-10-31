@@ -33,11 +33,22 @@ add_library(basic_session_runtime STATIC core/basic_session_runtime.c)
 target_include_directories(basic_session_runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
 target_link_libraries(basic_session_runtime PUBLIC basic_session basic_executor)
 
+# HW4-RUN-BREAK-A: real BSR C99 cooperative driver, no CONSOLE integration.
+add_library(hw4_run_scheduler STATIC integration/hw4_run_scheduler.c)
+target_include_directories(hw4_run_scheduler PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/integration)
+target_link_libraries(hw4_run_scheduler PUBLIC basic_session_runtime)
+
 add_library(basic_session STATIC core/basic_session.c)
 target_include_directories(basic_session PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
 target_link_libraries(basic_session PUBLIC basic_tokenizer basic_listing basic_program)
 
 include(CTest)
+# The scheduler test MUST follow include(CTest), which defines BUILD_TESTING.
+if(BUILD_TESTING)
+    add_executable(test_hw4_run_scheduler tests/test_hw4_run_scheduler.c)
+    target_link_libraries(test_hw4_run_scheduler PRIVATE hw4_run_scheduler)
+    add_test(NAME hw4_run_break_a_cooperative_bsr COMMAND test_hw4_run_scheduler)
+endif()
 # Labels are scheduled after the complete CMakeLists has registered all tests.
 if(BUILD_TESTING)
     include(cmake/CTestLabels.cmake)

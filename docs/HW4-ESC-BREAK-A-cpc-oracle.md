@@ -69,3 +69,73 @@ Fichiers `integration/hw4_cpc_escape_contract.[ch]` et `tests/test_hw4_cpc_escap
 Le banc `hw4_esc_break_a_transport_contract` comprend ESC pause/reprise répétée, ESC ESC, flèches/HOME/Suppr ANSI, CSI fragmentée, CSI surlong et corrompue, prompt/direct, commande hôte synthétique, pointeurs nuls et **différentiel négatif** contre le mutant « chaque octet ESC = BREAK ». GCC/Clang C99 `-Wall -Wextra -Wpedantic -Wconversion -Werror` OFF/ON ASan-UBSan. CMake/CTest enregistre uniquement ce test portable ; `core/` et le firmware ne le lient pas.
 
 État A : **transport host seulement**. Oracle ESC E00–E14 **UNVERIFIED** ; build Xtensa du nouveau module **N/A (non lié)** ; CYD `CPC_BREAK_ON_DEVICE_UNVERIFIED`. Les CI historiques doivent être relues sur le HEAD de la PR et consignées dans la remise, sans transformer un succès permanent CPC en oracle ESC. Tranche B reste bloquée à la décision du Pilotage après A et revue/fusion de #226 ; les missions natives STOP/CONT/ON BREAK sont distinctes.
+
+
+## Correctif C1 — quarantaine CSI et falsification du routage (31/10/2026)
+
+Mandat complémentaire **HW4-ESC-BREAK-A-C1** : sur la **même PR #232**, à partir de
+`c04a86b965fbcb843c11171d37ba68aaa459af92`, base PR toujours `main`.
+Les sources firmware, `core/`, scheduler, `!BREAK`, BREAK CPC natif et PR #226 ne changent pas.
+
+### Défaut réellement reproduit (ancienne source)
+
+Le blob historique Git `integration/hw4_cpc_escape_contract.c` a pour empreinte
+`d82fdc82e41e0766c9e376e114f0a07500337d6b` au HEAD antérieur.
+Pour le flux `1B 5B 31 00 44` (`ESC [ 1 NUL D`) :
+- l'ancien `HW4_ESC_CSI` émet `REJECTED` sur `NUL` **mais retourne à TEXT** ;
+- `D` est alors émis `OTHER`, et dans `PAUSED` le routeur le transforme en `RESUME` parasite ;
+- l'ancien `HW4_ESC_CSI_DISCARD` sortait également dès un contrôle (`NUL`, `ESC`, LF), avant le final ANSI.
+
+**RED démontré localement**, en compilant le source original au SHA ci-dessus avec le nouveau fichier
+`tests/test_hw4_cpc_escape_contract.c` (du présent HEAD) :
+```sh
+git show c04a86b965fbcb843c11171d37ba68aaa459af92:integration/hw4_cpc_escape_contract.c > /tmp/hw4-esc-old.c
+gcc -std=c99 -Wall -Wextra -Wpedantic -Wconversion -Werror -Iintegration \
+  /tmp/hw4-esc-old.c tests/test_hw4_cpc_escape_contract.c -o /tmp/hw4-esc-old
+/tmp/hw4-esc-old
+# exit=1 : FAIL tests/test_hw4_cpc_escape_contract.c:161: count == expected_count
+#          FAIL tests/test_hw4_cpc_escape_contract.c:183: quarantined_byte(&d, &phase, (uint8_t)'D', 0u, HW4_ESC_KEY_NONE) == 0
+```
+L'ancien source original et le nouveau fichier de tests furent effectivement compilés et exécutés
+sur hôte ; **ce RED est un test C99, non une nouvelle observation CPC**.
+
+### Contrat corrigé
+
+- Dans `CSI`, un octet hors paramètres/intermédiaires `0x20..0x3F` et hors final
+  `0x40..0x7E` émet **une seule fois** `REJECTED` et entre en `CSI_DISCARD`.
+  La même règle s'applique dès le **17e octet** de paramètres/intermédiaires.
+- Dans `CSI_DISCARD`, **tous** les octets, notamment `NUL`, `ESC`, LF, 0x7F
+  et les suivants, sont consommés silencieusement. **Seul** un octet final ANSI
+  explicite `0x40..0x7E` termine la quarantaine, sans émission d'un `ANSI`,
+  `OTHER` ou `ESCAPE`. Un final correct remet en `TEXT` et réinitialise
+  `sequence_length`. Les séquences ANSI CSI valides restent inchangées.
+- `release_pending()` ne décharge **jamais** une CSI, y compris rejetée, entre deux
+  fragments UART. La vraie fin/reset du flux (`finish()`) remet systématiquement
+  `TEXT` et le compteur à zéro. Elle émet `REJECTED` pour une CSI/SS3 encore
+  incomplète et **NONE** si la CSI était déjà rejetée (pas de double signalement).
+  **Aucun timeout arbitraire** ne déclenche de réarmement.
+- En `PAUSED`, le routeur reçoit **tous** les événements émis par le décodeur
+  pendant les tests (y compris `REJECTED`) : aucun `RESUME` ou `BREAK_REQUEST`
+  n'est généré par une CSI rejetée. Après son final ou `finish()`, une *nouvelle*
+  touche ordinaire peut légitimement provoquer `RESUME`.
+- Un final ANSI est défini au niveau transport par la plage standard `0x40..0x7E` ;
+  C1 ne prétend pas valider la signification CPC de ce final ni ajouter une
+  réinterprétation des touches du firmware.
+
+### Cas du test C1
+
+| ID | Séquence | Contrôle exigé |
+|---|---|---|
+| P0 | ESC [ 1 NUL D, puis x | `REJECTED` unique, ni RESUME pendant la CSI ; x reprend *après* final |
+| P1 | ESC [ 1 NUL ESC 1 D | ESC interne consommé, aucun BREAK ni RESUME |
+| P2 | ESC [ + 17 paramètres + LF ESC 2 D | surlongue rejetée, contrôles quarantainés, final réarme |
+| P3 | ESC [ DEL / frontière UART / 2 ESC ~ / ESC [ D | `release_pending` ne casse pas la quarantaine, ANSI suivant valide |
+| P4 | CSI valide tronquée à `finish`; CSI rejetée tronquée à `finish` | rejet une fois, zéro double signalement, TEXT réarmé |
+
+Preuve hôte C1 autonome locale : GCC 14.2 et Clang 17,
+`-std=c99 -Wall -Wextra -Wpedantic -Wconversion -Werror`,
+**4/4 OFF/ON ASan+UBSan PASS**. Le CTest racine réutilise le test existant
+`hw4_esc_break_a_transport_contract` : pas de nouveau binaire ou dépendance
+firmware. La CI du nouveau HEAD doit confirmer tous les workflows obligatoires.
+Statuts inchangés : `CPC_ESC_ORACLE_UNVERIFIED` et `CPC_BREAK_ON_DEVICE_UNVERIFIED`.
+

@@ -169,7 +169,7 @@ def cpc_record_lines(raw):
                 "CPC_RAM_LINE_OR_TERMINATOR_INVALID")
         numbers.append(line)
         cursor += length
-    require(raw[cursor:] == b"\\x00\\x00", "CPC_RAM_SENTINEL_CHANGED")
+    require(raw[cursor:] == b"\x00\x00", "CPC_RAM_SENTINEL_CHANGED")
     return numbers
 
 

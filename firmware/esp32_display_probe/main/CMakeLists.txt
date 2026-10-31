@@ -18,7 +18,8 @@ if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
             "../../../video/cpc_text.c" "../../../video/hw4_scroll_metrics.c"
             "../../../integration/hw4_pen_bridge.c"
             "../../../io/cpc_uart_console.c"
-            "../../../io/uart_line.c" "../../../io/cpc_screen_nav.c"
+            "../../../io/uart_line.c" "../../../io/hw4_shot_uart.c"
+            "../../../io/cpc_screen_nav.c"
             "../../../io/cpc_ready_policy.c" "../../../io/cpc_diag_policy.c"
         INCLUDE_DIRS "." "../../../video" "../../../io" "../../../integration"
         REQUIRES loco_core cyd_ili9341 esp_driver_uart esp_driver_gpio
@@ -67,3 +68,24 @@ else()
     )
     target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror -std=gnu17)
 endif()
+
+# HW4-SHOT-A: strict build provenance, never confuse the ELF digest with a
+# Git commit SHA. The PO must flash a real checked-out Git commit.
+if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
+    execute_process(
+        COMMAND git rev-parse --verify HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../../.."
+        OUTPUT_VARIABLE HW4_SHOT_GIT_SHA
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE HW4_SHOT_GIT_RESULT
+        ERROR_QUIET
+    )
+    if(NOT HW4_SHOT_GIT_RESULT EQUAL 0 OR
+       NOT HW4_SHOT_GIT_SHA MATCHES "^[0-9a-f]{40}$")
+        message(FATAL_ERROR
+            "HW4-SHOT-A needs a tracked Git HEAD for UART sha provenance")
+    endif()
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE
+        HW4_SHOT_GIT_SHA="${HW4_SHOT_GIT_SHA}")
+endif()
+

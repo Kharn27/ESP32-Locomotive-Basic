@@ -60,7 +60,7 @@ Prérequis : CYD ESP32-2432S028R, USB UART0 `/dev/ttyUSB0`, ESP-IDF v5.5.6, un s
 
 4. Au prompt, faire `LIST` (les 2 lignes doivent être identiques), `RUN` (redémarrage explicite seulement), `!BREAK` par `LF` après redémarrage, `NEW`, `LIST` (vide). Ensuite saisir `10 PEN 2`, `20 PEN 16`, `30 PRINT "NEVER"`, `RUN` : diagnostic attesté `Improper argument in 20`, aucun `NEVER`, un Ready. Tester `!BREAK` hors RUN : aucun BASIC soumis. Tester `!DEMO` pour une fin normale. Vérifier un aller-retour `HOME E3` et les flèches de l'éditeur. Exécuter `!SHOT` **exclusivement au prompt**, jamais dans la boucle infinie.
 
-5. Test semi-automatisé facultatif, après flash et fermeture du monitor :
+5. Test semi-automatisé facultatif, après flash et fermeture du monitor. Revenir à la racine du dépôt (`cd ../..` depuis `firmware/esp32_display_probe`) :
 
    ```sh
    python3 -m pip install pyserial

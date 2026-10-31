@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: ci-opt1-permanent-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.head_ref != 'oracle/j1-19-a-paper-cpc' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.head_ref != 'oracle/j1-19-a-paper-cpc' && github.head_ref != 'oracle/j1-21-a-cls-cpc' }}
 
 jobs:
   sealed-evidence:
@@ -547,5 +547,111 @@ jobs:
             ${{ runner.temp }}/j119-paper-origin-sha256.txt
             ${{ runner.temp }}/j119-paper-manifest-sha256.txt
             ${{ runner.temp }}/j119-paper-origin.txt
+          if-no-files-found: warn
+          retention-days: 90
+
+  cls-cpc-acquisition:
+    if: (github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-21-a-cls-cpc' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref_name == 'oracle/j1-21-a-cls-cpc')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      packages: read
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: true
+      - name: Pin exact CLS branch HEAD, CPC6128 ROM, Caprice32 source and safe diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$GITHUB_HEAD_SHA"
+          test "${{ github.event_name == 'workflow_dispatch' && github.ref_name || github.head_ref }}" = oracle/j1-21-a-cls-cpc
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          git diff origin/main...HEAD --name-only | tee /tmp/j121-cls-paths.txt
+          if grep -E '^(core/|video/|firmware/|integration/|hal/|io/|CMakeLists.txt$|tests/oracles/caprice32/|tests/fixtures/cpc6128/j1_17_|tests/fixtures/cpc6128/j1_18_|tools/j1_17_|tools/j1_18_)' /tmp/j121-cls-paths.txt; then
+            echo 'J1.21-A FORBIDDEN_DIFF_PATH'; exit 1
+          fi
+          python3 tools/j1_21_a_cls_oracle.py --check-sources
+          python3 -m unittest discover -s tests -p 'test_j1_21_a_cls_oracle.py' -q
+          echo 'J1.21-A ROM_CAPRICE_HEAD_AND_SCOPE_PASS'
+      - name: Acquire 28 CLS direct/numbered sessions, two screenshots each, from genuine CPC
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_21_a_cls_oracle.py --acquire tests/oracles/caprice32 \
+            --output "$RUNNER_TEMP/j121-cls" --head "$GITHUB_HEAD_SHA"
+          python3 tools/j1_21_a_cls_oracle.py --evidence "$RUNNER_TEMP/j121-cls"
+          ! find "$RUNNER_TEMP/j121-cls" -type f \( -name '*.sna' -o -name '*.rom' -o -name '*.dsk' -o -name cap32.cfg \) | grep .
+          find "$RUNNER_TEMP/j121-cls" -type f -print0 | sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/j121-cls-origin-sha256.txt"
+          sha256sum "$RUNNER_TEMP/j121-cls/manifest.json" > "$RUNNER_TEMP/j121-cls-manifest-sha256.txt"
+          printf 'GITHUB_RUN_ID=%s\nGITHUB_HEAD_SHA=%s\nCAPRICE_PIN=%s\n' "$GITHUB_RUN_ID" "$GITHUB_HEAD_SHA" 8c778bf072a06fb7c23b9cccd179041db7f79a52 > "$RUNNER_TEMP/j121-cls-origin.txt"
+          echo 'J1.21-A FRESH_28_CASE_SESSIONS_TWO_SHOTS_PASS UNSEALED'
+      - name: Archive first real acquisition with race protection or compare externally sealed evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST=tests/fixtures/cpc6128/j1_21_a_cls
+          if test ! -f "$DEST/manifest.json"; then
+            test ! -e "$DEST"
+            mkdir -p "$DEST"
+            cp -a "$RUNNER_TEMP/j121-cls/." "$DEST/"
+            python3 tools/j1_21_a_cls_oracle.py --evidence "$DEST"
+            ! find "$DEST" -type f \( -name '*.sna' -o -name '*.rom' -o -name '*.dsk' -o -name cap32.cfg \) | grep .
+            git config user.name loco-cyd-evidence-bot
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add "$DEST"
+            git commit -m 'evidence(J1.21-A): archive 28 genuine CLS CPC sessions'
+            REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/oracle/j1-21-a-cls-cpc | awk '{print $1}')"
+            test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA" || {
+              echo 'J1.21-A CONCURRENT_HEAD_ADVANCE_ARCHIVE_NOT_PUSHED'; exit 1;
+            }
+            git push origin HEAD:refs/heads/oracle/j1-21-a-cls-cpc
+            echo 'J1.21-A ARCHIVE_PENDING_EXTERNAL_SEAL'
+            echo 'J1.21-A GITHUB_TOKEN_PUSH_DOES_NOT_AUTOMATICALLY_TRIGGER_PR_CI'
+          else
+            python3 tools/j1_21_a_cls_oracle.py --evidence "$DEST" --permanent --self-test
+            python3 - "$DEST" "$RUNNER_TEMP/j121-cls" <<'PY'
+          import json, pathlib, sys
+          archived,fresh=map(pathlib.Path,sys.argv[1:])
+          manifest=json.loads((archived/'manifest.json').read_text())
+          for sess in ('original','repeat'):
+              for case in manifest['cases']:
+                  for rel in ('program.bin','list/printer.dat','run/printer.dat'):
+                      assert (archived/sess/case/rel).read_bytes()==(fresh/sess/case/rel).read_bytes(),(sess,case,rel)
+                  old=json.loads((archived/sess/case/'capture.json').read_text())
+                  new=json.loads((fresh/sess/case/'capture.json').read_text())
+                  for k in ('rois','err','erl','list_before_sha256','list_after_sha256'):
+                      assert old[k]==new[k],(sess,case,k)
+          print('J1.21-A FRESH_REACQUISITION_RAM_LIST_ERR_ERL_ROI_MATCH_ARCHIVE')
+          PY
+            echo 'J1.21-A EXTERNALLY_SEALED_PASS'
+          fi
+      - name: Preserve untouched original CLS CPC capture and external run SHA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: j121-cls-cpc-original-${{ github.run_id }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/j121-cls/
+            ${{ runner.temp }}/j121-cls-origin-sha256.txt
+            ${{ runner.temp }}/j121-cls-manifest-sha256.txt
+            ${{ runner.temp }}/j121-cls-origin.txt
           if-no-files-found: warn
           retention-days: 90

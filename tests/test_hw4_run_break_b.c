@@ -94,7 +94,7 @@ static int finish_ready(void)
 static int parser_edges(void)
 {
     static const char *bad[]={"!BREAKX\n","!BREA\n","!BREAK \r",
-                               "RUN\n","!SHOT\r","!BR\x1bEAK\n",
+                               "RUN\n","!SHOT\r","!BR\x1b" "EAK\n",
                                "!BREAK!BREAK\n"};
     size_t i,j;
     CHECK(setup()==0);
@@ -109,8 +109,10 @@ static int parser_edges(void)
         CHECK(hw4_run_break_input_feed(&f.parser,(uint8_t)p[1])
               ==HW4_BREAK_INPUT_NONE);
         CHECK(hw4_run_break_input_feed(&f.parser,(uint8_t)p[2])
-              ==HW4_BREAK_INPUT_REQUEST);
+              ==HW4_BREAK_INPUT_NONE);
         CHECK(hw4_run_break_input_feed(&f.parser,(uint8_t)p[3])
+              ==HW4_BREAK_INPUT_REQUEST);
+        CHECK(hw4_run_break_input_feed(&f.parser,(uint8_t)p[4])
               ==HW4_BREAK_INPUT_NONE);
     }
     for(i=0u;i<sizeof(bad)/sizeof(bad[0]);++i) {
@@ -160,7 +162,7 @@ static int infinite_run_and_fragmented_break(void)
                   ==HW4_BREAK_INPUT_NONE);
         for(i=0u;i<strlen(b);++i) {
             Hw4BreakInputEvent ev=hw4_run_break_input_feed(&f.parser,(uint8_t)b[i]);
-            if(i==2u) {
+            if(i==3u) {
                 CHECK(ev==HW4_BREAK_INPUT_REQUEST);
                 CHECK(hw4_run_scheduler_request_break(&f.scheduler));
             } else CHECK(ev==HW4_BREAK_INPUT_NONE);

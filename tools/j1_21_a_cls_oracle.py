@@ -203,6 +203,12 @@ def histogram(rows, rect):
     return hist
 
 
+def roi_rgb_sha(rows, rect):
+    """Exact RGB bytes inside the CPC text ROI, excluding screenshot title."""
+    x0,y0,x1,y1=rect
+    return sha(b"".join(bytes(row[3*x0:3*x1]) for row in rows[y0:y1]))
+
+
 def pixel_evidence(before, after):
     need(len(before) == len(after) == 540, "PNG_DIMENSIONS")
     need(all(len(x) == 768*3 for x in before+after), "PNG_WIDTH")
@@ -426,11 +432,18 @@ def verify(out, permanent=False):
         need(a["ram_hex"]==b["ram_hex"] and a["err"]==b["err"] and
              a["erl"]==b["erl"] and a["list_before_sha256"]==b["list_before_sha256"] and
              a["rois"]==b["rois"] and
-             a["screens"]["before_rgb_sha256"]==b["screens"]["before_rgb_sha256"] and
-             a["screens"]["after_rgb_sha256"]==b["screens"]["after_rgb_sha256"] and
              a["metadata"]["list"]["started_utc"]!=b["metadata"]["list"]["started_utc"] and
              a["metadata"]["run"]["started_utc"]!=b["metadata"]["run"]["started_utc"],
              "INDEPENDENT_REPEAT_MISMATCH_"+case)
+        # Caprice32 stamps the screenshot filename in the top overlay.
+        # Filename timestamp varies across processes; text AREA pixel bytes
+        # must still match exactly (not only their color histogram).
+        for stage in ("screen_0.png","screen_1.png"):
+            first=rgb.png_rgb(out/"original"/case/"run"/stage)
+            second=rgb.png_rgb(out/"repeat"/case/"run"/stage)
+            for name,rect in ROIS.items():
+                need(roi_rgb_sha(first,rect)==roi_rgb_sha(second,rect),
+                     "INDEPENDENT_ROI_PIXEL_MISMATCH_"+case+"_"+stage+"_"+name)
     return {"case_count":len(CASES),"sessions":len(CASES)*2,
             "seal":"EXTERNALLY_SEALED" if permanent else "UNSEALED",
             "classification":"OBSERVED"}

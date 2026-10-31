@@ -52,6 +52,7 @@ enum {
     CPC_ROWS = 25,
     RUN_QUANTUM = 8, /* eight BASIC steps max per app_main iteration */
     RUN_UART_POLL_BYTES = 16,
+    RUN_UART_DRAIN_BYTES = 768, /* bounded UART RX ring+FIFO drain */
     RUN_LOG_QUANTA = 64,
     PEN_EVENT_CAPACITY = 3, /* A0 DRAM guard: 3 typed events, no heap/VRAM */
     ECHO_IDLE_MS = 20,
@@ -777,11 +778,22 @@ void app_main(void)
                     if(!hw4_run_scheduler_request_break(&s_run_scheduler)) {
                         (void)fail("RUN_BREAK_REQUEST",-1); return;
                     }
-                    /* Drop typed-ahead input, including !SHOT and BASIC
-                     * edits. A later CRLF LF is consumed below. */
-                    if(uart_flush_input(UART_NUM_0)!=ESP_OK) {
-                        (void)fail("RUN_UART_FLUSH",-1); return;
+                    /* Drain the existing UART0 RX queue (512 ring + FIFO)
+                     * without importing another IRAM ringbuffer primitive.
+                     * Discard all typed-ahead BASIC, E3 and !SHOT bytes.
+                     * A late asynchronous CRLF LF is swallowed below. */
+                    unsigned discarded=0U;
+                    for(;discarded<RUN_UART_DRAIN_BYTES;++discarded) {
+                        uint8_t ignored=0U;
+                        const int consumed=uart_read_bytes(UART_NUM_0,
+                                                          &ignored,1U,0);
+                        if(consumed<0) {
+                            (void)fail("RUN_UART_DRAIN",consumed); return;
+                        }
+                        if(consumed==0) break;
                     }
+                    printf("HW4-RUN-B UART_DRAIN discarded=%u max=%u\n",
+                           discarded,RUN_UART_DRAIN_BYTES);
                     break;
                 }
             }

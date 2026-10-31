@@ -72,6 +72,15 @@ class TestOfflineCLSOracle(unittest.TestCase):
         self.assertFalse(cls.SEALED_FILE_SHA256)
         self.assertFalse(cls.SEALED_ACQUISITION_HEAD)
 
+    def test_timestamp_title_is_excluded_but_text_pixels_are_exact(self):
+        a=[bytearray(768*3) for _ in range(540)]
+        b=[bytearray(row) for row in a]
+        rect=cls.ROIS["text_area"]
+        b[12][15]=77  # Caprice screenshot filename/title outside CPC text.
+        self.assertEqual(cls.roi_rgb_sha(a,rect),cls.roi_rgb_sha(b,rect))
+        b[120][80*3]=99  # Genuine visible CPC region is discriminant.
+        self.assertNotEqual(cls.roi_rgb_sha(a,rect),cls.roi_rgb_sha(b,rect))
+
     def test_roi_sanity(self):
         for box in cls.ROIS.values():
             x0,y0,x1,y1=box

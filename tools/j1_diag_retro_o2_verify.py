@@ -267,7 +267,9 @@ def verify(root):
                     commands.index("PRINT #8,ERL") > commands.index("PRINT #8,ERR"),
                     "O2_SCREEN_PRINTER_ORDER_INVALID_"+case)
             ram.append((part / "program.bin").read_bytes())
-            printer.append((part / "run/printer.dat").read_bytes())
+            printer_path = part / "run/printer.dat"
+            # Probe not produced by Caprice32 => UNVERIFIED; never fabricate it.
+            printer.append(printer_path.read_bytes() if printer_path.is_file() else b"")
             png.append(sha(p.read_bytes()))
             probes.append((run.get("err_probe"), run.get("erl_probe")))
         require(ram[0] == ram[1], "O2_CPC_RAM_ORIGINAL_REPEAT_DIFFER_"+case)

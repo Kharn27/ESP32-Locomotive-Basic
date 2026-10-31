@@ -208,6 +208,21 @@ static void tests(void)
     CHECK_CASE(if_missing, 1U, BE_MISSING_TARGET, "ERROR\n", 0);
     CHECK_CASE(pen, 0U, BE_INVALID_PEN,
                "Improper argument in 10\n", 1);
+    /* A1b RED: original/repeat J1.12-A ROM-backed PNG text.
+     * The wrong NEXT belongs to line 30 although FOR preflight is line 10. */
+    {
+        static const char *orphan[] = {
+            "10 PRINT \"BEFORE\"", "20 NEXT I%", "30 PRINT \"NEVER\""
+        };
+        static const char *wrong[] = {
+            "10 FOR I%=1 TO 2", "20 PRINT \"NEVER\"",
+            "30 NEXT J%", "40 END"
+        };
+        CHECK_CASE(orphan, 1U, BE_NEXT_WITHOUT_FOR,
+                   "Unexpected NEXT in 20\n", 1);
+        CHECK_CASE(wrong, 0U, BE_NEXT_VARIABLE_MISMATCH,
+                   "Unexpected NEXT in 30\n", 1);
+    }
 #undef CHECK_CASE
 }
 int main(void)

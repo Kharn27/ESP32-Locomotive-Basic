@@ -388,11 +388,14 @@ static bool repaint_dirty(void)
     }
     if(s_text.scrolls<s_scroll_reported) s_scroll_reported=0U; /* !CLS */
     if(s_text.scrolls>s_scroll_reported) {
-        printf("HW4-C3-B2 SCREEN_SCROLL rows=%u total=%u "
-               "policy=mode1_vram program_preserved=1\n",
-               (unsigned)(s_text.scrolls-s_scroll_reported),
-               (unsigned)s_text.scrolls);
-        s_scroll_reported=s_text.scrolls;
+        /* No UART log per scroll during an infinite RUN; preserve metric. */
+        if(!s_run_active || s_run_quanta%RUN_LOG_QUANTA==0U) {
+            printf("HW4-C3-B2 SCREEN_SCROLL rows=%u total=%u "
+                   "policy=mode1_vram program_preserved=1\n",
+                   (unsigned)(s_text.scrolls-s_scroll_reported),
+                   (unsigned)s_text.scrolls);
+            s_scroll_reported=s_text.scrolls;
+        }
     }
     return true;
 }

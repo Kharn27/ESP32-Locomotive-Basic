@@ -67,10 +67,13 @@ class TestOfflineCLSOracle(unittest.TestCase):
             with self.assertRaisesRegex(cls.Invalid,"HEAD_FORMAT"):
                 cls.acquire(Path(t),Path(t)/"never","BAD_HEAD")
 
-    def test_not_presealed(self):
-        self.assertFalse(cls.SEALED_MANIFEST_SHA256)
-        self.assertFalse(cls.SEALED_FILE_SHA256)
-        self.assertFalse(cls.SEALED_ACQUISITION_HEAD)
+    def test_seal_matches_independent_original_artifact(self):
+        self.assertEqual(cls.SEALED_MANIFEST_SHA256,
+                         "dfe668e3ec5b799e22deec017049fd132b28a72a16036ccbfdfc8214e7f59a65")
+        self.assertEqual(cls.SEALED_ACQUISITION_HEAD,
+                         "4ae73a2c054b7332f64fb77eaf68e41b89d36ddb")
+        self.assertEqual(set(cls.SEALED_FILE_SHA256),cls.paths())
+        self.assertEqual(len(cls.SEALED_FILE_SHA256),252)
 
     def test_timestamp_title_is_excluded_but_text_pixels_are_exact(self):
         a=[bytearray(768*3) for _ in range(540)]

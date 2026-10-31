@@ -223,11 +223,153 @@ static void tests(void)
         CHECK_CASE(wrong, 0U, BE_NEXT_VARIABLE_MISMATCH,
                    "Unexpected NEXT in 30\n", 1);
     }
+    {
+        static const char *orphan_renumber[] = {
+            "500 PRINT \"BEFORE\"", "620 NEXT I%", "700 PRINT \"NEVER\""
+        };
+        static const char *orphan_colon[] = {
+            "550 PRINT \"BEFORE\":NEXT I%:PRINT \"NEVER\""
+        };
+        static const char *wrong_renumber[] = {
+            "410 FOR I%=1 TO 2", "510 PRINT \"NEVER\"",
+            "790 NEXT J%", "900 END"
+        };
+        static const char *wrong_colon[] = {
+            "10 FOR I%=1 TO 2:PRINT \"NEVER\"",
+            "20 NEXT J%:PRINT \"NEVER\"", "30 END"
+        };
+        static const char *wrong_quote_rem[] = {
+            "10 FOR I%=1 TO 2",
+            "20 PRINT \"NEXT J%: FOR K%\"",
+            "25 REM NEXT I%", "30 NEXT J%", "40 END"
+        };
+        static const char *without_next[] = {
+            "10 FOR I%=1 TO 2", "20 PRINT \"NEVER\""
+        };
+        static const char *overflow_next[] = {
+            "10 FOR I%=32767 TO 32767", "20 NEXT I%", "30 END"
+        };
+        CHECK_CASE(orphan_renumber, 1U, BE_NEXT_WITHOUT_FOR,
+                   "Unexpected NEXT in 620\n", 1);
+        CHECK_CASE(orphan_colon, 0U, BE_NEXT_WITHOUT_FOR,
+                   "Unexpected NEXT in 550\n", 1);
+        CHECK_CASE(wrong_renumber, 0U, BE_NEXT_VARIABLE_MISMATCH,
+                   "Unexpected NEXT in 790\n", 1);
+        CHECK_CASE(wrong_colon, 0U, BE_NEXT_VARIABLE_MISMATCH,
+                   "Unexpected NEXT in 20\n", 1);
+        CHECK_CASE(wrong_quote_rem, 0U, BE_NEXT_VARIABLE_MISMATCH,
+                   "Unexpected NEXT in 30\n", 1);
+        CHECK_CASE(without_next, 0U, BE_FOR_WITHOUT_NEXT, "ERROR\n", 0);
+        CHECK_CASE(overflow_next, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
+    }
 #undef CHECK_CASE
 }
+/* Only the CPC-attested NEXT causes can be promoted.
+ * A claimed status is insufficient without a read-only matching replay. */
+static void test_next_provenance(void)
+{
+    BSRResult result, fabricated;
+    BasicProgramLine line;
+    CpcStepDiagnostic diagnosis;
+    BasicSessionRuntime saved_runtime;
+    BasicVariableStore saved_store;
+    BasicVariableEntry saved_entries[32];
+    uint8_t saved_program[PROGRAM_CAP], saved_output[OUTPUT_CAP];
+    BEVideoEvent saved_events[EVENT_CAP];
+    uint16_t locus = 999U;
+    uint8_t bytes[80];
+    size_t written = 123U;
+    setup();
+    submit("10 FOR I%=1 TO 2");
+    submit("20 PRINT \"NEVER\"");
+    submit("30 NEXT J%");
+    submit("40 END");
+    submit("RUN");
+    result = step();
+    assert(result.status == BSR_EXECUTOR_ERROR &&
+           result.executor_status == BE_NEXT_VARIABLE_MISMATCH);
+    saved_runtime = f.runtime;
+    saved_store = f.store;
+    memcpy(saved_entries, f.entries, sizeof saved_entries);
+    memcpy(saved_program, f.storage, sizeof saved_program);
+    memcpy(saved_output, f.output, sizeof saved_output);
+    memcpy(saved_events, f.events, sizeof saved_events);
+    assert(be_next_fault_line(&f.runtime.executor,
+                              result.executor_status, &locus));
+    assert(locus == 30U);
+    assert(memcmp(&saved_runtime, &f.runtime, sizeof saved_runtime) == 0);
+    assert(memcmp(&saved_store, &f.store, sizeof saved_store) == 0);
+    assert(memcmp(saved_entries, f.entries, sizeof saved_entries) == 0);
+    assert(memcmp(saved_program, f.storage, sizeof saved_program) == 0);
+    assert(memcmp(saved_output, f.output, sizeof saved_output) == 0);
+    assert(memcmp(saved_events, f.events, sizeof saved_events) == 0);
+    locus = 991U;
+    assert(!be_next_fault_line(&f.runtime.executor, BE_MISSING_TARGET, &locus));
+    assert(locus == 991U);
+    fabricated = result;
+    fabricated.executor_status = BE_NEXT_WITHOUT_FOR;
+    diagnosis = cpc_diag_policy_step(fabricated, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+    fabricated.executor_status = BE_NO_EVENT_SPACE;
+    diagnosis = cpc_diag_policy_step(fabricated, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+    fabricated.executor_status = BE_MISSING_TARGET;
+    diagnosis = cpc_diag_policy_step(fabricated, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+    fabricated = result;
+    fabricated.status = BSR_SESSION_ERROR;
+    diagnosis = cpc_diag_policy_step(fabricated, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+    assert(bp_find(&f.program, 30U, &line) == BP_OK);
+    assert(f.storage[line.body_offset] == 0xb0u);
+    f.storage[line.body_offset] = 0x98u; /* forged NEXT replaced by END */
+    diagnosis = cpc_diag_policy_step(result, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+    f.storage[line.body_offset] = 0xb0u;
+    diagnosis = cpc_diag_policy_step(result, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_NEXT_UNEXPECTED &&
+           diagnosis.origin == CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE &&
+           diagnosis.line_number == 30U);
+    diagnosis.origin = CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE;
+    memset(bytes, 0x59, sizeof bytes);
+    assert(!cpc_diag_policy_format_step(diagnosis, bytes, sizeof bytes, &written));
+    assert(written == 123U);
+    for(size_t i=0U;i<sizeof bytes;++i) assert(bytes[i]==0x59u);
+    f.runtime.executor.cursor = f.program.size; /* forged invalid cursor */
+    diagnosis = cpc_diag_policy_step(result, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime = saved_runtime;
+    assert(memcmp(f.storage, saved_program, sizeof saved_program) == 0);
+}
+
+static void test_next_success(void)
+{
+    BSRResult result;
+    CpcStepDiagnostic diagnosis;
+    setup();
+    submit("10 FOR I%=1 TO 2");
+    submit("20 PRINT \"NEXT J% is just a string\"");
+    submit("25 REM NEXT K%");
+    submit("30 NEXT I%");
+    submit("40 END");
+    submit("RUN");
+    for(unsigned i=0U;i<10U;++i) {
+        result = step();
+        if(result.status == BSR_END) break;
+        assert(result.status == BSR_OK && result.executor_status == BE_OK);
+    }
+    assert(result.status == BSR_END);
+    result.executor_status = BE_NEXT_VARIABLE_MISMATCH;
+    result.status = BSR_EXECUTOR_ERROR;
+    diagnosis = cpc_diag_policy_step(result, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+}
+
 int main(void)
 {
     tests();
+    test_next_provenance();
+    test_next_success();
     puts("J1-DIAG-RETRO-A1a: GOSUB/RETURN CPC, renumber, negative origins, atomicity, Ready OK");
     return 0;
 }

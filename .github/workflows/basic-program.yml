@@ -22,6 +22,19 @@ jobs:
         compiler: [gcc, clang]
     steps:
       - uses: actions/checkout@v4
+      # Auxiliary disposable proof PR only: execute A0 on the EXACT
+      # synchronized production PR #236 SHA, never on this workflow patch.
+      - name: J1-DIAG-RETRO-A1b-C1 exact HEAD A0 self-test (gcc OFF)
+        if: matrix.compiler == 'gcc' && matrix.sanitizers == 'OFF'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin bd3216fe3ff5de538b632d3ec45fcd378cda6ebc
+          git checkout --detach bd3216fe3ff5de538b632d3ec45fcd378cda6ebc
+          echo 'J1-DIAG-A1b-C1 VERIFIED_SYNC_HEAD:'
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "bd3216fe3ff5de538b632d3ec45fcd378cda6ebc"
+          python3 tools/j1_diag_retro_a0_verify.py --self-test
+          echo 'J1-DIAG-A1b-C1 EXACT_HEAD_A0_SELF_TEST=PASS'
       - name: Configure
         run: |
           # Existing J0.23 host budget audit uses an anonymous struct inside

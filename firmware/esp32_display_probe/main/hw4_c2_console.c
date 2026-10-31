@@ -756,6 +756,34 @@ void app_main(void)
            "command_flush=1 dma_fail_stop=1\n",ECHO_IDLE_MS,ECHO_MAX_BYTES);
     for(;;) {
         if(!touch_poll()) return;
+        if(s_run_active) {
+            /* UART is polled before every quantum; no editor/SHOT in RUN. */
+            for(unsigned i=0U;i<RUN_UART_POLL_BYTES;++i) {
+                uint8_t byte=0U;
+                const int n=uart_read_bytes(UART_NUM_0,&byte,1U,0);
+                if(n<0) { (void)fail("RUN_UART_READ",n); return; }
+                if(n==0) break;
+                const Hw4BreakInputEvent event=
+                    hw4_run_break_input_feed(&s_run_input,byte);
+                if(event==HW4_BREAK_INPUT_REQUEST) {
+                    s_run_break_source=byte==(uint8_t)'\r' ? "UART_CR" : "UART_LF";
+                    s_run_break_requested_us=(uint64_t)esp_timer_get_time();
+                    s_run_skip_crlf_lf=byte==(uint8_t)'\r';
+                    if(!hw4_run_scheduler_request_break(&s_run_scheduler)) {
+                        (void)fail("RUN_BREAK_REQUEST",-1); return;
+                    }
+                    /* Drop typed-ahead input, including !SHOT and BASIC
+                     * edits. A later CRLF LF is consumed below. */
+                    if(uart_flush_input(UART_NUM_0)!=ESP_OK) {
+                        (void)fail("RUN_UART_FLUSH",-1); return;
+                    }
+                    break;
+                }
+            }
+            if(!basic_run_slice()) return;
+            vTaskDelay(1); /* mandatory cooperative yield between quanta */
+            continue;
+        }
         uint8_t ch=0U;
         int got=uart_read_bytes(UART_NUM_0,&ch,1U,
                                 pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : TOUCH_POLL_MS));
@@ -769,6 +797,10 @@ void app_main(void)
                 echo_pending=0U;
             }
             continue;
+        }
+        if(s_run_skip_crlf_lf) {
+            s_run_skip_crlf_lf=false;
+            if(ch==(uint8_t)'\n') continue;
         }
         UartLineEvent event=uart_line_feed_screen(&s_line,ch);
         if(event==UART_LINE_SCREENSHOT) {

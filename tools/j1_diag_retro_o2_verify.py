@@ -202,7 +202,7 @@ def review_one(review, case, png_hash):
             "\r" not in wording, "SCREEN_WORDING_NOT_REVIEWED_"+case)
     ready = review.get("ready_count")
     require(type(ready) is int and 0 <= ready <= 25 and
-            type(review.get("post_error_print_absent")) is bool,
+            type(review.get("forbidden_print_absent")) is bool,
             "READY_OR_PRINT_NOT_REVIEWED_"+case)
     # No prior assumption about the GOTO/IF error wording.
     return wording, review["ready_count"]
@@ -308,7 +308,7 @@ def self_test():
         "reviewed_original_and_repeat": True,
         "png_sha256": "a"*64, "reviewer": "independent human",
         "screen_text": "REVIEWED_BY_HUMAN_NOT_A_CPC_CLAIM",
-        "ready_count": 1, "post_error_print_absent": True}
+        "ready_count": 1, "forbidden_print_absent": True}
     require(review_one(base, "GOTO_MISSING", "a"*64)[1] == 1,
             "VALID_REVIEW_FIXTURE_REJECTED")
     bad = [

@@ -419,8 +419,6 @@ static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
                (unsigned)(s_text.bytes_clipped-clipped_before));
     return true; /* final frame is flushed by prompt */
 }
-/* Preflight ALL typed events before changing ANY pixel or sink counter.
- * One original PRINT_BYTES log is retained, not fragments/escape codes. */
 /* Exact PEN/INK whole-step preflight and ordered replay; no per-step logs. */
 static bool run_preflight(void *ctx,const uint8_t *bytes,size_t length,
                           const BEVideoEvent *events,size_t count)
@@ -438,8 +436,7 @@ static bool run_replay(void *ctx,const uint8_t *bytes,size_t length,
 }
 static bool display_error(void)
 {
-    /* The UART reject, RUN step and budget errors are host-only; no ROM
-     * diagnosis can be inferred from their internal numeric statuses. */
+    /* UART, renderer and host contract rejects are never CPC ROM errors. */
     printf("HW4-DIAG-A DIAG_POLICY origin=runtime_or_uart "
            "category=HOST_GENERIC message=ERROR\n");
     if(!cpc_diag_policy_write(&s_text,CPC_DIAG_HOST_GENERIC))
@@ -581,12 +578,15 @@ static bool basic_run_slice(void)
     }
     printf("HW4-RUN-B RUN_TERMINAL state=%u quanta=%u steps=%u "
            "break_source=%s stop_calls=%u latency_us=%llu "
+           "ignored_input_lines=%u overflow_input_lines=%u "
            "sha=%s program_preserved=1\n",
            (unsigned)slice.state,(unsigned)s_run_quanta,
            (unsigned)s_run_scheduler.total_steps,s_run_break_source,
            s_run_scheduler.stop_calls,
            (unsigned long long)(s_run_break_requested_us ?
                (uint64_t)esp_timer_get_time()-s_run_break_requested_us : 0U),
+           (unsigned)s_run_input.ignored_lines,
+           (unsigned)s_run_input.overflow_lines,
            HW4_SHOT_GIT_SHA);
     memory_report("run_terminal");
     return apply_ready_policy(s_run_ready_transition) && prompt();

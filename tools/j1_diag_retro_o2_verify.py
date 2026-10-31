@@ -154,6 +154,25 @@ def acquire(cap, image_cli, out):
     verify(out)
 
 
+def cpc_record_lines(raw):
+    # Native CPC BASIC pre-RUN RAM: bounded, length-prefixed records + 0000.
+    cursor, numbers = 0, []
+    while cursor < len(raw) - 2:
+        require(len(raw) - cursor >= 6, "TRUNCATED_CPC_RAM_RECORD")
+        length = raw[cursor] | (raw[cursor+1] << 8)
+        require(5 <= length <= len(raw) - cursor - 2,
+                "CPC_RAM_RECORD_LENGTH_INVALID")
+        line = raw[cursor+2] | (raw[cursor+3] << 8)
+        require(1 <= line <= 65535 and
+                (not numbers or line > numbers[-1]) and
+                raw[cursor+length-1] == 0,
+                "CPC_RAM_LINE_OR_TERMINATOR_INVALID")
+        numbers.append(line)
+        cursor += length
+    require(raw[cursor:] == b"\\x00\\x00", "CPC_RAM_SENTINEL_CHANGED")
+    return numbers
+
+
 def printer_probes(raw):
     # Parse only what the separate CPC printer actually wrote, not BEStatus.
     rows = raw.splitlines(keepends=True)
@@ -212,8 +231,11 @@ def verify(root):
     complete = 0
     for case, obj in recorded.items():
         source = source_bytes(case)
+        expected_lines = [int(line.split(b" ", 1)[0])
+                          for line in source.splitlines()]
         require(obj.get("source_sha256") == sha(source) and
-                obj.get("fault_line_in_source") == CASES[case][0],
+                obj.get("fault_line_in_source") == CASES[case][0] and
+                obj.get("line_numbers") == expected_lines,
                 "O2_SOURCE_PROVENANCE_CHANGED_"+case)
         ram, printer, png = [], [], []
         probes = []
@@ -249,6 +271,8 @@ def verify(root):
             png.append(sha(p.read_bytes()))
             probes.append((run.get("err_probe"), run.get("erl_probe")))
         require(ram[0] == ram[1], "O2_CPC_RAM_ORIGINAL_REPEAT_DIFFER_"+case)
+        require(cpc_record_lines(ram[0]) == expected_lines,
+                "O2_CPC_RAM_NOT_THE_SOURCE_LINES_"+case)
         require(printer[0] == printer[1] and probes[0] == probes[1],
                 "O2_PRINTER_ORIGINAL_REPEAT_DIFFER_"+case)
         for index, phase in enumerate(("original", "repeat")):

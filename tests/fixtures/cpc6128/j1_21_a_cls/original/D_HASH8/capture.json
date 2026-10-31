@@ -1,0 +1,256 @@
+{
+  "case": "D_HASH8",
+  "classification": "OBSERVED_IN_REAL_ACQUISITION",
+  "commands": {
+    "list": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "10 REM CLS HASH EIGHT",
+      "20 END",
+      "LIST",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
+      "LIST #8",
+      "CAP32_DELAY CAP32_EXIT"
+    ],
+    "run": [
+      "MODE 1",
+      "INK 0,0",
+      "INK 1,26",
+      "INK 2,6",
+      "INK 3,18",
+      "PAPER 0",
+      "PEN 1",
+      "CLS",
+      "NEW",
+      "10 REM CLS HASH EIGHT",
+      "20 END",
+      "LOCATE 1,15",
+      "PRINT \"J121CLS\"",
+      "LOCATE 1,1",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "CLS #8",
+      "CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "PRINT #8,ERR",
+      "PRINT #8,ERL",
+      "LIST #8",
+      "CAP32_DELAY CAP32_EXIT"
+    ]
+  },
+  "cursor_position": "UNVERIFIED_UNLESS_POST_PROBE_ACQUIRED",
+  "diagnostic_text": "UNVERIFIED_FROM_SCREEN",
+  "erl": 0,
+  "err": 5,
+  "kind": "CPC6128_CAPRICE32_REAL_ONLY",
+  "list_after_sha256": "9f0963a38958074bfba5c87d21965c97f920630a04eb31bef5b37be23b97b8bc",
+  "list_before_sha256": "9f0963a38958074bfba5c87d21965c97f920630a04eb31bef5b37be23b97b8bc",
+  "metadata": {
+    "list": {
+      "commands": [
+        "MODE 1",
+        "INK 0,0",
+        "INK 1,26",
+        "INK 2,6",
+        "INK 3,18",
+        "PAPER 0",
+        "PEN 1",
+        "CLS",
+        "NEW",
+        "10 REM CLS HASH EIGHT",
+        "20 END",
+        "LIST",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
+        "LIST #8",
+        "CAP32_DELAY CAP32_EXIT"
+      ],
+      "finished_utc": "2026-10-31T00:47:00.206275+00:00",
+      "screenshot_height": 540,
+      "screenshot_width": 768,
+      "started_utc": "2026-10-31T00:46:58.663915+00:00"
+    },
+    "run": {
+      "commands": [
+        "MODE 1",
+        "INK 0,0",
+        "INK 1,26",
+        "INK 2,6",
+        "INK 3,18",
+        "PAPER 0",
+        "PEN 1",
+        "CLS",
+        "NEW",
+        "10 REM CLS HASH EIGHT",
+        "20 END",
+        "LOCATE 1,15",
+        "PRINT \"J121CLS\"",
+        "LOCATE 1,1",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+        "CLS #8",
+        "CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+        "PRINT #8,ERR",
+        "PRINT #8,ERL",
+        "LIST #8",
+        "CAP32_DELAY CAP32_EXIT"
+      ],
+      "finished_utc": "2026-10-31T00:47:12.536228+00:00",
+      "screenshot_height": 540,
+      "screenshot_width": 768,
+      "started_utc": "2026-10-31T00:47:00.208704+00:00"
+    }
+  },
+  "phase": "J1.21-A",
+  "post_run_instrumentation": "PRINT #8 ERR/ERL + LIST #8 AFTER SECOND SCREENSHOT",
+  "preparation": [
+    "LOCATE 1,15",
+    "PRINT \"J121CLS\"",
+    "LOCATE 1,1"
+  ],
+  "printer_hex": "2035200d0a2030200d0a31302052454d20434c5320484153482045494748540d0a323020454e440d0a",
+  "printer_sha256": "04b7806b2ea8a59527c9e753408e6bb309c506898be4d6b143553a9894f9866f",
+  "ram_hex": "15 00 0A 00 C5 20 43 4C 53 20 48 41 53 48 20 45 49 47 48 54 00 06 00 14 00 98 00 00 00",
+  "ram_lines": [
+    10,
+    20
+  ],
+  "ram_region": {
+    "bank": "physical bank 0, Gate Array RAM config 0",
+    "base_pointer_address": 44644,
+    "base_pointer_value": 367,
+    "end_exclusive": 397,
+    "end_pointer_address": 44646,
+    "length": 29,
+    "line_numbers": [
+      10,
+      20
+    ],
+    "records": [
+      {
+        "length": 21,
+        "line": 10,
+        "offset": 0,
+        "terminator_offset": 20
+      },
+      {
+        "length": 6,
+        "line": 20,
+        "offset": 21,
+        "terminator_offset": 26
+      }
+    ],
+    "sentinel_offset": 27,
+    "snapshot_data_offset": 256,
+    "snapshot_program_offset": 624,
+    "start_address": 368,
+    "terminator_hex": "0000"
+  },
+  "ram_sha256": "97657db9d0264c98cc97dcc86a57dcaa660bf5cf652ddb1ebfa261bc3fdb6425",
+  "rois": {
+    "lower_right": {
+      "after_rgb_histogram": {
+        "0,0,0": 11520
+      },
+      "before_rgb_histogram": {
+        "0,0,0": 11520
+      },
+      "changed_rgb_pixels": 0,
+      "roi": [
+        560,
+        401,
+        704,
+        481
+      ],
+      "total_pixels": 11520
+    },
+    "text_area": {
+      "after_rgb_histogram": {
+        "0,0,0": 247912,
+        "0,0,127": 640,
+        "255,255,255": 7448
+      },
+      "before_rgb_histogram": {
+        "0,0,0": 247244,
+        "0,0,127": 640,
+        "255,255,255": 8116
+      },
+      "changed_rgb_pixels": 3884,
+      "roi": [
+        64,
+        81,
+        704,
+        481
+      ],
+      "total_pixels": 256000
+    },
+    "upper_left": {
+      "after_rgb_histogram": {
+        "0,0,0": 8302,
+        "0,0,127": 136,
+        "255,255,255": 2442
+      },
+      "before_rgb_histogram": {
+        "0,0,0": 8264,
+        "0,0,127": 136,
+        "255,255,255": 2480
+      },
+      "changed_rgb_pixels": 2042,
+      "roi": [
+        64,
+        81,
+        200,
+        161
+      ],
+      "total_pixels": 10880
+    },
+    "window_center": {
+      "after_rgb_histogram": {
+        "0,0,0": 63452,
+        "255,255,255": 548
+      },
+      "before_rgb_histogram": {
+        "0,0,0": 63596,
+        "255,255,255": 404
+      },
+      "changed_rgb_pixels": 144,
+      "roi": [
+        224,
+        201,
+        544,
+        401
+      ],
+      "total_pixels": 64000
+    }
+  },
+  "rom_not_executed_on_esp32": true,
+  "screen_capture_is_not_rom_token_evidence": true,
+  "screens": {
+    "after_rgb_sha256": "709ab9ec5d2de4d8f5648ce7cc7c289910ba69be4e91e448f34c88c8ac07653f",
+    "after_sha256": "27a689236a087889e3677b39abc43435514c931cab095e7420109b514468792b",
+    "before_rgb_sha256": "af7b97213e0cf74e38697f5b2a833938ac7c1a7c7f725d71c017cce2a072f032",
+    "before_sha256": "c0753ff5c3ec7509956b88fd27d04bf7804f1a6f5a634fcbe50395b20c684bf0"
+  },
+  "semantic_clear_window": "INCONCLUSIVE_PENDING_ROI_INSPECTION",
+  "session": "original",
+  "setup": [
+    "MODE 1",
+    "INK 0,0",
+    "INK 1,26",
+    "INK 2,6",
+    "INK 3,18",
+    "PAPER 0",
+    "PEN 1",
+    "CLS",
+    "NEW"
+  ],
+  "source_lines": [
+    "10 REM CLS HASH EIGHT",
+    "20 END"
+  ],
+  "source_mode": "direct",
+  "source_sha256": "427176f77872f9c38c1b769adae8904a44c8633b60899fab5bb82102383c034b"
+}

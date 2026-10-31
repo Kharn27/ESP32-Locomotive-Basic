@@ -54,6 +54,18 @@ PAPER_TOOL = "tools/j1_19_a_paper_oracle.py"
 PAPER_WORKFLOW = "ci-cpc-permanent.yml"
 PAPER_BRANCH = "oracle/j1-19-a-paper-cpc"
 PAPER_JOB = "paper-cpc-acquisition"
+CLS_TOOL = "tools/j1_21_a_cls_oracle.py"
+CLS_JOB = "cls-cpc-acquisition"
+CLS_BRANCH = "oracle/j1-21-a-cls-cpc"
+CLS_ARCHIVE = "tests/fixtures/cpc6128/j1_21_a_cls"
+CLS_PERMANENT_STEP = """      - name: J1.21-A CLS 252 external SHA seals (permanent, no Caprice32)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_21_a_cls_oracle.py --check-sources
+          python3 tools/j1_21_a_cls_oracle.py \\
+            --evidence tests/fixtures/cpc6128/j1_21_a_cls \\
+            --permanent --self-test"""
 PAPER_IMAGE = ("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
                "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c")
 PAPER_ROM = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
@@ -192,12 +204,167 @@ def audit(sources):
            "SEALED_STORES_PERMANENT_LOST")
     audit_paper_route(sources)
     audit_paper_permanent(sources)
+    audit_cls_route(sources)
+    audit_cls_permanent(sources)
     ea = (ROOT / "tools/j1_16_e_a_store.py").read_text()
     da = (ROOT / "tools/j1_16_d_a_store.py").read_text()
     demand("SEALED_E_A_ARCHIVE_MISMATCH" in ea and
            "UNVERIFIED_SCALAR_RETAINED" in ea and
            "SEALED_D_A_ARCHIVE_MISMATCH" in da,
            "E_A_C1_OR_D_A_SEAL_LOST")
+
+
+
+def audit_cls_permanent(sources):
+    """The CLS SHA chain is mandatory on all PRs and main, not only branch CLS."""
+    yml=sources[PAPER_WORKFLOW]
+    # Existing PAPER audit enforces unfiltered PR/push, exact sealed-evidence shape.
+    audit_paper_permanent(sources)
+    marker="\n  sealed-evidence:"
+    demand(yml.count(marker)==1,"CLS_SEALED_JOB_MISSING")
+    tail=yml.split(marker,1)[1]
+    boundary=re.search(r"(?m)^  [a-zA-Z][\w-]*:[ \t]*$",tail)
+    job=tail[:boundary.start()] if boundary else tail
+    header=CLS_PERMANENT_STEP.split("\n",1)[0]
+    matches=list(re.finditer(r"(?m)^"+re.escape(header)+r"$",job))
+    demand(len(matches)==1,"CLS_PERMANENT_STEP_MISSING")
+    rest=job[matches[0].end():]
+    next_step=re.search(r"(?m)^      - ",rest)
+    actual=job[matches[0].start():
+               matches[0].end()+next_step.start() if next_step else len(job)]
+    demand(actual.rstrip()==CLS_PERMANENT_STEP,"CLS_PERMANENT_STEP_ALTERED")
+    return True
+
+
+def cls_permanent_negative_tests(sources):
+    original=sources[PAPER_WORKFLOW]
+    step=CLS_PERMANENT_STEP
+    demand(original.count(step)==1,"CLS_PERMANENT_NEGATIVE_INERT")
+    def mutate(a,b):
+        demand(original.count(a)==1,"CLS_PERMANENT_NEGATIVE_INERT")
+        return original.replace(a,b,1)
+    failures={
+       "REMOVED":(mutate(step+"\n",""),"CLS_PERMANENT_STEP_MISSING"),
+       "NOT_PERMANENT":(mutate(step,step.replace("--permanent --self-test","--self-test")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "NO_SELF_TEST":(mutate(step,step.replace("--permanent --self-test","--permanent")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "WRONG_ARCHIVE":(mutate(step,step.replace(CLS_ARCHIVE,
+                          "tests/fixtures/cpc6128/j1_19_a_paper")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "FAKE_ORACLE":(mutate(step,step.replace(CLS_TOOL,"tools/not_cls_oracle.py")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "SKIP_ON_FAILURE":(mutate(step,step.replace("        shell: bash",
+                          "        continue-on-error: true\n        shell: bash")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "IF_FALSE":(mutate(step,step.replace("        shell: bash",
+                          "        if: false\n        shell: bash")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+       "NO_STRICT_SHELL":(mutate(step,step.replace("set -euo pipefail","set +e")),
+                        "CLS_PERMANENT_STEP_ALTERED"),
+    }
+    for name,(damaged,expected) in failures.items():
+        try:
+            audit_cls_permanent({**sources,PAPER_WORKFLOW:damaged})
+        except UnsafeRoute as ex:
+            demand(str(ex)==expected,"CLS_PERMANENT_WRONG_REJECTION_"+name+":"+str(ex))
+        else:
+            raise UnsafeRoute("CLS_PERMANENT_BYPASS_"+name)
+        print("CI-OPT3 CLS_PERMANENT_FALSIFICATION_REJECTED",name,expected)
+
+
+def audit_cls_route(sources):
+    """J1.21-A must reach the genuine pinned GHCR job, never a dummy gate."""
+    yml=sources[PAPER_WORKFLOW]
+    marker="\n  "+CLS_JOB+":"
+    demand(yml.count(marker)==1, "CLS_JOB_MISSING")
+    header,job=yml.split(marker,1)
+    guard=("if: (github.event_name == 'pull_request' && "
+           "github.head_ref == '"+CLS_BRANCH+"' && "
+           "github.event.pull_request.head.repo.full_name == github.repository) || "
+           "(github.event_name == 'workflow_dispatch' && "
+           "github.ref_name == '"+CLS_BRANCH+"')")
+    demand(guard in job,"CLS_BRANCH_FORK_GUARD")
+    demand("github.head_ref != '"+CLS_BRANCH+"'" in header and
+           "cancel-in-progress:" in header,"CLS_ARCHIVE_CANCEL_RISK")
+    demand("    permissions:\n      contents: write\n      packages: read" in job,
+           "CLS_JOB_PERMISSIONS")
+    demand("      image: "+PAPER_IMAGE in job,"CLS_GHCR_DIGEST")
+    demand('test "$(git rev-parse HEAD)" = "$GITHUB_HEAD_SHA"' in job and
+           "github.event.pull_request.head.sha || github.sha" in job and
+           "submodules: recursive" in job,"CLS_HEAD_PIN")
+    demand('test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = '+PAPER_CAPRICE in job and
+           'test "$(cat /usr/local/share/loco-caprice32-source.sha)" = '+PAPER_CAPRICE in job and
+           'test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d '+
+           "' ' -f 1)\" = "+PAPER_ROM in job,"CLS_ROM_CAPRICE_PIN")
+    demand("test -x /usr/local/bin/cap32" in job and
+           "cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32" in job,
+           "CLS_GENUINE_EMULATOR")
+    demand("git diff origin/main...HEAD --name-only" in job and
+           "J1.21-A FORBIDDEN_DIFF_PATH" in job and
+           "tests/fixtures/cpc6128/j1_18_" in job and
+           "tools/j1_18_" in job,"CLS_FORBIDDEN_DIFF_GUARD")
+    demand("python3 "+CLS_TOOL+" --check-sources" in job and
+           "test_j1_21_a_cls_oracle.py" in job and
+           "python3 "+CLS_TOOL+" --acquire tests/oracles/caprice32" in job and
+           ' --output "$RUNNER_TEMP/j121-cls" --head "$GITHUB_HEAD_SHA"' in job and
+           "python3 "+CLS_TOOL+' --evidence "$RUNNER_TEMP/j121-cls"' in job,
+           "CLS_REAL_CAPTURE_LINK")
+    demand("DEST="+CLS_ARCHIVE in job and
+           "git ls-remote --exit-code origin refs/heads/"+CLS_BRANCH in job and
+           'test "$REMOTE_HEAD" = "$GITHUB_HEAD_SHA"' in job and
+           "git push origin HEAD:refs/heads/"+CLS_BRANCH in job,
+           "CLS_ARCHIVE_ANTI_RACE")
+    demand("ARCHIVE_PENDING_EXTERNAL_SEAL" in job and
+           "--permanent --self-test" in job and
+           "FRESH_REACQUISITION_RAM_LIST_ERR_ERL_ROI_MATCH_ARCHIVE" in job and
+           "EXTERNALLY_SEALED_PASS" in job,
+           "CLS_REACQUISITION_OR_SEAL_MISSING")
+    demand("actions/upload-artifact@v4" in job and
+           "j121-cls-origin-sha256.txt" in job and
+           "j121-cls-manifest-sha256.txt" in job and
+           "j121-cls-origin.txt" in job and
+           "j121-cls-cpc-original-" in job,"CLS_ORIGINAL_ARTIFACT")
+    return True
+
+
+def cls_route_negative_tests(sources):
+    """Mutate only in memory; prove branch/fork, proof and archive guards."""
+    yml=sources[PAPER_WORKFLOW]
+    job="\n  "+CLS_JOB+":"
+    cases={
+      "MISSING_JOB":(yml.split(job,1)[0],"CLS_JOB_MISSING"),
+      "UNSAFE_BRANCH":(yml.replace("github.head_ref == '"+CLS_BRANCH+"'",
+                                  "github.head_ref == 'main'"),"CLS_BRANCH_FORK_GUARD"),
+      "FORK_ALLOW":(yml.replace("github.event.pull_request.head.repo.full_name == github.repository",
+                                "github.event.pull_request.head.repo.full_name != github.repository"),
+                     "PAPER_BRANCH_AND_FORK_GUARD"),
+      "UNPINNED_IMAGE":(yml.replace(PAPER_IMAGE,"ubuntu:latest"),"PAPER_GHCR"),
+      "CAPTURE_MISSING":(yml.replace(CLS_TOOL+" --acquire",
+                                   "tools/unknown.py --acquire"),"CLS_REAL_CAPTURE_LINK"),
+      "NO_ORIGIN_ARTIFACT":(yml.replace("j121-cls-origin-sha256.txt",
+                                         "untrusted-origin.txt"),"CLS_ORIGINAL_ARTIFACT"),
+      "NO_ANTIRACE":(yml.replace("git ls-remote --exit-code origin refs/heads/"+CLS_BRANCH,
+                                  "git rev-parse HEAD"),"CLS_ARCHIVE_ANTI_RACE"),
+      "SEAL_DISABLED":(yml.replace("FRESH_REACQUISITION_RAM_LIST_ERR_ERL_ROI_MATCH_ARCHIVE",
+                                    "FRESH_UNVERIFIED"),"CLS_REACQUISITION_OR_SEAL_MISSING"),
+    }
+    for label,(damaged,expected) in cases.items():
+        demand(damaged!=yml,"CLS_NEGATIVE_INERT_"+label)
+        try:
+            audit_paper_route({**sources,PAPER_WORKFLOW:damaged})
+            audit_cls_route({**sources,PAPER_WORKFLOW:damaged})
+        except UnsafeRoute as exc:
+            # Older PAPER guards may reject a global alteration first.
+            demand(str(exc)==expected or
+                   (label=="FORK_ALLOW" and str(exc) in
+                    ("PAPER_BRANCH_AND_FORK_GUARD","CLS_BRANCH_FORK_GUARD")) or
+                   (label=="UNPINNED_IMAGE" and str(exc) in
+                    ("PAPER_GHCR","CLS_GHCR_DIGEST")),
+                   "CLS_NEGATIVE_WRONG_REASON_"+label+":"+str(exc))
+        else:
+            raise UnsafeRoute("CLS_NEGATIVE_BYPASS_"+label)
+        print("CI-OPT3 CLS_FALSIFICATION_REJECTED",label,expected)
 
 
 def audit_paper_route(sources):
@@ -467,6 +634,8 @@ def paper_negative_tests(sources):
 
 
 def negative_tests(sources):
+    cls_route_negative_tests(sources)
+    cls_permanent_negative_tests(sources)
     paper_negative_tests(sources)
     paper_permanent_negative_tests(sources)
     paper_archive_negative_tests()
@@ -553,6 +722,10 @@ def check_diff(base, sources):
                 audit_paper_route(sources)
                 demand(PAPER_WORKFLOW in triggered_names([path], sources),
                        "PAPER_WORKFLOW_UNROUTED")
+            elif path == CLS_TOOL:
+                audit_cls_route(sources)
+                demand(PAPER_WORKFLOW in triggered_names([path], sources),
+                       "CLS_WORKFLOW_UNROUTED")
             else:
                 demand(bool(HISTORICAL.intersection(triggered_names([path], sources))),
                        "UNREGISTERED_NEW_ORACLE_" + path)

@@ -54,7 +54,7 @@ Ne jamais réutiliser le dossier de sortie.
 | E04 | E03, CONT puis second BREAK | Démontrer contexte et continuation par des captures avant/après |
 | E05 | 10 PRINT "A":GOTO 20 / 20 PRINT "B":GOTO 10 | Activité écran RUN/ESC/pause persistante/BREAK ; ne pas préjuger ligne 10/20 |
 | E10 | Démarrage frais sans RUN/STOP ; CONT | Erreur exacte et prompt à photographier |
-| E07, option | 10 A%=A%+1:LOCATE 1,1:PRINT A%;:GOTO 10 | Variables avant/après BREAK, PRINT A%, CONT, second BREAK ; candidat non validé |
+| E07, option | 10 A%=A%+1:GOTO 10 | Variables avant/après BREAK, PRINT A%, CONT, second BREAK ; candidat non validé |
 
 E08 **STOP** reste un témoin historique distinct (pas ESC). E00, E06, E09,
 E11–E14 ne sont pas acquis par R1. Ni imprimante #8 ni lecture ROM ne remplacent

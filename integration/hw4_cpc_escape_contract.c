@@ -46,11 +46,14 @@ size_t hw4_esc_decoder_feed(Hw4EscDecoder *decoder, uint8_t byte,
     case HW4_ESC_CSI:
         if (byte >= 0x40u && byte <= 0x7eu) {
             decoder->state = HW4_ESC_TEXT;
+            decoder->sequence_length = 0u;
             out[0] = HW4_ESC_KEY_ANSI;
             return 1u;
         }
         if (byte < 0x20u || byte > 0x3fu) {
-            decoder->state = HW4_ESC_TEXT;
+            /* Report once, then quarantine ALL remaining bytes until a
+             * real ANSI final. Controls, including ESC, are not new keys. */
+            decoder->state = HW4_ESC_CSI_DISCARD;
             out[0] = HW4_ESC_KEY_REJECTED;
             return 1u;
         }
@@ -67,11 +70,11 @@ size_t hw4_esc_decoder_feed(Hw4EscDecoder *decoder, uint8_t byte,
                      ? HW4_ESC_KEY_ANSI : HW4_ESC_KEY_REJECTED;
         return 1u;
     case HW4_ESC_CSI_DISCARD:
-        /* Discard through the ANSI final byte; no tail may become BASIC. */
+        /* Only an explicit ANSI final (0x40..0x7e) ends quarantine.
+         * Everything else, even NUL, ESC and high-bit bytes, is consumed. */
         if (byte >= 0x40u && byte <= 0x7eu) {
             decoder->state = HW4_ESC_TEXT;
-        } else if (byte < 0x20u || byte > 0x3fu) {
-            decoder->state = HW4_ESC_TEXT;
+            decoder->sequence_length = 0u;
         }
         return 0u;
     default:
@@ -96,7 +99,10 @@ Hw4EscKey hw4_esc_decoder_finish(Hw4EscDecoder *decoder)
     if (decoder != NULL) {
         if (decoder->state == HW4_ESC_PENDING) {
             result = HW4_ESC_KEY_ESCAPE;
-        } else if (decoder->state != HW4_ESC_TEXT) {
+        } else if (decoder->state == HW4_ESC_CSI ||
+                   decoder->state == HW4_ESC_SS3) {
+            /* Truncated prefix: one rejection at contractual end/reset.
+             * CSI_DISCARD already emitted REJECTED when it became invalid. */
             result = HW4_ESC_KEY_REJECTED;
         }
         hw4_esc_decoder_init(decoder);

@@ -82,9 +82,15 @@ static int oracle_case(const char *root,const char *name,int paper)
     uint8_t temporary[256],out[512],exported[512],listed[512],roundtrip[512];
     size_t ns,no,nr,np,native_length,list_length,reentry_length;
     BasicProgram p,imported,reentry;
-    char path[512];
+    char path[512],lower[32];
+    size_t letter, name_length=strlen(name);
+    CHECK(name_length<sizeof(lower));
+    for(letter=0u;letter<name_length;++letter)
+        lower[letter]=(char)(name[letter]>='A' && name[letter]<='Z' ?
+                    name[letter]-'A'+'a' : name[letter]);
+    lower[name_length]='\0';
     CHECK(snprintf(path,sizeof(path),"%s/tests/oracles/inputs/j1_21_a/%s.bas",
-                   root,name)>0);
+                   root,lower)>0);
     CHECK(load(path,source,sizeof(source),&ns)==0);
     CHECK(path_for(path,sizeof(path),root,"original",name,"program.bin")==0);
     CHECK(load(path,original,sizeof(original),&no)==0);

@@ -136,6 +136,14 @@ if(BUILD_TESTING)
 endif()
 
 
+# J1.21-B1: CLS 8A lexical-only, exact sealed CPC RAM/LIST read-only.
+if(BUILD_TESTING)
+    add_executable(test_basic_cls_token_list tests/test_basic_cls_token_list.c)
+    target_link_libraries(test_basic_cls_token_list PRIVATE basic_session_runtime)
+    add_test(NAME basic_cls_token_list COMMAND test_basic_cls_token_list
+             "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
 # J1.20-B1: ABS token FF00, 16 CPC original/repeat RAM images and semantic LIST.
 # No ABS runtime executable is registered or linked beyond the legacy engine.
 if(BUILD_TESTING)

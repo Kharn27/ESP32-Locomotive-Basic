@@ -22,6 +22,19 @@ jobs:
         compiler: [gcc, clang]
     steps:
       - uses: actions/checkout@v4
+      # Disposable A2-C1 proof. Checkout and hash-check the production
+      # HEAD from PR #243; this proof PR's workflow edit is never merged.
+      - name: J1-DIAG-RETRO-A2-C1 exact HEAD A0 self-test (GCC OFF)
+        if: matrix.compiler == 'gcc' && matrix.sanitizers == 'OFF'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin 0b87ff09e8becfc8400bdd4f69643100e91c2567
+          git checkout --detach 0b87ff09e8becfc8400bdd4f69643100e91c2567
+          echo J1-DIAG-RETRO-A2-C1-VERIFIED-HEAD:
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "0b87ff09e8becfc8400bdd4f69643100e91c2567"
+          python3 tools/j1_diag_retro_a0_verify.py --self-test
+          echo J1-DIAG-RETRO-A2-C1-EXACT-HEAD-A0-SELF-TEST=PASS
       - name: Configure
         run: |
           # Existing J0.23 host budget audit uses an anonymous struct inside

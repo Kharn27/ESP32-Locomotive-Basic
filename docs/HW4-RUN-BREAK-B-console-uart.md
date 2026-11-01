@@ -117,3 +117,40 @@ HEAD) demeure une **réserve distincte, sans optimisation C1**.
 
 La revue finale, l'acceptation et la fusion restent de la responsabilité
 exclusive du Pilotage. `!BREAK` reste **HOST_ONLY**, différent d'ESC CPC.
+
+## C2 — Intégration J1-DIAG-RETRO-A2 (02/11/2026)
+
+Mandat officiel du Pilotage : [PR #226 #6565370846](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/226#issuecomment-6565370846).
+La branche #226 réintègre `main@f3d11eb8a8723a85f08bb5317852a594780c831a` depuis
+`e60879f7b4e2178d69f6d3110ff1c3796fa01365`, avec un
+merge commit à deux parents, et conserve les 12 fichiers B/C1
+sans toucher au `core/`, `io/cpc_diag_policy.[ch]`, aux oracles
+A2/F9/R1 ni aux routines LCD.
+
+La provenance `CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE` de
+`cpc_diag_policy_step` est convertie vers **`source=CPC_F9_ZERO_ORACLE`**
+dans le helper C99 partagé `integration/hw4_run_diag_source.h`.
+Ce mapping **ne dépend pas du seul statut `BE_DIVISION_BY_ZERO`** :
+seule la politique A2 native, après inspection du contexte BASIC
+tokenisé, peut attribuer cette origine. `A%\\0` littéral est
+distingué de `A% MOD 0` (HOST/ERROR) ; pas de généralisation à
+FB, division variable, REAL ou `/`. Les quatre cas C2 de
+`hw4_run_break_b_uart_console_contract` exercent le vrai BSR,
+l'échec réel `BE_DIVISION_BY_ZERO`, le diagnostic **avant** `bsr_stop`,
+le formateur du texte TFT, le libellé UART, la ligne réelle 20/620,
+l'absence de `PRINT "NEVER"`, le programme conservé et Ready unique.
+Les sept scénarios C1 PEN/GOSUB/RETURN/NEXT et HOST restent.
+
+**Recette PO groupée sur le SHA C2 final uniquement, après CI verte :**
+aucun nouveau flash C1. Flasher le SHA complet annoncé par la remise
+développeur, vérifier le SHA au boot/RUN_START et utiliser UART0 115200
+sans double moniteur. Sur le même HEAD, effectuer les essais
+`!BREAK` CR (contrôle de conservation) et LF, `!DEMO` / END,
+PEN 16 en ligne 20 sans `PRINT "NEVER"`, éditeur E1/E3/HOME,
+`!SHOT` seulement au prompt, et les témoins F9
+`10 A%=1; 20 B%=A%\\0; 30 PRINT "NEVER"` (chaque ligne
+saisie séparément), `A%=0`, et `B%=A% MOD 0` négatif.
+Conserver la photo physique du TFT avant/pendant/après RUN/BREAK,
+UART brut, heap libre/bloc, marge pile, DMA, LCD et fluidité.
+Ne pas déduire `ON_DEVICE_C2_PASS` des tests sur le SHA C1.
+`!BREAK` demeure HOST_ONLY et non BREAK CPC ESC.

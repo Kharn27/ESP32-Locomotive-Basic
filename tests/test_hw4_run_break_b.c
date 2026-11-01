@@ -317,6 +317,16 @@ static int diagnostic_provenance_matrix(void)
         "10 GOTO 999", "20 PRINT \"NEVER\""};
     static const char *const if_missing[]={
         "10 A%=1", "20 IF A% THEN 999", "30 PRINT \"NEVER\""};
+    /* J1-DIAG-RETRO-A2: F9 is the literal integer \\ 0, not FB MOD.
+     * The same BE_DIVISION_BY_ZERO must never authenticate MOD. */
+    static const char *const f9_one[]={
+        "10 A%=1", "20 B%=A%\\0", "30 PRINT \"NEVER\""};
+    static const char *const f9_zero[]={
+        "10 A%=0", "20 B%=A%\\0", "30 PRINT \"NEVER\""};
+    static const char *const f9_620[]={
+        "600 A%=1", "620 B%=A%\\0", "630 PRINT \"NEVER\""};
+    static const char *const mod_zero[]={
+        "10 A%=1", "20 B%=A% MOD 0", "30 PRINT \"NEVER\""};
     DIAG_CASE(pen,1u,BE_INVALID_PEN,CPC_DIAG_PEN_IMPROPER_ARGUMENT,
               CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE,20u,
               "Improper argument in 20\n","NATIVE_PEN_ORACLE");
@@ -336,9 +346,20 @@ static int diagnostic_provenance_matrix(void)
               CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
     DIAG_CASE(if_missing,1u,BE_MISSING_TARGET,CPC_DIAG_HOST_GENERIC,
               CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
+    DIAG_CASE(f9_one,1u,BE_DIVISION_BY_ZERO,CPC_DIAG_DIVISION_INTEGER_ZERO,
+              CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE,20u,
+              "Division by zero in 20\n","CPC_F9_ZERO_ORACLE");
+    DIAG_CASE(f9_zero,1u,BE_DIVISION_BY_ZERO,CPC_DIAG_DIVISION_INTEGER_ZERO,
+              CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE,20u,
+              "Division by zero in 20\n","CPC_F9_ZERO_ORACLE");
+    DIAG_CASE(f9_620,1u,BE_DIVISION_BY_ZERO,CPC_DIAG_DIVISION_INTEGER_ZERO,
+              CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE,620u,
+              "Division by zero in 620\n","CPC_F9_ZERO_ORACLE");
+    DIAG_CASE(mod_zero,1u,BE_DIVISION_BY_ZERO,CPC_DIAG_HOST_GENERIC,
+              CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
     /* A failed BSR status by itself can never make a CPC origin. */
     CHECK(strcmp(hw4_run_diag_source(CPC_DIAG_ORIGIN_HOST),"HOST")==0);
-    puts("HW4-RUN-BREAK-B-C1 DIAG 7/7 real BSR cases, UART provenance + TFT text");
+    puts("HW4-RUN-BREAK-B-C2 DIAG 11/11 real BSR cases, UART provenance + TFT text");
     return 0;
 }
 #undef DIAG_CASE

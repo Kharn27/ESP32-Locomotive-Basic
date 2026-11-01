@@ -148,6 +148,31 @@ def analyze_run(run):
                 completion_source="jobs" if bounds else "run_updated_at_proxy")
 
 
+def select_latest_heads(runs, limit):
+    """Keep all workflows for newest N distinct SHA heads, never fastest runs.
+
+    Selection uses the earliest real run created_at per SHA. A date-filtered
+    API query must be exhaustive before selection: truncating a page of runs
+    could quietly omit a slow workflow and understate HEAD wall latency.
+    """
+    if limit is None:
+        return list(runs)
+    if not isinstance(limit, int) or limit < 1:
+        raise ValueError("latest-heads must be positive")
+    starts = {}
+    for r in runs:
+        if r.get("event") != "pull_request" or not r.get("head_sha"):
+            continue
+        created = stamp(r.get("created_at"))
+        if created is None:
+            continue
+        sha = r["head_sha"]
+        starts[sha] = min(starts.get(sha, created), created)
+    chosen = set(sorted(starts, key=lambda sha: (starts[sha], sha),
+                        reverse=True)[:limit])
+    return [r for r in runs if r.get("head_sha") in chosen]
+
+
 def _dedup_runs(runs):
     by_id = {}
     for r in runs:
@@ -288,19 +313,23 @@ class GitHubReadOnly:
 
 
 def fetch_live(client, *, max_pages, cutoff=CUTOFF, through=None, with_jobs=True,
-               max_jobs_runs=None, with_pr_files=True):
+               max_jobs_runs=None, with_pr_files=True, created=None,
+               latest_heads=None):
     """Snapshot entire collected interval; never silently cap population."""
     found = []
     exhausted = False
+    parameters = {"event": "pull_request"}
+    if created is not None:
+        parameters["created"] = created  # GitHub REST date-search range
     for i, page in enumerate(client.pages("/actions/runs", limit=max_pages,
-                        params={"event": "pull_request"}), 1):
+                        params=parameters), 1):
         found.extend(page)
         if len(page) < 100:
             exhausted = True
             break
         # Pages are by creation date descending; ensure older C99 baseline coverage
         # by separately retrieving authoritative published run ids.
-        if page and all(stamp(r.get("created_at")) < stamp(cutoff) for r in page):
+        if not created and page and all(stamp(r.get("created_at")) < stamp(cutoff) for r in page):
             exhausted = True  # All newer runs covered; don't need full historical history.
             break
     if not exhausted:
@@ -308,6 +337,7 @@ def fetch_live(client, *, max_pages, cutoff=CUTOFF, through=None, with_jobs=True
     sample = [r for r in found if stamp(r.get("created_at")) and
               stamp(r["created_at"]) >= stamp(cutoff) and
               (through is None or stamp(r["created_at"]) <= stamp(through))]
+    sample = select_latest_heads(sample, latest_heads)
     missing_shas = sorted({r["head_sha"] for r in sample if not r.get("pull_requests")})
     pr_by_sha = {}
     for sha in missing_shas:
@@ -359,7 +389,8 @@ def fetch_live(client, *, max_pages, cutoff=CUTOFF, through=None, with_jobs=True
     return {"source": "LIVE_GITHUB_API", "cutoff": cutoff, "through": through,
             "complete_post_window": exhausted, "runs": sample,
             "baseline_c99_runs": baseline, "pr_info": pr_info,
-            "metadata": {"calls": client.calls, "max_pages": max_pages}}
+            "metadata": {"calls": client.calls, "max_pages": max_pages,
+                         "created_filter": created, "latest_heads": latest_heads}}
 
 
 def diff_type(files):
@@ -492,6 +523,8 @@ def main(argv=None):
     ap.add_argument("--output", type=Path, required=True)
     ap.add_argument("--snapshot-out", type=Path, help="save raw JSON run metadata WITHOUT any token")
     ap.add_argument("--max-pages", type=int, default=30)
+    ap.add_argument("--created", help="GitHub REST created= date/range; bounds pagination")
+    ap.add_argument("--latest-heads", type=int, help="newest N distinct SHA, all their runs")
     ap.add_argument("--no-jobs", action="store_true", help="faster but no queue/real completion proof")
     ap.add_argument("--no-pr-files", action="store_true", help="skip diff typing")
     ap.add_argument("--cutoff", default=CUTOFF)
@@ -502,7 +535,10 @@ def main(argv=None):
     else:
         snapshot = fetch_live(GitHubReadOnly(args.repo, os.getenv("GITHUB_TOKEN")),
                               max_pages=args.max_pages, cutoff=args.cutoff, through=args.through,
-                              with_jobs=not args.no_jobs, with_pr_files=not args.no_pr_files)
+                              with_jobs=not args.no_jobs, with_pr_files=not args.no_pr_files,
+                              created=args.created, latest_heads=args.latest_heads)
+    if args.input and args.latest_heads is not None:
+        snapshot["runs"] = select_latest_heads(snapshot["runs"], args.latest_heads)
     snapshot["repo"] = args.repo
     output = report(snapshot)
     args.output.parent.mkdir(parents=True, exist_ok=True)

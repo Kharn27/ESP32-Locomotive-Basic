@@ -328,10 +328,12 @@ def verify(root):
             if outcome["status"] == "BEHAVIOR_DIFF":
                 divergent += 1
         print("O2_CASE=%s RAW_PAIRS=PASS SCREEN_REVIEW=%s BEHAVIOR=%s "
-              "REASONS=%s ERR=%s ERL=%s" %
+              "REASONS=%s READY=%s RUN_OUTPUT=%s ERR=%s ERL=%s" %
               (case, "REVIEWED" if outcome else "UNVERIFIED",
                outcome["status"] if outcome else "UNVERIFIED",
                ",".join(outcome["reasons"]) if outcome else "UNVERIFIED",
+               outcome["ready_count"] if outcome else "UNVERIFIED",
+               json.dumps(outcome["post_run_output_lines"]) if outcome else "UNVERIFIED",
                probes[0][0] if probes[0][0] is not None else "UNVERIFIED",
                probes[0][1] if probes[0][1] is not None else "UNVERIFIED"))
     require(set(root.iterdir()) -

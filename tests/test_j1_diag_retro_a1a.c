@@ -275,10 +275,10 @@ static void tests(void)
             "10 A%=1", "20 B%=A% MOD 0", "30 PRINT \"NEVER\""
         };
         CHECK_CASE(f9_one, 1U, BE_DIVISION_BY_ZERO,
-                   "Division by zero in 20\\n", 1);
+                   "Division by zero in 20\n", 1);
         CHECK_CASE(f9_zero, 1U, BE_DIVISION_BY_ZERO,
-                   "Division by zero in 20\\n", 1);
-        CHECK_CASE(fb_zero, 1U, BE_DIVISION_BY_ZERO, "ERROR\\n", 0);
+                   "Division by zero in 20\n", 1);
+        CHECK_CASE(fb_zero, 1U, BE_DIVISION_BY_ZERO, "ERROR\n", 0);
     }
 #undef CHECK_CASE
 }

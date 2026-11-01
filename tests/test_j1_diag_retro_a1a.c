@@ -262,6 +262,24 @@ static void tests(void)
         CHECK_CASE(without_next, 0U, BE_FOR_WITHOUT_NEXT, "ERROR\n", 0);
         CHECK_CASE(overflow_next, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
     }
+    /* A2 RED (J1.5-A CPC ROM): genuine integer F9 zero, NOT FB/MOD.
+     * The shared BE_DIVISION_BY_ZERO enum cannot prove the operator. */
+    {
+        static const char *f9_one[] = {
+            "10 A%=1", "20 B%=A%\\0", "30 PRINT \"NEVER\""
+        };
+        static const char *f9_zero[] = {
+            "10 A%=0", "20 B%=A%\\0", "30 PRINT \"NEVER\""
+        };
+        static const char *fb_zero[] = {
+            "10 A%=1", "20 B%=A% MOD 0", "30 PRINT \"NEVER\""
+        };
+        CHECK_CASE(f9_one, 1U, BE_DIVISION_BY_ZERO,
+                   "Division by zero in 20\\n", 1);
+        CHECK_CASE(f9_zero, 1U, BE_DIVISION_BY_ZERO,
+                   "Division by zero in 20\\n", 1);
+        CHECK_CASE(fb_zero, 1U, BE_DIVISION_BY_ZERO, "ERROR\\n", 0);
+    }
 #undef CHECK_CASE
 }
 /* Only the CPC-attested NEXT causes can be promoted.

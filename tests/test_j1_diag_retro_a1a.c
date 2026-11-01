@@ -63,6 +63,7 @@ static void expect_diagnostic(const char *const *sources, size_t count,
                               const char *expected, int historical)
 {
     uint8_t saved_program[PROGRAM_CAP], saved_output[OUTPUT_CAP];
+    uint8_t saved_vram[CPC_VIDEO_BYTES];
     BEVideoEvent saved_events[EVENT_CAP];
     BasicSessionRuntime before;
     BasicProgram before_program;
@@ -86,6 +87,7 @@ static void expect_diagnostic(const char *const *sources, size_t count,
             assert(cpc_text_write(&f.text, f.output, f.written));
     }
     memcpy(saved_program, f.storage, sizeof saved_program);
+    memcpy(saved_vram, f.vram, sizeof saved_vram);
     before_program = f.program;
     before_store = f.store;
     memcpy(before_entries, f.entries, sizeof before_entries);
@@ -104,6 +106,7 @@ static void expect_diagnostic(const char *const *sources, size_t count,
     assert(memcmp(&before, &f.runtime, sizeof before) == 0);
     assert(memcmp(saved_output, f.output, sizeof saved_output) == 0);
     assert(memcmp(saved_events, f.events, sizeof saved_events) == 0);
+    assert(memcmp(saved_vram, f.vram, sizeof saved_vram) == 0);
     assert(memcmp(saved_program, f.storage, sizeof saved_program) == 0);
     assert(memcmp(&before_program, &f.program, sizeof before_program) == 0);
     assert(memcmp(&before_store, &f.store, sizeof before_store) == 0);
@@ -111,6 +114,7 @@ static void expect_diagnostic(const char *const *sources, size_t count,
     assert(f.written == 71U && f.event_written == 73U);
     assert(f.text.bytes_received == bytes_before);
     diag = cpc_diag_policy_step(r, &f.runtime); /* MUST precede stop */
+    assert(memcmp(saved_vram, f.vram, sizeof saved_vram) == 0);
     assert((diag.category != CPC_DIAG_HOST_GENERIC) == (historical != 0));
     assert(cpc_diag_policy_format_step(diag, formatted, sizeof formatted, &length));
     assert(length == strlen(expected));
@@ -415,7 +419,7 @@ static void test_f9_provenance(void)
     BasicVariableEntry saved_entries[32];
     BasicVariableStore saved_store;
     uint8_t bytes[80];
-    size_t written = 191U, cursor, f9_pos;
+    size_t written = 191U, cursor, f9_pos, source_pos;
 
     setup();
     submit("10 A%=1");
@@ -469,9 +473,22 @@ static void test_f9_provenance(void)
     f.storage[f9_pos] = 0xfbu; /* same error enum, wrong operator */
     assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
            CPC_DIAG_HOST_GENERIC);
-    /* Fake F9 / zero in the destination's cache must not count. */
+    /* Fake F9 / zero in the destination cache, with real op F4,
+     * must not count as division. */
+    f.storage[f9_pos] = 0xf4u;
     f.storage[cursor + 1U] = 0xf9u;
     f.storage[cursor + 2U] = 0x0eu;
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved_program, sizeof saved_program);
+    /* Wrong explicit source type must not acquire a CPC diagnosis. */
+    source_pos = cursor;
+    while (source_pos < f9_pos && f.storage[source_pos] != 0xefu)
+        ++source_pos;
+    assert(source_pos + 1U < f9_pos);
+    ++source_pos;
+    assert(f.storage[source_pos] == 0x02u);
+    f.storage[source_pos] = 0x04u;
     assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
            CPC_DIAG_HOST_GENERIC);
     memcpy(f.storage, saved_program, sizeof saved_program);

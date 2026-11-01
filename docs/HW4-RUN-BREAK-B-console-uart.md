@@ -73,3 +73,47 @@ Prérequis : CYD ESP32-2432S028R, USB UART0 `/dev/ttyUSB0`, ESP-IDF v5.5.6, un s
 **Preuves à remettre au Pilotage par le PO :** SHA exact flashé, logs UART115200 bruts (dont RUN_START, YIELD>4096, RUN_TERMINAL, READY_POLICY, diagnostic PEN L20, DEVICE_MEMORY), photos écran avant/pendant/après BREAK, notes sur défilement vert, délais BREAK, erreurs/reboots, valeurs heap8_free/heap8_largest/stack_margin_bytes, compteur DMA et temps de transfert. Chaque résultat doit être explicitement PASS ou FAIL ; un échec bloque la fusion.
 
 **État tant que les preuves PO ne sont pas fournies :** `ON_DEVICE_UNVERIFIED`, sans sémantique BREAK CPC revendiquée.
+
+## C1 — Synchronisation avec main et diagnostics CPC (1er novembre 2026)
+
+Mandat Pilotage : [PR #226, commentaire #6564863778](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/226#issuecomment-6564863778).
+Branche / PR **inchangées** ; intégration du parent `main@5d43a9c7f1ebe6e8bea4af5285327c104831603e` dans
+`feat/hw4-run-break-b-console-uart`, sans écriture sur `main`.
+La fusion d'historique est un **merge commit à deux parents** : l'ancien
+HEAD B `520d86a348bda2f314cda4d8e2bc334baff54fb1` et le parent `main` indiqué ci-dessus.
+
+Le code RUN coopératif B demeure propriétaire de CONSOLE (quanta 8, 16 octets
+UART/quantum, `vTaskDelay(1)`, `!BREAK` hôte CR/LF, aucune limite 256).
+Le diagnostic d'une erreur BSR s'établit avant `bsr_stop`. Le helper
+C99 `integration/hw4_run_diag_source.h` ne classe **jamais** un statut
+BSR comme origine CPC : il convertit seulement le `CpcDiagOrigin` déjà
+vérifié par `cpc_diag_policy_step` en provenance UART distincte
+PEN / GOSUB / RETURN / NEXT / HOST. La catégorie, la ligne réelle et
+le texte TFT continuent d'être produits par `io/cpc_diag_policy`,
+**inchangé**.
+
+La régression `hw4_run_break_b_uart_console_contract` exécute le vrai BSR,
+le scheduler, les callbacks vidéo, le choix de diagnostic et le rendu pour :
+PEN 16 ligne 20, GOSUB absent, RETURN orphelin, NEXT orphelin et incorrect,
+GOTO/IF absents (HOST), sans PRINT après erreur. Le garde source réel
+exige l'appel au helper dans `basic_run_slice` : un simple retour
+`source=HOST` pour GOSUB/RETURN/NEXT doit échouer. Le CMake composé garde
+les tests B, les tests J1-DIAG-RETRO et le contrôle ESC-A sans raccord
+ESC/BREAK natif. Le sceau permanent R1 29/29 reste sur `main`, inchangé.
+
+**Tests PO matériels C1 requis avant toute fusion** : reprendre la procédure
+de flash ci-dessus sur le **nouveau HEAD intégral** de #226 communiqué dans
+la remise développeur ; l'ancien firmware `520d86a...` et ses résultats
+CYD partiels ne constituent pas une validation du nouveau HEAD.
+Contrôler d'abord `git rev-parse HEAD` égal à ce SHA et le marqueur
+`RUN_START sha=` sur UART115200, puis RUN >4096, BREAK fragmenté CR,
+nouveau RUN et BREAK LF, `stop_calls=1`, Ready unique, LIST/NEW,
+aucun PRINT après interruption, PEN16 ligne 20, `!DEMO`/END,
+E1/E3/HOME et SHOT exclusivement au prompt. Transmettre journal brut,
+photos physiques de la dalle avant/pendant/après RUN/BREAK, mesures
+heap/largest/pile/DMA et appréciation de la fluidité du scrolling.
+La lenteur LCD déjà mesurée (108,67 s de repaint cumulé sur l'ancien
+HEAD) demeure une **réserve distincte, sans optimisation C1**.
+
+La revue finale, l'acceptation et la fusion restent de la responsabilité
+exclusive du Pilotage. `!BREAK` reste **HOST_ONLY**, différent d'ESC CPC.

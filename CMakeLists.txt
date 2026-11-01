@@ -37,9 +37,10 @@ target_link_libraries(basic_session_runtime PUBLIC basic_session basic_executor)
 add_library(hw4_run_scheduler STATIC integration/hw4_run_scheduler.c)
 target_include_directories(hw4_run_scheduler PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/integration)
 target_link_libraries(hw4_run_scheduler PUBLIC basic_session_runtime)
-# HW4-RUN-BREAK-B: bounded host UART BREAK parser.
+# HW4-RUN-BREAK-B: portable bounded !BREAK host UART framing.
 add_library(hw4_run_break_input STATIC integration/hw4_run_break_input.c)
 target_include_directories(hw4_run_break_input PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/integration)
+
 
 add_library(basic_session STATIC core/basic_session.c)
 target_include_directories(basic_session PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
@@ -564,6 +565,13 @@ if(BUILD_TESTING)
     target_link_libraries(test_cpc_uart_console PRIVATE cpc_uart_console uart_line)
     add_test(NAME hw4_c2_screen_paging COMMAND test_cpc_uart_console)
 
+    # J1-DIAG-RETRO-A1a: screen-oracled GOSUB/RETURN, negative GOTO/IF/PEN.
+    add_executable(test_j1_diag_retro_a1a tests/test_j1_diag_retro_a1a.c)
+    target_link_libraries(test_j1_diag_retro_a1a PRIVATE
+                          cpc_diag_policy cpc_ready_policy basic_session_runtime)
+    add_test(NAME j1_diag_retro_a1a_gosub_return
+             COMMAND test_j1_diag_retro_a1a)
+
     add_executable(test_hw4_diag_a tests/test_hw4_diag_a.c)
     target_link_libraries(test_hw4_diag_a PRIVATE
                           cpc_diag_policy cpc_ready_policy cpc_uart_console
@@ -936,4 +944,15 @@ if(BUILD_TESTING)
     target_compile_options(test_hw4_touch_t1 PRIVATE -std=c99 -Wall
         -Wextra -Wpedantic -Wconversion -Werror)
     add_test(NAME hw4_touch_t1_gestures COMMAND test_hw4_touch_t1)
+endif()
+
+# HW4-ESC-BREAK-A: host C99 UART framing experiment only (no firmware linkage).
+if(BUILD_TESTING)
+    add_executable(test_hw4_cpc_escape_contract
+        tests/test_hw4_cpc_escape_contract.c
+        integration/hw4_cpc_escape_contract.c)
+    target_include_directories(test_hw4_cpc_escape_contract PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/integration)
+    add_test(NAME hw4_esc_break_a_transport_contract
+             COMMAND test_hw4_cpc_escape_contract)
 endif()

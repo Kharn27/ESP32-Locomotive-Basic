@@ -6,6 +6,7 @@
 #include "hw4_pen_bridge.h"
 #include "cpc_ready_policy.h"
 #include "cpc_diag_policy.h"
+#include "hw4_run_diag_source.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -14,6 +15,8 @@
 } } while(0)
 typedef struct {
     BasicProgram program;
+    BasicVariableStore store;
+    BasicVariableEntry entries[32];
     BasicSessionRuntime runtime;
     Hw4RunScheduler scheduler;
     Hw4RunBreakInput parser;
@@ -36,7 +39,8 @@ static int setup(void)
 {
     memset(&f,0,sizeof(f));
     CHECK(bp_init(&f.program,f.image,sizeof(f.image))==BP_OK);
-    CHECK(bsr_init(&f.runtime,&f.program).status==BSR_OK);
+    CHECK(bvs_init(&f.store,f.entries,32u)==BVS_OK);
+    CHECK(bsr_init_with_store(&f.runtime,&f.program,&f.store).status==BSR_OK);
     CHECK(cpc_video_init(&f.video,f.vram,sizeof(f.vram),CPC_MODE_1));
     CHECK(cpc_video_set_ink(&f.video,0u,1u));
     CHECK(cpc_video_set_ink(&f.video,1u,24u));
@@ -241,6 +245,104 @@ static int inline_end_and_no_reentry(void)
     CHECK(advance(1u).state==HW4_RUN_INVALID_ARGUMENT);
     return 0;
 }
+
+/* Independent true-BSR diagnostic regression through the same scheduler
+ * slice/diagnostic/renderer path as production CONSOLE. Source UART mapping
+ * is the exact shared pure-C99 helper, not a fabricated BEStatus rule. */
+static int diagnostic_case(const char *const *source, size_t source_count,
+                           unsigned previous_steps, BEStatus error,
+                           CpcDiagCategory category, CpcDiagOrigin origin,
+                           unsigned line, const char *message,
+                           const char *uart_source)
+{
+    uint8_t before_program[sizeof(f.image)], formatted[96];
+    size_t rendered=0u, before_prints, before_events, bytes_before;
+    CpcStepDiagnostic diagnostic;
+    Hw4RunSlice outcome;
+    size_t i;
+    CHECK(setup()==0);
+    for(i=0u;i<source_count;++i)
+        CHECK(submit(source[i]).status==BSR_OK);
+    memcpy(before_program,f.image,sizeof(before_program));
+    CHECK(start_run()==0);
+    for(i=0u;i<(size_t)previous_steps;++i) {
+        outcome=advance(1u);
+        CHECK(outcome.state==HW4_RUN_YIELDED && outcome.steps==1u);
+    }
+    before_prints=f.prints;
+    before_events=f.events_seen;
+    bytes_before=f.text.bytes_received;
+    outcome=advance(8u);
+    CHECK(outcome.state==HW4_RUN_EXECUTOR_ERROR);
+    CHECK(f.scheduler.last_result.status==BSR_EXECUTOR_ERROR);
+    CHECK(f.scheduler.last_result.executor_status==error);
+    CHECK(f.runtime.state==BSR_RUNNING); /* locus survives up to diagnosis */
+    CHECK(f.scheduler.stop_calls==0u);
+    CHECK(f.prints==before_prints && f.events_seen==before_events);
+    CHECK(f.text.bytes_received==bytes_before);
+    CHECK(memcmp(before_program,f.image,sizeof(before_program))==0);
+    diagnostic=cpc_diag_policy_step(f.scheduler.last_result,&f.runtime);
+    CHECK(diagnostic.category==category);
+    CHECK(diagnostic.origin==origin);
+    CHECK(diagnostic.line_number==line);
+    CHECK(strcmp(hw4_run_diag_source(diagnostic.origin),uart_source)==0);
+    CHECK(cpc_diag_policy_format_step(diagnostic,formatted,sizeof(formatted),
+                                     &rendered));
+    CHECK(rendered==strlen(message));
+    CHECK(memcmp(formatted,message,rendered)==0);
+    CHECK(bsr_stop(&f.runtime).status==BSR_OK); /* owner after diagnosis */
+    CHECK(cpc_diag_policy_write_step(&f.text,diagnostic));
+    CHECK(f.text.bytes_received==bytes_before+rendered);
+    CHECK(finish_ready()==0 && f.ready_count==1u);
+    CHECK(advance(8u).state==HW4_RUN_INVALID_ARGUMENT);
+    CHECK(memcmp(before_program,f.image,sizeof(before_program))==0);
+    return 0;
+}
+#define DIAG_CASE(lines,steps,reason,category,origin,line,msg,source) \
+    CHECK(diagnostic_case(lines,sizeof(lines)/sizeof((lines)[0]),steps, \
+                          reason,category,origin,line,msg,source)==0)
+static int diagnostic_provenance_matrix(void)
+{
+    static const char *const pen[]={
+        "10 PEN 2", "20 PEN 16:PRINT \"NEVER\"", "30 PRINT \"NEVER\""};
+    static const char *const gosub[]={
+        "10 GOSUB 999", "20 PRINT \"NEVER\""};
+    static const char *const returning[]={
+        "10 RETURN", "20 PRINT \"NEVER\""};
+    static const char *const next[]={
+        "10 PRINT \"BEFORE\"", "20 NEXT I%", "30 PRINT \"NEVER\""};
+    static const char *const wrong_next[]={
+        "10 FOR I%=1 TO 2", "20 NEXT J%", "30 PRINT \"NEVER\""};
+    static const char *const goto_missing[]={
+        "10 GOTO 999", "20 PRINT \"NEVER\""};
+    static const char *const if_missing[]={
+        "10 IF 1 THEN 999", "20 PRINT \"NEVER\""};
+    DIAG_CASE(pen,1u,BE_INVALID_PEN,CPC_DIAG_PEN_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE,20u,
+              "Improper argument in 20\n","NATIVE_PEN_ORACLE");
+    DIAG_CASE(gosub,0u,BE_MISSING_TARGET,CPC_DIAG_GOSUB_MISSING_TARGET,
+              CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE,10u,
+              "Line does not exist in 10\n","CPC_GOSUB_ORACLE");
+    DIAG_CASE(returning,0u,BE_RETURN_WITHOUT_GOSUB,CPC_DIAG_RETURN_UNEXPECTED,
+              CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE,10u,
+              "Unexpected RETURN in 10\n","CPC_RETURN_ORACLE");
+    DIAG_CASE(next,1u,BE_NEXT_WITHOUT_FOR,CPC_DIAG_NEXT_UNEXPECTED,
+              CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE,20u,
+              "Unexpected NEXT in 20\n","CPC_NEXT_ORACLE");
+    DIAG_CASE(wrong_next,0u,BE_NEXT_VARIABLE_MISMATCH,CPC_DIAG_NEXT_UNEXPECTED,
+              CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE,20u,
+              "Unexpected NEXT in 20\n","CPC_NEXT_ORACLE");
+    DIAG_CASE(goto_missing,0u,BE_MISSING_TARGET,CPC_DIAG_HOST_GENERIC,
+              CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
+    DIAG_CASE(if_missing,0u,BE_MISSING_TARGET,CPC_DIAG_HOST_GENERIC,
+              CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
+    /* A failed BSR status by itself can never make a CPC origin. */
+    CHECK(strcmp(hw4_run_diag_source(CPC_DIAG_ORIGIN_HOST),"HOST")==0);
+    puts("HW4-RUN-BREAK-B-C1 DIAG 7/7 real BSR cases, UART provenance + TFT text");
+    return 0;
+}
+#undef DIAG_CASE
+
 /* Source-level gate: ensure actual production CONSOLE dispatches the
  * independently tested C99 pieces, and cannot restore 256-step cutoff. */
 static int production_wiring(const char *path)
@@ -255,6 +357,7 @@ static int production_wiring(const char *path)
         "hw4_run_break_input_feed(&s_run_input,byte)",
         "hw4_run_scheduler_request_break(&s_run_scheduler)",
         "cpc_diag_policy_step(r,&s_basic.runtime)",
+        "hw4_run_diag_source(diag.origin)",
         "hw4_pen_preflight(&s_text",
         "hw4_pen_replay(&s_text",
         "if(slice.state==HW4_RUN_YIELDED)",
@@ -280,6 +383,7 @@ int main(int argc,char **argv)
     CHECK(parser_edges()==0);
     CHECK(infinite_run_and_fragmented_break()==0);
     CHECK(pen_error_and_video_reject()==0);
+    CHECK(diagnostic_provenance_matrix()==0);
     CHECK(inline_end_and_no_reentry()==0);
     CHECK(production_wiring(argv[1])==0);
     puts("HW4-RUN-BREAK-B real BSR/PEN parser 4160 steps + BREAK PASS");

@@ -7,6 +7,7 @@
 #include "hw4_pen_bridge.h"
 #include "hw4_run_scheduler.h"
 #include "hw4_run_break_input.h"
+#include "hw4_run_diag_source.h"
 #include "basic_variable_store.h"
 #include "j1_15_c_string_arena.h"
 #include "cpc_font.h"
@@ -552,8 +553,7 @@ static bool basic_run_slice(void)
                "source=%s message=%s\n",
                cpc_diag_policy_category(diag.category),
                (unsigned)diag.line_number,
-               diag.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE ?
-                   "NATIVE_PEN_ORACLE" : "HOST",
+               hw4_run_diag_source(diag.origin),
                cpc_diag_policy_message(diag.category));
         (void)bsr_stop(&s_basic.runtime);
         if(!cpc_diag_policy_write_step(&s_text,diag))

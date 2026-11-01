@@ -280,6 +280,24 @@ static void tests(void)
                    "Division by zero in 20\\n", 1);
         CHECK_CASE(fb_zero, 1U, BE_DIVISION_BY_ZERO, "ERROR\\n", 0);
     }
+    {
+        static const char *f9_620[] = {
+            "600 A%=1", "620 B%=A%\\0", "630 PRINT \"NEVER\""
+        };
+        static const char *f9_65535[] = {
+            "65000 A%=0", "65535 B%=A%\\0"
+        };
+        static const char *f9_before[] = {
+            "10 PRINT \"BEFORE\"", "15 A%=1", "20 B%=A%\\0",
+            "30 PRINT \"NEVER\""
+        };
+        CHECK_CASE(f9_620, 1U, BE_DIVISION_BY_ZERO,
+                   "Division by zero in 620\\n", 1);
+        CHECK_CASE(f9_65535, 1U, BE_DIVISION_BY_ZERO,
+                   "Division by zero in 65535\\n", 1);
+        CHECK_CASE(f9_before, 2U, BE_DIVISION_BY_ZERO,
+                   "Division by zero in 20\\n", 1);
+    }
 #undef CHECK_CASE
 }
 /* Only the CPC-attested NEXT causes can be promoted.
@@ -383,11 +401,144 @@ static void test_next_success(void)
     assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
 }
 
+/* A2: absence of false CPC origin for a forged status is mandatory.
+ * Byte-level corruptions are testing inputs only; production parser never
+ * modifies the stored tokenised bytes. */
+static void test_f9_provenance(void)
+{
+    static const char *forged_lines[] = {
+        "10 PRINT \"\\\\0\"", "20 REM A%\\\\0", "30 B%=A%\\0"
+    };
+    BSRResult genuine, forged;
+    BasicProgramLine line;
+    CpcStepDiagnostic diagnosis;
+    BasicSessionRuntime saved;
+    uint8_t saved_program[PROGRAM_CAP], saved_output[OUTPUT_CAP];
+    BEVideoEvent saved_events[EVENT_CAP];
+    BasicVariableEntry saved_entries[32];
+    BasicVariableStore saved_store;
+    uint8_t bytes[80];
+    size_t written = 191U, cursor, f9_pos;
+    (void)forged_lines; /* explicit lexical decoys tested below */
+
+    setup();
+    submit("10 A%=1");
+    submit("20 B%=A%\\0");
+    submit("30 PRINT \"NEVER\"");
+    submit("RUN");
+    assert(step().status == BSR_OK);
+    genuine = step();
+    assert(genuine.status == BSR_EXECUTOR_ERROR &&
+           genuine.executor_status == BE_DIVISION_BY_ZERO);
+    saved = f.runtime;
+    saved_store = f.store;
+    memcpy(saved_entries, f.entries, sizeof saved_entries);
+    memcpy(saved_program, f.storage, sizeof saved_program);
+    memcpy(saved_output, f.output, sizeof saved_output);
+    memcpy(saved_events, f.events, sizeof saved_events);
+    diagnosis = cpc_diag_policy_step(genuine, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_DIVISION_INTEGER_ZERO &&
+           diagnosis.origin == CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE &&
+           diagnosis.line_number == 20U);
+    assert(memcmp(&saved, &f.runtime, sizeof saved) == 0);
+    assert(memcmp(&saved_store, &f.store, sizeof saved_store) == 0);
+    assert(memcmp(saved_entries, f.entries, sizeof saved_entries) == 0);
+    assert(memcmp(saved_program, f.storage, sizeof saved_program) == 0);
+    assert(memcmp(saved_output, f.output, sizeof saved_output) == 0);
+    assert(memcmp(saved_events, f.events, sizeof saved_events) == 0);
+    /* Falsified native cause on a valid F9 zero is not enough. */
+    forged = genuine;
+    forged.status = BSR_SESSION_ERROR;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    forged.status = BSR_OVERLAP;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    forged = genuine;
+    forged.executor_status = BE_INTEGER_OVERFLOW;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    assert(bp_find(&f.program, 20U, &line) == BP_OK);
+    cursor = line.body_offset;
+    f9_pos = cursor + line.body_length - 2U;
+    assert(f.storage[f9_pos] == 0xf9u);
+    assert(f.storage[f9_pos + 1U] == 0x0eu);
+    f.storage[f9_pos + 1U] = 0x0fu; /* nonzero divisor */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.storage[f9_pos + 1U] = 0x19u; /* truncated numeric payload */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.storage[f9_pos + 1U] = 0x0eu;
+    f.storage[f9_pos] = 0xfbu; /* same error enum, wrong operator */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    /* Fake F9 / zero in the destination's cache must not count. */
+    f.storage[cursor + 1U] = 0xf9u;
+    f.storage[cursor + 2U] = 0x0eu;
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved_program, sizeof saved_program);
+    f.storage[cursor] = 0x04u; /* wrong destination type */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved_program, sizeof saved_program);
+    f.runtime.executor.cursor = f.program.size; /* invalid cursor */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.runtime = saved;
+    f.runtime.executor.statement_offset = 1U; /* not reached assignment */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.runtime = saved;
+    f.runtime.variables = NULL; /* no INTEGER store */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.runtime = saved;
+    diagnosis.origin = CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE;
+    memset(bytes, 0x8bu, sizeof bytes);
+    assert(!cpc_diag_policy_format_step(diagnosis, bytes, sizeof bytes, &written));
+    assert(written == 191U);
+    for(size_t i = 0U; i < sizeof bytes; ++i) assert(bytes[i] == 0x8bu);
+
+    /* Forged F9 cause on a perfectly valid nonzero F9 expression. */
+    setup();
+    submit("10 A%=1"); submit("20 B%=A%\\1"); submit("RUN");
+    assert(step().status == BSR_OK);
+    forged = genuine;
+    diagnosis = cpc_diag_policy_step(forged, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+    assert(step().status == BSR_OK); /* F9 nonzero succeeds */
+
+    /* FB nonzero succeeds; a forged BE code still cannot promote MOD. */
+    setup();
+    submit("10 A%=1"); submit("20 B%=A% MOD 1"); submit("RUN");
+    assert(step().status == BSR_OK);
+    diagnosis = cpc_diag_policy_step(forged, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+    assert(step().status == BSR_OK);
+
+    /* Token-like text in strings and comments cannot claim division. */
+    setup();
+    submit("10 PRINT \"\\\\0\""); submit("20 REM B%=A%\\0"); submit("RUN");
+    diagnosis = cpc_diag_policy_step(forged, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+    assert(step().status == BSR_OK);
+    diagnosis = cpc_diag_policy_step(forged, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+
+    setup();
+    submit("10 ' B%=A%\\0"); submit("RUN");
+    diagnosis = cpc_diag_policy_step(forged, &f.runtime);
+    assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
+}
+
 int main(void)
 {
     tests();
     test_next_provenance();
     test_next_success();
+    test_f9_provenance();
     puts("J1-DIAG-RETRO-A1a: GOSUB/RETURN CPC, renumber, negative origins, atomicity, Ready OK");
     return 0;
 }

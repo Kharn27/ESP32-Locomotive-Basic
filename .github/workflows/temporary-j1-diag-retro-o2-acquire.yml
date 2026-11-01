@@ -1,0 +1,116 @@
+name: TEMP O2 authentic CPC acquisition - NEVER MERGE
+
+# Pilotage #235 exception: workflow exists ONLY on the temporary branch.
+on:
+  push:
+    branches:
+      - ci/o2-temp-collect-235
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: temporary-o2-acquire-235-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    # ROM-free, exact immutable digest. No apt or emulator rebuild.
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      # PR #237 HEAD frozen for this acquisition, independent of auxiliary HEAD.
+      GITHUB_HEAD_SHA: ebe0cbd4123dd7fc725808426d25e6e467f10e46
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout exact O2 SHA and its authentic CPC ROM submodule
+        uses: actions/checkout@v4
+        with:
+          ref: ebe0cbd4123dd7fc725808426d25e6e467f10e46
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Fail closed on Git SHA, emulator source, immutable digest and ROM
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          echo "O2_TEMP_WORKFLOW_EVENT_SHA=$GITHUB_SHA"
+          echo "O2_PROGRAM_CHECKOUT_SHA=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_HEAD_SHA"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test -s tests/oracles/caprice32/rom/amsdos.rom
+          test -x /usr/local/bin/cap32
+          echo "O2_ROM_SHA256=31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
+          echo "O2_EMULATOR_PIN=8c778bf072a06fb7c23b9cccd179041db7f79a52"
+          echo "O2_COLLECTOR_BLOB=$(git hash-object tools/j1_diag_retro_o2_verify.py)"
+          test "$(git hash-object tools/j1_diag_retro_o2_verify.py)" = d1a841c4f76899a0643d28fbf92b28c3a31dbc34
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          echo "O2_PINNED_PRECHECK=PASS"
+
+      - name: Compile standalone image CLI and run fail-closed negative probes
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/j1_diag_retro_o2_verify.py
+          python3 tools/j1_diag_retro_o2_verify.py --check-sources --self-test
+          cmake -S . -B "$RUNNER_TEMP/o2-c99" -DBP_SANITIZERS=OFF
+          cmake --build "$RUNNER_TEMP/o2-c99" --target basic_program_image_cli --parallel 2
+          test -x "$RUNNER_TEMP/o2-c99/basic_program_image_cli"
+          echo "O2_HOST_PRECHECK=PASS"
+
+      - name: Acquire 6 independent original and repeat CPC pairs (24 processes)
+        run: |
+          set -euo pipefail
+          python3 tools/j1_diag_retro_o2_verify.py --acquire \
+            --caprice tests/oracles/caprice32 \
+            --image-cli "$RUNNER_TEMP/o2-c99/basic_program_image_cli" \
+            --output "$RUNNER_TEMP/o2-capture"
+          echo "O2_ACQUISITION_FINISHED"
+
+      - name: Verify raw, authentic captures and forbid full ROM or SNA export
+        run: |
+          set -euo pipefail
+          python3 tools/j1_diag_retro_o2_verify.py --verify "$RUNNER_TEMP/o2-capture"
+          test -f "$RUNNER_TEMP/o2-capture/manifest.json"
+          test "$(find "$RUNNER_TEMP/o2-capture" -type f -name 'run.png' | wc -l)" -eq 12
+          test "$(find "$RUNNER_TEMP/o2-capture" -type f -name 'list.png' | wc -l)" -eq 12
+          if find "$RUNNER_TEMP/o2-capture" -type f \( -iname '*.rom' -o -iname '*.sna' -o -iname '*.dsk' -o -iname '*token*' \) | grep .; then
+            echo 'O2_FORBIDDEN_ARCHIVE_CONTENT'
+            exit 1
+          fi
+          echo "O2_RAW_ARCHIVE_SHA=$(sha256sum "$RUNNER_TEMP/o2-capture/manifest.json" | cut -d ' ' -f 1)"
+          echo "O2_RAW_ARCHIVE=INTEGRITY_PASS SCREEN_HUMAN_REVIEW_PENDING"
+
+      - name: Upload only permitted raw CPC evidence for separate human review
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: o2-cpc-raw-${{ github.run_id }}
+          path: ${{ runner.temp }}/o2-capture/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
+
+      - name: Report true acquisition failure without synthetic evidence
+        if: failure()
+        run: |
+          echo 'O2_FAIL_CLOSED: acquisition failed; NO VERIFIED O2 ORACLE'
+          echo "O2_WORKFLOW_RUN=${GITHUB_RUN_ID} O2_PROGRAM_HEAD=${GITHUB_HEAD_SHA}"
+          if test -d "$RUNNER_TEMP/o2-capture"; then
+            find "$RUNNER_TEMP/o2-capture" -type f \( -name 'caprice.log' -o -name 'comparison.json' \) | sort | head -50 | while read -r f; do
+              echo "O2_DEBUG_LOG=$f"
+              if test "${f##*/}" = caprice.log; then tail -n 35 "$f"; fi
+            done
+          fi
+          echo 'O2_NO_EVIDENCE_ARTIFACT_UPLOADED_ON_FAILED_RUN'

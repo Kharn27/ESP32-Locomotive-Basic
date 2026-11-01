@@ -9,6 +9,31 @@
 
 L'oracle antérieur J1.10-A (docs/J1.10-A-if-then-cpc-oracle.md) a bien observé par **imprimante CPC** un IF vrai vers ligne manquante avec ERR=8, ERL=20. Cette mesure en lecture seule n'établit pas le texte écran exigé par O2 et ne remplace pas la répétition nouvelle. L'audit A0 #224 prouve le message GOSUB, **pas** sa transposition à GOTO/IF.
 
+## Conservation permanente sous la PR #237 — second run indépendant
+
+Le [workflow temporaire #41259031518](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259031518) a **réacquis** les six cas sur le même SHA O2 `ebe0cbd4123dd7fc725808426d25e6e467f10e46` : 24 processus CPC, `--verify` PASS brut, **157/157** empreintes retrouvées dans le manifeste. Il constitue un **deuxième run**, et n'est pas une copie des écrans du premier run #41258489746. Les six couples de captures RUN sont de nouveau octet pour octet identiques, avec les **mêmes six SHA PNG et les mêmes ERR/ERL** que dans le premier run.
+
+Les 157 fichiers bruts de ce second run sont conservés dans le **blob Git binaire permanent** (format `tar.xz` déterministe, sans ROM/SNA/DSK) à :
+
+`tests/fixtures/cpc6128/j1_diag_goto_if_missing/capture/o2-cpc-raw-41259031518.tar.xz`
+
+- SHA-256 du fichier décompressable : **`72a57f80f9b2dc278ff23ab7a1cf558ceb322155f639907b2c62673a695bcb5d`**.
+- SHA du blob Git vérifié indépendamment : **`6bff4661404530c7b91f07ab57f3f94afa699e08`** ; taille **46012 octets** ; manifest brut SHA-256 `4032d76441709be0ceccc278913ef2d9e0190d7b6a62943dcc8f8b8fda34dfc5`.
+- Index de scellement `tests/fixtures/cpc6128/j1_diag_goto_if_missing/archive_seal.json`; artefact brut secondaire <https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259031518/artifacts/13064995072>.
+- **Transfert réalisé avec le connecteur GitHub après lecture du journal du runner en droits lecture seulement**, sans `contents:write` dans le workflow, sans modification du workflow de #237 et sans injecter de ROM dans le dépôt.
+
+Pour restaurer les fichiers **exactement dans l'arbre attendu** par le vérificateur sur la branche O2 :
+
+~~~sh
+mkdir -p /tmp/o2-cpc
+tar -xJf tests/fixtures/cpc6128/j1_diag_goto_if_missing/capture/o2-cpc-raw-41259031518.tar.xz -C /tmp/o2-cpc
+sha256sum tests/fixtures/cpc6128/j1_diag_goto_if_missing/capture/o2-cpc-raw-41259031518.tar.xz
+python3 tools/j1_diag_retro_o2_verify.py --check-sources --self-test
+python3 tools/j1_diag_retro_o2_verify.py --verify /tmp/o2-cpc
+~~~
+
+`--verify` **réussit l'intégrité des captures brutes** et affiche néanmoins `CPC_ORACLE_UNVERIFIED` tant que le `screen_review.json` **réellement relu par un humain** manque. Les transcriptions de `acquisition_index.json` sont des hypothèses de lecture visuelle de l'assistant, à confirmer par le Pilotage sur les PNG originaux et repeat. **Aucun `CPC_ORACLE_VERIFIED` ne doit être déclaré par le développeur sans cette étape.**
+
 ## Acquisition O2 nouvelle sur ROM authentique — 1er novembre 2026
 
 **Chaîne de preuve vérifiable :**

@@ -98,19 +98,19 @@ docker run --rm --network none -v "$PWD:/project" -w /project \
 
 La sortie doit être **absente** avant toute acquisition : refus automatique d'écraser des témoins. Le manifeste brut ne peut être produit que par des processus Caprice32 réels. Si le processus CPC ne produit pas de fichier imprimante, le vérificateur n'en crée **aucun** et note les sondes `ERR`/`ERL` `UNVERIFIED` plutôt que fabriquer des octets. L'image écran reste une observation distincte. En cas d'indisponibilité de l'environnement ou d'une capture : **CPC_ORACLE_UNVERIFIED**.
 
-## Revue humaine, archivage et garde négatif
+## Revue humaine, constat et conformité — correction demandée par Pilotage #5725512564
 
-Le manifeste de l'archive capturée est sous capture/manifest.json, avec deux arbres originaux : capture/original/ et capture/repeat/. Après avoir réellement inspecté les deux captures de chaque cas, établir manuellement capture/screen_review.json, objet JSON indexé par ID, champs :
+Le manifeste brut est sous `capture/manifest.json`, avec deux arbres `capture/original/` et `capture/repeat/`. Le fichier `capture/screen_review.json` **ne doit être créé qu'après inspection humaine réelle** des deux PNG de chaque cas. Il contient un objet par ID (`GOTO_MISSING`, etc.) :
 
-- case : nom exact ; provenance : CPC_SCREEN_HUMAN_VISUAL ;
-- reviewed_original_and_repeat : true **seulement après** double relecture ;
-- png_sha256 : hash calculé du même PNG original/repeat ;
-- reviewer : identité du relecteur réel ;
-- screen_text : texte authentique recopié sans interpolation ;
-- ready_count : nombre observé après RUN ;
-- forbidden_print_absent : constat réel de sortie interdite, selon le cas.
+- `case` : ID exact ; `provenance` : `CPC_SCREEN_HUMAN_VISUAL` ; `reviewer` : relecteur identifié ; `reviewed_original_and_repeat` : `true` après les **deux** lectures.
+- `original` et `repeat` sont **deux objets distincts**, chacun avec `png_sha256` réellement mesuré, `post_run_output_lines` (tableau de **lignes écran réellement émises après la commande RUN et avant le Ready**, transcrites exactement), et `ready_count` (nombre de `Ready` **après ce RUN**).
+- Ne pas reporter dans `post_run_output_lines` les lignes de programme que Caprice32 a **échoées lors de leur saisie** : un `PRINT "NEVER"` visible dans le programme saisi n'est **pas** une sortie `NEVER` exécutée. De même, la trace imprimante `#8` n'est pas une ligne écran.
+- Pour `IF_UNTAKEN_MISSING`, mesurer explicitement la sortie post-RUN `AFTER`. Pour les cinq cas d'échec, transcrire la ligne d'erreur brute **sans la deviner à partir de GOSUB ou de BEStatus**. Une divergence réelle doit être préservée et signalée, jamais corrigée dans la transcription.
+- Le vérificateur exige que les deux relectures aient les mêmes constats lorsque les PNG bruts sont identiques ; sinon `SCREEN_REVIEW_ORIGINAL_REPEAT_TRANSCRIPT_DIFF` et FAIL. Une déclaration `reviewed_original_and_repeat=true` **n'est pas une preuve visuelle autonome** : le Pilotage doit encore relire les deux captures.
 
-Le vérificateur contrôle le couple revue/SHA, mais **ne remplace pas** l'examen humain des pixels. Sans revue, il peut éventuellement attester une archive brute cohérente, **pas** l'exactitude du texte écran. Le self-test refuse **11 falsifications en mémoire** : six incohérences de revue (mauvais SHA, faux repeat, origine non ROM, relecteur absent, texte absent, compteur Ready négatif) et cinq altérations de structure RAM (tronquage, sentinelle, fin d'enregistrement, numéro nul, longueur incohérente). Les valeurs de test sont synthétiques et ne sont jamais archivées comme observations CPC. Aucun faux PNG n'est écrit.
+**Deux verdicts séparés** après contrôle SHA/archives : `SCREEN_REVIEW=REVIEWED` exprime seulement une transcription renseignée des deux captures ; `BEHAVIOR=BEHAVIOR_PASS` ou `BEHAVIOR_DIFF` vérifie séparément les constats, avec raisons explicites. Les anomalies suivantes sont `BEHAVIOR_DIFF` et **jamais** `BEHAVIOR_PASS` : `ready_count=0` ou double Ready, `NEVER` exécuté **après RUN**, absence de `AFTER` dans le IF non pris, sortie inattendue, ou locus d'erreur absent/différent. Une **vraie** anomalie est toujours archivable comme observation CPC, et son statut DIFF reste visible. L'outil ne convertit **jamais** la simple présence de la revue en `CPC_ORACLE_VERIFIED` : le meilleur résultat automatique, lorsque toutes les revues sont renseignées sans divergence structurelle, est `O2_EVIDENCE_READY_FOR_PILOTAGE_REVIEW` ; la validation finale du texte appartient au Pilotage.
+
+Les mutations automatiques sont des données de test **éphémères en mémoire uniquement**, jamais des PNG ou des oracles factices : **8/8** falsifications de métadonnées refusées (SHA, relecture non faite, fausse provenance, identité absente, structure, Ready invalide, transcriptions original/repeat divergentes), **6/6** divergences de comportement conservées comme `BEHAVIOR_DIFF` (Ready absent, NEVER exécuté, IF non pris sans AFTER, NEVER en IF non pris, mauvais locus, locus absent) et **5/5** corruptions de structure CPC RAM rejetées. `IF_UNTAKEN_MISSING` avec `AFTER` et Ready unique est un positif du **test de politique seulement**, pas une mesure CPC.
 
 ~~~sh
 python3 tools/j1_diag_retro_o2_verify.py --check-sources --self-test

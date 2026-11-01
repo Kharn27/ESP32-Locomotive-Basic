@@ -92,6 +92,40 @@ jobs:
           echo "O2_RAW_ARCHIVE_SHA=$(sha256sum "$RUNNER_TEMP/o2-capture/manifest.json" | cut -d ' ' -f 1)"
           echo "O2_RAW_ARCHIVE=INTEGRITY_PASS SCREEN_HUMAN_REVIEW_PENDING"
 
+      - name: Emit verified ROM-free proof bundle for read-only archival handoff
+        run: |
+          set -euo pipefail
+          python3 - <<'PY_O2_BUNDLE'
+          import base64
+          import hashlib
+          import io
+          from pathlib import Path
+          import tarfile
+          root = Path(__import__('os').environ['RUNNER_TEMP']) / 'o2-capture'
+          assert (root / 'manifest.json').is_file()
+          files = sorted(p for p in root.rglob('*') if p.is_file())
+          assert len(files) == 157, 'O2_UNEXPECTED_FILE_COUNT'
+          assert not any(p.suffix.lower() in {'.rom', '.sna', '.dsk'} for p in files)
+          stream = io.BytesIO()
+          with tarfile.open(fileobj=stream, mode='w:xz', preset=9) as archive:
+              for path in files:
+                  meta = archive.gettarinfo(str(path), arcname=path.relative_to(root).as_posix())
+                  meta.mtime = 0
+                  meta.uid = meta.gid = 0
+                  meta.uname = meta.gname = ''
+                  with path.open('rb') as inp:
+                      archive.addfile(meta, inp)
+          raw = stream.getvalue()
+          print('O2_ARCHIVE_TAR_XZ_SHA256=' + hashlib.sha256(raw).hexdigest(), flush=True)
+          print('O2_ARCHIVE_FILES=' + str(len(files)), flush=True)
+          print('O2_ARCHIVE_BYTES=' + str(len(raw)), flush=True)
+          encoded = base64.b64encode(raw).decode('ascii')
+          print('O2_ARCHIVE_START', flush=True)
+          for i in range(0, len(encoded), 2048):
+              print('O2_ARCHIVE_CHUNK=' + encoded[i:i+2048], flush=True)
+          print('O2_ARCHIVE_END', flush=True)
+          PY_O2_BUNDLE
+
       - name: Upload only permitted raw CPC evidence for separate human review
         if: success()
         uses: actions/upload-artifact@v4

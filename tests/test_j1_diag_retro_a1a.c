@@ -465,8 +465,67 @@ static void test_o2b_false_and_forged(void)
     for(size_t i=0U;i<sizeof bytes;++i) assert(bytes[i] == 0xa9U);
 }
 
+
+/* The failed RUN must not damage stored BASIC; LIST remains byte-exact. */
+static void test_o2b_list_preserved(void)
+{
+    static const char expected[] =
+        "370 GOTO 999\n400 PRINT \"NEVER\"\n";
+    BasicProgram before_program;
+    uint8_t before_bytes[PROGRAM_CAP];
+    BSRResult result;
+    CpcStepDiagnostic diag;
+    setup();
+    submit("370 GOTO 999");
+    submit("400 PRINT \"NEVER\"");
+    submit("RUN");
+    before_program = f.program;
+    memcpy(before_bytes, f.storage, sizeof before_bytes);
+    result = step();
+    assert(result.status == BSR_EXECUTOR_ERROR &&
+           result.executor_status == BE_MISSING_TARGET);
+    diag = cpc_diag_policy_step(result, &f.runtime);
+    assert(diag.category == CPC_DIAG_GOTO_MISSING_TARGET &&
+           diag.origin == CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE &&
+           diag.line_number == 370U);
+    assert(bsr_stop(&f.runtime).status == BSR_OK);
+    assert(memcmp(&before_program, &f.program, sizeof f.program) == 0);
+    assert(memcmp(before_bytes, f.storage, sizeof before_bytes) == 0);
+    submit("LIST");
+    assert(f.written == sizeof(expected) - 1U);
+    assert(memcmp(f.output, expected, f.written) == 0);
+}
+
+/* A missing-target status with REM, an unknown source, or another phase is
+ * host only. Direct (non-numbered) GOTO isn't a witnessed O2-B RUN locus. */
+static void test_o2b_other_origins(void)
+{
+    BSRResult r;
+    CpcStepDiagnostic diag;
+    setup();
+    submit("10 REM GOTO 999");
+    submit("20 PRINT \"AFTER\"");
+    submit("RUN");
+    r = step();
+    assert(r.status == BSR_OK);
+    r.status = BSR_EXECUTOR_ERROR;
+    r.executor_status = BE_MISSING_TARGET;
+    f.runtime.executor.cursor = 0U;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime.executor.program = NULL;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    /* No CPC sentence is inferred from a direct input/source selection. */
+    diag.category = cpc_diag_policy_select(
+        (const uint8_t *)"GOTO 999", sizeof("GOTO 999") - 1U, r);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+}
+
 int main(void)
 {
+    test_o2b_list_preserved();
+    test_o2b_other_origins();
     test_o2b_false_and_forged();
     tests();
     test_next_provenance();

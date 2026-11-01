@@ -33,11 +33,11 @@ def verify(source):
         "touch_poll", "send_dirty_band", "repaint_dirty", "display_error",
         "display_bytes", "apply_ready_policy", "prompt", "basic_submit",
         "basic_run", "is_command", "diagnostic_demo", "execute_line",
-        "uart_init")
+        "uart_init", "run_preflight", "run_replay", "basic_run_slice")
     for name in mandatory_bool:
         assert name in fs and fs[name][0] == "bool", "bool signature: "+name
-    assert "display_print_events" in fs
-    assert fs["display_print_events"][0] == "Hw4PenDisplayResult"
+    # B migrates the old enum display function into two bool callbacks.
+    assert "display_print_events" not in fs
     assert "app_main" in fs and fs["app_main"][0] == "void"
 
     # Exhaustive check of literal returns in every CONSOLE bool/enum function;
@@ -66,14 +66,17 @@ def verify(source):
     assert "if(e!=ESP_OK) return fail(" in touch
     assert touch.rstrip().endswith("return true;")
     run = fs["basic_run"][1]
-    assert "if(next==HW4_PEN_RUN_DONE) return true;" in run
-    assert "if(next==HW4_PEN_RUN_FATAL) return false;" in run
-    assert "HW4_PEN_RUN_CONTINUE" not in run or True
-
-    display = fs["display_print_events"][1]
-    assert display.rstrip().endswith("return HW4_PEN_DISPLAY_OK;")
-    assert "HW4_PEN_DISPLAY_REJECT_DIAGNOSED" in display
-    assert "return HW4_PEN_DISPLAY_FATAL;" in display
+    assert "hw4_run_scheduler_init(&s_run_scheduler" in run
+    assert "RUN_STEP_BUDGET" not in source
+    driver = fs["basic_run_slice"][1]
+    assert "hw4_run_scheduler_slice(&s_run_scheduler" in driver
+    assert "if(slice.state==HW4_RUN_YIELDED)" in driver
+    assert "return apply_ready_policy(s_run_ready_transition) && prompt();" in driver
+    preflight = fs["run_preflight"][1]
+    replay = fs["run_replay"][1]
+    assert "hw4_pen_preflight(&s_text" in preflight
+    assert "hw4_pen_replay(&s_text" in replay
+    assert replay.rstrip().endswith("return s_run_video_failure==HW4_PEN_OK;")
 
     prompt = fs["prompt"][1]
     assert "if(!repaint_dirty()) return false;" in prompt
@@ -99,9 +102,9 @@ def self_test(source):
     verify(source)
     # Mutants must be detected. No repository file is changed.
     replacements = (
-        ("return true;\n}\nstatic bool display_error(void)",
+        ("return s_run_video_failure==HW4_PEN_OK;\n}\nstatic bool display_error(void)",
          "return HW4_PEN_DISPLAY_OK;\n}\nstatic bool display_error(void)"),
-        ("return HW4_PEN_DISPLAY_OK;\n}\nstatic bool display_error(void)",
+        ("return s_run_video_failure==HW4_PEN_OK;\n}\nstatic bool display_error(void)",
          "return true;\n}\nstatic bool display_error(void)"),
         ("if(!prompt()) return;", "if(prompt()) return;"),
         ("if(!touch_init()) return;", "if(touch_init()) return;"),

@@ -22,6 +22,19 @@ jobs:
         compiler: [gcc, clang]
     steps:
       - uses: actions/checkout@v4
+      # Disposable A2 proof: run the historical verifier on the exact
+      # production PR head, not the temporary workflow-patch commit.
+      - name: J1-DIAG-RETRO-A2 exact HEAD A0 self-test (GCC OFF)
+        if: matrix.compiler == 'gcc' && matrix.sanitizers == 'OFF'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin 7b1018bb01c4f41432df1c4d130604f1fff3f2b5
+          git checkout --detach 7b1018bb01c4f41432df1c4d130604f1fff3f2b5
+          echo J1-DIAG-RETRO-A2-VERIFIED-HEAD:
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "7b1018bb01c4f41432df1c4d130604f1fff3f2b5"
+          python3 tools/j1_diag_retro_a0_verify.py --self-test
+          echo J1-DIAG-RETRO-A2-EXACT-HEAD-A0-SELF-TEST=PASS
       - name: Configure
         run: |
           # Existing J0.23 host budget audit uses an anonymous struct inside

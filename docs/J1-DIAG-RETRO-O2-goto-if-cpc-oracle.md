@@ -144,6 +144,14 @@ Résultats exécutés avec Python 3 (hôte, pas CPC) :
 
 Ces tests ne valident **ni la création effective d'une archive CPC**, ni la lecture d'un écran O2 réel, ni le comportement final de l'émulateur sur les six nouveaux scénarios. Les contrôles d'acquisition réel original+repeat et de validation complète d'une archive restent à exécuter sur la ROM authentifiée. `CPC_ORACLE_UNVERIFIED` reste le statut obligatoire jusqu'à ce résultat.
 
+## État de l'environnement d'acquisition après revue Pilotage
+
+Vérification du 1er novembre 2026 : le runtime du développeur exécute Python et `xvfb-run`, mais **ne dispose pas de l'exécutable Caprice32 `cap32` épinglé, de la ROM CPC6128 locale ni de Docker/Podman**. Un `git ls-remote` sur `github.com` échoue en **DNS** (`Could not resolve host`). L'accès GitHub par connecteur permet de vérifier et de mettre à jour les fichiers/revues, **mais pas de lancer une commande arbitraire dans le conteneur GHCR**. La ROM et l'image GHCR restent identifiées par leurs hashes ; aucune ROM distribuée dans cette PR.
+
+Les cinq workflows GitHub existants vérifient les familles historiques sur la PR ; **aucun ne lance le collecteur O2 sur les six programmes**. Ajouter un workflow, injecter une exécution dans un job ou modifier un module étranger serait explicitement **hors du mandat #235** : ces contournements ne sont pas utilisés. La procédure Docker épinglée ci-dessus constitue la route d'acquisition reproductible **sur un runner Linux ayant accès au conteneur et au submodule** ; si aucun tel runner n'est provisionné, demander **arbitrage environnemental du Pilotage**, et ne pas promouvoir les archives historiques comme nouvelles preuves O2.
+
+Le correctif de revue a été exécuté localement sous Python 3 sur le **contenu exact** du blob GitHub `9c25ba92900e77a11c5e345b0275f12b499e3b88` : `python3 -m py_compile` PASS, `--check-sources --self-test` PASS avec 6 sources, 8/8 falsifications de métadonnées rejetées, 6/6 divergences signalées `BEHAVIOR_DIFF`, 5/5 corruptions RAM rejetées. `--verify` avec un dossier absent reste FAIL `CPC_CAPTURE_MISSING`. **Aucune exécution CPC de nouveaux cas** dans cet environnement ; `CPC_ORACLE_UNVERIFIED` reste obligatoire.
+
 ## Critères et exclusions
 
 Le statut CPC_ORACLE_VERIFIED demande 6 paires originale/repeat réelles, soit **12 exécutions RUN et 12 pré-RUN LIST/SNA**, les sorties brutes, hashes, provenance et transcriptions humaines; ERR/ERL doivent rester UNVERIFIED si aucune sonde utilisable. Les vérifications CI Linux/CPC/ARCH/OPT3 applicables seront consignées sur le HEAD de livraison. O2 ne demande ni firmware Xtensa ni tests CYD (ON_DEVICE_NOT_APPLICABLE).

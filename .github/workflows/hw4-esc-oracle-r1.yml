@@ -7,6 +7,8 @@ on:
       - 'tests/fixtures/cpc6128/hw4_esc_r1/**'
       - 'docs/HW4-ESC-ORACLE-R1.md'
       - '.github/workflows/hw4-esc-oracle-r1.yml'
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

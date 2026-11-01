@@ -1,6 +1,6 @@
 # J1-DIAG-RETRO-O2-B — GOTO / IF missing-target CPC diagnostics
 
-Mandat : [#246](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/246). Base initiale : `main@5d43a9c7f1ebe6e8bea4af5285327c104831603e`. PR : [#247](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/247), **non fusionnée**. Le Pilotage est seul responsable de la revue et de la fusion.
+Mandat : [#246](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/246). Base initiale : `main@5d43a9c7f1ebe6e8bea4af5285327c104831603e`. Base de réconciliation A2 : `main@f3d11eb8a8723a85f08bb5317852a594780c831a` (#243 fusionnée). PR : [#247](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/247), **non fusionnée**. Le Pilotage est seul responsable de la revue et de la fusion.
 
 ## Périmètre livré
 
@@ -38,7 +38,7 @@ Chaque programme est précédé de `NEW`, puis exécuté avec `RUN`. Résultats 
 
 Comparer à configuration et toolchain identiques les `idf.py size` CONSOLE de `main@5d43a9c7…` et de la PR au HEAD exact (Flash Code, image, IRAM, DRAM) avec liens vers les jobs. Heap, marge pile, DMA, LCD requièrent des preuves **physiques** ; ne pas inventer de nombres.
 
-Concurrence : A2 [#243](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/243) édite `io/cpc_diag_policy.[ch]` et `tests/test_j1_diag_retro_a1a.c`. Réconciliation non destructive et vérification F9/MOD après ordre Pilotage ; ne pas rebaser de façon destructive.
+A2 [#243](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/243) intégrée à `main@f3d11eb8a8723a85f08bb5317852a594780c831a`. Réconciliation non destructive par commit à deux parents sur branche O2-B : conserver F9/FB et valeurs historiques des catégories/provenances ; revérifier le corpus F9/MOD et les cinq CI sur ce HEAD. Oracle #237 toujours distinct, en attente de revue humaine et fusion Pilotage.
 
 ## Protocole PO — après gel SHA et feu vert Pilotage exclusivement
 

@@ -41,10 +41,11 @@ const char *cpc_diag_policy_category(CpcDiagCategory category)
         case CPC_DIAG_LINE_DOES_NOT_EXIST: return "NUMBERED_DELETE_ABSENT";
         case CPC_DIAG_PEN_IMPROPER_ARGUMENT: return "PEN_IMPROPER_ARGUMENT_CPC";
         case CPC_DIAG_GOSUB_MISSING_TARGET: return "GOSUB_MISSING_TARGET_CPC";
-        case CPC_DIAG_GOTO_MISSING_TARGET: return "GOTO_MISSING_TARGET_CPC";
-        case CPC_DIAG_IF_MISSING_TARGET: return "IF_TAKEN_MISSING_TARGET_CPC";
         case CPC_DIAG_RETURN_UNEXPECTED: return "RETURN_UNEXPECTED_CPC";
         case CPC_DIAG_NEXT_UNEXPECTED: return "NEXT_UNEXPECTED_CPC";
+        case CPC_DIAG_DIVISION_INTEGER_ZERO: return "INTEGER_F9_DIVISION_BY_ZERO_CPC";
+        case CPC_DIAG_GOTO_MISSING_TARGET: return "GOTO_MISSING_TARGET_CPC";
+        case CPC_DIAG_IF_MISSING_TARGET: return "IF_TAKEN_MISSING_TARGET_CPC";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -57,10 +58,11 @@ const char *cpc_diag_policy_message(CpcDiagCategory category)
         case CPC_DIAG_LINE_DOES_NOT_EXIST: return "Line does not exist";
         case CPC_DIAG_PEN_IMPROPER_ARGUMENT: return "Improper argument";
         case CPC_DIAG_GOSUB_MISSING_TARGET: return "Line does not exist";
-        case CPC_DIAG_GOTO_MISSING_TARGET: return "Line does not exist";
-        case CPC_DIAG_IF_MISSING_TARGET: return "Line does not exist";
         case CPC_DIAG_RETURN_UNEXPECTED: return "Unexpected RETURN";
         case CPC_DIAG_NEXT_UNEXPECTED: return "Unexpected NEXT";
+        case CPC_DIAG_DIVISION_INTEGER_ZERO: return "Division by zero";
+        case CPC_DIAG_GOTO_MISSING_TARGET: return "Line does not exist";
+        case CPC_DIAG_IF_MISSING_TARGET: return "Line does not exist";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -341,6 +343,61 @@ bool cpc_diag_policy_next_locus(const BasicExecutor *executor, BEStatus reason,
     return false;
 }
 
+/* A2: a narrow read-only corroboration of the actual reached, tokenised
+ * INTEGER assignment. Both F9 (integer division) and FB (MOD) return
+ * BE_DIVISION_BY_ZERO, so BEStatus alone cannot license a CPC message.
+ * Only the historically witnessed RHS literal zero (canonical 0E) and
+ * an existing INTEGER source variable are admitted. Colon continuations,
+ * noncanonical encodings, fabricated status/payload and other operators
+ * remain host diagnostics. No BASIC evaluation or state change here. */
+static void f9_skip_spaces(const uint8_t *body, size_t length, size_t *pos)
+{
+    while (*pos < length && body[*pos] == (uint8_t)' ') ++*pos;
+}
+
+static bool f9_zero_assignment(const BasicSessionRuntime *runtime,
+                               const BasicProgramLine *line)
+{
+    const BasicExecutor *executor = &runtime->executor;
+    const uint8_t *body = runtime->program->data + line->body_offset;
+    const size_t length = line->body_length;
+    size_t pos = 0U, used = 0U;
+    BasicVariableKey key;
+    BasicVariableValue value;
+    if (executor->statement_offset != 0U ||
+        runtime->variables == NULL ||
+        executor->variables != runtime->variables ||
+        bp_validate(runtime->program) != BP_OK)
+        return false;
+    f9_skip_spaces(body, length, &pos);
+    if (pos < length && body[pos] == 0xa5u) { /* optional LET */
+        ++pos;
+        f9_skip_spaces(body, length, &pos);
+    }
+    if (pos >= length || body[pos] != 0x02u ||
+        bvb_resolve_explicit(body, length, pos, &key, &used) != BVB_OK ||
+        key.type != (uint8_t)BVT_INTEGER || used == 0U ||
+        used > length - pos)
+        return false;
+    pos += used;
+    f9_skip_spaces(body, length, &pos);
+    if (pos >= length || body[pos++] != 0xefu) return false; /* = */
+    f9_skip_spaces(body, length, &pos);
+    if (pos >= length || body[pos] != 0x02u ||
+        bvb_read_explicit(body, length, pos, runtime->variables,
+                          &key, &used, &value) != BVB_OK ||
+        key.type != (uint8_t)BVT_INTEGER ||
+        value.type != (uint8_t)BVT_INTEGER ||
+        used == 0U || used > length - pos)
+        return false;
+    pos += used;
+    f9_skip_spaces(body, length, &pos);
+    if (pos >= length || body[pos++] != 0xf9u) return false; /* NOT FB */
+    f9_skip_spaces(body, length, &pos);
+    if (pos >= length || body[pos++] != 0x0eu) return false; /* exact 0 */
+    f9_skip_spaces(body, length, &pos);
+    return pos == length; /* no second statement, comment, or payload */
+}
 
 /* Reject a forged continuation pointing into an opaque string/reference or
  * numeric payload. The executor itself only resumes at statement boundaries.
@@ -477,7 +534,8 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
        result.executor_status!=BE_MISSING_TARGET &&
        result.executor_status!=BE_RETURN_WITHOUT_GOSUB &&
        result.executor_status!=BE_NEXT_WITHOUT_FOR &&
-       result.executor_status!=BE_NEXT_VARIABLE_MISMATCH)
+       result.executor_status!=BE_NEXT_VARIABLE_MISMATCH &&
+       result.executor_status!=BE_DIVISION_BY_ZERO)
         return diagnostic;
 
     cursor=runtime->executor.cursor;
@@ -485,6 +543,13 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
        line.offset!=runtime->executor.cursor || line.number==0U ||
        runtime->executor.statement_offset>=line.body_length)
         return diagnostic;
+    if(result.executor_status==BE_DIVISION_BY_ZERO) {
+        if(!f9_zero_assignment(runtime,&line)) return diagnostic;
+        diagnostic.category=CPC_DIAG_DIVISION_INTEGER_ZERO;
+        diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE;
+        diagnostic.line_number=line.number;
+        return diagnostic;
+    }
     if(result.executor_status==BE_NEXT_WITHOUT_FOR ||
        result.executor_status==BE_NEXT_VARIABLE_MISMATCH) {
         /* Reproduce the exact failed probe against the unchanged executor,
@@ -538,6 +603,7 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
     static const uint8_t gosub_prefix[]="Line does not exist in ";
     static const uint8_t return_prefix[]="Unexpected RETURN in ";
     static const uint8_t next_prefix[]="Unexpected NEXT in ";
+    static const uint8_t f9_prefix[]="Division by zero in ";
     const uint8_t *prefix=NULL;
     size_t prefix_length=0U;
     uint8_t digits[5];
@@ -573,6 +639,10 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE) {
         prefix=next_prefix;
         prefix_length=sizeof(next_prefix)-1U;
+    } else if(diagnostic.category==CPC_DIAG_DIVISION_INTEGER_ZERO &&
+              diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE) {
+        prefix=f9_prefix;
+        prefix_length=sizeof(f9_prefix)-1U;
     } else {
         return false;
     }

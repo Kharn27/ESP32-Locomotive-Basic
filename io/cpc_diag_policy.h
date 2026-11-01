@@ -14,6 +14,7 @@ typedef enum {
     CPC_DIAG_GOSUB_MISSING_TARGET,
     CPC_DIAG_RETURN_UNEXPECTED,
     CPC_DIAG_NEXT_UNEXPECTED,
+    CPC_DIAG_DIVISION_INTEGER_ZERO,
     CPC_DIAG_GOTO_MISSING_TARGET,
     CPC_DIAG_IF_MISSING_TARGET,
     CPC_DIAG_COUNT
@@ -26,6 +27,7 @@ typedef enum {
     CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE
 } CpcDiagOrigin;
@@ -36,17 +38,17 @@ typedef struct {
     uint16_t line_number; /* 0 for host diagnostics; never a fixed L10. */
 } CpcStepDiagnostic;
 
-/* A failed RUNNING executor step keeps its executor cursor. Resolve
+/* A failed, still-running native executor step keeps its cursor. Resolve
  * the real stored line BEFORE bsr_stop(). A standalone BEStatus or a renderer
  * rejection is never sufficient evidence for a CPC diagnostic.
- * For O2-B, GOTO/IF require a reached token, missing stored target and
- * (for IF) a taken condition from the read-only INTEGER store. */
+ * For O2-B GOTO/IF require reached tokens, absent target and taken IF. */
 /* Read-only provenance query, no BASIC execution/ERR state mutation.
  * On failure *line_number is unchanged. Bounded lexical FOR/NEXT scan. */
 bool cpc_diag_policy_next_locus(const BasicExecutor *executor, BEStatus reason,
                                  uint16_t *line_number);
 CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
                                         const BasicSessionRuntime *runtime);
+/* A2: tokenised F9 INTEGER literal-zero only; FB/MOD keeps host fallback. */
 /* One LF-terminated diagnostic. Host fallback is ERROR\n, with no fabricated
  * line number; invalid fabricated CPC contexts fail closed, writing nothing.
  * format_step is also a byte-exact regression seam, without heap or printf. */

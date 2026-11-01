@@ -247,6 +247,102 @@ def audit(sources):
 
 
 
+
+def r1_exact_step(job, expected, code):
+    header = expected.split("\n", 1)[0]
+    demand(job.count(header) == 1, code + "_MISSING")
+    tail = job.split(header, 1)[1]
+    boundary = re.search(r"(?m)^      - ", tail)
+    actual = header + (tail[:boundary.start()] if boundary else tail)
+    demand(actual.rstrip() == expected, code + "_ALTERED")
+
+
+def audit_r1_permanent(sources):
+    """A PR cannot bypass both independently pinned R1 checks."""
+    workflow = sources[R1_WORKFLOW]
+    required = EXPECTED_ROUTES[R1_WORKFLOW]
+    actual = filters(workflow)
+    demand(actual is not None and len(actual) == len(required)
+           and set(actual) == set(required), "R1_MANDATORY_FILTER_SET_MISMATCH")
+    demand("  push:\n    branches: [main]" in workflow,
+           "R1_MAIN_PUSH_MISSING")
+    marker = "\n  sealed-originals:\n"
+    demand(workflow.count(marker) == 1, "R1_SEALED_JOB_MISSING")
+    tail = workflow.split(marker, 1)[1]
+    boundary = re.search(r"(?m)^  [A-Za-z][\w-]*:[ \t]*$", tail)
+    job = tail[:boundary.start()] if boundary else tail
+    prefix = job.split("\n    steps:", 1)[0]
+    demand("    runs-on: ubuntu-24.04" in prefix
+           and not re.search(r"(?m)^    (?:if|needs|continue-on-error):",
+                             prefix),
+           "R1_SEALED_JOB_CONDITIONAL")
+    demand(job.count(R1_SEAL_COMMAND) == 1
+           and job.count(R1_VERIFY_COMMAND) == 1,
+           "R1_SEAL_COMMAND_MISSING")
+    r1_exact_step(job, R1_SEALED_STEP, "R1_SEALED_STEP")
+    demand("if: github.event_name == 'workflow_dispatch' && "
+           "github.ref_name == 'oracle/hw4-esc-r1-cpc'" in workflow,
+           "R1_UNREQUESTED_ACQUISITION")
+    permanent = sources["ci-cpc-permanent.yml"]
+    marker = "\n  sealed-evidence:\n"
+    demand(permanent.count(marker) == 1, "R1_PERMANENT_JOB_MISSING")
+    tail = permanent.split(marker, 1)[1]
+    boundary = re.search(r"(?m)^  [A-Za-z][\w-]*:[ \t]*$", tail)
+    job = tail[:boundary.start()] if boundary else tail
+    demand(job.count(R1_SEAL_COMMAND) == 1
+           and job.count(R1_VERIFY_COMMAND) == 1,
+           "R1_PERMANENT_SEAL_MISSING")
+    r1_exact_step(job, R1_PERMANENT_STEP, "R1_PERMANENT_STEP")
+
+
+def r1_negative_tests(sources):
+    """Only in-memory workflow mutations; original files never touched."""
+    original = sources[R1_WORKFLOW]
+    for required in EXPECTED_ROUTES[R1_WORKFLOW]:
+        needle = "      - '" + required + "'\n"
+        demand(needle in original, "R1_NEGATIVE_INERT_" + required)
+        altered = {**sources, R1_WORKFLOW: original.replace(needle, "", 1)}
+        try:
+            audit_r1_permanent(altered)
+        except UnsafeRoute as exc:
+            demand(str(exc) == "R1_MANDATORY_FILTER_SET_MISMATCH",
+                   "R1_FILTER_WRONG_REJECTION_" + required + ":" + str(exc))
+        else:
+            raise UnsafeRoute("R1_REMOVED_FILTER_ACCEPTED_" + required)
+        print("CI-OPT3 R1_FILTER_REMOVAL_REJECTED", required)
+    for label, workflow, before, after, expected in (
+        ("SEALED_JOB_SKIPPED", R1_WORKFLOW,
+         "  sealed-originals:\n    runs-on:",
+         "  sealed-originals:\n    if: false\n    runs-on:",
+         "R1_SEALED_JOB_CONDITIONAL"),
+        ("R1_SEAL_CHANGED", R1_WORKFLOW, R1_SEAL_COMMAND,
+         R1_SEAL_COMMAND.replace(R1_SEAL, "0" * 64),
+         "R1_SEAL_COMMAND_MISSING"),
+        ("PERMANENT_SEAL_CHANGED", "ci-cpc-permanent.yml",
+         R1_SEAL_COMMAND, R1_SEAL_COMMAND.replace(R1_SEAL, "0" * 64),
+         "R1_PERMANENT_SEAL_MISSING"),
+        ("PERMANENT_STEP_REMOVED", "ci-cpc-permanent.yml",
+         R1_PERMANENT_STEP + "\n", "",
+         "R1_PERMANENT_SEAL_MISSING"),
+    ):
+        src = sources[workflow]
+        demand(before in src, "R1_NEGATIVE_INERT_" + label)
+        altered = {**sources, workflow: src.replace(before, after, 1)}
+        try:
+            audit_r1_permanent(altered)
+        except UnsafeRoute as exc:
+            demand(str(exc) == expected,
+                   "R1_NEGATIVE_WRONG_REJECTION_" + label + ":" + str(exc))
+        else:
+            raise UnsafeRoute("R1_NEGATIVE_ACCEPTED_" + label)
+        print("CI-OPT3 R1_SEAL_BYPASS_REJECTED", label)
+    for proof in (R1_VERIFIER, R1_MANIFEST,
+                  "tests/fixtures/cpc6128/hw4_esc_r1/E03/screenshot_fake.png"):
+        demand(R1_WORKFLOW in triggered_names([proof], sources),
+               "R1_EVIDENCE_CHANGE_NOT_ROUTED_" + proof)
+        print("CI-OPT3 R1_EVIDENCE_PR_TRIGGER_VERIFIED", proof)
+
+
 def audit_cls_permanent(sources):
     """The CLS SHA chain is mandatory on all PRs and main, not only branch CLS."""
     yml=sources[PAPER_WORKFLOW]

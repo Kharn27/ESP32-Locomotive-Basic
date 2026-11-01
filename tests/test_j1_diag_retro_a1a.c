@@ -406,10 +406,12 @@ static void test_o2b_false_and_forged(void)
     spoof = r;
     spoof.status = BSR_EXECUTOR_ERROR;
     spoof.executor_status = BE_MISSING_TARGET;
-    f.runtime.executor.cursor = 0U;
+    assert(bp_find(&f.program, 20U, &line) == BP_OK);
+    f.runtime.executor.cursor = line.offset;
     f.runtime.executor.statement_offset = 0U;
     diag = cpc_diag_policy_step(spoof, &f.runtime);
     assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime.executor.cursor = line.next_offset;
     r = step();
     assert(r.status == BSR_OK && f.written == sizeof("AFTER\n") - 1U);
     assert(memcmp(f.output, "AFTER\n", f.written) == 0);
@@ -454,8 +456,8 @@ static void test_o2b_false_and_forged(void)
     assert(diag.category == CPC_DIAG_HOST_GENERIC);
 
     /* Unknown category/origin pairing never partially writes diagnostics. */
-    diag.category = CPC_DIAG_GOTO_MISSING_TARGET;
-    diag.origin = CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE;
+    diag.category = CPC_DIAG_GOSUB_MISSING_TARGET;
+    diag.origin = CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE;
     diag.line_number = 370U;
     memset(bytes, 0xa9, sizeof bytes);
     assert(!cpc_diag_policy_format_step(diag, bytes, sizeof bytes, &written));

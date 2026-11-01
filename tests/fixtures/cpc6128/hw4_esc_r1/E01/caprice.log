@@ -1,0 +1,78 @@
+returncode=0
+[stdout]
+VERBOSE src/argparse.cpp:117 - Append to autocmd: 10 GOTO 10
+VERBOSE src/argparse.cpp:117 - Append to autocmd: RUN
+VERBOSE src/argparse.cpp:117 - Append to autocmd: CAP32_DELAYCAP32_DELAYCAP32_SCRNSHOTCAP32_DELAYCAP32_DELAY‚CAP32_DELAYCAP32_DELAYCAP32_SCRNSHOTCAP32_DELAYCAP32_DELAYCAP32_DELAYCAP32_DELAYCAP32_SCRNSHOTCAP32_DELAYCAP32_DELAYCAP32_EXIT
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_DELAY
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_EXIT
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_SCRNSHOT
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_SCRNSHOT
+VERBOSE src/argparse.cpp:92 - Recognized keyword: CAP32_SCRNSHOT
+Using configuration file: /tmp/hw4-esc-r1-captures/E01/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+VERBOSE src/slotshandler.cpp:1434 - Ignoring empty filename passed to file_load.
+VERBOSE src/slotshandler.cpp:1434 - Ignoring empty filename passed to file_load.
+VERBOSE src/slotshandler.cpp:1434 - Ignoring empty filename passed to file_load.
+VERBOSE src/slotshandler.cpp:1434 - Ignoring empty filename passed to file_load.
+VERBOSE src/cap32.cpp:1794 - Timing: First frame at 74 - next frame in 20 ( 20/(4/4) ) at 94
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: 1 - keycode: SDLK_1 (49) - scancode:  (1634754915) - CPC key: CPC_1 - CPC scancode: 128
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: 0 - keycode: SDLK_0 (48) - scancode:  (791687226) - CPC key: CPC_0 - CPC scancode: 64
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Space - keycode: SDLK_SPACE (32) - scancode:  (1852387121) - CPC key: CPC_SPACE - CPC scancode: 87
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: G - keycode: SDLK_g (103) - scancode:  (1634493810) - CPC key: CPC_G - CPC scancode: 356
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: O - keycode: SDLK_o (111) - scancode:  (255) - CPC key: CPC_O - CPC scancode: 322
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: T - keycode: SDLK_t (116) - scancode:  (255) - CPC key: CPC_T - CPC scancode: 355
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: O - keycode: SDLK_o (111) - scancode: SDL_SCANCODE_UNKNOWN (0) - CPC key: CPC_O - CPC scancode: 322
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Space - keycode: SDLK_SPACE (32) - scancode:  (992327855) - CPC key: CPC_SPACE - CPC scancode: 87
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: 1 - keycode: SDLK_1 (49) - scancode: SDL_SCANCODE_RIGHTBRACKET (48) - CPC key: CPC_1 - CPC scancode: 128
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: 0 - keycode: SDLK_0 (48) - scancode: SDL_SCANCODE_RIGHTBRACKET (48) - CPC key: CPC_0 - CPC scancode: 64
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Return - keycode: SDLK_RETURN (13) - scancode:  (992316556) - CPC key: CPC_RETURN - CPC scancode: 34
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: R - keycode: SDLK_r (114) - scancode:  (1886284079) - CPC key: CPC_R - CPC scancode: 354
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: U - keycode: SDLK_u (117) - scancode:  (255) - CPC key: CPC_U - CPC scancode: 338
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: N - keycode: SDLK_n (110) - scancode:  (992320974) - CPC key: CPC_N - CPC scancode: 342
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Return - keycode: SDLK_RETURN (13) - scancode:  (1697820400) - CPC key: CPC_RETURN - CPC scancode: 34
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (992282132) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode: SDL_SCANCODE_RIGHTBRACKET (48) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: F3 - keycode: SDLK_F3 (1073741884) - scancode:  (1886284079) - CPC key: CAP32_SCRNSHOT - CPC scancode: 4105
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (1886284079) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+INFO    src/cap32.cpp:2194 - Dumping screen to /tmp/hw4-esc-r1-captures/E01/screenshot_20261031_235539.png
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (1697886608) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Escape - keycode: SDLK_ESCAPE (27) - scancode:  (992327732) - CPC key: CPC_ESC - CPC scancode: 130
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (255) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (992309020) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: F3 - keycode: SDLK_F3 (1073741884) - scancode:  (992325645) - CPC key: CAP32_SCRNSHOT - CPC scancode: 4105
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (1697899200) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+INFO    src/cap32.cpp:2194 - Dumping screen to /tmp/hw4-esc-r1-captures/E01/screenshot_20261031_235542.png
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (992327054) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (1697899200) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (1697898496) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: F3 - keycode: SDLK_F3 (1073741884) - scancode:  (1697892480) - CPC key: CAP32_SCRNSHOT - CPC scancode: 4105
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (-841104435) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+INFO    src/cap32.cpp:2194 - Dumping screen to /tmp/hw4-esc-r1-captures/E01/screenshot_20261031_235546.png
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: Pause - keycode: SDLK_PAUSE (1073741896) - scancode:  (570439978) - CPC key: CAP32_DELAY - CPC scancode: 4112
+VERBOSE src/cap32.cpp:2993 - Take into account CAP32_DELAY
+VERBOSE src/cap32.cpp:2940 - Keyboard: pressed: F10 - keycode: SDLK_F10 (1073741891) - scancode:  (-842400807) - CPC key: CAP32_EXIT - CPC scancode: 4096
+
+[stderr]

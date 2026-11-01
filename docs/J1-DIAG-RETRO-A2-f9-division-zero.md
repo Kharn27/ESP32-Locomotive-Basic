@@ -61,7 +61,7 @@ Les logs ESP-IDF v5.5.6 du profil **CONSOLE** sur [main de départ #41257532821]
 ```sh
 git fetch origin
 git checkout --detach <SHA_COMPLET_GELE_PAR_PILOTAGE>
-cd firmware/esp32_probe
+cd firmware/esp32_display_probe
 idf.py -DLOCO_CYD_PROFILE=CONSOLE build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```

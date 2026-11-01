@@ -201,10 +201,16 @@ def review_one(review, case, png_hash):
             isinstance(review.get("reviewer"), str) and
             len(review["reviewer"].strip()) >= 2,
             "SCREEN_REVIEW_PROVENANCE_INCOMPLETE_" + case)
+    require(set(review) == {"case", "provenance", "reviewed_original_and_repeat",
+                            "reviewer", "original", "repeat"},
+            "SCREEN_REVIEW_UNKNOWN_FIELDS_" + case)
     observed = []
     for phase in ("original", "repeat"):
         item = review.get(phase)
-        require(isinstance(item, dict) and item.get("png_sha256") == png_hash,
+        require(isinstance(item, dict) and
+                set(item) == {"png_sha256", "post_run_output_lines", "ready_count"},
+                "SCREEN_REVIEW_UNKNOWN_PHASE_FIELDS_" + case)
+        require(item.get("png_sha256") == png_hash,
                 "SCREEN_REVIEW_PHASE_HASH_INVALID_" + case + "_" + phase)
         lines = item.get("post_run_output_lines")
         require(isinstance(lines, list) and len(lines) <= 25 and
@@ -375,6 +381,8 @@ def self_test():
         with_phase("ready_count", -1),
         with_phase("post_run_output_lines", ["different in 10"]),
         with_phase("ready_count", 2),
+        {**base, "forbidden_print_absent": False},
+        with_phase("forbidden_print_absent", False),
     ]
     for index, mutant in enumerate(metadata_mutants):
         try:
@@ -426,7 +434,7 @@ def self_test():
         raise AssertionError("NEGATIVE_RAM_MUTANT_NOT_REJECTED_%u" % index)
     require(not (SOURCES / "manifest.json").exists(),
             "SOURCE_DIR_MUST_NOT_IMPERSONATE_ORACLE")
-    print("O2_NEGATIVE_METADATA=8/8 REJECTED "
+    print("O2_NEGATIVE_METADATA=10/10 REJECTED "
           "O2_NEGATIVE_BEHAVIOR=6/6 DIFF "
           "O2_NEGATIVE_RAM=5/5 REJECTED "
           "NO_GENERATED_CPC_EVIDENCE")

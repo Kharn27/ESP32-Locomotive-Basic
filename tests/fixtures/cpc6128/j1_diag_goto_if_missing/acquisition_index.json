@@ -1,0 +1,108 @@
+{
+  "phase": "J1-DIAG-RETRO-O2",
+  "kind": "AUTHENTIC_CAPTURE_PROVENANCE_AND_ASSISTANT_VISUAL_TRANSCRIPTION_NOT_HUMAN_APPROVAL",
+  "acquisition_checkout_sha": "ebe0cbd4123dd7fc725808426d25e6e467f10e46",
+  "workflow_branch": "ci/o2-temp-collect-235",
+  "workflow_sha": "661ce18e035bbe3abc1a2aa5e50f6b4d4861881a",
+  "workflow_run_id": 41258489746,
+  "workflow_run_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258489746",
+  "artifact_id": 13064455609,
+  "artifact_url": "https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258489746/artifacts/13064455609",
+  "artifact_zip_bytes": 151831,
+  "extracted_raw_manifest_sha256": "50f4dfc5e5f564a308645319302e803fd019e5d8c9b21555d7f0ad75e5882983",
+  "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+  "caprice32_source_sha": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+  "container_image": "ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c",
+  "archive_type": "GitHub Actions artifact (full original and repeat raw files) - link currently retained 14 days",
+  "capture_count": {
+    "case_pairs": 6,
+    "run_processes": 12,
+    "pre_run_list_sna_processes": 12,
+    "run_png_files": 12,
+    "list_png_files": 12,
+    "raw_files": 157
+  },
+  "integrity": {
+    "github_workflow_capture_and_verify": "SUCCESS",
+    "locally_rehashed_157_files": "MATCH_EXACT",
+    "forbidden_rom_sna_files": 0,
+    "original_repeat_png_hashes_match": "6/6"
+  },
+  "screen_review_is_human_approved": false,
+  "pilotage_cpc_oracle_status": "PENDING_HUMAN_SCREEN_REVIEW",
+  "note": "All post-RUN screen lines below were visually inspected from authentic original and repeat PNGs by the assistant, not an independent human. Do NOT use as screen_review.json or declare CPC_ORACLE_VERIFIED without Pilotage's own visual review.",
+  "cases": {
+    "GOTO_MISSING": {
+      "fault_line_in_source": 10,
+      "original_and_repeat_run_png_sha256": "45cb5f805ec940d9d2b21a535bbaed496a17055debc8bc7181e77f573dc7dfcf",
+      "original_and_repeat_post_run_screen_lines": [
+        "Line does not exist in 10"
+      ],
+      "original_and_repeat_post_run_ready_count": 1,
+      "original_and_repeat_printer_probe_ERR": 8,
+      "original_and_repeat_printer_probe_ERL": 10,
+      "post_run_never_printed": false,
+      "human_reviewer": "UNVERIFIED"
+    },
+    "IF_TAKEN_MISSING": {
+      "fault_line_in_source": 20,
+      "original_and_repeat_run_png_sha256": "b4a1339fc4d01f0024ef63a42fc7c2bbf702459b72c698d510a7a06fe8a78a8b",
+      "original_and_repeat_post_run_screen_lines": [
+        "Line does not exist in 20"
+      ],
+      "original_and_repeat_post_run_ready_count": 1,
+      "original_and_repeat_printer_probe_ERR": 8,
+      "original_and_repeat_printer_probe_ERL": 20,
+      "post_run_never_printed": false,
+      "human_reviewer": "UNVERIFIED"
+    },
+    "IF_UNTAKEN_MISSING": {
+      "fault_line_in_source": 20,
+      "original_and_repeat_run_png_sha256": "5d3c00d3ec0b521332fe99e4102ce46795205c7ec51741efa70f607301e0b6b1",
+      "original_and_repeat_post_run_screen_lines": [
+        "AFTER"
+      ],
+      "original_and_repeat_post_run_ready_count": 1,
+      "original_and_repeat_printer_probe_ERR": 0,
+      "original_and_repeat_printer_probe_ERL": 0,
+      "post_run_never_printed": false,
+      "human_reviewer": "UNVERIFIED"
+    },
+    "GOSUB_CONTROL": {
+      "fault_line_in_source": 10,
+      "original_and_repeat_run_png_sha256": "39ea4fba39ccc946b33f4b665395137c41a212ae6ed68275396e9f5796fa0b73",
+      "original_and_repeat_post_run_screen_lines": [
+        "Line does not exist in 10"
+      ],
+      "original_and_repeat_post_run_ready_count": 1,
+      "original_and_repeat_printer_probe_ERR": 8,
+      "original_and_repeat_printer_probe_ERL": 10,
+      "post_run_never_printed": false,
+      "human_reviewer": "UNVERIFIED"
+    },
+    "GOTO_RENUMBERED": {
+      "fault_line_in_source": 370,
+      "original_and_repeat_run_png_sha256": "8e2e0ef05fd8903fa374dcbaf3e68704183b2b4c60f05f01a68d3174d32ed1a2",
+      "original_and_repeat_post_run_screen_lines": [
+        "Line does not exist in 370"
+      ],
+      "original_and_repeat_post_run_ready_count": 1,
+      "original_and_repeat_printer_probe_ERR": 8,
+      "original_and_repeat_printer_probe_ERL": 370,
+      "post_run_never_printed": false,
+      "human_reviewer": "UNVERIFIED"
+    },
+    "IF_TAKEN_RENUMBERED": {
+      "fault_line_in_source": 520,
+      "original_and_repeat_run_png_sha256": "ffd945e705943e7b3023f8cc60803551e98de89ab722468a5d83f8e4ea508365",
+      "original_and_repeat_post_run_screen_lines": [
+        "Line does not exist in 520"
+      ],
+      "original_and_repeat_post_run_ready_count": 1,
+      "original_and_repeat_printer_probe_ERR": 8,
+      "original_and_repeat_printer_probe_ERL": 520,
+      "post_run_never_printed": false,
+      "human_reviewer": "UNVERIFIED"
+    }
+  }
+}

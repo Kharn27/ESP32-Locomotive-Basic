@@ -522,8 +522,56 @@ static void test_o2b_other_origins(void)
     assert(diag.category == CPC_DIAG_HOST_GENERIC);
 }
 
+
+/* A CPC-looking opcode inside the payload byte of PRINT 160 is not executable.
+ * A corrupted stored line number must likewise never be interpolated. */
+static void test_o2b_opaque_payload_and_forged_line(void)
+{
+    BSRResult r;
+    CpcStepDiagnostic diag;
+    BasicProgramLine line;
+    size_t cursor = 0U, payload = 0U;
+    bool found = false;
+    setup();
+    submit("10 PRINT 160");
+    submit("RUN");
+    r = step();
+    assert(r.status == BSR_OK);
+    r.status = BSR_EXECUTOR_ERROR;
+    r.executor_status = BE_MISSING_TARGET;
+    assert(bp_next(&f.program, &cursor, &line) == BP_OK);
+    for(size_t i = 0U; i + 1U < line.body_length; ++i) {
+        if(f.storage[line.body_offset + i] == 0x19U &&
+           f.storage[line.body_offset + i + 1U] == 0xa0U) {
+            payload = i + 1U;
+            found = true;
+            break;
+        }
+    }
+    assert(found);
+    f.runtime.executor.cursor = line.offset;
+    f.runtime.executor.statement_offset = payload;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+
+    setup();
+    submit("10 GOTO 999");
+    submit("RUN");
+    r = step();
+    assert(r.status == BSR_EXECUTOR_ERROR &&
+           r.executor_status == BE_MISSING_TARGET);
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_GOTO_MISSING_TARGET);
+    /* Zero-line record is corrupt, not an authoritative source line. */
+    f.storage[2] = 0U;
+    f.storage[3] = 0U;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+}
+
 int main(void)
 {
+    test_o2b_opaque_payload_and_forged_line();
     test_o2b_list_preserved();
     test_o2b_other_origins();
     test_o2b_false_and_forged();

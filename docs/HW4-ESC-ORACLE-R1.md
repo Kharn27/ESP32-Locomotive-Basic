@@ -158,3 +158,90 @@ le précédent témoin **STOP distinct d'ESC**.
 E07, E10 ; `CPC_BREAK_ON_DEVICE_UNVERIFIED`.
 Pas d'essai CPC physique ni CYD et aucune modification firmware ou PR #226.
 **Tranche B toujours bloquée, aucune auto-approbation/fusion.**
+
+## C1 — Scellement permanent, sans acquisition ni retouche (01/11/2026)
+
+**Mandat HW4-ESC-ORACLE-R1-C1** : corriger la faille de déclenchement/contournement
+des contrôles de l'archive R1, sans nouvelle capture ni changement d'une seule
+preuve originale. Base de comparaison **PR #239 HEAD
+`ba27a75d82f01ad9fff5cba2d1d8421cee38ef02`**, base PR toujours `main`.
+Le contenu du répertoire `tests/fixtures/cpc6128/hw4_esc_r1/` est **inchangé** ;
+29 PNG et huit sessions originales. PR #226 toujours totalement hors périmètre.
+
+### Sceau indépendant, non autorégénéré
+
+Le SHA-256 original du manifeste est **épinglé en dur, en dehors de
+l'archive**, à la fois dans le job `sealed-originals` du workflow
+`hw4-esc-oracle-r1.yml` et dans le job non conditionnel
+`sealed-evidence` de `ci-cpc-permanent.yml` :
+
+`5eff0daedd5d41d37f05848c02913de3bf8aa4b47009a43a6986095d54b3e850`
+
+Chaque job vérifie **d'abord** le SHA-256 brut du `manifest.json`
+par `sha256sum --check`, puis exécute
+`tests/oracles/hw4_esc_r1_verify.py --evidence tests/fixtures/cpc6128/hw4_esc_r1 --expected-manifest-sha256 <sceau-fixe> --self-test`.
+Le vérificateur compare **à nouveau** l'empreinte hors manifeste avant de
+parser son JSON, puis contrôle ROM/source, les huit identifiants de session,
+les 29 PNG natifs, les tailles, empreintes, checkpoints, logs et événements,
+et **l'ensemble exact des chemins** (aucun fichier ajouté/manquant).
+Les conditions critiques emploient des exceptions explicites, pas des
+`assert` désactivables par `python -O`.
+
+Ce sceau **n'est jamais calculé puis accepté automatiquement depuis
+un nouveau manifeste**. Une modification coordonnée du PNG et du champ SHA
+du manifeste est rejetée par le SHA-256 externe, même si ses deux valeurs
+se correspondent. Tout remplacement du sceau exige une modification de
+politique CI visible et une revue indépendante ; ce n'est pas une simple
+mise à jour des fixtures.
+
+### Routage CI non contournable silencieusement
+
+Le workflow R1 suit les cinq chemins obligatoires :
+`hw4_esc_r1_capture.py`, `hw4_esc_r1_verify.py`,
+`tests/fixtures/cpc6128/hw4_esc_r1/**`, la documentation R1 et
+le fichier workflow R1 lui-même. Le **job `sealed-originals` est
+inconditionnel pour toute PR déclenchée**, y compris hors de la branche
+d'acquisition, et aussi lors d'un `push` sur `main`. Le job
+`acquire` ne s'exécute plus lors des PR : il est **réservé au
+`workflow_dispatch` explicite sur la branche R1**. C1 ne déclenche donc
+aucune nouvelle acquisition.
+
+Le workflow `ci-cpc-permanent.yml`, déjà déclenché sans filtre sur
+**toutes les PR et sur `main`**, exécute indépendamment l'étape
+R1 C1 dans son job obligatoire `sealed-evidence`.
+Ainsi, une PR qui altère les preuves ne se repose pas sur un seul
+workflow filtré.
+
+L'audit `tools/ci/opt3_routing.py` conserve le registre fermé des
+**33 workflows / 5 familles**, exige **l'égalité de l'ensemble des cinq
+filtres**, le déclencheur `push main`, le job non conditionnel et
+les commandes de vérification avec ce SHA exact **dans les deux jobs**.
+Le self-test OPT3 prouve par mutations *en mémoire* que la suppression de
+chaque filtre obligatoire, le désarmement du job ou la suppression/
+altération de l'étape permanente sont rejetés. Les chemins vérificateur,
+manifeste et image individuelle sont aussi testés pour le routage PR.
+
+### Matrice des falsifications réalisées
+
+| Mutant / chemin modifié | Déclenchement / résultat attendu | Preuve de rejet |
+|---|---|---|
+| PNG seul, octet final modifié (copie temporaire) | R1 + CPC permanent ; FAIL fermé | `R1_MUTATED_PNG_REJECTED` |
+| PNG + champ SHA du manifeste corrigé ensemble | R1 + CPC permanent ; FAIL via sceau fixe | `R1_COORDINATED_PNG_MANIFEST_REJECTED` |
+| Manifeste seul (+LF) | R1 + CPC permanent ; FAIL via sceau fixe | `R1_MANIFEST_ONLY_REJECTED` |
+| PNG absent / image supplémentaire | FAIL, ensemble exact de fichiers | `R1_MISSING_PNG_REJECTED` / `R1_EXTRA_FILE_REJECTED` |
+| Vérificateur modifié isolément | R1 déclenché + CPC permanent obligatoire | `R1_EVIDENCE_PR_TRIGGER_VERIFIED` |
+| Chacun des 5 filtres R1 supprimé | Audit OPT3 FAIL | `R1_FILTER_REMOVAL_REJECTED` |
+| Job R1 désactivé, sceau R1/permanent altéré, étape permanente retirée | Audit OPT3 FAIL | `R1_SEAL_BYPASS_REJECTED` |
+| Archive inchangée | **29/29 originaux vérifiés** | `R1_INDEPENDENT_PNG_SHA_VERIFIED 29 EXTERNAL_SEAL_VERIFIED` |
+
+L'absence de contournement **se rapporte aux mutations testées et à la
+configuration CI versionnée**, non à une impossibilité cryptographique
+face à un administrateur modifiant simultanément les règles GitHub ou
+tous les contrôles du dépôt. La protection hors dépôt relève des
+règles de revue et de branches GitHub administrées par le Pilotage.
+
+**Statut de livraison C1 :** contrôle d'intégrité documentaire/CI, aucun
+changement de sémantique CPC ni de programme BASIC. `HOST_VERIFIED`
+seulement après succès des preuves CI au HEAD final ; les observations
+R1 originales restent distinctes et `CPC_BREAK_ON_DEVICE_UNVERIFIED`.
+Aucune auto-acceptation/fusion, **tranche B toujours bloquée**.

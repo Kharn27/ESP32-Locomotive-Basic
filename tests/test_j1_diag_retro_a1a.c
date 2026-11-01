@@ -275,10 +275,10 @@ static void tests(void)
             "10 A%=1", "20 B%=A% MOD 0", "30 PRINT \"NEVER\""
         };
         CHECK_CASE(f9_one, 1U, BE_DIVISION_BY_ZERO,
-                   "Division by zero in 20\\n", 1);
+                   "Division by zero in 20\n", 1);
         CHECK_CASE(f9_zero, 1U, BE_DIVISION_BY_ZERO,
-                   "Division by zero in 20\\n", 1);
-        CHECK_CASE(fb_zero, 1U, BE_DIVISION_BY_ZERO, "ERROR\\n", 0);
+                   "Division by zero in 20\n", 1);
+        CHECK_CASE(fb_zero, 1U, BE_DIVISION_BY_ZERO, "ERROR\n", 0);
     }
     {
         static const char *f9_620[] = {
@@ -292,11 +292,11 @@ static void tests(void)
             "30 PRINT \"NEVER\""
         };
         CHECK_CASE(f9_620, 1U, BE_DIVISION_BY_ZERO,
-                   "Division by zero in 620\\n", 1);
+                   "Division by zero in 620\n", 1);
         CHECK_CASE(f9_65535, 1U, BE_DIVISION_BY_ZERO,
-                   "Division by zero in 65535\\n", 1);
+                   "Division by zero in 65535\n", 1);
         CHECK_CASE(f9_before, 2U, BE_DIVISION_BY_ZERO,
-                   "Division by zero in 20\\n", 1);
+                   "Division by zero in 20\n", 1);
     }
 #undef CHECK_CASE
 }
@@ -406,9 +406,6 @@ static void test_next_success(void)
  * modifies the stored tokenised bytes. */
 static void test_f9_provenance(void)
 {
-    static const char *forged_lines[] = {
-        "10 PRINT \"\\\\0\"", "20 REM A%\\\\0", "30 B%=A%\\0"
-    };
     BSRResult genuine, forged;
     BasicProgramLine line;
     CpcStepDiagnostic diagnosis;
@@ -419,7 +416,6 @@ static void test_f9_provenance(void)
     BasicVariableStore saved_store;
     uint8_t bytes[80];
     size_t written = 191U, cursor, f9_pos;
-    (void)forged_lines; /* explicit lexical decoys tested below */
 
     setup();
     submit("10 A%=1");

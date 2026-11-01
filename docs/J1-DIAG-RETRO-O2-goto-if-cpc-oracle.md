@@ -5,9 +5,32 @@
 
 ## Statut
 
-**CPC_ORACLE_UNVERIFIED — collecte authentique encore bloquée.** Le développeur ne dispose dans son environnement ni de la ROM CPC6128 ni de l'exécutable Caprice32 épinglé. Les six sources et le collecteur sont préparés sans créer de faux PNG, de faux manifestes, de texte écran ou de fausses valeurs ERR/ERL. Ce document n'est ni une acquisition ROM ni une acceptation Pilotage.
+**ACQUISITION CPC ROM-BACKED EFFECTUÉE — revue humaine Pilotage encore requise.** La dérogation CI ciblée [#235](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/235#issuecomment-6551282739) a débloqué les six paires authentiques dans le [run #41258489746](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258489746), via la [PR temporaire #240](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/240). Le checkout O2 acquis était `ebe0cbd4123dd7fc725808426d25e6e467f10e46` ; l'identité ROM/émulateur, les 24 processus et `--verify` sans revue humaine sont confirmés par les logs et le manifeste brut. **Pas de déclaration `CPC_ORACLE_VERIFIED` tant que le Pilotage n'a pas examiné les deux PNG de chaque cas et attesté les transcriptions.**
 
 L'oracle antérieur J1.10-A (docs/J1.10-A-if-then-cpc-oracle.md) a bien observé par **imprimante CPC** un IF vrai vers ligne manquante avec ERR=8, ERL=20. Cette mesure en lecture seule n'établit pas le texte écran exigé par O2 et ne remplace pas la répétition nouvelle. L'audit A0 #224 prouve le message GOSUB, **pas** sa transposition à GOTO/IF.
+
+## Acquisition O2 nouvelle sur ROM authentique — 1er novembre 2026
+
+**Chaîne de preuve vérifiable :**
+
+- Runner Ubuntu 24.04 ; GHCR par digest `7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c` ; ROM `31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562` ; Caprice32 source `8c778bf072a06fb7c23b9cccd179041db7f79a52`.
+- Branche auxiliaire `ci/o2-temp-collect-235`, **un seul nouveau workflow**, PR #240 `DRAFT — NEVER MERGE`, HEAD `661ce18e035bbe3abc1a2aa5e50f6b4d4861881a`. Checkout **réel** du collecteur/sources `#237@ebe0cbd4123dd7fc725808426d25e6e467f10e46` ; blob outil `d1a841c4f76899a0643d28fbf92b28c3a31dbc34`.
+- [GitHub Actions run #41258489746](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258489746) **SUCCESS**, acquisition des 6 cas deux fois (**12 LIST/SNA temporaire + 12 RUN/screenshot**, dans 24 processus Caprice32 distincts), vérification `--verify` PASS sans transcription humaine, `10/10` mutations de métadonnées rejetées, `6/6` divergences conservées DIFF, `5/5` corruptions RAM rejetées.
+- [Artefact brut `o2-cpc-raw-41258489746`](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258489746/artifacts/13064455609), identifiant `13064455609`, taille ZIP `151831` octets (rétention initiale 14 jours). Contient `manifest.json`, 6 cas × original/repeat, **12 `run.png` + 12 `list.png`**, programmes BASIC, enregistrements RAM, sonde imprimante et journaux. **157 fichiers**, hashes manifestes revérifiés **157/157** ; **aucune ROM/SNA complet/DSK**. Manifeste brut SHA-256 : `50f4dfc5e5f564a308645319302e803fd019e5d8c9b21555d7f0ad75e5882983`.
+- L'index de provenance `tests/fixtures/cpc6128/j1_diag_goto_if_missing/acquisition_index.json` contient le lien durable vers le run, les SHA-256 des douze captures, les sondes CPC et les **transcriptions visuelles provisoires de l'assistant**. **Ce fichier n'est pas `screen_review.json`** et ne prétend pas matérialiser une revue humaine.
+
+| Cas acquis | Texte écran visuellement lu après RUN sur original **et** repeat (à confirmer humainement) | Ready post-RUN | ERR | ERL |
+|---|---|---:|---:|---:|
+| `GOTO_MISSING` | `Line does not exist in 10` | 1 | 8 | 10 |
+| `IF_TAKEN_MISSING` | `Line does not exist in 20` | 1 | 8 | 20 |
+| `IF_UNTAKEN_MISSING` | `AFTER` (aucune erreur) | 1 | 0 | 0 |
+| `GOSUB_CONTROL` | `Line does not exist in 10` | 1 | 8 | 10 |
+| `GOTO_RENUMBERED` | `Line does not exist in 370` | 1 | 8 | 370 |
+| `IF_TAKEN_RENUMBERED` | `Line does not exist in 520` | 1 | 8 | 520 |
+
+Les `ERR` et `ERL` sont les **deux lignes numériques réelles du canal `printer.dat`** et ne sont pas extraits des pixels ni des statuts internes. `NEVER` apparaît dans les lignes de programme **saisies**, mais n'a jamais été exécuté après RUN dans les cinq échecs. Chaque PNG original est **octet pour octet identique** à son repeat, tout en provenant d'un processus nouveau. Aucun texte d'erreur n'a été normalisé par le collecteur.
+
+**Statut de validation :** `CPC_RAW_CAPTURE_VERIFIED`, `CPC_VISUAL_ASSISTANT_PRELIMINARY`, **`HUMAN_REVIEW_PENDING`**. Il reste au Pilotage à **voir lui-même** les PNG original/repeat et à signer un vrai `screen_review.json`. Le collecteur ne pourra alors émettre au plus que `O2_EVIDENCE_READY_FOR_PILOTAGE_REVIEW`, jamais s'auto-approuver.
 
 ## Observation historique ROM-backed contrôlée par lecture visuelle (J1.10-A, pas une acquisition O2)
 
@@ -31,7 +54,7 @@ Line does not exist in 20
 Ready
 ```
 
-Le manifeste indépendant enregistre `ERR=8`, `ERL=20`, canal imprimante de `printer.dat` distinct de l'écran et paires de processus CPC originaux/repeat. ROM CPC6128 `31c3668c...`, Caprice32 `8c778bf...`, exactement comme identifiés ci-dessous. Ce témoin **démontre une formulation pour l'IF numérique pris avec cible 90 absente et ligne 20**, mais **ne couvre pas encore** le nouveau cas `IF A% THEN 999`, la renumérotation `IF`, ni surtout `GOTO`. Les authentiques nouvelles paires O2 restent `CPC_ORACLE_UNVERIFIED` et ne doivent pas être simulées par recopie de ce PNG. Les archives J1.10-A ne sont ni modifiées, ni dupliquées, ni baptisées « nouvelles captures O2 ».
+Le manifeste indépendant enregistre `ERR=8`, `ERL=20`, canal imprimante de `printer.dat` distinct de l'écran et paires de processus CPC originaux/repeat. ROM CPC6128 `31c3668c...`, Caprice32 `8c778bf...`, exactement comme identifiés ci-dessous. Ce témoin **démontre une formulation pour l'IF numérique pris avec cible 90 absente et ligne 20**, mais **ne couvre pas encore** le nouveau cas `IF A% THEN 999`, la renumérotation `IF`, ni surtout `GOTO`. Ces témoins historiques ne remplacent pas les nouvelles paires O2 désormais acquises séparément dans #41258489746. Les archives J1.10-A ne sont ni modifiées, ni dupliquées, ni baptisées « nouvelles captures O2 ».
 
 ### Contrôle historique supplémentaire, branche IF non prise
 
@@ -49,7 +72,7 @@ Lecture visuelle indépendante des **deux** PNG de l'archive antérieure `HW4-DI
 - Provenance du manifeste `tests/fixtures/cpc6128/hw4_diag_a/manifest.json` : `main` original `2f1aa23aba49aa8b27a12dbd84289fc94f5ed197`, run `40895194240`, Caprice32 `8c778bf...`, ROM CPC6128 `31c3668c...`, `independent_cpc_process=true` dans les deux sessions.
 - **ERR et ERL : UNVERIFIED** pour cette session directe ; aucune sonde imprimante n'y est archivée.
 
-Ce résultat apporte une observation ancienne de la famille GOTO, mais **ne prouve ni le texte complet ni le locus pour `10 GOTO 999 / RUN`**. Il ne compte donc pour **aucun des six cas nouvellement requis** par #235 ; archives HW4 conservées en lecture seule. La mission O2 reste `CPC_ORACLE_UNVERIFIED`.
+Ce résultat apporte une observation ancienne de la famille GOTO, mais **ne prouve ni le texte complet ni le locus pour `10 GOTO 999 / RUN`**. Il ne compte donc pour **aucun des six cas nouvellement requis** par #235 ; archives HW4 conservées en lecture seule. La capture O2 en mode RUN est désormais acquise séparément ; seule la validation humaine finale est en attente.
 
 ## Six programmes à exécuter
 
@@ -146,15 +169,15 @@ Résultats exécutés avec Python 3 (hôte, pas CPC) :
 - `--verify <capture-absente>` : `CPC_CAPTURE_MISSING`, exit 1 attendu, **aucune preuve fabriquée**.
 - `--acquire --caprice /does/not/exist --image-cli /does/not/exist --output <capture-absente>` : `PINNED_CAPRICE32_UNAVAILABLE`, exit 1 attendu ; **aucun répertoire de capture créé**.
 
-Ces tests ne valident **ni la création effective d'une archive CPC**, ni la lecture d'un écran O2 réel, ni le comportement final de l'émulateur sur les six nouveaux scénarios. Les contrôles d'acquisition réel original+repeat et de validation complète d'une archive restent à exécuter sur la ROM authentifiée. `CPC_ORACLE_UNVERIFIED` reste le statut obligatoire jusqu'à ce résultat.
+Ces tests ne valident **ni la création effective d'une archive CPC**, ni la lecture d'un écran O2 réel, ni le comportement final de l'émulateur sur les six nouveaux scénarios. Les contrôles d'acquisition réel original+repeat et de validation complète d'une archive restent à exécuter sur la ROM authentifiée. Le résultat ROM-backed a depuis été acquis ; la **relecture humaine et la confirmation Pilotage** demeurent nécessaires.
 
 ## État de l'environnement d'acquisition après revue Pilotage
 
 Vérification du 1er novembre 2026 : le runtime du développeur exécute Python et `xvfb-run`, mais **ne dispose pas de l'exécutable Caprice32 `cap32` épinglé, de la ROM CPC6128 locale ni de Docker/Podman**. Un `git ls-remote` sur `github.com` échoue en **DNS** (`Could not resolve host`). L'accès GitHub par connecteur permet de vérifier et de mettre à jour les fichiers/revues, **mais pas de lancer une commande arbitraire dans le conteneur GHCR**. La ROM et l'image GHCR restent identifiées par leurs hashes ; aucune ROM distribuée dans cette PR.
 
-Les cinq workflows GitHub existants vérifient les familles historiques sur la PR ; **aucun ne lance le collecteur O2 sur les six programmes**. Ajouter un workflow, injecter une exécution dans un job ou modifier un module étranger serait explicitement **hors du mandat #235** : ces contournements ne sont pas utilisés. La procédure Docker épinglée ci-dessus constitue la route d'acquisition reproductible **sur un runner Linux ayant accès au conteneur et au submodule** ; si aucun tel runner n'est provisionné, demander **arbitrage environnemental du Pilotage**, et ne pas promouvoir les archives historiques comme nouvelles preuves O2.
+Les cinq workflows GitHub existants vérifient les familles historiques sur la PR ; **aucun ne lance le collecteur O2 sur les six programmes**. Depuis, le Pilotage a **autorisé expressément une seule PR auxiliaire non fusionnable contenant un nouveau workflow**, sans modifier les pipelines historiques ni #237. Cette dérogation a été appliquée dans #240. La procédure Docker épinglée ci-dessus constitue la route d'acquisition reproductible **sur un runner Linux ayant accès au conteneur et au submodule** ; le runner GHCR a effectivement exécuté ce protocole dans #41258489746 ; plus d'arbitrage d'environnement requis, et ne pas promouvoir les archives historiques comme nouvelles preuves O2.
 
-Le correctif de revue a été exécuté localement sous Python 3 sur le **contenu exact** du blob GitHub `558cc31cdb8917e9ffe9880a4ab64ad54b2071f2` : `python3 -m py_compile` PASS, `--check-sources --self-test` PASS avec 6 sources, 10/10 falsifications de métadonnées rejetées, 6/6 divergences signalées `BEHAVIOR_DIFF`, 5/5 corruptions RAM rejetées. `--verify` avec un dossier absent reste FAIL `CPC_CAPTURE_MISSING`. **Aucune exécution CPC de nouveaux cas** dans cet environnement ; `CPC_ORACLE_UNVERIFIED` reste obligatoire.
+Le correctif de revue a été exécuté localement sous Python 3 sur le **contenu exact** du blob GitHub `558cc31cdb8917e9ffe9880a4ab64ad54b2071f2` : `python3 -m py_compile` PASS, `--check-sources --self-test` PASS avec 6 sources, 10/10 falsifications de métadonnées rejetées, 6/6 divergences signalées `BEHAVIOR_DIFF`, 5/5 corruptions RAM rejetées. `--verify` avec un dossier absent reste FAIL `CPC_CAPTURE_MISSING`. **Depuis ce test de disponibilité locale, l'exception CI a exécuté les nouveaux cas sous GHCR dans #41258489746.** Ce constat historique sur le runtime local ne constitue plus un blocage de capture.
 
 ## Critères et exclusions
 

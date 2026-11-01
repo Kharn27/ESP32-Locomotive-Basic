@@ -14,6 +14,7 @@ typedef enum {
     CPC_DIAG_GOSUB_MISSING_TARGET,
     CPC_DIAG_RETURN_UNEXPECTED,
     CPC_DIAG_NEXT_UNEXPECTED,
+    CPC_DIAG_DIVISION_INTEGER_ZERO,
     CPC_DIAG_COUNT
 } CpcDiagCategory;
 
@@ -23,7 +24,8 @@ typedef enum {
     CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE,
-    CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE
+    CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE
 } CpcDiagOrigin;
 
 typedef struct {
@@ -42,6 +44,7 @@ bool cpc_diag_policy_next_locus(const BasicExecutor *executor, BEStatus reason,
                                  uint16_t *line_number);
 CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
                                         const BasicSessionRuntime *runtime);
+/* A2: tokenised F9 INTEGER literal-zero only; FB/MOD keeps host fallback. */
 /* One LF-terminated diagnostic. Host fallback is ERROR\n, with no fabricated
  * line number; invalid fabricated CPC contexts fail closed, writing nothing.
  * format_step is also a byte-exact regression seam, without heap or printf. */

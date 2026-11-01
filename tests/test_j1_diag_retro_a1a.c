@@ -569,8 +569,36 @@ static void test_o2b_opaque_payload_and_forged_line(void)
     assert(diag.category == CPC_DIAG_HOST_GENERIC);
 }
 
+
+/* IF attribution must use the same store actually wired to the executor. */
+static void test_o2b_if_store_origin(void)
+{
+    BSRResult r;
+    CpcStepDiagnostic diag;
+    setup();
+    submit("10 A%=1");
+    submit("20 IF A% THEN 999");
+    submit("RUN");
+    assert(step().status == BSR_OK);
+    r = step();
+    assert(r.status == BSR_EXECUTOR_ERROR &&
+           r.executor_status == BE_MISSING_TARGET);
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_IF_MISSING_TARGET &&
+           diag.origin == CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE &&
+           diag.line_number == 20U);
+    f.runtime.executor.variables = NULL;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime.executor.variables = &f.store;
+    f.runtime.variables = NULL;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+}
+
 int main(void)
 {
+    test_o2b_if_store_origin();
     test_o2b_opaque_payload_and_forged_line();
     test_o2b_list_preserved();
     test_o2b_other_origins();

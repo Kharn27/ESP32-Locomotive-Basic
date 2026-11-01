@@ -316,7 +316,7 @@ static int diagnostic_provenance_matrix(void)
     static const char *const goto_missing[]={
         "10 GOTO 999", "20 PRINT \"NEVER\""};
     static const char *const if_missing[]={
-        "10 IF 1 THEN 999", "20 PRINT \"NEVER\""};
+        "10 A%=1", "20 IF A% THEN 999", "30 PRINT \"NEVER\""};
     DIAG_CASE(pen,1u,BE_INVALID_PEN,CPC_DIAG_PEN_IMPROPER_ARGUMENT,
               CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE,20u,
               "Improper argument in 20\n","NATIVE_PEN_ORACLE");
@@ -334,7 +334,7 @@ static int diagnostic_provenance_matrix(void)
               "Unexpected NEXT in 20\n","CPC_NEXT_ORACLE");
     DIAG_CASE(goto_missing,0u,BE_MISSING_TARGET,CPC_DIAG_HOST_GENERIC,
               CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
-    DIAG_CASE(if_missing,0u,BE_MISSING_TARGET,CPC_DIAG_HOST_GENERIC,
+    DIAG_CASE(if_missing,1u,BE_MISSING_TARGET,CPC_DIAG_HOST_GENERIC,
               CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
     /* A failed BSR status by itself can never make a CPC origin. */
     CHECK(strcmp(hw4_run_diag_source(CPC_DIAG_ORIGIN_HOST),"HOST")==0);

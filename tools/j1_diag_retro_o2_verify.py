@@ -188,24 +188,60 @@ def printer_probes(raw):
 
 
 def review_one(review, case, png_hash):
-    require(isinstance(review, dict), "REVIEW_INVALID_"+case)
-    require(review.get("case") == case and
+    """Check authenticity metadata, then classify observed *post-RUN* output.
+
+    A faithfully transcribed CPC anomaly is valid evidence even when behavior
+    differs. That case is REVIEWED/DIFF, never silently PASS or unreviewed.
+    Metadata cannot independently prove that pixels were read: Pilotage must
+    still inspect both original screenshots and their transcriptions.
+    """
+    require(isinstance(review, dict) and review.get("case") == case and
             review.get("provenance") == "CPC_SCREEN_HUMAN_VISUAL" and
-            review.get("reviewed_original_and_repeat") is True,
-            "FORGED_OR_INCOMPLETE_SCREEN_REVIEW_"+case)
-    require(review.get("png_sha256") == png_hash and
+            review.get("reviewed_original_and_repeat") is True and
             isinstance(review.get("reviewer"), str) and
             len(review["reviewer"].strip()) >= 2,
-            "SCREEN_REVIEW_IDENTITY_OR_HASH_MISSING_"+case)
-    wording = review.get("screen_text")
-    require(isinstance(wording, str) and len(wording) > 0 and
-            "\r" not in wording, "SCREEN_WORDING_NOT_REVIEWED_"+case)
-    ready = review.get("ready_count")
-    require(type(ready) is int and 0 <= ready <= 25 and
-            type(review.get("forbidden_print_absent")) is bool,
-            "READY_OR_PRINT_NOT_REVIEWED_"+case)
-    # No prior assumption about the GOTO/IF error wording.
-    return wording, review["ready_count"]
+            "SCREEN_REVIEW_PROVENANCE_INCOMPLETE_" + case)
+    observed = []
+    for phase in ("original", "repeat"):
+        item = review.get(phase)
+        require(isinstance(item, dict) and item.get("png_sha256") == png_hash,
+                "SCREEN_REVIEW_PHASE_HASH_INVALID_" + case + "_" + phase)
+        lines = item.get("post_run_output_lines")
+        require(isinstance(lines, list) and len(lines) <= 25 and
+                all(isinstance(line, str) and len(line) <= 160 and
+                    not any(c in line for c in "\r\n\x00")
+                    for line in lines),
+                "SCREEN_REVIEW_POST_RUN_TRANSCRIPT_INVALID_" + case)
+        ready = item.get("ready_count")
+        require(type(ready) is int and 0 <= ready <= 25,
+                "SCREEN_REVIEW_READY_COUNT_INVALID_" + case)
+        observed.append((lines, ready))
+    require(observed[0] == observed[1],
+            "SCREEN_REVIEW_ORIGINAL_REPEAT_TRANSCRIPT_DIFF_" + case)
+    lines, ready = observed[0]
+    # Do not assume the wording of the GOTO / IF CPC error. Only check the
+    # semantic witness (missing destination, locus and post-RUN output).
+    reasons = []
+    if ready != 1:
+        reasons.append("READY_COUNT_%d" % ready)
+    if any("NEVER" in line for line in lines):
+        reasons.append("FORBIDDEN_PRINT_EXECUTED")
+    if case == "IF_UNTAKEN_MISSING":
+        if lines != ["AFTER"]:
+            reasons.append("EXPECTED_AFTER_ONLY")
+    else:
+        expected_line = CASES[case][0]
+        # Screen wording is empirical, not inferred from GOSUB/A0 or BEStatus.
+        # An alternate authentic wording remains recorded, with a DIFF flag.
+        if len(lines) != 1:
+            reasons.append("EXPECTED_SINGLE_ERROR_LINE")
+        if len(lines) == 1:
+            match = re.search(r"(?:^|\s)in ([0-9]+)$", lines[0])
+            if match is None or int(match.group(1)) != expected_line:
+                reasons.append("ERROR_LOCUS_UNVERIFIED_OR_DIFFERENT")
+    return {"status": "BEHAVIOR_PASS" if not reasons else "BEHAVIOR_DIFF",
+            "reasons": reasons, "post_run_output_lines": list(lines),
+            "ready_count": ready}
 
 
 def verify(root):
@@ -229,6 +265,7 @@ def verify(root):
     require(isinstance(reviews, dict) and
             set(reviews).issubset(set(CASES)), "UNKNOWN_SCREEN_REVIEW")
     complete = 0
+    divergent = 0
     for case, obj in recorded.items():
         source = source_bytes(case)
         expected_lines = [int(line.split(b" ", 1)[0])
@@ -284,54 +321,93 @@ def verify(root):
                     run.get("printer_raw_hex") == raw.hex(" ").upper(),
                     "O2_PROBES_NOT_GENUINE_PRINTER_BYTES_"+case)
         require(png[0] == png[1], "O2_PNG_ORIGINAL_REPEAT_DIFFER_"+case)
+        outcome = None
         if case in reviews:
-            review_one(reviews[case], case, png[0])
+            outcome = review_one(reviews[case], case, png[0])
             complete += 1
-        print("O2_CASE=%s RAW_PAIRS=PASS SCREEN=%s ERR=%s ERL=%s" %
-              (case, "HUMAN_REVIEWED" if case in reviews else "UNVERIFIED",
+            if outcome["status"] == "BEHAVIOR_DIFF":
+                divergent += 1
+        print("O2_CASE=%s RAW_PAIRS=PASS SCREEN_REVIEW=%s BEHAVIOR=%s "
+              "REASONS=%s ERR=%s ERL=%s" %
+              (case, "REVIEWED" if outcome else "UNVERIFIED",
+               outcome["status"] if outcome else "UNVERIFIED",
+               ",".join(outcome["reasons"]) if outcome else "UNVERIFIED",
                probes[0][0] if probes[0][0] is not None else "UNVERIFIED",
                probes[0][1] if probes[0][1] is not None else "UNVERIFIED"))
     require(set(root.iterdir()) -
             {root/"original", root/"repeat", root/"manifest.json",
              root/"screen_review.json"} == set(),
             "O2_UNEXPECTED_ARCHIVE_PATH")
-    print("O2_RAW_ARCHIVE=PASS SCREEN_REVIEWED=%u/%u %s" %
-          (complete, len(CASES),
-           "CPC_ORACLE_REVIEW_READY" if complete == len(CASES) else
-           "CPC_ORACLE_UNVERIFIED"))
+    # Validation of structured metadata never auto-approves an oracle. The
+    # independent human + Pilotage still own the screen pixel verification.
+    verdict = ("O2_EVIDENCE_READY_FOR_PILOTAGE_REVIEW" if
+               complete == len(CASES) and divergent == 0 else
+               "O2_REVIEWED_WITH_BEHAVIOR_DIFF" if divergent else
+               "CPC_ORACLE_UNVERIFIED")
+    print("O2_RAW_ARCHIVE=PASS SCREEN_REVIEWED=%u/%u BEHAVIOR_DIFF=%u %s" %
+          (complete, len(CASES), divergent, verdict))
     return complete
 
 
 def self_test():
-    # All negative mutations are in memory, not invented CPC screenshots.
+    # Fake bytes below are ephemeral test cases, NOT CPC screenshots/oracles.
     check_sources()
-    base = {
-        "case": "GOTO_MISSING", "provenance": "CPC_SCREEN_HUMAN_VISUAL",
-        "reviewed_original_and_repeat": True,
-        "png_sha256": "a"*64, "reviewer": "independent human",
-        "screen_text": "REVIEWED_BY_HUMAN_NOT_A_CPC_CLAIM",
-        "ready_count": 1, "forbidden_print_absent": True}
-    require(review_one(base, "GOTO_MISSING", "a"*64)[1] == 1,
-            "VALID_REVIEW_FIXTURE_REJECTED")
-    bad = [
-        ({**base, "png_sha256":"b"*64}, "sha"),
-        ({**base, "reviewed_original_and_repeat":False}, "repeat"),
-        ({**base, "provenance":"HOST_INFERRED"}, "origin"),
-        ({**base, "reviewer":""}, "identity"),
-        ({**base, "screen_text":""}, "wording"),
-        ({**base, "ready_count":-1}, "ready")
+    base_phase = {"png_sha256": "a"*64,
+                  "post_run_output_lines": ["TEST_ERROR in 10"],
+                  "ready_count": 1}
+    base = {"case": "GOTO_MISSING",
+            "provenance": "CPC_SCREEN_HUMAN_VISUAL",
+            "reviewed_original_and_repeat": True,
+            "reviewer": "in-memory test only",
+            "original": dict(base_phase), "repeat": dict(base_phase)}
+    require(review_one(base, "GOTO_MISSING", "a"*64)["status"] ==
+            "BEHAVIOR_PASS", "VALID_REVIEW_STRUCTURE_REJECTED")
+    def with_phase(key, value, phase="original"):
+        return {**base, phase: {**base[phase], key: value}}
+    metadata_mutants = [
+        {**base, "original": {**base_phase, "png_sha256": "b"*64}},
+        {**base, "reviewed_original_and_repeat": False},
+        {**base, "provenance": "HOST_INFERRED"},
+        {**base, "reviewer": ""},
+        with_phase("post_run_output_lines", "not an array"),
+        with_phase("ready_count", -1),
+        with_phase("post_run_output_lines", ["different in 10"]),
+        with_phase("ready_count", 2),
     ]
-    for mutant, label in bad:
+    for index, mutant in enumerate(metadata_mutants):
         try:
             review_one(mutant, "GOTO_MISSING", "a"*64)
         except ValueError:
             continue
-        raise AssertionError("NEGATIVE_MUTANT_NOT_REJECTED_"+label)
-    # Synthetic in-memory parser unit fixtures, never stored as CPC evidence.
+        raise AssertionError("NEGATIVE_REVIEW_METADATA_ACCEPTED_%u" % index)
+    # Crucial Pilotage review gate: genuine anomalous observations must be
+    # retained but classified DIFF, never BEHAVIOR_PASS.
+    def both(lines, ready=1, case="GOTO_MISSING"):
+        return {**base, "case": case,
+                "original": {**base_phase, "post_run_output_lines": lines,
+                             "ready_count": ready},
+                "repeat": {**base_phase, "post_run_output_lines": lines,
+                           "ready_count": ready}}
+    behavior_mutants = [
+        both(["TEST_ERROR in 10"], 0),
+        both(["TEST_ERROR in 10", "NEVER"]),
+        both([], case="IF_UNTAKEN_MISSING"),
+        both(["NEVER"], case="IF_UNTAKEN_MISSING"),
+        both(["TEST_ERROR in 999"]),
+        both(["ERROR_WITHOUT_LINE_NUMBER"]),
+    ]
+    for index, mutant in enumerate(behavior_mutants):
+        observed = review_one(mutant, mutant["case"], "a"*64)
+        require(observed["status"] == "BEHAVIOR_DIFF" and
+                bool(observed["reasons"]),
+                "NEGATIVE_BEHAVIOR_PROMOTED_%u" % index)
+    require(review_one(both(["AFTER"], case="IF_UNTAKEN_MISSING"),
+                       "IF_UNTAKEN_MISSING", "a"*64)["status"] ==
+            "BEHAVIOR_PASS", "IF_UNTAKEN_AFTER_REJECTED")
+    # Synthetically built parser input, never archived as CPC evidence.
     test_record = bytes.fromhex("06 00 0a 00 0e 00 00 00")
     require(cpc_record_lines(test_record) == [10], "CPC_RAM_PARSER_FIXTURE")
-    raw_numeric = b" 12\r\n -7\r\n"
-    require(printer_probes(raw_numeric) == (12, -7),
+    require(printer_probes(b" 12\r\n -7\r\n") == (12, -7),
             "PRINTER_PARSER_FIXTURE")
     ram_mutants = [
         bytes.fromhex("06 00 0a 00 0e 00 00"),
@@ -340,15 +416,18 @@ def self_test():
         bytes.fromhex("06 00 00 00 0e 00 00 00"),
         bytes.fromhex("07 00 0a 00 0e 00 00 00")
     ]
-    for mutant in ram_mutants:
+    for index, mutant in enumerate(ram_mutants):
         try:
             cpc_record_lines(mutant)
         except ValueError:
             continue
-        raise AssertionError("NEGATIVE_RAM_MUTANT_NOT_REJECTED")
+        raise AssertionError("NEGATIVE_RAM_MUTANT_NOT_REJECTED_%u" % index)
     require(not (SOURCES / "manifest.json").exists(),
             "SOURCE_DIR_MUST_NOT_IMPERSONATE_ORACLE")
-    print("O2_NEGATIVE_MUTATIONS=11/11 PASS NO_GENERATED_CPC_EVIDENCE")
+    print("O2_NEGATIVE_METADATA=8/8 REJECTED "
+          "O2_NEGATIVE_BEHAVIOR=6/6 DIFF "
+          "O2_NEGATIVE_RAM=5/5 REJECTED "
+          "NO_GENERATED_CPC_EVIDENCE")
 
 
 def main():

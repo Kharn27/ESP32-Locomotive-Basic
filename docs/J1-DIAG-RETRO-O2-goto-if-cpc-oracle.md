@@ -39,6 +39,18 @@ Le Développeur a également examiné le PNG ROM-backed existant de `F_FALSE_MIS
 
 Le contrôle positif historique distinct `J1.11-A/F_MISSING_TARGET` montre `Line does not exist in 10` puis `Ready` à l'écran après `10 GOSUB 999`. Il reste en lecture seule et ne justifie aucun mapping GOTO. **La formulation de GOTO demeure entièrement non vérifiée par ces archives.**
 
+## Témoignage historique GOTO en **mode direct**, distinct d'O2/RUN
+
+Lecture visuelle indépendante des **deux** PNG de l'archive antérieure `HW4-DIAG-A`, ID `06_d05_direct_goto` :
+
+- Source clavier réelle : `GOTO 999` **sans numéro de ligne et sans RUN**.
+- Écran original et repeat : `Line does not exist` (sans `in <ligne>`), suivi d'un `Ready` visible. Ce texte est **transcrit de la capture**, non extrapolé depuis GOSUB.
+- `tests/fixtures/cpc6128/hw4_diag_a/{original,repeat}/06_d05_direct_goto/screen.png` ; SHA-256 identique **`d62e0da2a96f4eeecd6cd36101279d65009fd6920fcff911492f23df129dd951`**, selon le manifeste brut.
+- Provenance du manifeste `tests/fixtures/cpc6128/hw4_diag_a/manifest.json` : `main` original `2f1aa23aba49aa8b27a12dbd84289fc94f5ed197`, run `40895194240`, Caprice32 `8c778bf...`, ROM CPC6128 `31c3668c...`, `independent_cpc_process=true` dans les deux sessions.
+- **ERR et ERL : UNVERIFIED** pour cette session directe ; aucune sonde imprimante n'y est archivée.
+
+Ce résultat apporte une observation ancienne de la famille GOTO, mais **ne prouve ni le texte complet ni le locus pour `10 GOTO 999 / RUN`**. Il ne compte donc pour **aucun des six cas nouvellement requis** par #235 ; archives HW4 conservées en lecture seule. La mission O2 reste `CPC_ORACLE_UNVERIFIED`.
+
 ## Six programmes à exécuter
 
 Les fichiers sous tests/fixtures/cpc6128/j1_diag_goto_if_missing/sources/ sont les **sources seulement**.

@@ -287,7 +287,7 @@ def verify(root):
                     run.get("fresh_cpc_run_process") is True and
                     run.get("returncode") == 0 and
                     run.get("screen_png_present") is True and
-                    run.get("screenshot_before_post_run_probes") is not False,
+                    run.get("screenshot_before_post_run_probes") is True,
                     "O2_CAPTURE_SEQUENCE_INVALID_"+case)
             require((part / "original.bas").read_bytes() == source,
                     "O2_ORIGINAL_SOURCE_MODIFIED_"+case)

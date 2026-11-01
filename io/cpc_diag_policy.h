@@ -12,6 +12,8 @@ typedef enum {
     CPC_DIAG_LINE_DOES_NOT_EXIST,
     CPC_DIAG_PEN_IMPROPER_ARGUMENT,
     CPC_DIAG_GOSUB_MISSING_TARGET,
+    CPC_DIAG_GOTO_MISSING_TARGET,
+    CPC_DIAG_IF_MISSING_TARGET,
     CPC_DIAG_RETURN_UNEXPECTED,
     CPC_DIAG_NEXT_UNEXPECTED,
     CPC_DIAG_COUNT
@@ -22,6 +24,8 @@ typedef enum {
     CPC_DIAG_ORIGIN_HOST = 0,
     CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE
 } CpcDiagOrigin;
@@ -32,10 +36,11 @@ typedef struct {
     uint16_t line_number; /* 0 for host diagnostics; never a fixed L10. */
 } CpcStepDiagnostic;
 
-/* A failed, still-running native PEN step keeps its executor cursor. Resolve
+/* A failed RUNNING executor step keeps its executor cursor. Resolve
  * the real stored line BEFORE bsr_stop(). A standalone BEStatus or a renderer
  * rejection is never sufficient evidence for a CPC diagnostic.
- * Only PEN 16 and PEN -1 have an independent CPC error witness. */
+ * For O2-B, GOTO/IF require a reached token, missing stored target and
+ * (for IF) a taken condition from the read-only INTEGER store. */
 /* Read-only provenance query, no BASIC execution/ERR state mutation.
  * On failure *line_number is unchanged. Bounded lexical FOR/NEXT scan. */
 bool cpc_diag_policy_next_locus(const BasicExecutor *executor, BEStatus reason,
@@ -51,7 +56,7 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
 bool cpc_diag_policy_write_step(CpcText *text, CpcStepDiagnostic diagnostic);
 
 /* Only a genuine numbered-line deletion BS_NOT_FOUND can select CPC text.
- * Other errors (including GOTO, LISTT, UART or executor failures) stay
+ * Other errors (including direct GOTO, LISTT, UART or executor failures) stay
  * generic. No BASIC semantics, status enums or Ready policy are altered. */
 CpcDiagCategory cpc_diag_policy_select(const uint8_t *source, size_t length,
                                        BSRResult result);

@@ -382,7 +382,8 @@ static bool o2b_missing_target(const BasicSessionRuntime *runtime,
         BasicVariableValue lhs_value;
         size_t used = 0U;
         int taken;
-        if (runtime->variables == NULL) return false;
+        if (runtime->variables == NULL ||
+            runtime->executor.variables != runtime->variables) return false;
         /* IF cannot be reached after a preceding statement in this executor.
          * At a genuine continuation it must be the first executed token. */
         {

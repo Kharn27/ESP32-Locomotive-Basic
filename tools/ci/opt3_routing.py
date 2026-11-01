@@ -35,7 +35,10 @@ FAMILIES = {
 }
 EXPECTED_ROUTES = {
     "hw4-esc-oracle-r1.yml": ("tests/oracles/hw4_esc_r1_capture.py",
-                                   ".github/workflows/hw4-esc-oracle-r1.yml"),
+        "tests/oracles/hw4_esc_r1_verify.py",
+        "tests/fixtures/cpc6128/hw4_esc_r1/**",
+        "docs/HW4-ESC-ORACLE-R1.md",
+        ".github/workflows/hw4-esc-oracle-r1.yml"),
     "j1-6-a-mod.yml": ("tools/j1_6_mod_verify.py", "tests/fixtures/cpc6128/j1_integer_mod/**"),
     "j1-7-a-add-vars.yml": ("tools/j1_7_add_vars_verify.py", "tests/fixtures/cpc6128/j1_integer_add_vars/**"),
     "j1-8-a-sub-vars.yml": ("tools/j1_8_sub_vars_verify.py", "tests/fixtures/cpc6128/j1_integer_sub_vars/**"),
@@ -72,6 +75,32 @@ PAPER_IMAGE = ("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
                "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c")
 PAPER_ROM = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
 PAPER_CAPRICE = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+
+R1_WORKFLOW = "hw4-esc-oracle-r1.yml"
+R1_MANIFEST = "tests/fixtures/cpc6128/hw4_esc_r1/manifest.json"
+R1_VERIFIER = "tests/oracles/hw4_esc_r1_verify.py"
+# Independent seal; not derived from mutable archive JSON.
+R1_SEAL = "5eff0daedd5d41d37f05848c02913de3bf8aa4b47009a43a6986095d54b3e850"
+R1_SEAL_COMMAND = ("echo '" + R1_SEAL + "  " + R1_MANIFEST +
+                   "' | sha256sum --check --status")
+R1_VERIFY_COMMAND = ("python3 " + R1_VERIFIER +
+    " --evidence tests/fixtures/cpc6128/hw4_esc_r1"
+    " --expected-manifest-sha256 " + R1_SEAL + " --self-test")
+R1_SEALED_STEP = """      - name: Permanent R1 29 PNG archive and external manifest seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          """ + R1_SEAL_COMMAND + """
+          """ + R1_VERIFY_COMMAND + """
+          echo 'R1_C1_PERMANENT_ORIGINALS_AND_EXTERNAL_SEAL_PASS'"""
+R1_PERMANENT_STEP = """      - name: HW4-ESC-R1-C1 permanently sealed original manifest and 29 CPC PNGs
+        shell: bash
+        run: |
+          set -euo pipefail
+          """ + R1_SEAL_COMMAND + """
+          """ + R1_VERIFY_COMMAND + """
+          echo 'R1_C1_UNFILTERED_PERMANENT_ARCHIVE_PASS'"""
+
 
 
 # Exact in-job command contract. Never accept a grep match in an acquisition job.
@@ -208,6 +237,7 @@ def audit(sources):
     audit_paper_permanent(sources)
     audit_cls_route(sources)
     audit_cls_permanent(sources)
+    audit_r1_permanent(sources)
     ea = (ROOT / "tools/j1_16_e_a_store.py").read_text()
     da = (ROOT / "tools/j1_16_d_a_store.py").read_text()
     demand("SEALED_E_A_ARCHIVE_MISMATCH" in ea and
@@ -636,6 +666,7 @@ def paper_negative_tests(sources):
 
 
 def negative_tests(sources):
+    r1_negative_tests(sources)
     cls_route_negative_tests(sources)
     cls_permanent_negative_tests(sources)
     paper_negative_tests(sources)

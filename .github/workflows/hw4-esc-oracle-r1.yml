@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'tests/oracles/hw4_esc_r1_capture.py'
+      - 'tests/oracles/hw4_esc_r1_verify.py'
+      - 'tests/fixtures/cpc6128/hw4_esc_r1/**'
       - 'docs/HW4-ESC-ORACLE-R1.md'
       - '.github/workflows/hw4-esc-oracle-r1.yml'
   workflow_dispatch:
@@ -17,13 +19,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  sealed-originals:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Permanent R1 29 PNG archive and external manifest seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '5eff0daedd5d41d37f05848c02913de3bf8aa4b47009a43a6986095d54b3e850  tests/fixtures/cpc6128/hw4_esc_r1/manifest.json' | sha256sum --check --status
+          python3 tests/oracles/hw4_esc_r1_verify.py --evidence tests/fixtures/cpc6128/hw4_esc_r1 --expected-manifest-sha256 5eff0daedd5d41d37f05848c02913de3bf8aa4b47009a43a6986095d54b3e850 --self-test
+          echo 'R1_C1_PERMANENT_ORIGINALS_AND_EXTERNAL_SEAL_PASS'
   acquire:
-    if: >-
-      (github.event_name == 'pull_request' &&
-       github.head_ref == 'oracle/hw4-esc-r1-cpc' &&
-       github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'workflow_dispatch' &&
-       github.ref_name == 'oracle/hw4-esc-r1-cpc')
+    # A new acquisition is never launched by a PR archive/verifier edit.
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'oracle/hw4-esc-r1-cpc'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     container:

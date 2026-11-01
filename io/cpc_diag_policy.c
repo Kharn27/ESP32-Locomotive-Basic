@@ -1,6 +1,7 @@
 /* HW4-DIAG-A: historical CPC wording only for missing numbered deletion. */
 #include "cpc_diag_policy.h"
 #include "basic_variable_ref.h"
+#include "basic_variable_binding.h"
 #include <string.h>
 
 static bool numbered_deletion(const uint8_t *source,size_t length)
@@ -41,6 +42,7 @@ const char *cpc_diag_policy_category(CpcDiagCategory category)
         case CPC_DIAG_PEN_IMPROPER_ARGUMENT: return "PEN_IMPROPER_ARGUMENT_CPC";
         case CPC_DIAG_GOSUB_MISSING_TARGET: return "GOSUB_MISSING_TARGET_CPC";
         case CPC_DIAG_RETURN_UNEXPECTED: return "RETURN_UNEXPECTED_CPC";
+        case CPC_DIAG_NEXT_UNEXPECTED: return "NEXT_UNEXPECTED_CPC";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -54,6 +56,7 @@ const char *cpc_diag_policy_message(CpcDiagCategory category)
         case CPC_DIAG_PEN_IMPROPER_ARGUMENT: return "Improper argument";
         case CPC_DIAG_GOSUB_MISSING_TARGET: return "Line does not exist";
         case CPC_DIAG_RETURN_UNEXPECTED: return "Unexpected RETURN";
+        case CPC_DIAG_NEXT_UNEXPECTED: return "Unexpected NEXT";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -129,6 +132,208 @@ static uint8_t reached_flow(const BasicProgram *program,
     return 0U;
 }
 
+/* A1b fault-localisation is a read-only lexical consultation, intentionally
+ * hosted in the diagnostic module. CI-ARCH prohibits a PR changing core/
+ * and io/ together; the executor and its existing FOR/NEXT contract stay
+ * untouched. No status-only mapping or search for raw B0 bytes is allowed.
+ * This scanner mirrors for_match's statement-start, reference and literal
+ * skipping. It cannot execute BASIC or change any referenced object. */
+
+static void next_skip_spaces(const uint8_t *b, size_t n, size_t *at)
+{
+    while (*at < n && b[*at] == (uint8_t)' ') ++*at;
+}
+
+static bool next_key_equal(const BasicVariableKey *a,
+                           const BasicVariableKey *b)
+{
+    return a->type == b->type && a->name_length == b->name_length &&
+           memcmp(a->name, b->name, a->name_length) == 0;
+}
+
+static bool next_reference(const uint8_t *b, size_t n, size_t *at,
+                           BasicVariableKey *key)
+{
+    size_t used = 0U;
+    if (*at >= n ||
+        bvb_resolve_explicit(b, n, *at, key, &used) != BVB_OK ||
+        key->type != (uint8_t)BVT_INTEGER || used > n - *at)
+        return false;
+    *at += used;
+    return true;
+}
+
+/* Advance past one statement's payload, stopping just after a true colon.
+ * Quoted strings, comments, reference caches and numeric payloads are opaque;
+ * a malformed sequence fails closed. A finished line returns pos == n. */
+static bool next_skip_statement(const uint8_t *b, size_t n, size_t *at)
+{
+    bool quoted = false;
+    while (*at < n) {
+        uint8_t token = b[*at];
+        if (token == (uint8_t)'"') {
+            quoted = !quoted;
+            ++*at;
+        } else if (quoted) {
+            ++*at;
+        } else if (token == 0xc5u ||
+                   (token == 0x01u && *at + 1U < n && b[*at + 1U] == 0xc0u)) {
+            *at = n;
+            return true;
+        } else if (token == 0x01u) {
+            ++*at;
+            return true;
+        } else if ((token >= 0x02u && token <= 0x04u) ||
+                   (token >= 0x0bu && token <= 0x0du)) {
+            BasicVariableRef ref;
+            if (bvr_decode(b, n, *at, &ref) != BVR_OK ||
+                ref.consumed == 0U || ref.consumed > n - *at)
+                return false;
+            *at += ref.consumed;
+        } else if (token == 0x19u || token == 0x1au ||
+                   token == 0x1du || token == 0x1eu || token == 0x1fu) {
+            size_t payload = token == 0x19u ? 1U : (token == 0x1fu ? 5U : 2U);
+            if (n - *at <= payload) return false;
+            *at += payload + 1U;
+        } else {
+            ++*at;
+        }
+    }
+    return !quoted;
+}
+
+/* This is the same fixed-depth structural walk as core::for_match.
+ * The offending NEXT's BasicProgramLine.number is returned when its
+ * explicit variable contradicts the currently expected loop variable. */
+static bool next_scan_from_for(const BasicProgram *program,
+                               const BasicProgramLine *first,
+                               size_t pos, const BasicVariableKey *wanted,
+                               uint16_t *line_number)
+{
+    BasicVariableKey nested[BE_FOR_STACK_CAPACITY];
+    size_t depth = 0U, cursor = first->offset;
+    bool first_line = true;
+    BasicProgramLine line;
+    BPStatus status;
+    const uint8_t *initial = program->data + first->body_offset;
+    if (!next_skip_statement(initial, first->body_length, &pos)) return false;
+    while ((status = bp_next(program, &cursor, &line)) == BP_OK) {
+        const uint8_t *body = program->data + line.body_offset;
+        size_t n = line.body_length;
+        if (!first_line) pos = 0U;
+        first_line = false;
+        while (pos < n) {
+            uint8_t token;
+            next_skip_spaces(body, n, &pos);
+            if (pos == n) break;
+            token = body[pos++];
+            if (token == 0xc5u) break;
+            if (token == 0x01u) {
+                if (pos < n && body[pos] == 0xc0u) break;
+                continue;
+            }
+            if (token == 0x9eu) {
+                if (depth == BE_FOR_STACK_CAPACITY) return false;
+                next_skip_spaces(body, n, &pos);
+                if (!next_reference(body, n, &pos, &nested[depth]))
+                    return false;
+                ++depth;
+            } else if (token == 0xb0u) {
+                BasicVariableKey key;
+                const BasicVariableKey *expected =
+                    depth == 0U ? wanted : &nested[depth - 1U];
+                next_skip_spaces(body, n, &pos);
+                if (pos < n && body[pos] == 0x02u) {
+                    if (!next_reference(body, n, &pos, &key)) return false;
+                    if (!next_key_equal(&key, expected)) {
+                        *line_number = line.number;
+                        return true;
+                    }
+                }
+                next_skip_spaces(body, n, &pos);
+                if (pos < n && body[pos] != 0x01u) return false;
+                if (depth == 0U) return false; /* matching NEXT, not an error */
+                --depth;
+            }
+            if (!next_skip_statement(body, n, &pos)) return false;
+        }
+    }
+    return false; /* includes missing NEXT or malformed program */
+}
+
+bool cpc_diag_policy_next_locus(const BasicExecutor *executor, BEStatus reason,
+                             uint16_t *line_number)
+{
+    const BasicProgram *program;
+    BasicProgramLine line;
+    size_t cursor, pos;
+    const uint8_t *b;
+    uint16_t fault = 0U;
+    if (executor == NULL || line_number == NULL ||
+        (reason != BE_NEXT_WITHOUT_FOR &&
+         reason != BE_NEXT_VARIABLE_MISMATCH))
+        return false;
+    program = executor->program;
+    if (program == NULL || bp_validate(program) != BP_OK ||
+        executor->for_depth > BE_FOR_STACK_CAPACITY ||
+        executor->call_depth > BE_GOSUB_STACK_CAPACITY)
+        return false;
+    cursor = executor->cursor;
+    if (bp_next(program, &cursor, &line) != BP_OK ||
+        line.offset != executor->cursor || line.number == 0U ||
+        executor->statement_offset >= line.body_length)
+        return false;
+    pos = executor->statement_offset;
+    b = program->data + line.body_offset;
+    while (pos < line.body_length) {
+        uint8_t token;
+        next_skip_spaces(b, line.body_length, &pos);
+        if (pos == line.body_length) break;
+        token = b[pos++];
+        if (token == 0xb0u) {
+            if (reason == BE_NEXT_WITHOUT_FOR &&
+                executor->for_depth == 0U) {
+                /* The real executor has reported this exact orphan cause. */
+                *line_number = line.number;
+                return true;
+            }
+            if (reason == BE_NEXT_VARIABLE_MISMATCH &&
+                executor->for_depth != 0U) {
+                BasicVariableKey key;
+                next_skip_spaces(b, line.body_length, &pos);
+                if (pos < line.body_length && b[pos] == 0x02u &&
+                    next_reference(b, line.body_length, &pos, &key) &&
+                    !next_key_equal(&key,
+                        &executor->for_stack[executor->for_depth - 1U].key)) {
+                    *line_number = line.number;
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (token == 0x9eu) {
+            BasicVariableKey wanted;
+            if (reason != BE_NEXT_VARIABLE_MISMATCH) return false;
+            next_skip_spaces(b, line.body_length, &pos);
+            if (!next_reference(b, line.body_length, &pos, &wanted))
+                return false;
+            if (next_scan_from_for(program, &line, pos, &wanted, &fault) &&
+                fault != 0U) {
+                *line_number = fault;
+                return true;
+            }
+            return false;
+        }
+        if (token == 0xc5u || token == 0x9fu || token == 0xa0u ||
+            token == 0xa1u || token == 0xc9u ||
+            (token == 0x01u && pos < line.body_length && b[pos] == 0xc0u))
+            return false;
+        if (!next_skip_statement(b, line.body_length, &pos))
+            return false;
+    }
+    return false;
+}
+
 /* bsr_step_events() preserves failed cursor, output and RUNNING state.
  * Resolve from the real stored record BEFORE bsr_stop(), with no side
  * effects. Status numbers are host enums, never historical CPC ERR codes. */
@@ -141,6 +346,7 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
     BasicProgramLine line;
     size_t cursor;
     uint8_t flow;
+    uint16_t next_line = 0u;
     if(result.status!=BSR_EXECUTOR_ERROR ||
        runtime==NULL || runtime->state!=BSR_RUNNING ||
        runtime->program==NULL || runtime->executor.program!=runtime->program)
@@ -148,7 +354,9 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
     /* Never treat an arbitrary executor rejection as a ROM diagnostic. */
     if(result.executor_status!=BE_INVALID_PEN &&
        result.executor_status!=BE_MISSING_TARGET &&
-       result.executor_status!=BE_RETURN_WITHOUT_GOSUB)
+       result.executor_status!=BE_RETURN_WITHOUT_GOSUB &&
+       result.executor_status!=BE_NEXT_WITHOUT_FOR &&
+       result.executor_status!=BE_NEXT_VARIABLE_MISMATCH)
         return diagnostic;
 
     cursor=runtime->executor.cursor;
@@ -156,6 +364,19 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
        line.offset!=runtime->executor.cursor || line.number==0U ||
        runtime->executor.statement_offset>=line.body_length)
         return diagnostic;
+    if(result.executor_status==BE_NEXT_WITHOUT_FOR ||
+       result.executor_status==BE_NEXT_VARIABLE_MISMATCH) {
+        /* Reproduce the exact failed probe against the unchanged executor,
+         * including for_match's real offending NEXT record. No guessing
+         * from the FOR cursor, no raw token scan or status-only mapping. */
+        if(!cpc_diag_policy_next_locus(&runtime->executor,
+                             result.executor_status,&next_line))
+            return diagnostic;
+        diagnostic.category=CPC_DIAG_NEXT_UNEXPECTED;
+        diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE;
+        diagnostic.line_number=next_line;
+        return diagnostic;
+    }
     if(result.executor_status==BE_INVALID_PEN) {
         diagnostic.category=CPC_DIAG_PEN_IMPROPER_ARGUMENT;
         diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE;
@@ -187,6 +408,7 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
     static const uint8_t pen_prefix[]="Improper argument in ";
     static const uint8_t gosub_prefix[]="Line does not exist in ";
     static const uint8_t return_prefix[]="Unexpected RETURN in ";
+    static const uint8_t next_prefix[]="Unexpected NEXT in ";
     const uint8_t *prefix=NULL;
     size_t prefix_length=0U;
     uint8_t digits[5];
@@ -214,6 +436,10 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE) {
         prefix=return_prefix;
         prefix_length=sizeof(return_prefix)-1U;
+    } else if(diagnostic.category==CPC_DIAG_NEXT_UNEXPECTED &&
+              diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE) {
+        prefix=next_prefix;
+        prefix_length=sizeof(next_prefix)-1U;
     } else {
         return false;
     }

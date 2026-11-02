@@ -145,7 +145,11 @@ static int test_case(const Oracle *c)
         CHECK(f.store.count==saved_count && f.written==777u);
         return 0;
     }
-    CHECK(be_step(&f.executor,f.output,sizeof(f.output),&f.written)==BE_OK);
+    {
+        BEStatus got = be_step(&f.executor,f.output,sizeof(f.output),&f.written);
+        if (got != BE_OK) fprintf(stderr,"%s: first step BEStatus=%d\n",c->id,(int)got);
+        CHECK(got == BE_OK);
+    }
     if(!is_if) {
         CHECK(f.written==0u);
         CHECK(bvs_get(&f.store,&key,&value)==BVS_OK);

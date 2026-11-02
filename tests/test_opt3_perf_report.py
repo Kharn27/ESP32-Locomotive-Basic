@@ -212,5 +212,67 @@ class LatencyTests(unittest.TestCase):
         self.assertIn("Aucun gain global", text)
 
 
+
+class LatestCohortTests(unittest.TestCase):
+    """New deterministic cohort selection; all traces are TEST_SYNTHETIC."""
+
+    def test_latest_head_keeps_all_parallel_workflows(self):
+        rows = copy.deepcopy(trace()["runs"][0:4])
+        newer = copy.deepcopy(rows)
+        for i, r in enumerate(newer):
+            r["head_sha"] = "f" * 40
+            r["id"] = 991000 + i
+            r["created_at"] = "2026-11-01T23:00:00Z"
+        chosen = perf.select_latest_heads(rows + newer, 1)
+        self.assertEqual(len(chosen), 4)
+        self.assertEqual({r["head_sha"] for r in chosen}, {"f" * 40})
+        self.assertEqual({r["id"] for r in chosen},
+                         {991000, 991001, 991002, 991003})
+
+    def test_latest_does_not_select_success_only(self):
+        old = copy.deepcopy(trace()["runs"][0])
+        new = copy.deepcopy(old)
+        new["id"] = 998877
+        new["head_sha"] = "e" * 40
+        new["created_at"] = "2026-11-01T23:10:00Z"
+        new["conclusion"] = "cancelled"
+        chosen = perf.select_latest_heads([old, new], 1)
+        self.assertEqual([r["id"] for r in chosen], [998877])
+        self.assertEqual(chosen[0]["conclusion"], "cancelled")
+
+    def test_latest_invalid_limit_fails(self):
+        for limit in (0, -1):
+            with self.assertRaises(ValueError):
+                perf.select_latest_heads(trace()["runs"], limit)
+
+    def test_latest_unbounded_does_not_modify_snapshot(self):
+        original = copy.deepcopy(trace()["runs"])
+        result = perf.select_latest_heads(original, None)
+        self.assertEqual(result, original)
+        self.assertIsNot(result, original)
+
+    def test_date_filter_is_forwarded_to_rest_pagination(self):
+        from unittest.mock import Mock
+        client = Mock()
+        client.pages.return_value = iter([[]])
+        client.get.return_value = {}
+        snapshot = perf.fetch_live(client, max_pages=1,
+                                   created="2026-11-01", latest_heads=40,
+                                   with_jobs=False, with_pr_files=False)
+        self.assertEqual(snapshot["metadata"]["created_filter"], "2026-11-01")
+        self.assertEqual(snapshot["metadata"]["latest_heads"], 40)
+        self.assertEqual(client.pages.call_args.kwargs["params"]["created"],
+                         "2026-11-01")
+        self.assertEqual(snapshot["runs"], [])
+
+    def test_truncated_date_pages_fail_closed(self):
+        from unittest.mock import Mock
+        client = Mock()
+        row = copy.deepcopy(trace()["runs"][0])
+        client.pages.return_value = iter([[dict(row, id=i) for i in range(100)]])
+        with self.assertRaisesRegex(RuntimeError, "pagination incomplete"):
+            perf.fetch_live(client, max_pages=1, created="2026-11-01",
+                            with_jobs=False, with_pr_files=False)
+
 if __name__ == "__main__":
     unittest.main()

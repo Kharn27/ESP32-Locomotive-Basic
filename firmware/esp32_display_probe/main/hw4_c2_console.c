@@ -92,6 +92,8 @@ static CpcUartEditor s_edit;
 static CpcScreenNavigation s_nav;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
 static size_t s_scroll_reported;
+/* A1-P1 UART-only experiment; default OFF, logical BASIC remains intact. */
+static bool s_vscr_hold, s_vscr_t1_ack;
 /* Boot-specific tag plus monotonic seq: unique captures in a monitor session. */
 static uint32_t s_shot_boot_tag;
 static uint32_t s_shot_seq;
@@ -317,6 +319,7 @@ static bool touch_init(void)
 }
 static bool touch_poll(void)
 {
+    if(s_vscr_hold) return true; /* never change MADCTL under active VSCR */
     uint64_t elapsed=0U;
     const uint64_t now=touch_now_ms();
     const Hw4TouchEvent event=hw4_touch_t1_step(
@@ -362,6 +365,7 @@ static bool send_dirty_band(void *context, unsigned row)
 }
 static bool repaint_dirty(void)
 {
+    if(s_vscr_hold) return true; /* display frozen; dirty bits retained */
     hw4_scroll_observe_text(&s_scroll_metrics,(uint32_t)s_text.scrolls);
     if(s_video.dirty_bands!=0U) {
         unsigned sent=0U;
@@ -636,6 +640,118 @@ static bool diagnostic_demo(void)
     }
     return basic_run();
 }
+
+/* P1 UART host protocol. No BASIC token or framebuffer modification.
+ * A console-only hold is necessary while hardware GRAM diverges from VRAM.
+ * ACK records an operator assertion, NEVER a physical PASS from firmware.
+ */
+static bool vscr_line(const uint8_t *source,size_t n)
+{
+    static const char tag[]="!VPROBE";
+    if(n<sizeof(tag)-1U) return false;
+    for(size_t i=0U;i<sizeof(tag)-1U;++i) {
+        uint8_t ch=source[i];
+        if(ch>='a' && ch<='z') ch=(uint8_t)(ch-'a'+'A');
+        if(ch!=(uint8_t)tag[i]) return false;
+    }
+    return n==sizeof(tag)-1U || source[sizeof(tag)-1U]==' ';
+}
+static bool vscr_console_command(const uint8_t *source,size_t n)
+{
+    const bool off=is_command(source,n,"!VPROBE OFF");
+    const bool pattern=is_command(source,n,"!VPROBE PATTERN");
+    const bool a=is_command(source,n,"!VPROBE T1A");
+    const bool b=is_command(source,n,"!VPROBE T1B");
+    const bool ack=is_command(source,n,"!VPROBE ACK");
+    const bool up=is_command(source,n,"!VPROBE UP");
+    const bool down=is_command(source,n,"!VPROBE DOWN");
+    const bool wrap=is_command(source,n,"!VPROBE WRAP");
+    const bool mark=is_command(source,n,"!VPROBE MARK");
+    if(!(off||pattern||a||b||ack||up||down||wrap||mark)) {
+        printf("HW4-VSCR-P1 REJECT reason=UNKNOWN_HOST_COMMAND program_preserved=1\n");
+        return true;
+    }
+    if(off) {
+        const esp_err_t err=cyd_lcd_vscr_probe_restore();
+        if(err!=ESP_OK) return fail("VSCR_RESTORE",(int)err);
+        s_vscr_hold=false;
+        s_vscr_t1_ack=false;
+        if(!prompt() || !repaint_full()) return false;
+        printf("HW4-VSCR-P1 RESTORE mode=OFF vsp=0 full_repaint=1 "
+               "controller_unverified=1 program_preserved=1\n");
+        memory_report("vscr_restore");
+        return true;
+    }
+    if(pattern) {
+        if(cyd_lcd_vscr_probe_is_active()) {
+            printf("HW4-VSCR-P1 REJECT reason=RESTORE_FIRST\n");
+            return true;
+        }
+        const esp_err_t err=cyd_lcd_vscr_probe_pattern();
+        if(err!=ESP_OK) return fail("VSCR_PATTERN",(int)err);
+        s_vscr_hold=true;
+        s_vscr_t1_ack=false;
+        printf("HW4-VSCR-P1 PATTERN controller=OFF margins=20_200_20 "
+               "photo_required=1 program_preserved=1\n");
+        memory_report("vscr_pattern");
+        return true;
+    }
+    if(a || b) {
+        if(cyd_lcd_vscr_probe_is_active()) {
+            printf("HW4-VSCR-P1 REJECT reason=RESTORE_FIRST\n");
+            return true;
+        }
+        const unsigned start=a ? 0U : 80U;
+        esp_err_t err=cyd_lcd_vscr_probe_begin(start);
+        if(err!=ESP_OK) return fail("VSCR_BEGIN",(int)err);
+        s_vscr_hold=true;
+        s_vscr_t1_ack=false;
+        err=cyd_lcd_vscr_probe_shift(1,1U);
+        if(err!=ESP_OK) return fail("VSCR_T1_SHIFT",(int)err);
+        printf("HW4-VSCR-P1 T1 candidate=%c visible_start=%u "
+               "tfa=%u vsa=200 bfa=%u shift=UP8 "
+               "axis=CONTROLLER_UNVERIFIED margins=PHOTO_REQUIRED\n",
+               a ? 'A' : 'B',start,start+20U,100U-start);
+        memory_report("vscr_t1");
+        return true;
+    }
+    if(!s_vscr_hold || !cyd_lcd_vscr_probe_is_active()) {
+        printf("HW4-VSCR-P1 REJECT reason=T1_REQUIRED program_preserved=1\n");
+        return true;
+    }
+    if(ack) {
+        s_vscr_t1_ack=true;
+        printf("HW4-VSCR-P1 T1_ACK operator_claim=1 "
+               "physical_pass=UNVERIFIED requires_PO_evidence=1\n");
+        return true;
+    }
+    if(!s_vscr_t1_ack) {
+        printf("HW4-VSCR-P1 REJECT reason=T1_UNACKNOWLEDGED "
+               "next=OFF_OR_ACK\n");
+        return true;
+    }
+    const uint64_t started=(uint64_t)esp_timer_get_time();
+    esp_err_t err=ESP_OK;
+    if(up || down)
+        err=cyd_lcd_vscr_probe_shift(up ? 1 : -1,1U);
+    else if(wrap) {
+        for(unsigned i=0U;i<26U && err==ESP_OK;++i)
+            err=cyd_lcd_vscr_probe_shift(1,1U);
+    } else if(mark)
+        err=cyd_lcd_vscr_probe_marker();
+    if(err!=ESP_OK) return fail("VSCR_T2_T3",(int)err);
+    CydLcdDiagnostics diag;
+    if(!cyd_lcd_diagnostics(&diag)) return fail("VSCR_DIAGNOSTICS",-1);
+    printf("HW4-VSCR-P1 STEP operation=%s elapsed_us=%llu "
+           "param_commands=%u marker_writes=%u dma_fault=%u "
+           "lcd_error=%s controller_unverified=1\n",
+           up ? "UP8" : down ? "DOWN8" : wrap ? "WRAP26" : "MARK_RAMWR",
+           (unsigned long long)((uint64_t)esp_timer_get_time()-started),
+           diag.vscr_param_commands,diag.vscr_marker_writes,
+           (unsigned)diag.dma_fault,esp_err_to_name(diag.last_error));
+    return true;
+}
+
 static bool execute_line(void)
 {
     const uint8_t *source=s_line.data;
@@ -645,6 +761,16 @@ static bool execute_line(void)
         printf("%02x",(unsigned)source[i]);
     if(length>32U) printf("...");
     printf("\n");
+    if(vscr_line(source,length)) {
+        if(!cpc_uart_console_end_line(&s_text))
+            return fail("INPUT_EOL",-1);
+        return vscr_console_command(source,length);
+    }
+    if(s_vscr_hold) {
+        printf("HW4-VSCR-P1 REJECT reason=DISPLAY_FROZEN "
+               "allowed=VPROBE_ONLY basic_not_executed=1\n");
+        return true;
+    }
     if(!cpc_uart_console_end_line(&s_text))
         return fail("INPUT_EOL",-1);
     CpcReadyTransition transition=CPC_READY_UNCHARACTERIZED_DIRECT;
@@ -778,6 +904,8 @@ void app_main(void)
     e=cyd_lcd_backlight(true);
     if(e!=ESP_OK) { (void)fail("BACKLIGHT",(int)e); return; }
     memory_report("interactive_ready");
+    printf("HW4-VSCR-P1 BOOT state=OFF default=OFF axis=UNVERIFIED "
+           "command=!VPROBE_PATTERN then_T1A_or_T1B\n");
     printf("HW4-C2 HELP submit_4_numbered_lines_then_RUN "
            "LIST_NEW=real_BSR !DEMO=HW4-C1 !CLS=screen_only\n");
     if(!prompt()) return;

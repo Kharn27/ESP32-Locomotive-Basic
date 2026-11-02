@@ -10,6 +10,8 @@ typedef struct {
     unsigned orientation, width, height, transfer_count, timeout_count;
     unsigned heap8_free, heap8_largest, heap8_min, stack_margin_bytes;
     esp_err_t last_error;
+    bool vscr_probe_active;
+    unsigned vscr_param_commands, vscr_marker_writes;
 } CydLcdDiagnostics;
 esp_err_t cyd_lcd_init(void);
 uint8_t *cyd_lcd_band(void);
@@ -18,4 +20,11 @@ esp_err_t cyd_lcd_orientation(unsigned index, uint16_t clear_rgb565);
 unsigned cyd_lcd_current_orientation(void);
 esp_err_t cyd_lcd_backlight(bool enabled);
 bool cyd_lcd_diagnostics(CydLcdDiagnostics *out);
+/* P1 diagnostic only, OFF at boot; no changes to CPC video raster. */
+esp_err_t cyd_lcd_vscr_probe_pattern(void);
+esp_err_t cyd_lcd_vscr_probe_begin(unsigned visible_start);
+esp_err_t cyd_lcd_vscr_probe_shift(int direction,unsigned rows);
+esp_err_t cyd_lcd_vscr_probe_marker(void);
+esp_err_t cyd_lcd_vscr_probe_restore(void);
+bool cyd_lcd_vscr_probe_is_active(void);
 #endif

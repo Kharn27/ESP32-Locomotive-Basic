@@ -1,5 +1,6 @@
 /* CYD transport extracted from HW3; BASIC/render independent. MIT. */
 #include "cyd_ili9341.h"
+#include "cyd_vscr_probe_policy.h"
 #include <limits.h>
 #include <stddef.h>
 #include <string.h>
@@ -37,6 +38,11 @@ static esp_lcd_panel_io_handle_t s_io;
 static SemaphoreHandle_t s_done;
 static uint8_t *s_band;
 static bool s_bus_owned, s_fault;
+/* A1-P1 diagnostics only: no active VSCR at boot. */
+static bool s_vscr_active;
+static CydVscrPlan s_vscr_plan;
+static uint16_t s_vscr_offset;
+static unsigned s_vscr_params, s_vscr_marker_writes;
 static unsigned s_active_case = UINT_MAX;
 static int s_width = LCD_NATIVE_W, s_height = LCD_NATIVE_H;
 static unsigned s_transfers, s_timeouts;
@@ -52,10 +58,31 @@ static bool IRAM_ATTR on_color_done(esp_lcd_panel_io_handle_t io,
     return task_woken == pdTRUE;
 }
 
-uint8_t *cyd_lcd_band(void) { return (s_panel && !s_fault) ? s_band : NULL; }
+static esp_err_t vscr_latch(esp_err_t err)
+{
+    s_last_error=err;
+    if(err!=ESP_OK) {
+        s_fault=true;
+        (void)gpio_set_level(LCD_BL,0);
+        ESP_LOGE(TAG,"VSCR_P1_FAIL_STOP err=%s retry=0",esp_err_to_name(err));
+    }
+    return err;
+}
+static esp_err_t vscr_param(uint8_t cmd,const uint8_t *params,size_t n)
+{
+    if(!s_panel || !s_io || !s_done || s_fault) return ESP_ERR_INVALID_STATE;
+    /* All callers execute in the sole CONSOLE task between completed DMA sends. */
+    const esp_err_t err=esp_lcd_panel_io_tx_param(s_io,cmd,params,n);
+    if(err==ESP_OK) ++s_vscr_params;
+    return vscr_latch(err);
+}
+uint8_t *cyd_lcd_band(void)
+{
+    return (s_panel && !s_fault && !s_vscr_active) ? s_band : NULL;
+}
 esp_err_t cyd_lcd_send(int x, int y, int width, int height)
 {
-    if (!s_panel || !s_done || s_fault) return ESP_ERR_INVALID_STATE;
+    if (!s_panel || !s_done || s_fault || s_vscr_active) return ESP_ERR_INVALID_STATE;
     if (x < 0 || y < 0 || width <= 0 || height <= 0 ||
         x > s_width || width > s_width - x ||
         y > s_height || height > s_height - y ||
@@ -105,7 +132,7 @@ static esp_err_t clear_native_gram(bool wide, uint16_t rgb)
  */
 esp_err_t cyd_lcd_orientation(unsigned int idx, uint16_t rgb)
 {
-    if (s_panel == NULL || s_fault) return ESP_ERR_INVALID_STATE;
+    if (s_panel == NULL || s_fault || s_vscr_active) return ESP_ERR_INVALID_STATE;
     if (idx > 13U) return ESP_ERR_INVALID_ARG;
     /* The first boot of case 9 looks correct on the physical CYD but
      * selecting 9 then b used to corrupt the image. This guard separates
@@ -225,6 +252,130 @@ fail:
     return err;
 }
 
+
+/* UART-only, bounded P1 diagnostic using the existing driver-owned DMA buffer.
+ * The colour pattern codes every CPC row (binary column labels) and distinct
+ * top/bottom margins. Its geometry is a HYPOTHESIS, not a controller verdict.
+ */
+esp_err_t cyd_lcd_vscr_probe_pattern(void)
+{
+    if(!s_panel || !s_band || s_fault || s_vscr_active ||
+       s_active_case!=10U || s_width!=320 || s_height!=240)
+        return ESP_ERR_INVALID_STATE;
+    static const uint16_t stripes[4]={0xF800U,0x07E0U,0xFFE0U,0x07FFU};
+    for(unsigned top=0U;top<240U;top+=8U) {
+        for(unsigned dy=0U;dy<8U;++dy) {
+            const unsigned y=top+dy;
+            for(unsigned x=0U;x<320U;++x) {
+                uint16_t rgb;
+                if(y<20U) rgb=0x001FU;
+                else if(y>=220U) rgb=0xF81FU;
+                else {
+                    const unsigned row=(y-20U)/8U;
+                    rgb=stripes[row%4U];
+                    if(x<8U) rgb=0x0000U;
+                    if(x>=312U) rgb=0xFFFFU;
+                    if(x>=24U && x<88U && ((row>>((x-24U)/8U))&1U))
+                        rgb=0x0000U;
+                }
+                const size_t index=((size_t)dy*320U+x)*2U;
+                s_band[index]=(uint8_t)(rgb>>8U);
+                s_band[index+1U]=(uint8_t)rgb;
+            }
+        }
+        const esp_err_t err=cyd_lcd_send(0,(int)top,320,8);
+        if(err!=ESP_OK) return err;
+    }
+    return ESP_OK;
+}
+esp_err_t cyd_lcd_vscr_probe_begin(unsigned visible_start)
+{
+    CydVscrPlan plan;
+    if(s_vscr_active || s_fault ||
+       !cyd_vscr_plan(s_active_case,(unsigned)s_width,
+                      (unsigned)s_height,visible_start,&plan))
+        return ESP_ERR_INVALID_ARG;
+    esp_err_t err=cyd_lcd_vscr_probe_pattern();
+    if(err!=ESP_OK) return err;
+    uint8_t def[6];
+    cyd_vscr_def_bytes(&plan,def);
+    err=vscr_param(0x33U,def,sizeof(def));
+    if(err!=ESP_OK) return err;
+    const uint8_t pos[2]={(uint8_t)(plan.tfa>>8U),(uint8_t)plan.tfa};
+    err=vscr_param(0x37U,pos,sizeof(pos));
+    if(err!=ESP_OK) return err;
+    s_vscr_plan=plan;
+    s_vscr_offset=0U;
+    s_vscr_active=true;
+    return ESP_OK;
+}
+esp_err_t cyd_lcd_vscr_probe_shift(int direction,unsigned rows)
+{
+    uint16_t next;
+    if(!s_vscr_active || s_fault ||
+       !cyd_vscr_advance(s_vscr_offset,direction,rows,&next))
+        return ESP_ERR_INVALID_ARG;
+    const uint16_t vsp=(uint16_t)(s_vscr_plan.tfa+next);
+    const uint8_t pos[2]={(uint8_t)(vsp>>8U),(uint8_t)vsp};
+    const esp_err_t err=vscr_param(0x37U,pos,sizeof(pos));
+    if(err==ESP_OK) s_vscr_offset=next;
+    return err;
+}
+esp_err_t cyd_lcd_vscr_probe_marker(void)
+{
+    if(!s_vscr_active || s_fault || !s_band) return ESP_ERR_INVALID_STATE;
+    const uint8_t column[4]={0U,96U,0U,223U};
+    for(unsigned i=0U;i<128U;++i) {
+        s_band[2U*i]=0xFFU;
+        s_band[2U*i+1U]=0xFFU;
+    }
+    /* Eight independent raster writes to avoid crossing a circular boundary.
+     * DMA buffer is not reused until the existing ISR completion semaphore.
+     */
+    for(unsigned y=208U;y<216U;++y) {
+        uint16_t addr=0U;
+        if(!cyd_vscr_address(&s_vscr_plan,s_vscr_offset,y,&addr))
+            return ESP_ERR_INVALID_STATE;
+        const uint8_t page[4]={(uint8_t)(addr>>8U),(uint8_t)addr,
+                               (uint8_t)(addr>>8U),(uint8_t)addr};
+        esp_err_t err=vscr_param(0x2AU,column,sizeof(column));
+        if(err!=ESP_OK) return err;
+        err=vscr_param(0x2BU,page,sizeof(page));
+        if(err!=ESP_OK) return err;
+        (void)xSemaphoreTake(s_done,0);
+        err=esp_lcd_panel_io_tx_color(s_io,0x2CU,s_band,256U);
+        if(err==ESP_OK && xSemaphoreTake(s_done,pdMS_TO_TICKS(2000))!=pdTRUE) {
+            err=ESP_ERR_TIMEOUT; ++s_timeouts;
+        }
+        if(vscr_latch(err)!=ESP_OK) return err;
+        ++s_transfers;
+        ++s_vscr_marker_writes;
+    }
+    return ESP_OK;
+}
+esp_err_t cyd_lcd_vscr_probe_restore(void)
+{
+    if(!s_panel || s_fault) return ESP_ERR_INVALID_STATE;
+    if(!s_vscr_active) return ESP_OK;
+    /* Canonical default: zero scroll offset, VSCRDEF covering full 320 GRAM.
+     * If any command fails, sticky fault + BL off; NEVER retry or repaint.
+     */
+    const uint8_t anchor[2]={(uint8_t)(s_vscr_plan.tfa>>8U),
+                              (uint8_t)s_vscr_plan.tfa};
+    const uint8_t full[6]={0U,0U,1U,64U,0U,0U};
+    const uint8_t zero[2]={0U,0U};
+    esp_err_t err=vscr_param(0x37U,anchor,sizeof(anchor));
+    if(err!=ESP_OK) return err;
+    err=vscr_param(0x33U,full,sizeof(full));
+    if(err!=ESP_OK) return err;
+    err=vscr_param(0x37U,zero,sizeof(zero));
+    if(err!=ESP_OK) return err;
+    s_vscr_active=false;
+    s_vscr_offset=0U;
+    return ESP_OK; /* CONSOLE must then repaint full logical 320x240. */
+}
+bool cyd_lcd_vscr_probe_is_active(void) { return s_vscr_active; }
+
 unsigned cyd_lcd_current_orientation(void) { return s_active_case; }
 esp_err_t cyd_lcd_backlight(bool enabled)
 {
@@ -244,5 +395,9 @@ bool cyd_lcd_diagnostics(CydLcdDiagnostics *d)
     d->heap8_largest=(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     d->heap8_min=(unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
     d->stack_margin_bytes=(unsigned)uxTaskGetStackHighWaterMark(NULL);
-    d->last_error=s_last_error; return true;
+    d->last_error=s_last_error;
+    d->vscr_probe_active=s_vscr_active;
+    d->vscr_param_commands=s_vscr_params;
+    d->vscr_marker_writes=s_vscr_marker_writes;
+    return true;
 }

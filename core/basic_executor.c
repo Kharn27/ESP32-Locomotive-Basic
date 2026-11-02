@@ -1305,7 +1305,8 @@ static BEStatus execute_line(const BasicProgram *program,
             if (pos == length) {
                 return BE_TRUNCATED;
             }
-            if (logic_tokens_present(body, length, pos)) {
+            if (body[pos] == (uint8_t)'(' &&
+                logic_tokens_present(body, length, pos)) {
                 int16_t condition;
                 status = evaluate_logical_integer(body, length, &pos,
                                                   variables, 1, &condition);

@@ -365,9 +365,9 @@ static bool send_dirty_band(void *context, unsigned row)
 }
 static bool repaint_dirty(void)
 {
-    if(s_vscr_hold) return true; /* display frozen; dirty bits retained */
     hw4_scroll_observe_text(&s_scroll_metrics,(uint32_t)s_text.scrolls);
     if(s_video.dirty_bands!=0U) {
+        if(!s_vscr_hold) { /* hardware probe holds dirty bands for OFF repaint */
         unsigned sent=0U;
         uint32_t start=esp_cpu_get_cycle_count();
         /* Exactly ONE attempt. Real LCD errors latch s_fault, so preserve
@@ -396,6 +396,7 @@ static bool repaint_dirty(void)
                    got ? (unsigned)d.dma_fault : 1U,
                    got ? esp_err_to_name(d.last_error) : "UNKNOWN");
             return false;
+        }
         }
     }
     if(s_text.scrolls<s_scroll_reported) s_scroll_reported=0U; /* !CLS */

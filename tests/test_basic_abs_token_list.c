@@ -593,6 +593,23 @@ static int abs_negative_green(void)
             CHECK(memcmp(h.output,saved,sizeof(saved))==0);
         }
     }
+    /* FF 00 inside REM, quote and numeric payload must never be
+     * interpreted as the reached ABS function (opaque-token probes). */
+    {
+        static const uint8_t opaque[][7]={
+            {0xc5u,' ',0xffu,0x00u},
+            {0xbfu,' ','"',0xffu,0x00u,'"'},
+            {0xbfu,' ',0x19u,0xffu,0x00u}
+        };
+        const size_t sizes[]={4u,6u,5u};
+        for(i=0u;i<3u;++i) {
+            AbsHarness h;
+            CHECK(abs_prepare(&h,"PRINT ABS(1)",2u)==0);
+            CHECK(bp_put(&h.program,10u,opaque[i],sizes[i])==BP_OK);
+            CHECK(be_init_with_store(&h.executor,&h.program,&h.store)==BE_OK);
+            CHECK(abs_rejected(&h,BE_BAD_SEQUENCE,sizeof(h.output))==0);
+        }
+    }
     return 0;
 }
 

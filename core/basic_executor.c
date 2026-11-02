@@ -1535,10 +1535,13 @@ BEStatus be_init(BasicExecutor *executor, const BasicProgram *program)
     return be_init_with_store(executor, program, NULL);
 }
 
-BEStatus be_step_events(BasicExecutor *executor, uint8_t *output,
+/* Shared preflight/emission pipeline: preview differs ONLY by suppressing
+ * the final store, stack and cursor commits. Both paths use execute_line
+ * twice and identical buffer, space and overlap guards. */
+static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
                         size_t output_capacity, size_t *written,
                         BEVideoEvent *events, size_t event_capacity,
-                        size_t *event_written)
+                        size_t *event_written, int commit)
 {
     const BasicProgram *program;
     BasicProgramLine line;
@@ -1712,7 +1715,7 @@ BEStatus be_step_events(BasicExecutor *executor, uint8_t *output,
         /* Unreachable while the documented immutable-input contract holds. */
         return BE_BAD_PROGRAM;
     }
-    if (assignment.present) {
+    if (commit && assignment.present) {
         status = store_error(assignment.value.type == (uint8_t)BVT_STRING ?
                      bvs_assign_string(variables, &assignment.key,
                                        assignment.string_bytes, assignment.string_length) :
@@ -1721,6 +1724,9 @@ BEStatus be_step_events(BasicExecutor *executor, uint8_t *output,
             return status;
         }
     }
+    /* Only commit may change stacks, cursor or stores. The preview writes
+     * exclusively to caller staging buffers and success counters. */
+    if (commit) {
     /* One committed stack action, after both pure passes completed. */
     if (transition.action == BE_FLOW_PUSH) {
         executor->call_stack[executor->call_depth++] = transition.frame;
@@ -1743,13 +1749,31 @@ BEStatus be_step_events(BasicExecutor *executor, uint8_t *output,
         executor->for_depth = 0u;
         memset(executor->for_stack, 0, sizeof(executor->for_stack));
     }
-    *written = writer.length;
-    *event_written = event_writer.length;
     executor->statement_offset = transition.next_statement;
     executor->cursor = next;
+    } /* end BASIC commit-only effects */
+    *written = writer.length;
+    *event_written = event_writer.length;
     return BE_OK;
 }
 
+BEStatus be_step_events(BasicExecutor *executor, uint8_t *output,
+                        size_t output_capacity, size_t *written,
+                        BEVideoEvent *events, size_t event_capacity,
+                        size_t *event_written)
+{
+    return step_events_impl(executor, output, output_capacity, written,
+                            events, event_capacity, event_written, 1);
+}
+
+BEStatus be_preview_step_events(BasicExecutor *executor, uint8_t *output,
+                                size_t output_capacity, size_t *written,
+                                BEVideoEvent *events, size_t event_capacity,
+                                size_t *event_written)
+{
+    return step_events_impl(executor, output, output_capacity, written,
+                            events, event_capacity, event_written, 0);
+}
 
 BEStatus be_step(BasicExecutor *executor, uint8_t *output,
                  size_t output_capacity, size_t *written)

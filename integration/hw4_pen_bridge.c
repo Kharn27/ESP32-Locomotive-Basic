@@ -113,15 +113,17 @@ Hw4PenStatus hw4_pen_replay(CpcText *sink,
     return HW4_PEN_OK;
 }
 
-/* C1: CONSOLE-specific palette restoration after the real UART clear.
- * cpc_uart_console_clear() resets MODE1 and INK0/INK1; the PEN display
- * integration owns the additional explicit INK2=6 and INK3=18. Neither
- * core nor the generic UART/video layer adopts a global palette policy. */
+/* HW4-PAL-BOOT-CPC-B1: CONSOLE-specific !CLS resets to genuine CPC MODE1
+ * INK0..3 = {1,24,20,6}. The generic UART clear already restores MODE1,
+ * INK0 and INK1; explicitly pin INK2 and INK3 here so CONSOLE boot
+ * and !CLS share the same palette. This is distinct from BASIC CLS in
+ * RUN, which preserves caller-selected inks. The historical PEN15 green
+ * projection remains available only under an explicit INK3=18 witness. */
 bool hw4_pen_console_clear(CpcText *text)
 {
     if (!cpc_uart_console_clear(text)) return false;
-    return cpc_video_set_ink(text->video, 2U, 6U) &&
-           cpc_video_set_ink(text->video, 3U, 18U);
+    return cpc_video_set_ink(text->video, 2U, 20U) &&
+           cpc_video_set_ink(text->video, 3U, 6U);
 }
 
 /* The one diagnostic has already been rendered and the runtime stopped.

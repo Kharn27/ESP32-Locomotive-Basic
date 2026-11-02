@@ -52,6 +52,13 @@ if(BUILD_TESTING)
     add_executable(test_hw4_run_scheduler tests/test_hw4_run_scheduler.c)
     target_link_libraries(test_hw4_run_scheduler PRIVATE hw4_run_scheduler)
     add_test(NAME hw4_run_break_a_cooperative_bsr COMMAND test_hw4_run_scheduler)
+    # J1.21-B2b: real core preview + scheduler + MODE1 VRAM bridge;
+    # existing C99 GCC/Clang sanitizer and CI-ARCH gates discover this CTest.
+    add_executable(test_j1_21_b2b_cls_cyd tests/test_j1_21_b2b_cls_cyd.c)
+    target_link_libraries(test_j1_21_b2b_cls_cyd PRIVATE
+        hw4_run_scheduler hw4_pen_bridge)
+    add_test(NAME j1_21_b2b_cls_transactional_mode1
+             COMMAND test_j1_21_b2b_cls_cyd)
     add_executable(test_hw4_run_break_b tests/test_hw4_run_break_b.c)
     target_link_libraries(test_hw4_run_break_b PRIVATE
         hw4_run_break_input hw4_run_scheduler hw4_pen_bridge

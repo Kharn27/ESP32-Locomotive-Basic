@@ -613,6 +613,79 @@ static int abs_negative_green(void)
     return 0;
 }
 
+
+/* End-to-end numbered BASIC: assignment A%, PRINT ABS(A%), assignment
+ * B%=ABS(A%), PRINT B%. No injected A% and no printer transport. */
+static int abs_program_green(void)
+{
+    static const struct {
+        const char *assignment;
+        const char *expected;
+        int16_t value;
+    } cases[]={
+        {"A%=0"," 0 \n",0},
+        {"A%=7"," 7 \n",7},
+        {"A%=-7"," 7 \n",7},
+        {"A%=32767"," 32767 \n",32767},
+        {"A%=-32767"," 32767 \n",32767}
+    };
+    size_t i;
+    for(i=0u;i<sizeof(cases)/sizeof(cases[0]);++i) {
+        AbsHarness h;
+        BasicVariableKey key={0};
+        BasicVariableValue v={0};
+        const char *lines[]={"PRINT ABS(A%)","B%=ABS(A%)","PRINT B%"};
+        uint8_t body[128];
+        size_t j,n;
+        CHECK(abs_prepare(&h,cases[i].assignment,2u)==0);
+        for(j=0u;j<3u;++j) {
+            n=0u;
+            CHECK(bt_tokenize((const uint8_t *)lines[j],strlen(lines[j]),
+                              body,sizeof(body),&n)==BT_OK);
+            CHECK(bp_put(&h.program,(uint16_t)(20u+j*10u),body,n)==BP_OK);
+        }
+        CHECK(be_init_with_store(&h.executor,&h.program,&h.store)==BE_OK);
+        n=77u;
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_OK);
+        CHECK(n==0u);
+        key.type=(uint8_t)BVT_INTEGER;
+        key.name_length=1u;
+        key.name[0]=(uint8_t)'A';
+        CHECK(bvs_get(&h.store,&key,&v)==BVS_OK);
+        CHECK(v.data.integer==(cases[i].assignment[3]=='-' ?
+                  (int16_t)(-cases[i].value) : cases[i].value));
+        n=77u;
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_OK);
+        CHECK(n==strlen(cases[i].expected));
+        CHECK(memcmp(h.output,cases[i].expected,n)==0);
+        n=77u;
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_OK);
+        CHECK(n==0u && abs_assert_b(&h,cases[i].value)==0);
+        n=77u;
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_OK);
+        CHECK(n==strlen(cases[i].expected));
+        CHECK(memcmp(h.output,cases[i].expected,n)==0);
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_END);
+    }
+    /* The real A%=-32768 assignment is legal; its ABS use is not. */
+    {
+        AbsHarness h;
+        uint8_t body[128];
+        size_t n=0u;
+        CHECK(abs_prepare(&h,"A%=-32768",2u)==0);
+        CHECK(bt_tokenize((const uint8_t *)"PRINT ABS(A%)",
+                          strlen("PRINT ABS(A%)"),
+                          body,sizeof(body),&n)==BT_OK);
+        CHECK(bp_put(&h.program,20u,body,n)==BP_OK);
+        CHECK(be_init_with_store(&h.executor,&h.program,&h.store)==BE_OK);
+        n=23u;
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_OK);
+        CHECK(n==0u);
+        CHECK(abs_rejected(&h,BE_UNSUPPORTED,sizeof(h.output))==0);
+    }
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     size_t i;
@@ -624,6 +697,7 @@ int main(int argc, char **argv)
     CHECK(alias_list_roundtrip()==0);
     CHECK(abs_native_green()==0);
     CHECK(abs_negative_green()==0);
+    CHECK(abs_program_green()==0);
     puts("J1.20-B1 16/16 MATCH_EXACT_RAM, LIST source-semantic, RUN unsupported");
     return 0;
 }

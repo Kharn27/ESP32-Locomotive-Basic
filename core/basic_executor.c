@@ -1369,6 +1369,37 @@ static BEStatus execute_line(const BasicProgram *program,
             if (pos == length) {
                 return BE_TRUNCATED;
             }
+            if (body[pos] == 0xbfu) {
+                size_t then_start = pos, else_start = 0u, p = pos;
+                BEEmitter check = {NULL, 0u};
+                ++p;
+                status = print8_piece(body, length, &p, variables, &check, 0);
+                if (status != BE_OK) return status;
+                skip_spaces(body, length, &p);
+                if (p < length) {
+                    if (length - p < 2u || body[p] != 0x01u ||
+                        body[p + 1u] != 0x97u) return BE_BAD_SEQUENCE;
+                    p += 2u;
+                    skip_spaces(body, length, &p);
+                    else_start = p;
+                    if (p == length || body[p++] != 0xbfu)
+                        return BE_BAD_SEQUENCE;
+                    status = print8_piece(body, length, &p, variables,
+                                          &check, 0);
+                    if (status != BE_OK) return status;
+                    skip_spaces(body, length, &p);
+                }
+                if (p != length) return BE_BAD_SEQUENCE;
+                if (take_branch || else_start != 0u) {
+                    p = (take_branch ? then_start : else_start) + 1u;
+                    status = print8_piece(body, length, &p, variables, out, 0);
+                    if (status != BE_OK) return status;
+                    status = emit(out, (uint8_t)'\n');
+                    if (status != BE_OK) return status;
+                }
+                *next = line->next_offset;
+                return BE_OK;
+            }
             if (body[pos] == 0x02u) {
                 BEAssignment then_arm = {0};
                 BEAssignment else_arm = {0};

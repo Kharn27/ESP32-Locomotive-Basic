@@ -50,8 +50,10 @@ static void setup(void)
     assert(cpc_video_init(&f.video, f.vram, sizeof(f.vram), CPC_MODE_1));
     assert(cpc_video_set_ink(&f.video, 0U, 1U)); /* boot blue */
     assert(cpc_video_set_ink(&f.video, 1U, 24U)); /* boot yellow */
-    assert(cpc_video_set_ink(&f.video, 2U, 6U)); /* configured red */
-    assert(cpc_video_set_ink(&f.video, 3U, 18U)); /* configured green */
+    /* Historical PEN15 / red-green fixture: explicitly non-default
+     * now that CONSOLE boot and !CLS use genuine CPC cyan/red. */
+    assert(cpc_video_set_ink(&f.video, 2U, 6U)); /* experimental red */
+    assert(cpc_video_set_ink(&f.video, 3U, 18U)); /* PEN15 green witness */
     assert(cpc_video_set_text_colors(&f.video, 1U, 0U));
     assert(cpc_text_init(&f.text, &f.video, glyph, NULL));
     assert(f.video.pen == 1U && f.video.paper == 0U);
@@ -330,9 +332,9 @@ static void test_scrolling_preserves_text_counters(void)
 }
 
 
-/* C1 regression: actual CONSOLE !CLS wrapper invokes the real
- * cpc_uart_console_clear(); no fake video reset or substituted sink.
- * The same source must FAIL on C1 red and PASS after palette restoration. */
+/* Historical experimental INK2 red/INK3 green C1 witness: real BSR and
+ * cpc_uart_console_clear() path. After !CLS the CPC palette is checked
+ * before explicitly restoring this legacy colour witness for replay. */
 static void run_c1_colour_cases(void)
 {
     const uint8_t expected_pen[] = {2U,3U,15U,4U};
@@ -395,12 +397,14 @@ static void test_c1_real_console_cls_palette(void)
     assert(f.video.mode==CPC_MODE_1 && f.video.paper==0U &&
            f.video.pen==1U);
     assert(f.video.ink[0]==1U && f.video.ink[1]==24U);
-    /* C1 RED EXPECTATION: original cpc_uart_console_clear resets mode and
-     * overwrites INK2/3 with defaults (20/6), not boot's 6/18. */
-    assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+    /* !CLS now restores CPC cyan/red: the prior green PEN15 context
+     * is NOT inherited. Keep the historical experimental witness explicit. */
+    assert(f.video.ink[2]==20U && f.video.ink[3]==6U);
     assert(f.text.bytes_received==0U && f.text.glyphs_drawn==0U);
+    assert(cpc_video_set_ink(&f.video,2U,6U)); /* experimental red */
+    assert(cpc_video_set_ink(&f.video,3U,18U)); /* PEN15 green witness */
     assert(cpc_uart_console_prompt(&f.text,&cleared) && !cleared);
-    run_c1_colour_cases(); /* colour and PEN16 still valid after !CLS */
+    run_c1_colour_cases(); /* historic context explicitly configured */
 }
 
 
@@ -434,7 +438,7 @@ static void test_j118b_ink_explicit_reject_no_partial_replay(void)
     assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
     assert(f.program.size==original_program_size);
     assert(hw4_pen_console_clear(&f.text)); /* real C1 !CLS path */
-    assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+    assert(f.video.ink[2]==20U && f.video.ink[3]==6U);
     assert_rejected_replay(f.events,3U,f.output,f.written,
                            HW4_PEN_SET_INK_UNSUPPORTED);
     assert(f.program.size==original_program_size);
@@ -462,7 +466,10 @@ static void test_c1_run_stop_case(bool ink_only)
         if(run_index==1U) {
             assert(hw4_pen_console_clear(&f.text)); /* real C1 !CLS */
             assert(f.program.size==original_size);
-            assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+            assert(f.video.ink[2]==20U && f.video.ink[3]==6U);
+            /* Retain the old red/green test context, explicitly. */
+            assert(cpc_video_set_ink(&f.video,2U,6U));
+            assert(cpc_video_set_ink(&f.video,3U,18U));
         }
         assert(submit("RUN").status==BSR_OK);
         for(unsigned i=0U;i<4U;++i) {
@@ -582,7 +589,7 @@ static void test_c1_c2_successive_pen_lines_reach_end(void)
         bool ready=false,cleared=false;
         if(pass!=0U) {
             assert(hw4_pen_console_clear(&f.text)); /* real !CLS */
-            assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+            assert(f.video.ink[2]==20U && f.video.ink[3]==6U);
             assert(f.program.size==stored);
         }
         assert(submit("RUN").status==BSR_OK);
@@ -777,8 +784,126 @@ static void test_diag_pen_native_and_host_guards(void)
     }
 }
 
+
+/* HW4-PAL-BOOT-CPC-B1: source-level CONSOLE boot contract plus the real
+ * BSR -> bridge -> MODE1 RGB565 path. The old experimental PEN15 witness
+ * remains separately configured in setup(); this CPC context rejects it. */
+static void test_cpc_palette_boot_source(void)
+{
+    const char *path=getenv("HW4_PEN_C2_CONSOLE_SOURCE");
+    char line[512];
+    FILE *file;
+    bool ink2=false,ink3=false,context=false;
+    assert(path!=NULL);
+    file=fopen(path,"rb");
+    assert(file!=NULL);
+    while(fgets(line,sizeof(line),file)!=NULL) {
+        if(strstr(line,"cpc_video_set_ink(&s_video,2U,20U)")!=NULL)
+            ink2=true;
+        if(strstr(line,"cpc_video_set_ink(&s_video,3U,6U)")!=NULL)
+            ink3=true;
+        if(strstr(line,"ink0=1_blue ink1=24_yellow ink2=20_cyan ink3=6_red")!=NULL)
+            context=true;
+    }
+    assert(fclose(file)==0);
+    assert(ink2 && ink3 && context);
+}
+
+static void test_cpc_palette_run_and_clear(void)
+{
+    static const uint8_t expected_pen[]={1U,2U,3U};
+    static const uint8_t expected_ink[]={24U,20U,6U};
+    uint8_t saved[sizeof(f.program_bytes)];
+    size_t saved_size;
+    unsigned pass;
+    setup();
+    /* The generic video MODE1 init is already CPC-correct. Override
+     * the historical fixture's explicitly experimental green profile. */
+    assert(cpc_video_set_ink(&f.video,2U,20U));
+    assert(cpc_video_set_ink(&f.video,3U,6U));
+    assert(f.video.ink[0]==1U && f.video.ink[1]==24U &&
+           f.video.ink[2]==20U && f.video.ink[3]==6U);
+    assert(submit("10 PEN 1:PRINT \"Y\"").status==BSR_OK);
+    assert(submit("20 PEN 2:PRINT \"C\"").status==BSR_OK);
+    assert(submit("30 PEN 3:PRINT \"R\"").status==BSR_OK);
+    assert(submit("40 END").status==BSR_OK);
+    saved_size=f.program.size;
+    memcpy(saved,f.program_bytes,sizeof(saved));
+    for(pass=0U;pass<2U;++pass) {
+        uint16_t rgb[CPC_VIDEO_TFT_WIDTH];
+        unsigned i;
+        assert(submit("RUN").status==BSR_OK);
+        for(i=0U;i<3U;++i) {
+            assert(step(OUT_CAP,EVENT_CAP).status==BSR_OK);
+            assert(f.written==2U && f.event_written==1U);
+            assert(f.events[0].type==BE_VIDEO_SET_TEXT_PEN);
+            assert(f.events[0].pen==expected_pen[i]);
+            assert(hw4_pen_preflight(&f.text,f.output,f.written,
+                                    f.events,f.event_written)==HW4_PEN_OK);
+            assert(hw4_pen_replay(&f.text,f.output,f.written,
+                                 f.events,f.event_written)==HW4_PEN_OK);
+            assert_colour(i,expected_pen[i]);
+            assert(f.video.ink[expected_pen[i]]==expected_ink[i]);
+            assert(cpc_video_render_row(&f.video,
+                     CPC_VIDEO_VIEW_TOP+i*8U,rgb,CPC_VIDEO_TFT_WIDTH));
+            /* Glyph starts at x=0; x=7 is PAPER0, still CPC blue. */
+            assert(rgb[7]==cpc_video_palette_rgb565(1U));
+        }
+        assert(step(OUT_CAP,EVENT_CAP).status==BSR_OK);
+        assert(step(OUT_CAP,EVENT_CAP).status==BSR_END);
+        assert(f.program.size==saved_size &&
+               memcmp(saved,f.program_bytes,sizeof(saved))==0);
+        assert(f.video.cursor_visible && f.text.bytes_clipped==0U);
+        if(pass==0U) {
+            uint8_t mapped=0xAAU;
+            BEVideoEvent fifteen={BE_VIDEO_SET_TEXT_PEN,15U,0U,0U,0U};
+            assert(hw4_pen_pixel_index(&f.video,15U,&mapped)==
+                   HW4_PEN_UNVERIFIED_VISUAL);
+            assert(mapped==0xAAU);
+            assert_rejected_replay(&fifteen,1U,NULL,0U,
+                                   HW4_PEN_UNVERIFIED_VISUAL);
+            /* A user-visible ink change must not survive !CLS, unlike
+             * native CLS in RUN, which preserves the current inks. */
+            assert(cpc_video_set_ink(&f.video,2U,26U));
+            assert(cpc_video_set_ink(&f.video,3U,18U));
+            assert(hw4_pen_console_clear(&f.text));
+            assert(f.video.ink[0]==1U && f.video.ink[1]==24U &&
+                   f.video.ink[2]==20U && f.video.ink[3]==6U);
+            assert(f.video.mode==CPC_MODE_1 && f.video.paper==0U &&
+                   f.video.pen==1U && f.video.border==1U);
+            assert(f.text.row==0U && f.text.column==0U);
+            assert(f.program.size==saved_size &&
+                   memcmp(saved,f.program_bytes,sizeof(saved))==0);
+        }
+    }
+}
+
+static void test_cpc_palette_native_cls_keeps_inks(void)
+{
+    setup();
+    assert(cpc_video_set_ink(&f.video,2U,20U));
+    assert(cpc_video_set_ink(&f.video,3U,6U));
+    assert(submit("10 PEN 3:PRINT \"X\":CLS:PRINT \"R\"").status==BSR_OK);
+    assert(submit("20 END").status==BSR_OK);
+    assert(submit("RUN").status==BSR_OK);
+    assert(step(OUT_CAP,EVENT_CAP).status==BSR_OK);
+    assert(f.event_written==2U && f.events[0].type==BE_VIDEO_SET_TEXT_PEN &&
+           f.events[1].type==BE_VIDEO_CLEAR_TEXT);
+    assert(hw4_pen_preflight(&f.text,f.output,f.written,
+                             f.events,f.event_written)==HW4_PEN_OK);
+    assert(hw4_pen_replay(&f.text,f.output,f.written,
+                          f.events,f.event_written)==HW4_PEN_OK);
+    assert(f.video.ink[0]==1U && f.video.ink[1]==24U &&
+           f.video.ink[2]==20U && f.video.ink[3]==6U);
+    assert(pixel_at(0U,0U)==3U && f.text.scrolls==0U);
+    assert_colour(0U,3U);
+}
+
 int main(void)
 {
+    test_cpc_palette_boot_source();
+    test_cpc_palette_run_and_clear();
+    test_cpc_palette_native_cls_keeps_inks();
     test_diag_pen_native_and_host_guards();
     test_order_and_preserved_print();
     test_pen_only_and_oracle_bounds();

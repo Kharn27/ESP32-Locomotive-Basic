@@ -734,11 +734,14 @@ void app_main(void)
     if(e!=ESP_OK) { (void)fail("LCD_ORIENTATION",(int)e); return; }
     printf("HW4-C2 ORIENTATION_PASS case=%u\n",
            cyd_lcd_current_orientation());
+    /* HW4-PAL-BOOT-CPC-B1: CPC MODE1 default, no test-only green
+     * override. Logical PEN15 still requires an explicitly set INK3=18
+     * witness and is rejected by the CPC boot palette. */
     if(!cpc_video_init(&s_video,s_vram,sizeof(s_vram),CPC_MODE_1) ||
        !cpc_video_set_ink(&s_video,0U,1U) ||
        !cpc_video_set_ink(&s_video,1U,24U) ||
-       !cpc_video_set_ink(&s_video,2U,6U) ||
-       !cpc_video_set_ink(&s_video,3U,18U) ||
+       !cpc_video_set_ink(&s_video,2U,20U) ||
+       !cpc_video_set_ink(&s_video,3U,6U) ||
        !cpc_video_set_border(&s_video,1U) ||
        !cpc_video_set_text_colors(&s_video,1U,0U) ||
        !cpc_text_init(&s_text,&s_video,hw3_glyph_callback,NULL)) {
@@ -748,8 +751,8 @@ void app_main(void)
            "cols=40 rows=25 vram_bytes=%u ink_fg=24 ink_bg=1\n",
            CPC_VIDEO_BYTES);
     printf("HW4-PEN-A INK_CONTEXT mode=1 paper=0 "
-           "ink0=1_blue ink1=24_yellow ink2=6_red ink3=18_green "
-           "pen4=background_only pen15=green_witness_only "
+           "ink0=1_blue ink1=24_yellow ink2=20_cyan ink3=6_red "
+           "pen4=background_only pen15=unverified_requires_ink3_18 "
            "events_capacity=%u\n",PEN_EVENT_CAPACITY);
     /* Startup in existing MODE1 VRAM: no second renderer or splash delay. */
     if(!cpc_boot_console(&s_text,true)) {

@@ -23,6 +23,10 @@ static void start(void)
     assert(cpc_video_init(&video,g.pixels,CPC_VIDEO_BYTES,CPC_MODE_1));
     assert(cpc_video_set_ink(&video,0U,1U));
     assert(cpc_video_set_ink(&video,1U,24U));
+    /* Generic MODE1 initialization is the CPC palette, not HW4-PEN-A
+     * experimental red/green.  Both boot and UART clear retain it. */
+    assert(video.ink[0]==1U && video.ink[1]==24U &&
+           video.ink[2]==20U && video.ink[3]==6U);
     assert(cpc_video_set_border(&video,1U));
     assert(cpc_video_set_text_colors(&video,1U,0U));
     assert(cpc_text_init(&sink,&video,glyph,NULL));
@@ -141,6 +145,8 @@ static void check(bool cyd)
     guarded();
     assert(cpc_uart_console_clear(&sink)); /* !CLS intentionally clears banner */
     assert(sink.row==0U && sink.column==0U);
+    assert(video.ink[0]==1U && video.ink[1]==24U &&
+           video.ink[2]==20U && video.ink[3]==6U);
     uint8_t pixel=3U;
     assert(cpc_video_get(&video,8U,3U*8U,&pixel) && pixel==0U);
     guarded();

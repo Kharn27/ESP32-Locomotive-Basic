@@ -52,6 +52,10 @@ bool cpc_video_get(const CpcVideo *video, unsigned x, unsigned y, uint8_t *pen);
 bool cpc_video_set_ink(CpcVideo *video, unsigned pen, unsigned colour);
 bool cpc_video_set_border(CpcVideo *video, unsigned colour);
 bool cpc_video_set_text_colors(CpcVideo *video, unsigned pen, unsigned paper);
+/* B2b: MODE1 full-window CLS; prevalidate then clear ONLY the text raster,
+ * cell validity and cursor position. Preserve mode, inks, PEN/PAPER, border
+ * and visibility. Dirty all 25 bands; zero heap, same VRAM owner. */
+bool cpc_video_clear_text(CpcVideo *video);
 /* Pure E2 query. Returns false on invalid args or outside MODE1 without
  * writing outputs. On success *known is set; *character is written ONLY when
  * known, so an unknown cell cannot be mistaken for an implicit space. */

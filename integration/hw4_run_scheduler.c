@@ -53,7 +53,7 @@ bool hw4_run_scheduler_request_break(Hw4RunScheduler *scheduler)
 
 static bool arguments_ok(const Hw4RunScheduler *scheduler, size_t quantum,
                          const Hw4RunReceiver *receiver,
-                         const uint8_t *output, size_t output_capacity,
+                         const uint8_t *output,
                          const size_t *written,
                          const BEVideoEvent *events, size_t event_capacity,
                          const size_t *event_written)
@@ -148,7 +148,7 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
                                    size_t event_capacity, size_t *event_written)
 {
     size_t steps = 0u;
-    if (!arguments_ok(scheduler, quantum, receiver, output, output_capacity, written,
+    if (!arguments_ok(scheduler, quantum, receiver, output, written,
                       events, event_capacity, event_written))
         return outcome(HW4_RUN_INVALID_ARGUMENT, 0u);
 

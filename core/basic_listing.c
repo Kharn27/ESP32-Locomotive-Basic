@@ -438,6 +438,40 @@ static BLStatus bl_logic_expression(const uint8_t *b, size_t len,
     return BL_OK;
 }
 
+
+/* J1.22-B IF THEN/ELSE printer arm; structural inverse of tokenized BF. */
+static BLStatus bl_inline_print8(const uint8_t *b, size_t len,
+                                 size_t *at, BLEmitter *out)
+{
+    size_t p = *at;
+    BLStatus st;
+    int closed = 0;
+    if (len - p < 5u || b[p++] != 0xbfu) return BL_BAD_SEQUENCE;
+    st = append_word(out, "PRINT");
+    if (st == BL_OK) st = append_spaces(b, len, &p, out);
+    if (st != BL_OK) return st;
+    if (len - p < 4u || b[p] != (uint8_t)'#' ||
+        b[p + 1u] != 0x16u || b[p + 2u] != (uint8_t)',')
+        return BL_BAD_SEQUENCE;
+    p += 3u;
+    st = append_word(out, "#8,");
+    if (st == BL_OK) st = append_spaces(b, len, &p, out);
+    if (st != BL_OK) return st;
+    if (p == len || b[p++] != (uint8_t)'"') return BL_BAD_SEQUENCE;
+    st = append_byte(out, (uint8_t)'"');
+    if (st != BL_OK) return st;
+    while (p < len) {
+        uint8_t c = b[p++];
+        if (c < 0x20u || c > 0x7eu) return BL_BAD_SEQUENCE;
+        st = append_byte(out, c);
+        if (st != BL_OK) return st;
+        if (c == (uint8_t)'"') { closed = 1; break; }
+    }
+    if (!closed) return BL_TRUNCATED;
+    *at = p;
+    return BL_OK;
+}
+
 static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
 {
     size_t pos = 0;
@@ -830,6 +864,21 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 status = abs_expression(body, length, &pos, out, 1);
                 if (status != BL_OK) return status;
                 if (pos != length) return BL_BAD_SEQUENCE;
+            } else if (stream8 && t == (uint8_t)'"') {
+                static const uint8_t prefix[] = {
+                    '"','V','A','L','U','E','=','"',';'
+                };
+                size_t j;
+                if (length - (pos - 1u) < sizeof(prefix) ||
+                    memcmp(body + pos - 1u, prefix, sizeof(prefix)) != 0)
+                    return BL_BAD_SEQUENCE;
+                for (j = 0u; j < sizeof(prefix); ++j) {
+                    status = append_byte(out, prefix[j]);
+                    if (status != BL_OK) return status;
+                }
+                pos = pos - 1u + sizeof(prefix);
+                status = for_reference(body, length, &pos, out);
+                if (status != BL_OK) return status;
             } else if (stream8 && !(t == 0x02u || t == 0x19u))
                 return BL_BAD_SEQUENCE;
             else if (t == (uint8_t)'"') {

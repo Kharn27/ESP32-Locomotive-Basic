@@ -225,8 +225,9 @@ def review_one(review, case, png_hash):
     require(observed[0] == observed[1],
             "SCREEN_REVIEW_ORIGINAL_REPEAT_TRANSCRIPT_DIFF_" + case)
     lines, ready = observed[0]
-    # Do not assume the wording of the GOTO / IF CPC error. Only check the
-    # semantic witness (missing destination, locus and post-RUN output).
+    # Classify the five failing cases against the exact CPC wording observed
+    # on the pinned ROM captures. Different authentic wording stays REVIEWED
+    # but must be BEHAVIOR_DIFF, even if it uses the correct line number.
     reasons = []
     if ready != 1:
         reasons.append("READY_COUNT_%d" % ready)
@@ -238,13 +239,16 @@ def review_one(review, case, png_hash):
     else:
         expected_line = CASES[case][0]
         # Screen wording is empirical, not inferred from GOSUB/A0 or BEStatus.
-        # An alternate authentic wording remains recorded, with a DIFF flag.
+        # Preserve any divergent transcription; do not reject raw acquisition.
+        expected_text = "Line does not exist in %d" % expected_line
         if len(lines) != 1:
             reasons.append("EXPECTED_SINGLE_ERROR_LINE")
-        if len(lines) == 1:
+        elif lines[0] != expected_text:
             match = re.search(r"(?:^|\s)in ([0-9]+)$", lines[0])
             if match is None or int(match.group(1)) != expected_line:
                 reasons.append("ERROR_LOCUS_UNVERIFIED_OR_DIFFERENT")
+            else:
+                reasons.append("ERROR_LABEL_DIFFERENT")
     return {"status": "BEHAVIOR_PASS" if not reasons else "BEHAVIOR_DIFF",
             "reasons": reasons, "post_run_output_lines": list(lines),
             "ready_count": ready}
@@ -362,7 +366,7 @@ def self_test():
     # Fake bytes below are ephemeral test cases, NOT CPC screenshots/oracles.
     check_sources()
     base_phase = {"png_sha256": "a"*64,
-                  "post_run_output_lines": ["TEST_ERROR in 10"],
+                  "post_run_output_lines": ["Line does not exist in 10"],
                   "ready_count": 1}
     base = {"case": "GOTO_MISSING",
             "provenance": "CPC_SCREEN_HUMAN_VISUAL",
@@ -400,18 +404,34 @@ def self_test():
                 "repeat": {**base_phase, "post_run_output_lines": lines,
                            "ready_count": ready}}
     behavior_mutants = [
-        both(["TEST_ERROR in 10"], 0),
-        both(["TEST_ERROR in 10", "NEVER"]),
+        both(["Line does not exist in 10"], 0),
+        both(["Line does not exist in 10", "NEVER"]),
         both([], case="IF_UNTAKEN_MISSING"),
         both(["NEVER"], case="IF_UNTAKEN_MISSING"),
-        both(["TEST_ERROR in 999"]),
+        both(["Line does not exist in 999"]),
         both(["ERROR_WITHOUT_LINE_NUMBER"]),
+        both(["Other error in 10"]),
     ]
     for index, mutant in enumerate(behavior_mutants):
         observed = review_one(mutant, mutant["case"], "a"*64)
         require(observed["status"] == "BEHAVIOR_DIFF" and
                 bool(observed["reasons"]),
                 "NEGATIVE_BEHAVIOR_PROMOTED_%u" % index)
+    # Across all five historical error cases, a correct locus with the
+    # wrong label must remain DIFF; exact text must PASS.
+    for case in CASES:
+        if case == "IF_UNTAKEN_MISSING":
+            continue
+        line = CASES[case][0]
+        expected = "Line does not exist in %d" % line
+        good = review_one(both([expected], case=case), case, "a"*64)
+        bad_text = "Other error in %d" % line
+        bad = review_one(both([bad_text], case=case), case, "a"*64)
+        require(good["status"] == "BEHAVIOR_PASS" and
+                bad["status"] == "BEHAVIOR_DIFF" and
+                "ERROR_LABEL_DIFFERENT" in bad["reasons"] and
+                bad["post_run_output_lines"] == [bad_text],
+                "EXACT_CPC_ERROR_LABEL_GATE_"+case)
     require(review_one(both(["AFTER"], case="IF_UNTAKEN_MISSING"),
                        "IF_UNTAKEN_MISSING", "a"*64)["status"] ==
             "BEHAVIOR_PASS", "IF_UNTAKEN_AFTER_REJECTED")
@@ -436,7 +456,7 @@ def self_test():
     require(not (SOURCES / "manifest.json").exists(),
             "SOURCE_DIR_MUST_NOT_IMPERSONATE_ORACLE")
     print("O2_NEGATIVE_METADATA=10/10 REJECTED "
-          "O2_NEGATIVE_BEHAVIOR=6/6 DIFF "
+          "O2_NEGATIVE_BEHAVIOR=7/7 DIFF O2_EXACT_LABEL_FIVE_CASES=5/5 PASS "
           "O2_NEGATIVE_RAM=5/5 REJECTED "
           "NO_GENERATED_CPC_EVIDENCE")
 

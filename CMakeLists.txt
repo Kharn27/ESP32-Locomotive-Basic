@@ -175,6 +175,13 @@ endif()
 
 # J1.21-B2a: core-only CLS typed event and side-effect-free BSR preview.
 if(BUILD_TESTING)
+    # C1: direct CLS 8A typed-event preparation; core-only real BSR test.
+    add_executable(test_j1_21_c1_direct_cls tests/test_j1_21_c1_direct_cls.c)
+    target_link_libraries(test_j1_21_c1_direct_cls PRIVATE
+        basic_session_runtime basic_variable_store basic_tokenizer)
+    add_test(NAME j1_21_c1_direct_cls_atomic_cpc_d_full
+             COMMAND test_j1_21_c1_direct_cls ${CMAKE_CURRENT_SOURCE_DIR})
+
     add_executable(test_j1_21_b2a_cls_preview tests/test_j1_21_b2a_cls_preview.c)
     target_link_libraries(test_j1_21_b2a_cls_preview PRIVATE
         basic_session_runtime basic_variable_store)

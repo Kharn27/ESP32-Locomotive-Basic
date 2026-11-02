@@ -161,7 +161,7 @@ static int rejected_preflight_is_atomic(void) {
     CHECK(reject_case("10 PRINT \"A\":CLS:PRINT \"B\"", true,
                       HW4_PEN_OK) == 0);
     CHECK(reject_after_assignment("10 A%=7", "20 PRINT A%:CLS") == 0);
-    CHECK(reject_after_assignment("10 A$=\\"X\\"", "20 PRINT A$:CLS") == 0);
+    CHECK(reject_after_assignment("10 A$=\"X\"", "20 PRINT A$:CLS") == 0);
     CHECK(reject_case("10 PEN 2:PRINT \"NO\":INK 1,26:CLS",
                       false, HW4_PEN_SET_INK_UNSUPPORTED) == 0);
     return 0;

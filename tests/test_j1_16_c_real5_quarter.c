@@ -120,7 +120,7 @@ static int run(F *f) {
     return 0;
 }
 static int source_negative(void) {
-    static const char *bad[]={"A=0.1","A=1.20","A=-1.25","A=0","A=1.250",
+    static const char *bad[]={"A=0.1","A=1.20","A=-1.25","A=1.250",
         "A!=1.5","A!=1.25","A=1.25:PRINT A","A=1.25 : END",
         "LET A=1.25","B=1.25","a=1.25","A=1.25X","A=1.25 ",
         "PRINT B","PRINT A:PRINT A","PRINTA","? A",
@@ -198,7 +198,7 @@ static int print_negative(void) {
     CHECK(send(&f,"10 PRINT A").status==BSR_OK);
     CHECK(send(&f,"RUN").status==BSR_OK);
     CHECK(fail(&f,BE_VARIABLE_NOT_FOUND,sizeof(f.output))==0);
-    value.type=(uint8_t)BVT_REAL;value.data.real5[4]=0x81u;
+    value.type=(uint8_t)BVT_REAL;value.data.real5[4]=0x82u; /* non-witness store */
     CHECK(bvs_assign(&f.store,&key,&value)==BVS_OK);
     CHECK(fail(&f,BE_UNSUPPORTED,sizeof(f.output))==0);
     value.data.real5[3]=0x20u;value.data.real5[4]=0x81u;

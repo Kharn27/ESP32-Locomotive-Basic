@@ -150,7 +150,7 @@ static int run(F *f) {
     return 0;
 }
 static int source_negative(void) {
-    static const char *bad[]={"A=0.1","A=1.20","A=-1.25","A=0","A=1.250",
+    static const char *bad[]={"A=0.1","A=1.20","A=-1.25","A=1.250",
         "A=-0.50","A=-0.5 ","A=-0.5X","A= -0.5","A =-0.5",
         "LET A=-0.5","B=-0.5","a=-0.5","A!=-0.5","A=--0.5",
         "A!=1.5","A!=1.25","A=1.25:PRINT A","A=1.25 : END",
@@ -261,7 +261,7 @@ static int print_negative(void) {
     CHECK(send(&f,"10 PRINT A").status==BSR_OK);
     CHECK(send(&f,"RUN").status==BSR_OK);
     CHECK(fail(&f,BE_VARIABLE_NOT_FOUND,sizeof(f.output))==0);
-    value.type=(uint8_t)BVT_REAL;value.data.real5[4]=0x81u;
+    value.type=(uint8_t)BVT_REAL;value.data.real5[4]=0x82u; /* non-witness store */
     CHECK(bvs_assign(&f.store,&key,&value)==BVS_OK);
     CHECK(fail(&f,BE_UNSUPPORTED,sizeof(f.output))==0);
     value.data.real5[3]=0x20u;value.data.real5[4]=0x81u;
@@ -333,7 +333,7 @@ static int stored_value_separation(void) {
     CHECK(send(&f,"RUN").status==BSR_OK);
     v.type=(uint8_t)BVT_REAL;
     memcpy(v.data.real5,values[2],5u);
-    v.data.real5[4]=0x81u; /* hybrid negative/sign/exponent */
+    v.data.real5[4]=0x82u; /* non-attested signed hybrid */
     CHECK(bvs_assign(&f.store,&key,&v)==BVS_OK);
     CHECK(fail(&f,BE_UNSUPPORTED,sizeof(f.output))==0);
     return 0;

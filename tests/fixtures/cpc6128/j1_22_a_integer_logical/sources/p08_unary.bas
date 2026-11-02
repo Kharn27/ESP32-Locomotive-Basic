@@ -1,0 +1,3 @@
+10 A%=NOT (1 AND (2+3))
+20 PRINT #8,"VALUE=";A%
+30 END

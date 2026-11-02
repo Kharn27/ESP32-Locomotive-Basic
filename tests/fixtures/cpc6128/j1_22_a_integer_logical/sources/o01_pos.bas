@@ -1,0 +1,3 @@
+10 A%=5 OR 2
+20 PRINT #8,"VALUE=";A%
+30 END

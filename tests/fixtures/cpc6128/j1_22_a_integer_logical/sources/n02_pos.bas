@@ -1,0 +1,3 @@
+10 A%=NOT 5
+20 PRINT #8,"VALUE=";A%
+30 END

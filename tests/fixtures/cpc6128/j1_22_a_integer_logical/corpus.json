@@ -1,0 +1,293 @@
+{
+  "schema": 1,
+  "phase": "J1.22-A",
+  "base_sha": "1d5edc630390bfb109d6596693ec63c8d8588a28",
+  "cases": {
+    "A00_ZERO": {
+      "family": "AND",
+      "expression": "0 AND -1",
+      "question": "bitwise versus truth: zero annihilator",
+      "lines": [
+        "10 A%=0 AND -1",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "766c9a5ec6270e053fe15eb51d47595f774bf3815a4f95d6de65c6403732078e",
+      "evidence_status": "UNVERIFIED"
+    },
+    "A01_POS": {
+      "family": "AND",
+      "expression": "5 AND 3",
+      "question": "bitwise versus boolean: noncanonical result",
+      "lines": [
+        "10 A%=5 AND 3",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "d1ab956bc72ee17c88fb84131b52e6f9806ec07b62bb50b197243f8e0da7b314",
+      "evidence_status": "UNVERIFIED"
+    },
+    "A02_NEG": {
+      "family": "AND",
+      "expression": "-5 AND 3",
+      "question": "signed two-complement interaction",
+      "lines": [
+        "10 A%=-5 AND 3",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "2dfebca2af98e54f6dae699f25315016db8ef04c1c6c6d09ab8b1dafce72b0f6",
+      "evidence_status": "UNVERIFIED"
+    },
+    "A03_MIN": {
+      "family": "AND",
+      "expression": "-32768 AND 32767",
+      "question": "signed boundary",
+      "lines": [
+        "10 A%=-32768 AND 32767",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "73846ea011b8265548716629516cbab4c6bb13e2409149dd54e2f4b874b97d78",
+      "evidence_status": "UNVERIFIED"
+    },
+    "O00_ZERO": {
+      "family": "OR",
+      "expression": "0 OR 0",
+      "question": "zero identity",
+      "lines": [
+        "10 A%=0 OR 0",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "40f75c93489442190cbc04bd800c39416bcb833357cab29c5c5613d2e2d86bb4",
+      "evidence_status": "UNVERIFIED"
+    },
+    "O01_POS": {
+      "family": "OR",
+      "expression": "5 OR 2",
+      "question": "noncanonical positive bit pattern",
+      "lines": [
+        "10 A%=5 OR 2",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "d378e990eb7679c77cd569d75d845ca83ff1d5727fbb34bae251252fadf08825",
+      "evidence_status": "UNVERIFIED"
+    },
+    "O02_NEG": {
+      "family": "OR",
+      "expression": "-2 OR 1",
+      "question": "negative operand",
+      "lines": [
+        "10 A%=-2 OR 1",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "f5d0a681bf22f21f510c64681c96b44b478928fc233a904c6f21b2bebbd40a1b",
+      "evidence_status": "UNVERIFIED"
+    },
+    "X00_ZERO": {
+      "family": "XOR",
+      "expression": "0 XOR 0",
+      "question": "zero identity",
+      "lines": [
+        "10 A%=0 XOR 0",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "040137638f51afe5e6d37d679d3fdd5f44a1ccd62c221ea61a118e33eb9dff4e",
+      "evidence_status": "UNVERIFIED"
+    },
+    "X01_POS": {
+      "family": "XOR",
+      "expression": "5 XOR 3",
+      "question": "noncanonical positive bit pattern",
+      "lines": [
+        "10 A%=5 XOR 3",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "f36a90e471a61fce2000118518d7a82d35ae7690776fb857fac532d1e9737c52",
+      "evidence_status": "UNVERIFIED"
+    },
+    "X02_NEG": {
+      "family": "XOR",
+      "expression": "-5 XOR 3",
+      "question": "negative operand",
+      "lines": [
+        "10 A%=-5 XOR 3",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "3b470dc9f71264b62b3f285d4405a72d7d673f8d22fe13ba15f4094a4316bc62",
+      "evidence_status": "UNVERIFIED"
+    },
+    "N00_ZERO": {
+      "family": "NOT",
+      "expression": "NOT 0",
+      "question": "signed bitwise complement versus boolean",
+      "lines": [
+        "10 A%=NOT 0",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "ba4db77453f0ca760ceb0ffd41662e80424818f08f5cac7a6f2c37dc18cdfe31",
+      "evidence_status": "UNVERIFIED"
+    },
+    "N01_MINUS1": {
+      "family": "NOT",
+      "expression": "NOT -1",
+      "question": "negative identity edge",
+      "lines": [
+        "10 A%=NOT -1",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "2cca83de4101ee6c642bad773c628146d6962938654624c5a81ad7883dd0b709",
+      "evidence_status": "UNVERIFIED"
+    },
+    "N02_POS": {
+      "family": "NOT",
+      "expression": "NOT 5",
+      "question": "positive operand",
+      "lines": [
+        "10 A%=NOT 5",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "973a49034f86331c8bfb618b91d1b78371d7ceb51ac9eaa71a6c08a8bb982a2e",
+      "evidence_status": "UNVERIFIED"
+    },
+    "N03_MIN": {
+      "family": "NOT",
+      "expression": "NOT -32768",
+      "question": "negative boundary",
+      "lines": [
+        "10 A%=NOT -32768",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "24790518915e59ea037ab89cf21c89589b9e57b999236b5c30cd10dddb188059",
+      "evidence_status": "UNVERIFIED"
+    },
+    "P01_ADD": {
+      "family": "PRECEDENCE",
+      "expression": "1+2 AND 4",
+      "question": "discriminate (1+2) AND 4 vs 1+(2 AND 4)",
+      "lines": [
+        "10 A%=1+2 AND 4",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "165a624e43820342655c69497f372533781b5ddf0c55df48977e3851d760e05e",
+      "evidence_status": "UNVERIFIED"
+    },
+    "P02_MULT": {
+      "family": "PRECEDENCE",
+      "expression": "2*3 OR 1",
+      "question": "discriminate (2*3) OR 1 vs 2*(3 OR 1)",
+      "lines": [
+        "10 A%=2*3 OR 1",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "e570a72e21ca2d0321449058252d9fd9e5bb655dd988fcea104e6244e03724d0",
+      "evidence_status": "UNVERIFIED"
+    },
+    "P03_IDIV": {
+      "family": "PRECEDENCE",
+      "expression": "9\\2 XOR 5",
+      "question": "discriminate (9\\2) XOR 5 vs 9\\(2 XOR 5)",
+      "lines": [
+        "10 A%=9\\2 XOR 5",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "1fd148305a9dd12128aa7bca162271311fa24c45261f39f2707f0c62de7b0293",
+      "evidence_status": "UNVERIFIED"
+    },
+    "P04_MOD": {
+      "family": "PRECEDENCE",
+      "expression": "10 MOD 4 AND 3",
+      "question": "discriminate (10 MOD 4) AND 3 vs 10 MOD (4 AND 3)",
+      "lines": [
+        "10 A%=10 MOD 4 AND 3",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "d671bf39426fc551463868ead4df3027ebb98ea1727b3aaee827f26fa4632cec",
+      "evidence_status": "UNVERIFIED"
+    },
+    "P05_REL": {
+      "family": "RELATION_IF",
+      "expression": "(1<2) AND (2<3)",
+      "question": "comparison plus IF taken",
+      "lines": [
+        "10 IF (1<2) AND (2<3) THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"",
+        "20 END"
+      ],
+      "source_sha256": "2adf43120b54e867feda788d747668a0030bbd48580158f2152bf7e5602348be",
+      "evidence_status": "UNVERIFIED"
+    },
+    "P06_IF_ELSE": {
+      "family": "RELATION_IF",
+      "expression": "(1<2) AND (2<1)",
+      "question": "IF false branch / ELSE only",
+      "lines": [
+        "10 IF (1<2) AND (2<1) THEN PRINT #8,\"BAD\" ELSE PRINT #8,\"ELSE\"",
+        "20 END"
+      ],
+      "source_sha256": "25c91bc2776bf0c5adfa964798c11b17d3d582d87a3c5ace83d6a16d8745bb49",
+      "evidence_status": "UNVERIFIED"
+    },
+    "P07_NESTED": {
+      "family": "PARENTHESES",
+      "expression": "((1+2) AND (4-1)) OR (NOT (2 AND 1))",
+      "question": "nested parenthesis and subtraction",
+      "lines": [
+        "10 A%=((1+2) AND (4-1)) OR (NOT (2 AND 1))",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "5cc4b0ff97b38c810eb07c95670bd8908a55d61bf4504db8fcc55ca1e8424265",
+      "evidence_status": "UNVERIFIED"
+    },
+    "P08_UNARY": {
+      "family": "PARENTHESES",
+      "expression": "NOT (1 AND (2+3))",
+      "question": "unary NOT and nested binary",
+      "lines": [
+        "10 A%=NOT (1 AND (2+3))",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "82b5a514f941d2881cebbcd49015e45bff8149ebbc581edabd4004e444756115",
+      "evidence_status": "UNVERIFIED"
+    },
+    "E01_DIV0": {
+      "family": "DIAGNOSTIC",
+      "expression": "8 AND (4\\0)",
+      "question": "CPC division by zero observation; assignment may abort",
+      "lines": [
+        "10 A%=8 AND (4\\0)",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "dcf84c3e83463c1d1f6beaa841433fb303ba4fca0dff242d7e770408c47fb569",
+      "evidence_status": "UNVERIFIED"
+    },
+    "E02_OVERFLOW": {
+      "family": "DIAGNOSTIC",
+      "expression": "(32767+1) AND 1",
+      "question": "CPC overflow observation; assignment may abort",
+      "lines": [
+        "10 A%=(32767+1) AND 1",
+        "20 PRINT #8,\"VALUE=\";A%",
+        "30 END"
+      ],
+      "source_sha256": "ef327a2806aa154461e4b8a91878ec49b4820e8c96c85440b373c7de5076a48b",
+      "evidence_status": "UNVERIFIED"
+    }
+  }
+}

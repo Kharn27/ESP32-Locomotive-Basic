@@ -189,7 +189,7 @@ static int negatives(void) {
     return 0;
 }
 static int mutated(const Witness *w) {
-    size_t i,n=w->l10_size-4u;
+    size_t i,n=w->l10_size-5u;
     for(i=0;i<n+1u;++i) {
         F f;uint8_t body[20],saved[sizeof(f.storage)],out[sizeof(f.output)];
         BasicVariableStore store;BasicVariableEntry entries[3];

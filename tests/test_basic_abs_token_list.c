@@ -572,10 +572,11 @@ static int abs_negative_green(void)
     {
         static const uint8_t raw[][13]={
             {0xbfu,' ',0xffu,0x00u,'(',0x0fu}, /* missing ')' */
-            {0xbfu,' ',0xffu,0x00u,'(',0x0fu,')',0x0fu} /* suffix */
+            {0xbfu,' ',0xffu,0x00u,'(',0x0fu,')',0x0fu}, /* suffix */
+            {0xbfu,' ',0xffu,0x00u,'(',0x1au,0xffu} /* truncated 1A word */
         };
-        const size_t lengths[]={6u,8u};
-        for(i=0u;i<2u;++i) {
+        const size_t lengths[]={6u,8u,7u};
+        for(i=0u;i<3u;++i) {
             AbsHarness h;
             BEStatus actual;
             uint8_t saved[sizeof(h.output)];

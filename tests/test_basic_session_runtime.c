@@ -366,10 +366,10 @@ static int test_preserved_session_error(void)
 }
 
 
-/* J1.19-B1 deliberately adds no PAPER execution or CYD event. Even the
- * lexically accepted out-of-range CPC forms remain unknown to the executor.
- * A failed RUN step must keep the program, cursor and output unchanged. */
-static int test_paper_b1_run_unsupported(void)
+/* J1.19-B1 lexical evidence is retained. B2 adds runtime PAPER:
+ * with no event receiver the six valid forms reject atomically; the two
+ * CPC invalid bounds reject with their distinct host cause. */
+static int test_paper_b2_legacy_no_events(void)
 {
     static const char *const sources[] = {
         "20 PAPER 0", "20 PAPER 1", "20 PAPER 2", "20 PAPER 3",
@@ -391,7 +391,7 @@ static int test_paper_b1_run_unsupported(void)
         save(&f, &previous);
         r = advance(&f, sizeof(f.output));
         CHECK(r.status == BSR_EXECUTOR_ERROR);
-        CHECK(r.executor_status == BE_UNKNOWN_TOKEN);
+        CHECK(r.executor_status == (i < 6u ? BE_EVENT_RECEIVER_REQUIRED : BE_INVALID_PAPER));
         CHECK(same(&f, &previous) == 0);
         CHECK(bsr_stop(&f.runtime).status == BSR_OK);
         CHECK(submit(&f, "LIST").status == BSR_OK);
@@ -407,7 +407,7 @@ int main(void)
     CHECK(test_list_and_new_while_running() == 0);
     CHECK(test_stop_and_infinite_loop() == 0);
     CHECK(test_executor_errors() == 0);
-    CHECK(test_paper_b1_run_unsupported() == 0);
+    CHECK(test_paper_b2_legacy_no_events() == 0);
     CHECK(test_invalid_arguments_and_aliasing() == 0);
     CHECK(test_preserved_session_error() == 0);
     puts("basic_session_runtime: OK");

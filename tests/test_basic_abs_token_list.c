@@ -1,4 +1,4 @@
-/* J1.20-B1: exact CPC RAM oracle + semantic LIST only, never RUN ABS.
+/* J1.20-B1/B2a: exact CPC RAM oracle, semantic LIST and bounded RUN ABS.
  * Reads the two immutable J1.20-A acquisitions, no synthesized oracle. */
 #include "basic_program.h"
 #include "basic_tokenizer.h"
@@ -34,8 +34,9 @@ static int load(const char *path, uint8_t *data, size_t cap, size_t *n)
     return 0;
 }
 
-/* A single genuine stored FF00 expression is fed to the unchanged executor,
- * with cursor/output/count and storage snapshot verified on failure. */
+/* A single genuine stored FF00 expression is fed to the native executor.
+ * The three literal cases execute; all other isolated cases are rejected.
+ * Cursor/output/count are verified for both outcomes and RAM stays intact. */
 static int run_initial_abs(const BasicProgram *whole, const char *name)
 {
     BasicProgram isolated;
@@ -68,8 +69,8 @@ static int run_initial_abs(const BasicProgram *whole, const char *name)
         size_t i;
         if (strcmp(name, "a00") == 0 || strcmp(name, "a01") == 0 ||
             strcmp(name, "an1") == 0) {
-            /* B2a RED: first non-#8 PRINT ABS literal is now executable.
-             * CPC LF differs from printer transport CRLF. */
+            /* B2a GREEN: the three non-#8 PRINT ABS literals execute.
+             * Native LF differs from CPC printer transport CRLF. */
             const char *want = strcmp(name, "a00") == 0 ? " 0 \n" : " 1 \n";
             CHECK(result == BE_OK);
             CHECK(written == 4u && memcmp(output, want, 4u) == 0);
@@ -177,12 +178,15 @@ static int each_oracle(const char *root, const char *name)
     CHECK(sent == 112u);
     for (generated = 0u; generated < sizeof(rendered); ++generated)
         CHECK(rendered[generated] == 0x7cu);
-    /* Imported RAM is immutable across unsupported RUN and repeat listing. */
+    /* Imported RAM remains immutable after native ABS or rejected RUN. */
     memcpy(snap, import_storage, sizeof(snap));
     CHECK(run_initial_abs(&imported, name) == 0);
     CHECK(memcmp(snap, import_storage, sizeof(snap)) == 0);
-    printf("ABS-B1 %s MATCH_EXACT_RAM original+repeat MATCH_SEMANTIC_LIST "
-           "RUN_HOST_UNSUPPORTED\n", name);
+    printf("ABS-B1/B2a %s MATCH_EXACT_RAM original+repeat MATCH_SEMANTIC_LIST "
+           "%s\n", name,
+           (strcmp(name, "a00") == 0 || strcmp(name, "a01") == 0 ||
+            strcmp(name, "an1") == 0) ?
+           "RUN_NATIVE_ABS_INTEGER_PASS" : "RUN_HOST_UNSUPPORTED");
     return 0;
 }
 
@@ -699,6 +703,8 @@ int main(int argc, char **argv)
     CHECK(abs_native_green()==0);
     CHECK(abs_negative_green()==0);
     CHECK(abs_program_green()==0);
-    puts("J1.20-B1 16/16 MATCH_EXACT_RAM, LIST source-semantic, RUN unsupported");
+    puts("J1.20-B1/B2a 16/16 MATCH_EXACT_RAM, LIST source-semantic; "
+         "isolated RUN: 3/16 RUN_NATIVE_ABS_INTEGER_PASS, "
+         "13/16 RUN_HOST_UNSUPPORTED; B2a INTEGER tests PASS");
     return 0;
 }

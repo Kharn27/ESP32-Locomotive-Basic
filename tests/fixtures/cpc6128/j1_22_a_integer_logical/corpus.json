@@ -197,14 +197,14 @@
     },
     "P03_IDIV": {
       "family": "PRECEDENCE",
-      "expression": "9\\2 XOR 5",
-      "question": "discriminate (9\\2) XOR 5 vs 9\\(2 XOR 5)",
+      "expression": "8\\2 XOR 1",
+      "question": "discriminate (8\\2) XOR 1 vs 8\\(2 XOR 1)",
       "lines": [
-        "10 A%=9\\2 XOR 5",
+        "10 A%=8\\2 XOR 1",
         "20 PRINT #8,\"VALUE=\";A%",
         "30 END"
       ],
-      "source_sha256": "1fd148305a9dd12128aa7bca162271311fa24c45261f39f2707f0c62de7b0293",
+      "source_sha256": "2af3e060e13b3c07713c34841467d0e60fc4e365e92328ea8ca4971fd7b20bc1",
       "evidence_status": "UNVERIFIED"
     },
     "P04_MOD": {

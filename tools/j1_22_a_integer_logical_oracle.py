@@ -25,7 +25,7 @@ ROM = '31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562'
 CAPRICE = '8c778bf072a06fb7c23b9cccd179041db7f79a52'
 GHCR = ('ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:'
         '7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c')
-CORPUS_SHA256 = '167678d1e7a675de040556b5505133bebab803717d321ec456b8cdb45a715ca0'
+CORPUS_SHA256 = 'b6be133ea38a6be5a1cb87fea4d77352fa1ac7a814eed1c115feaf8bb30b7d4e'
 SESSIONS = ('original', 'repeat')
 FILESET = ('program.bin', 'capture.json', 'list/caprice.log',
            'list/screen.png', 'list/printer.dat', 'run/caprice.log',

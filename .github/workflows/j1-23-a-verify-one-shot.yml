@@ -1,0 +1,26 @@
+name: J1.23-A ephemeral offline independent evidence verify
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/j1-23-a-verify-one-shot.yml"
+      - "tests/test_j1_23_a_locate_border_oracle.py"
+      - "tests/fixtures/cpc6128/j1_23_a_locate_border/**"
+permissions:
+  contents: read
+jobs:
+  evidence:
+    if: github.head_ref == 'oracle/j1-23-a-locate-border'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check 360 external SHA256s and 20 original/repeat fixtures
+        run: |
+          python3 -m unittest discover -s tests -p 'test_j1_23_a_locate_border_oracle.py' -v
+      - name: Independent archive checker with original run SHA
+        run: |
+          python3 tools/j1_23_a_locate_border_oracle.py \
+            --verify tests/fixtures/cpc6128/j1_23_a_locate_border \
+            --external-manifest-sha256 31addf9025214ea4f4f5ea3d8f592cb0cffbfac4c0fd962d2fee9fa30266a1f8 \
+            --self-test

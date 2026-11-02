@@ -56,8 +56,10 @@ jobs:
           ! grep -RE 'esp_lcd_new_panel_ili9341' firmware/esp32_display_probe/main/ --include='*.c'
           ! grep -RE 'malloc[()]|calloc[()]|realloc[()]|free[()]' io/uart_line.c io/cpc_uart_console.c firmware/esp32_display_probe/main/hw4_c2_console.c
           grep -F 'bsr_submit(' firmware/esp32_display_probe/main/hw4_c2_console.c
-          # HW4-PEN-A: the typed event-aware step replaces the legacy byte-only call.
-          grep -F 'bsr_step_events(' firmware/esp32_display_probe/main/hw4_c2_console.c
+          # HW4-RUN-BREAK-B: event-aware step is owned by the scheduler,
+          # not called directly by the CONSOLE UART/LCD owner.
+          grep -F 'hw4_run_scheduler_slice(' firmware/esp32_display_probe/main/hw4_c2_console.c
+          grep -F 'bsr_step_events(' integration/hw4_run_scheduler.c
           grep -F 'UART_ANSI_CSI' io/uart_line.c
           grep -F 'cpc_uart_console_edit(' firmware/esp32_display_probe/main/hw4_c2_console.c
           # Core/HW4 co-mutation rejected by ci_arch_changes.sh using same base.

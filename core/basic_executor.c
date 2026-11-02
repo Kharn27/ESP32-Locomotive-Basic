@@ -865,21 +865,27 @@ static BEStatus execute_line(const BasicProgram *program,
                     static const uint8_t half_print[] = {
                         0xbfu, (uint8_t)' ', 0x0du, 0u, 0u, 0xc1u
                     };
-                    static const uint8_t bits[3][5] = {
+                    static const uint8_t bits[6][5] = {
                         {0u, 0u, 0u, 0u, 0x80u}, /* R_HALF */
                         {0u, 0u, 0u, 0x20u, 0x81u}, /* R_QUARTER */
-                        {0u, 0u, 0u, 0x80u, 0x80u} /* sealed R_NEG_HALF */
+                        {0u, 0u, 0u, 0x80u, 0x80u}, /* R_NEG_HALF */
+                        {0u, 0u, 0u, 0u, 0u}, /* E-A R_ZERO */
+                        {0u, 0u, 0u, 0u, 0x81u}, /* E-A R_ONE */
+                        {0u, 0u, 0u, 0x80u, 0x81u} /* E-A R_NEG_ONE */
                     };
-                    static const uint8_t text[3][6] = {
+                    static const uint8_t text[6][6] = {
                         {' ', '0', '.', '5', ' ', 0u},
                         {' ', '1', '.', '2', '5', ' '},
-                        {'-', '0', '.', '5', ' ', 0u}
+                        {'-', '0', '.', '5', ' ', 0u},
+                        {' ', '0', ' ', 0u, 0u, 0u},
+                        {' ', '1', ' ', 0u, 0u, 0u},
+                        {'-', '1', ' ', 0u, 0u, 0u}
                     };
-                    static const size_t text_length[3] = {5u, 6u, 5u};
+                    static const size_t text_length[6] = {5u, 6u, 5u, 3u, 3u, 3u};
                     BasicVariableKey key;
                     BasicVariableValue value;
                     size_t consumed;
-                    size_t i, choice = 3u;
+                    size_t i, choice = 6u;
                     BVSStatus lookup;
                     if (variables == NULL) return BE_UNSUPPORTED;
                     if (length != sizeof(half_print) ||
@@ -894,13 +900,13 @@ static BEStatus execute_line(const BasicProgram *program,
                     if (value.type != (uint8_t)BVT_REAL) return BE_INVALID_TYPE;
                     /* Select from five actual stored bytes, not source history.
                      * This is not a REAL5 decoder or general sign rule. */
-                    for (i = 0u; i < 3u; ++i) {
+                    for (i = 0u; i < 6u; ++i) {
                         if (memcmp(value.data.real5, bits[i], 5u) == 0) {
                             choice = i;
                             break;
                         }
                     }
-                    if (choice == 3u) return BE_UNSUPPORTED;
+                    if (choice == 6u) return BE_UNSUPPORTED;
                     for (i = 0u; i < text_length[choice]; ++i) {
                         status = emit(out, text[choice][i]);
                         if (status != BE_OK) return status;
@@ -1139,37 +1145,43 @@ static BEStatus execute_line(const BasicProgram *program,
             flow->action = BE_FLOW_CLEAR;
             return BE_OK;
         } else if (token == 0x0du) {
-            static const uint8_t real_line[3][12] = {
+            static const uint8_t real_line[6][12] = {
                 {0x0du, 0u, 0u, 0xc1u, 0xefu, 0x1fu,
                  0u, 0u, 0u, 0u, 0x80u, 0u},
                 {0x0du, 0u, 0u, 0xc1u, 0xefu, 0x1fu,
                  0u, 0u, 0u, 0x20u, 0x81u, 0u},
                 {0x0du, 0u, 0u, 0xc1u, 0xefu, 0xf5u,
-                 0x1fu, 0u, 0u, 0u, 0u, 0x80u}
+                 0x1fu, 0u, 0u, 0u, 0u, 0x80u},
+                {0x0du, 0u, 0u, 0xc1u, 0xefu, 0x0eu}, /* 0 */
+                {0x0du, 0u, 0u, 0xc1u, 0xefu, 0x0fu}, /* 1 */
+                {0x0du, 0u, 0u, 0xc1u, 0xefu, 0xf5u, 0x0fu} /* -1 */
             };
-            static const uint8_t stored[3][5] = {
+            static const uint8_t stored[6][5] = {
                 {0u, 0u, 0u, 0u, 0x80u},
                 {0u, 0u, 0u, 0x20u, 0x81u},
-                {0u, 0u, 0u, 0x80u, 0x80u} /* observed signed store */
+                {0u, 0u, 0u, 0x80u, 0x80u},
+                {0u, 0u, 0u, 0u, 0u}, /* measured E-A zero */
+                {0u, 0u, 0u, 0u, 0x81u}, /* measured E-A one */
+                {0u, 0u, 0u, 0x80u, 0x81u} /* measured E-A minus one */
             };
-            static const size_t lengths[3] = {11u, 11u, 12u};
+            static const size_t lengths[6] = {11u, 11u, 12u, 6u, 6u, 7u};
             BasicVariableKey key;
             BasicVariableValue value = {0};
-            size_t consumed, i, choice = 3u;
+            size_t consumed, i, choice = 6u;
             if (preceding_statement || variables == NULL) return BE_UNSUPPORTED;
-            for (i = 0u; i < 3u; ++i) {
+            for (i = 0u; i < 6u; ++i) {
                 if (length == lengths[i] &&
                     memcmp(body, real_line[i], lengths[i]) == 0) {
                     choice = i;
                     break;
                 }
             }
-            if (choice == 3u) return BE_BAD_SEQUENCE;
+            if (choice == 6u) return BE_BAD_SEQUENCE;
             status = scalar_real_key(body, length, pos - 1u, &key, &consumed);
             if (status != BE_OK || consumed != 4u) return BE_BAD_SEQUENCE;
             value.type = (uint8_t)BVT_REAL;
-            /* The signed literal's 5 bytes encode positive 0.5; the CPC
-             * store observed after unary F5 is independently pinned. */
+            /* Store comes from the independently witnessed CPC windows,
+             * not from interpreting token F5 or host floating arithmetic. */
             memcpy(value.data.real5, stored[choice], sizeof(value.data.real5));
             assignment->present = 1;
             assignment->key = key;

@@ -114,3 +114,114 @@ GITHUB_TOKEN=... python3 tools/ci/opt3_perf_report.py \
 **Exclusions tenues :** aucun changement `core/`, `firmware/`, `video/`, `io/`, `hal/`, `integration/`, sceaux CPC, `CMakeLists.txt`, `.github/workflows/`, routes `opt3_routing.py` ou budget A0. Aucun contrôle de performance ajouté à la CI. Pas de test physique CYD pertinent (`ON_DEVICE_NOT_APPLICABLE`).
 
 **Statut proposé à Pilotage :** `PERF_NOT_YET_VERIFIED` — outil et données audités, cohorte non indépendante et baseline globale manquante. Demander un nouveau mandat ciblé si l'analyse future de cohorts appariées confirme une régression ; ne pas modifier les gates ici.
+
+
+---
+
+## Actualisation PERF-A — deuxième fenêtre authentique du 1er novembre 2026 (mandat du 2 novembre)
+
+**Base GitHub de cette actualisation :** `main@f3d11eb8a8723a85f08bb5317852a594780c831a`. La [PR historique #196](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/196) avait déjà fusionné le premier audit ; le snapshot permanent des **41 HEADs du 30 octobre** ci-dessus reste intact. Ce complément **n'écrase pas** ses résultats ni ses oracles.
+
+**Acquisition reproductible :** GitHub REST `GET /repos/Kharn27/ESP32-Locomotive-Basic/actions/runs?event=pull_request&created=2026-11-01&per_page=100&page=N` : pages de **100, 100, 43 runs** (la troisième page ferme exhaustivement la journée), soit 243 exécutions. Coupure descriptive **`2026-11-01T23:15:26Z`** : 235 runs créés avant cette date, couvrant **44 HEADs SHA** ; sélection des **40 HEADs les plus récents par premier `run.created_at`**, en conservant **tous** leurs runs des cinq couloirs et leurs échecs/annulations. Les quatre autres HEADs, antérieurs dans la journée, ne sont pas annulés/supprimés de GitHub : la limite de fenêtre de 40 est explicite. Aucune donnée synthétique dans les chiffres ci-dessous.
+
+La latence murale observée pour un HEAD est `max(run.updated_at) - min(run.created_at)` **entre les workflows des cinq couloirs parallèles**. Les travaux historiques `CPC_ACQUISITION` et les jobs mémoire optionnels sont **en dehors de cette projection à cinq couloirs** ; le générateur général existant les conserve et les sépare si déclenchés. `updated_at` est un **proxy API**, non une preuve de fin réelle du dernier job ; le mode complet du script calcule, lorsque les jobs sont accessibles, la borne par `jobs[].completed_at`. Aucune durée parallèle n'est additionnée.
+
+### Population et percentiles (nearest-rank, bornée aux 40 HEADs)
+
+| Mesure | N | P50 | P95 | Maximum |
+|---|---:|---:|---:|---:|
+| Fenêtre cinq couloirs, **tous les HEADs terminés** : 13 succès, 20 annulations, 7 échecs | 40 | 2.00 min | 3.00 min | 3.35 min |
+| Même cohorte, **succès observés uniquement** (vue *biaisée*, jamais échantillon primaire) | 13 | 2.47 min | 3.35 min | 3.35 min |
+
+Les annulations raccourcissent artificiellement la fenêtre des HEADs remplacés ; **la P50/P95 « tous verdicts » n'est donc pas le temps nécessaire pour obtenir une validation verte**. La sous-cohorte verte n'est pas représentative. Les 40 HEADs ne correspondent qu'à **5 numéros de PR retrouvés**, plus **5 SHA sans association PR déterminée** ; ils ne représentent **pas 40 PR indépendantes**. Parmi les HEADs, les PR #237/#239/#243/#247 contiennent plusieurs révisions corrélées. Les mappings manquants ont été vérifiés par `GET /commits/{sha}/pulls` lorsque les métadonnées de run étaient vides ; le défaut d'association reste étiqueté.
+
+### Durées des workflows par famille, seulement quand le run est SUCCESS (secondaire, biais de sélection)
+
+| Famille | N | P50 (s) | P95 (s) | Maximum (s) | Non déclenchée parmi 40 |
+|---|---:|---:|---:|---:|---:|
+| C99 | 22 | 76 | 90 | 93 | 0 |
+| CPC_PERMANENT | 18 | 145 | 160 | 160 | 0 |
+| ARCH | 39 | 11 | 15 | 20 | 0 |
+| ROUTER | 36 | 10 | 12 | 12 | 0 |
+| XTENSA | 9 | 162 | 201 | 201 | 17 |
+
+Ces mesures sont les **durées de runs individuels**, pas les latences complètes des PR. `XTENSA NOT_TRIGGERED` sur 17 HEADs n'est pas un succès du build ESP32 ; il s'agit d'un couloir filtré par chemins. Les workflows CPC indépendants et les acquisitions ROM sont distincts du permanent, et un job d'acquisition SKIPPED ne constitue jamais un oracle acquis.
+
+### Inventaire de 40 HEADs réels — liens immuables
+
+| # | HEAD exact (lien commit) | PR connue | Verdict observé | Mur (min) | Run C99 témoin |
+|---:|---|---|---|---:|---|
+| 1 | [`0d3cb23d7ecd`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/0d3cb23d7ecd37c161594269e409ad63ee708769) | [#247](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/247) | SUCCESS_OBSERVED | 2.40 | [41361207485](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41361207485) |
+| 2 | [`0a0a5e4a1ba1`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/0a0a5e4a1ba129203447a9e3b6c3ba03cbc127c0) | [#247](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/247) | SUCCESS_OBSERVED | 3.35 | [41359560976](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41359560976) |
+| 3 | [`0365ac7eb19a`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/0365ac7eb19afeb7977c09bf51e9148ba26d6169) | [#247](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/247) | CANCELLED | 2.75 | [41359400928](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41359400928) |
+| 4 | [`e05837655aba`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/e05837655aba964cf1324129e41dc72d8a0237ad) | [#247](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/247) | CANCELLED | 2.63 | [41359219667](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41359219667) |
+| 5 | [`c1f8fc0daafa`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/c1f8fc0daafa57069dafa3f38c8ee831afcd2159) | [#247](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/247) | CANCELLED | 2.00 | [41359100785](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41359100785) |
+| 6 | [`dd5f8293589f`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/dd5f8293589f97a1dd53d115967743ac9af16fd0) | [#247](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/247) | CANCELLED | 1.77 | [41358984167](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41358984167) |
+| 7 | [`4900ec734196`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/4900ec734196c6f1060ed95f5dd11d0879e728aa) | [#247](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/247) | CANCELLED | 0.53 | [41358963627](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41358963627) |
+| 8 | [`78b6f40b1276`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/78b6f40b1276e5bc9c4c4d31768271e0a314d3d5) | [#247](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/247) | FAILURE | 2.45 | [41358818183](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41358818183) |
+| 9 | [`e60879f7b4e2`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/e60879f7b4e2178d69f6d3110ff1c3796fa01365) | [#226](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/226) | SUCCESS_OBSERVED | 3.07 | [41358415744](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41358415744) |
+| 10 | [`f00cc60c8918`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/f00cc60c891868e28fa67d2d4331d5fac3f5e23e) | [#226](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/226) | FAILURE | 1.88 | [41358283470](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41358283470) |
+| 11 | [`97a46f894815`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/97a46f894815c0314bf8d3ca9538e50565f628c4) | PR non résolue | SUCCESS_OBSERVED | 2.70 | [41357623345](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41357623345) |
+| 12 | [`0b87ff09e8be`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/0b87ff09e8becfc8400bdd4f69643100e91c2567) | [#243](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/243) | SUCCESS_OBSERVED | 2.43 | [41357560761](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41357560761) |
+| 13 | [`1a2a17f8463e`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/1a2a17f8463e5746f2c469a393a0cec32c07bbe3) | PR non résolue | SUCCESS_OBSERVED | 2.42 | [41259593475](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259593475) |
+| 14 | [`7b1018bb01c4`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/7b1018bb01c4f41432df1c4d130604f1fff3f2b5) | [#243](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/243) | SUCCESS_OBSERVED | 2.47 | [41259566349](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259566349) |
+| 15 | [`da5f12ae6e2a`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/da5f12ae6e2ac05d63dbd4be54b7cdc29ab08f53) | [#243](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/243) | SUCCESS_OBSERVED | 2.87 | [41259329963](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259329963) |
+| 16 | [`6bf3ae02e5cc`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/6bf3ae02e5cc0d3d3b59c7cf5b46021edbfe0c9e) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | SUCCESS_OBSERVED | 2.55 | [41259248152](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259248152) |
+| 17 | [`972cd94258f2`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/972cd94258f27f203bd16976e0dfd9a03604d0c3) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | CANCELLED | 0.88 | [41259199281](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259199281) |
+| 18 | [`dd1c1e3bf651`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/dd1c1e3bf651ae79e3f17e18091a645febc3b584) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | CANCELLED | 0.62 | [41259175423](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259175423) |
+| 19 | [`a61d711b5b9f`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/a61d711b5b9f48e43876879cda468d8223b6e562) | [#243](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/243) | CANCELLED | 2.38 | [41259169871](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259169871) |
+| 20 | [`ff5e9478e7d7`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/ff5e9478e7d7b0368462a538fc27d54a7444e1b3) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | CANCELLED | 0.95 | [41259134304](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259134304) |
+| 21 | [`b583d54267ab`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/b583d54267ab938aba7ec5a8575a949d0a4a5486) | PR non résolue | FAILURE | 1.93 | [41259035101](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259035101) |
+| 22 | [`57dfce8da797`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/57dfce8da797b0ee498dc75346aef2438fc14b7d) | [#243](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/243) | CANCELLED | 2.42 | [41259032681](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259032681) |
+| 23 | [`4d79448498a7`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/4d79448498a7eb9027cd555d509f5a7579ed34b8) | PR non résolue | FAILURE | 2.38 | [41259022260](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41259022260) |
+| 24 | [`b2ca7b75f88d`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/b2ca7b75f88d3a9334e9c04e088c2b7257ea5a6d) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | SUCCESS_OBSERVED | 2.43 | [41258934827](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258934827) |
+| 25 | [`a22e7258bd7f`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/a22e7258bd7fec7200b9750e54de8b092f811d25) | [#243](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/243) | FAILURE | 1.98 | [41258872929](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258872929) |
+| 26 | [`599000f3ffcc`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/599000f3ffcc877f396f5fe795a1a92a1a518721) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | CANCELLED | 1.23 | [41258849620](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258849620) |
+| 27 | [`1539d5a68f67`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/1539d5a68f672f03d828cd80cea9d8a1ee30416b) | [#239](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/239) | SUCCESS_OBSERVED | 3.00 | [41258785557](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258785557) |
+| 28 | [`9285eaa4e681`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/9285eaa4e6817dd9689a6f6a6ec03843c9f93f04) | [#239](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/239) | CANCELLED | 1.50 | [41258698383](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258698383) |
+| 29 | [`7aafffc80a5e`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/7aafffc80a5ed127618df163de00a6b22cf6c4a4) | [#239](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/239) | CANCELLED | 0.40 | [41258685892](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258685892) |
+| 30 | [`8c3599837e93`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/8c3599837e931b9c8cc381000fd962408b95a8a0) | [#239](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/239) | FAILURE | 0.55 | [41258661313](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258661313) |
+| 31 | [`49707ea3bfb2`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/49707ea3bfb201028c0beee22370ae7c88034b1a) | [#239](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/239) | CANCELLED | 1.25 | [41258589325](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258589325) |
+| 32 | [`bd297ce44bc7`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/bd297ce44bc7c1d953cf8d5d962f235276745299) | [#239](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/239) | CANCELLED | 0.35 | [41258571954](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258571954) |
+| 33 | [`3a81f4d7d2a0`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/3a81f4d7d2a0313e516e471a87fa077590da2757) | [#239](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/239) | CANCELLED | 0.82 | [41258537263](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258537263) |
+| 34 | [`661ce18e035b`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/661ce18e035bbe3abc1a2aa5e50f6b4d4861881a) | PR non résolue | FAILURE | 2.42 | [41258512263](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258512263) |
+| 35 | [`ebe0cbd4123d`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/ebe0cbd4123dd7fc725808426d25e6e467f10e46) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | SUCCESS_OBSERVED | 2.43 | [41258404758](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41258404758) |
+| 36 | [`2d8a04859fda`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/2d8a04859fdab4e87f2997533b43b0c385ca2ec2) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | SUCCESS_OBSERVED | 2.45 | [41255389773](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41255389773) |
+| 37 | [`835b3f914687`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/835b3f9146879f88548b6795035de70e24159be6) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | CANCELLED | 0.45 | [41255377164](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41255377164) |
+| 38 | [`b46e8c7651c6`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/b46e8c7651c671444c90b11c2dbcb8710d3b07ed) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | CANCELLED | 1.97 | [41255255416](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41255255416) |
+| 39 | [`ed4f0cd39761`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/ed4f0cd39761f2e9c3746ae4193d7026f1e63c84) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | CANCELLED | 0.83 | [41255214018](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41255214018) |
+| 40 | [`7e4cb4649594`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/7e4cb46495943faf59f77121763ec9b615260dcf) | [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) | CANCELLED | 0.73 | [41255174680](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41255174680) |
+
+**Jobs et queues, échantillons réels non extrapolés** (API `GET /actions/runs/{id}/jobs`, timestamps job `started_at-created_at`) : [C99 #41361207485](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41361207485), **quatre jobs exécutés**, attente **3/4/4/4 s** (P95=4 s), exécutions **38/74/62/72 s** ; [CPC permanent #41361207468](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41361207468), un job effectué avec attente **3 s** et cinq jobs SKIPPED non assimilés à du travail ; [Xtensa #41361207629](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41361207629), quatre jobs effectivement exécutés avec attentes **3/2/3/3 s** (P95=3 s) et un job SKIPPED. **Ces quelques jobs ne fondent aucune P95 globale de queue** : exécuter l'outil sans `--no-jobs` pour une distribution complète, sous réserve d'authentification et de quota API. Les jobs `SKIPPED` ne sont pas des succès, et leurs timestamps factices ne prouvent pas une attente nulle.
+
+**Incident hors fenêtre des quarante derniers HEADs, vérifié indépendamment** : sur [`0d4214fdc4670dcdaa36f7704fe692b92d43d963`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/0d4214fdc4670dcdaa36f7704fe692b92d43d963), les runs [#40974350096](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40974350096), [#40974350095](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40974350095), [#40974350098](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40974350098), [#40974350079](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40974350079) et [#40974350124](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/40974350124) sont tous **FAILURE**, créés le 29 octobre 23:37:02Z, mis à jour le 30 octobre 14:53:30Z (**916,47 min / 15 h 16**), **zéro job retourné pour chaque run** par l'API. Cause réelle **INCONNUE** : aucun calcul de 15 heures n'est attribuable au compilateur, à Xtensa ou au runner sans preuve. Cet événement reste dans le snapshot antérieur et **n'est pas effacé** par cette nouvelle sélection temporelle.
+
+### Avant / après : limites d'équivalence
+
+La baseline initiale [CI-OPT3 cinq familles](./CI-OPT3-five-family-routes.md) cite **20 runs C99 SUCCESS présélectionnés** : **P50=1,25 min**, **P95=3,82 min**, **max=5,13 min**. La fenêtre récente mesure **40 HEADs avec tous états**, et les workflows et types de diff ont évolué. Elle n'a pas de 20 PR pré-OPT3 appariées par type de fichier, statut, conditions de runner et combinaisons de gates. Par conséquent, **ni gain global chiffré ni régression chiffrée comparative** ne sont démontrés. Le taux de succès observé sur 40 HEADs n'est pas un taux de succès par PR ; les reprises rapides gonflent les annulations. Le coût du garde mémoire A0 de la PR #190 (six images base/HEAD) reste une famille optionnelle distincte, **sans changement de seuil ni de workflow**.
+
+### Commandes de reproduction de la nouvelle fenêtre
+
+```bash
+python3 -m unittest discover -s tests -p 'test_opt3_perf_report.py' -v
+
+# Fenêtre exhaustive d'une seule date, HEADs récents sans sélection de succès.
+# Sélection figée avant 23:15:26Z ; la pagination est fail-closed.
+GITHUB_TOKEN=${GITHUB_TOKEN} python3 tools/ci/opt3_perf_report.py \
+  --created 2026-11-01 --through 2026-11-01T23:15:26Z \
+  --latest-heads 40 --max-pages 10 --no-jobs --no-pr-files \
+  --snapshot-out /tmp/ci-perf-nov01-api.json \
+  --output /tmp/ci-perf-nov01-report.md
+
+# Variante complète (jobs, tentatives et PR/file mapping) : requêtes GET
+# plus nombreuses, authentification/rate limit à prévoir.
+GITHUB_TOKEN=${GITHUB_TOKEN} python3 tools/ci/opt3_perf_report.py \
+  --created 2026-11-01 --through 2026-11-01T23:15:26Z \
+  --latest-heads 40 --max-pages 10 \
+  --snapshot-out /tmp/ci-perf-nov01-full.json \
+  --output /tmp/ci-perf-nov01-full.md
+```
+
+La première commande produit un instantané exhaustif des runs sélectionnés avec les **bornes API `updated_at`** ; la variante complète est celle qui documente réellement files/jours de reruns et fins de jobs. L'outil initial, son snapshot fermé du 30 octobre et ses assertions d'intégrité sont conservés. Les changements de la présente actualisation sont strictement l'ajout du filtre `created`, d'une sélection non biaisée par SHA et des tests associés ; **aucun gate CI, archive CPC, firmware ou outil de routage n'a été modifié**.
+
+**Verdict proposé au Pilotage : `PERF_NOT_YET_VERIFIED`.** L'échantillon satisfait le nombre de HEADs distincts post-déploiement, pas le seuil de comparabilité/indépendance nécessaire pour certifier `P95<5 min` ni un gain global. Les mesures elles-mêmes sont auditables ; le gel ou la clôture de la revendication reste exclusivement au Pilotage.

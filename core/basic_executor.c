@@ -67,6 +67,23 @@ static BEStatus emit_ink_event(BEEventEmitter *events, uint8_t ink,
     return BE_OK;
 }
 
+/* J1.21-B2: CLS has no payload. Preserve the historical event layout;
+ * its ordering is represented by the already-existing print_offset. */
+static BEStatus emit_clear_event(BEEventEmitter *events, size_t print_offset)
+{
+    if (events->length == SIZE_MAX) return BE_NO_EVENT_SPACE;
+    if (events->data != NULL) {
+        BEVideoEvent *event = &events->data[events->length];
+        event->type = BE_VIDEO_CLEAR_TEXT;
+        event->pen = 0u;
+        event->ink = 0u;
+        event->colour = 0u;
+        event->print_offset = print_offset;
+    }
+    ++events->length;
+    return BE_OK;
+}
+
 /* Distinct-object relational pointer comparisons are undefined by C99.
  * uintptr_t is available on Linux/ESP32; otherwise caller guarantees
  * disjointness. All nonzero spans must describe valid accessible objects. */
@@ -762,7 +779,10 @@ static BEStatus execute_line(const BasicProgram *program,
             return comment_end(body, length, pos + 1u,
                                line->next_offset, next);
         }
-        if (token == 0xbbu) { /* PEN immediate, not a byte-stream escape. */
+        if (token == 0x8au) { /* CPC CLS: no direct firmware side effect. */
+            status = emit_clear_event(events, out->length);
+            if (status != BE_OK) return status;
+        } else if (token == 0xbbu) { /* PEN immediate, not a byte-stream escape. */
             uint8_t pen;
             status = pen_argument(body, length, &pos, &pen);
             if (status != BE_OK) return status;

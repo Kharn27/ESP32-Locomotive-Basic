@@ -44,13 +44,15 @@ typedef enum {
  * pen is a logical CPC argument, NOT a MODE renderer palette index.
  * SET_INK changes logical palette mapping; the renderer may need to
  * recolour already-drawn pixels, not just future PRINT bytes.
+ * CLS clears a video text domain at print_offset, never a PRINT escape.
  * No RGB table, colour rendering, or blinking is provided by core.
  * The three historical fields retain their offsets and initializer order.
  * Appended ink/colour fields increase sizeof(BEVideoEvent); consumers
  * must recompile and budgets must reflect the caller-owned array size. */
 typedef enum {
     BE_VIDEO_SET_TEXT_PEN = 1,
-    BE_VIDEO_SET_INK = 2
+    BE_VIDEO_SET_INK = 2,
+    BE_VIDEO_CLEAR_TEXT = 3 /* CLS 8A: MODE1 text clear; no PRINT bytes */
 } BEVideoEventType;
 typedef struct {
     BEVideoEventType type;
@@ -151,7 +153,7 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
 
 /* Exactly one stored BASIC line per call. Explicit ordered video side channel,
  * fixed caller-owned capacity; no allocation or hardware dependency.
- * events=NULL is allowed only for capacity=0; a reached PEN or INK returns
+ * events=NULL is allowed only for capacity=0; reached PEN, INK or CLS returns
  * BE_EVENT_RECEIVER_REQUIRED without consuming anything.
  * On BE_OK *written and *event_written report counts (including zeros).
  * On all errors and BE_END neither count, buffer, cursor nor store changes.

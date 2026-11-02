@@ -40,9 +40,9 @@ static uint8_t *s_band;
 static bool s_bus_owned, s_fault;
 /* A1-P1 diagnostics only: no active VSCR at boot. */
 static bool s_vscr_active;
-static CydVscrPlan s_vscr_plan;
-static uint16_t s_vscr_offset;
-static unsigned s_vscr_params, s_vscr_marker_writes;
+/* No persistent plan copy: 200-line VSA and other geometry are constants. */
+static uint16_t s_vscr_tfa, s_vscr_offset;
+static uint16_t s_vscr_params, s_vscr_marker_writes;
 static unsigned s_active_case = UINT_MAX;
 static int s_width = LCD_NATIVE_W, s_height = LCD_NATIVE_H;
 static unsigned s_transfers, s_timeouts;
@@ -73,7 +73,7 @@ static esp_err_t vscr_param(uint8_t cmd,const uint8_t *params,size_t n)
     if(!s_panel || !s_io || !s_done || s_fault) return ESP_ERR_INVALID_STATE;
     /* All callers execute in the sole CONSOLE task between completed DMA sends. */
     const esp_err_t err=esp_lcd_panel_io_tx_param(s_io,cmd,params,n);
-    if(err==ESP_OK) ++s_vscr_params;
+    if(err==ESP_OK && s_vscr_params!=UINT16_MAX) ++s_vscr_params;
     return vscr_latch(err);
 }
 uint8_t *cyd_lcd_band(void)
@@ -304,7 +304,7 @@ esp_err_t cyd_lcd_vscr_probe_begin(unsigned visible_start)
     const uint8_t pos[2]={(uint8_t)(plan.tfa>>8U),(uint8_t)plan.tfa};
     err=vscr_param(0x37U,pos,sizeof(pos));
     if(err!=ESP_OK) return err;
-    s_vscr_plan=plan;
+    s_vscr_tfa=plan.tfa;
     s_vscr_offset=0U;
     s_vscr_active=true;
     return ESP_OK;
@@ -315,7 +315,7 @@ esp_err_t cyd_lcd_vscr_probe_shift(int direction,unsigned rows)
     if(!s_vscr_active || s_fault ||
        !cyd_vscr_advance(s_vscr_offset,direction,rows,&next))
         return ESP_ERR_INVALID_ARG;
-    const uint16_t vsp=(uint16_t)(s_vscr_plan.tfa+next);
+    const uint16_t vsp=(uint16_t)(s_vscr_tfa+next);
     const uint8_t pos[2]={(uint8_t)(vsp>>8U),(uint8_t)vsp};
     const esp_err_t err=vscr_param(0x37U,pos,sizeof(pos));
     if(err==ESP_OK) s_vscr_offset=next;
@@ -324,6 +324,9 @@ esp_err_t cyd_lcd_vscr_probe_shift(int direction,unsigned rows)
 esp_err_t cyd_lcd_vscr_probe_marker(void)
 {
     if(!s_vscr_active || s_fault || !s_band) return ESP_ERR_INVALID_STATE;
+    CydVscrPlan plan;
+    if(!cyd_vscr_plan(10U,320U,240U,(unsigned)s_vscr_tfa-20U,&plan))
+        return ESP_ERR_INVALID_STATE;
     const uint8_t column[4]={0U,96U,0U,223U};
     for(unsigned i=0U;i<128U;++i) {
         s_band[2U*i]=0xFFU;
@@ -334,7 +337,7 @@ esp_err_t cyd_lcd_vscr_probe_marker(void)
      */
     for(unsigned y=208U;y<216U;++y) {
         uint16_t addr=0U;
-        if(!cyd_vscr_address(&s_vscr_plan,s_vscr_offset,y,&addr))
+        if(!cyd_vscr_address(&plan,s_vscr_offset,y,&addr))
             return ESP_ERR_INVALID_STATE;
         const uint8_t page[4]={(uint8_t)(addr>>8U),(uint8_t)addr,
                                (uint8_t)(addr>>8U),(uint8_t)addr};
@@ -349,7 +352,7 @@ esp_err_t cyd_lcd_vscr_probe_marker(void)
         }
         if(vscr_latch(err)!=ESP_OK) return err;
         ++s_transfers;
-        ++s_vscr_marker_writes;
+        if(s_vscr_marker_writes!=UINT16_MAX) ++s_vscr_marker_writes;
     }
     return ESP_OK;
 }
@@ -360,8 +363,8 @@ esp_err_t cyd_lcd_vscr_probe_restore(void)
     /* Canonical default: zero scroll offset, VSCRDEF covering full 320 GRAM.
      * If any command fails, sticky fault + BL off; NEVER retry or repaint.
      */
-    const uint8_t anchor[2]={(uint8_t)(s_vscr_plan.tfa>>8U),
-                              (uint8_t)s_vscr_plan.tfa};
+    const uint8_t anchor[2]={(uint8_t)(s_vscr_tfa>>8U),
+                              (uint8_t)s_vscr_tfa};
     const uint8_t full[6]={0U,0U,1U,64U,0U,0U};
     const uint8_t zero[2]={0U,0U};
     esp_err_t err=vscr_param(0x37U,anchor,sizeof(anchor));

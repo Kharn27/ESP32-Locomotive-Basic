@@ -723,13 +723,25 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 index += 3u;
                 if (index == length) return BT_UNSUPPORTED_CONSTRUCT;
             }
-            if (stream8 && !keyword_matches(source, length, index, "ABS", &count) &&
+            if (stream8 && !(length - index >= 9u &&
+                memcmp(source + index, "\"VALUE=\";", 9u) == 0) &&
+                !keyword_matches(source, length, index, "ABS", &count) &&
                 !(length - index == 2u && source[index] == (uint8_t)'B' &&
                   source[index + 1u] == (uint8_t)'%') &&
                 !(length - index == 2u && source[index] == (uint8_t)'8' &&
                   source[index + 1u] == (uint8_t)'8'))
                 return BT_UNSUPPORTED_CONSTRUCT;
-            if (keyword_matches(source, length, index, "ABS", &count)) {
+            if (stream8 && length - index >= 9u &&
+                memcmp(source + index, "\"VALUE=\";", 9u) == 0) {
+                size_t i;
+                for (i = 0u; i < 9u; ++i) {
+                    status = emit(out, source[index + i]);
+                    if (status != BT_OK) return status;
+                }
+                index += 9u;
+                status = explicit_variable(source, length, &index, out,
+                                           BVR_TYPE_INTEGER);
+            } else if (keyword_matches(source, length, index, "ABS", &count)) {
                 status = abs_expression(source, length, &index, out, 1);
             } else if (source[index] == (uint8_t)'"') {
                 status = quoted_string(source, length, &index, out);

@@ -8,6 +8,10 @@
 
 /* At most 128 BASIC steps per host turn. Owner yields/polls between turns. */
 #define HW4_RUN_QUANTUM_MAX 128u
+/* B2b: static, caller-owned (scheduler descriptor) preview staging. Separate
+ * from public output/event arrays. CONSOLE owns a static scheduler; no heap. */
+#define HW4_RUN_PREVIEW_BYTES 4096u
+#define HW4_RUN_PREVIEW_EVENTS 8u
 typedef enum {
     HW4_RUN_IDLE = 0, HW4_RUN_RUNNING, HW4_RUN_YIELDED,
     HW4_RUN_BREAK_REQUESTED, HW4_RUN_BROKEN, HW4_RUN_ENDED,
@@ -15,7 +19,8 @@ typedef enum {
 } Hw4RunState;
 typedef enum {
     HW4_RUN_DISPLAY_NONE = 0, HW4_RUN_DISPLAY_PREFLIGHT_FAILED,
-    HW4_RUN_DISPLAY_REPLAY_FAILED
+    HW4_RUN_DISPLAY_REPLAY_FAILED,
+    HW4_RUN_DISPLAY_COMMIT_MISMATCH
 } Hw4RunDisplayFailure;
 
 /* Mandatory PRECHECK is read-only. REPLAY must consume ordered PRINT slices
@@ -42,6 +47,10 @@ typedef struct {
     size_t total_steps; /* saturating statistic, not a total execution cap */
     unsigned stop_calls;
     bool break_pending;
+    uint8_t preview_output[HW4_RUN_PREVIEW_BYTES];
+    BEVideoEvent preview_events[HW4_RUN_PREVIEW_EVENTS];
+    size_t preview_written;
+    size_t preview_event_written;
 } Hw4RunScheduler;
 typedef struct {
     Hw4RunState state;
@@ -53,7 +62,13 @@ typedef struct {
 bool hw4_run_scheduler_init(Hw4RunScheduler *scheduler,
                             BasicSessionRuntime *runtime);
 bool hw4_run_scheduler_request_break(Hw4RunScheduler *scheduler);
-/* No mutation on bad quantum/arguments. A valid YIELD never calls bsr_stop.
+/* Staging arrays are part of the caller-owned scheduler. For CONSOLE this is
+ * static; pass capacities <= HW4_RUN_PREVIEW_BYTES/EVENTS. A preflight reject
+ * leaves public output/events/counts untouched, as does a preview failure.
+ * After preflight, commit into public arrays; compare before video replay.
+ * A post-commit divergence fails closed (no replay), NOT a BASIC rollback.
+ * A failed replay is fail-stop; pixels already applied are not reversible.
+ * No mutation on bad quantum/arguments. A valid YIELD never calls bsr_stop.
  * Failed BSR or display status terminates driver without auto-stopping BSR:
  * owner can examine exact PEN error provenance before bsr_stop. */
 Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,

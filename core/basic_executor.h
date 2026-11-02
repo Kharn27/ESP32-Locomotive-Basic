@@ -35,30 +35,36 @@ typedef enum {
     BE_INVALID_PEN, /* host policy for CPC 16/-1, never CPC ERR=5 */
     BE_EVENT_RECEIVER_REQUIRED,
     BE_NO_EVENT_SPACE,
-    BE_INVALID_INK /* only four measured CPC boundaries, host diagnostic */
+    BE_INVALID_INK, /* only four measured CPC boundaries, host diagnostic */
+    BE_INVALID_PAPER /* J1.19-A: host cause, NOT CPC numeric ERR=5 */
 } BEStatus;
 
 /* Typed, caller-owned video event, never encoded in PRINT.
  * print_offset counts PRINT bytes preceding the event within this step;
  * the caller can replay ordered PRINT slices and events.
  * pen is a logical CPC argument, NOT a MODE renderer palette index.
+ * SET_TEXT_PAPER has a tagged, logical CPC index in the existing ink byte;
+ * pen remains ZERO, so old PEN payloads are never reinterpreted.
+ * The event type, not the payload field name, determines its semantics.
  * SET_INK changes logical palette mapping; the renderer may need to
  * recolour already-drawn pixels, not just future PRINT bytes.
  * CLS clears a video text domain at print_offset, never a PRINT escape.
  * No RGB table, colour rendering, or blinking is provided by core.
  * The three historical fields retain their offsets and initializer order.
- * Appended ink/colour fields increase sizeof(BEVideoEvent); consumers
- * must recompile and budgets must reflect the caller-owned array size. */
+ * Existing ABI remains unchanged: no new fields or shifted offsets.
+ * The TEXT_PAPER type deliberately uses the existing logical-index payload;
+ * HW4 consumers must reject unknown types during preflight. */
 typedef enum {
     BE_VIDEO_SET_TEXT_PEN = 1,
     BE_VIDEO_SET_INK = 2,
-    BE_VIDEO_CLEAR_TEXT = 3 /* CLS 8A: MODE1 text clear; no PRINT bytes */
+    BE_VIDEO_CLEAR_TEXT = 3, /* CLS 8A: text clear; no PRINT bytes */
+    BE_VIDEO_SET_TEXT_PAPER = 4 /* PAPER BA: logical CPC text background */
 } BEVideoEventType;
 typedef struct {
     BEVideoEventType type;
     uint8_t pen; /* historical PEN argument; zero for SET_INK */
     size_t print_offset; /* original third field: preserve positional initializers */
-    uint8_t ink; /* CPC logical palette index, not MODE pixel index */
+    uint8_t ink; /* SET_INK: palette index; SET_TEXT_PAPER: logical paper */
     uint8_t colour; /* CPC colour code, NOT an RGB or renderer value */
 } BEVideoEvent;
 
@@ -153,7 +159,7 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
 
 /* Exactly one stored BASIC line per call. Explicit ordered video side channel,
  * fixed caller-owned capacity; no allocation or hardware dependency.
- * events=NULL is allowed only for capacity=0; reached PEN, INK or CLS returns
+ * events=NULL is allowed only for capacity=0; reached PEN/INK/CLS/PAPER returns
  * BE_EVENT_RECEIVER_REQUIRED without consuming anything.
  * On BE_OK *written and *event_written report counts (including zeros).
  * On all errors and BE_END neither count, buffer, cursor nor store changes.

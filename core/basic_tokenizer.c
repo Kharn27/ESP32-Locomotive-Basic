@@ -478,6 +478,8 @@ static int logical_keyword_in_source(const uint8_t *src, size_t length,
     static const char *const words[] = {"AND", "OR", "XOR", "NOT"};
     for (i = start; i < length; ++i) {
         size_t j;
+        if (src[i] == (uint8_t)':' || src[i] == (uint8_t)'"') break;
+        if (keyword_matches(src, length, i, "THEN", &used)) break;
         if (i > start && identifier_continuation(src[i - 1u])) continue;
         for (j = 0u; j < sizeof(words) / sizeof(words[0]); ++j)
             if (keyword_matches(src, length, i, words[j], &used)) return 1;

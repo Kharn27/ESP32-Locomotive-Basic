@@ -1,5 +1,6 @@
 #include "hw4_run_scheduler.h"
 #include <stdint.h>
+#include <string.h>
 
 static Hw4RunSlice outcome(Hw4RunState state, size_t steps)
 {
@@ -20,6 +21,8 @@ bool hw4_run_scheduler_init(Hw4RunScheduler *scheduler,
     scheduler->total_steps = 0u;
     scheduler->stop_calls = 0u;
     scheduler->break_pending = false;
+    scheduler->preview_written = 0u;
+    scheduler->preview_event_written = 0u;
     return true;
 }
 
@@ -36,7 +39,8 @@ bool hw4_run_scheduler_request_break(Hw4RunScheduler *scheduler)
 
 static bool arguments_ok(const Hw4RunScheduler *scheduler, size_t quantum,
                          const Hw4RunReceiver *receiver,
-                         const uint8_t *output, const size_t *written,
+                         const uint8_t *output, size_t output_capacity,
+                         const size_t *written,
                          const BEVideoEvent *events, size_t event_capacity,
                          const size_t *event_written)
 {
@@ -51,7 +55,9 @@ static bool arguments_ok(const Hw4RunScheduler *scheduler, size_t quantum,
            receiver->replay != NULL && output != NULL && written != NULL &&
            event_written != NULL &&
            (events != NULL || event_capacity == 0u) &&
-           event_capacity <= SIZE_MAX / sizeof(*events);
+           event_capacity <= SIZE_MAX / sizeof(*events) &&
+           output_capacity <= HW4_RUN_PREVIEW_BYTES &&
+           event_capacity <= HW4_RUN_PREVIEW_EVENTS;
 }
 
 Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
@@ -61,7 +67,7 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
                                    size_t event_capacity, size_t *event_written)
 {
     size_t steps = 0u;
-    if (!arguments_ok(scheduler, quantum, receiver, output, written,
+    if (!arguments_ok(scheduler, quantum, receiver, output, output_capacity, written,
                       events, event_capacity, event_written))
         return outcome(HW4_RUN_INVALID_ARGUMENT, 0u);
 
@@ -80,34 +86,76 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
             scheduler->break_pending = false;
             return outcome(scheduler->state, steps);
         }
-        step = bsr_step_events(scheduler->runtime, output, output_capacity,
-                               written, events, event_capacity, event_written);
+        /* Stage on B2a's side-effect-free executor before asking VIDEO.
+         * Neither output nor events (nor their public lengths) are touched. */
+        step = bsr_preview_step_events(
+            scheduler->runtime, scheduler->preview_output, output_capacity,
+            &scheduler->preview_written, scheduler->preview_events,
+            event_capacity, &scheduler->preview_event_written);
         scheduler->last_result = step;
         if (step.status == BSR_END) {
+            /* Only commit advances RUNNING -> IDLE; no video for END. */
+            BSRResult end = bsr_step_events(scheduler->runtime, output,
+                                            output_capacity, written, events,
+                                            event_capacity, event_written);
+            scheduler->last_result = end;
+            if (end.status != BSR_END || end.executor_status != step.executor_status) {
+                scheduler->display_failure = HW4_RUN_DISPLAY_COMMIT_MISMATCH;
+                scheduler->state = HW4_RUN_DISPLAY_ERROR;
+                return outcome(HW4_RUN_DISPLAY_ERROR, steps);
+            }
             scheduler->state = HW4_RUN_ENDED;
             return outcome(HW4_RUN_ENDED, steps);
         }
         if (step.status != BSR_OK) {
-            /* BSR_INVALID_ARGUMENT and BSR_OVERLAP are host contracts,
-             * never BASIC faults or CPC ERR/ERL. Keep original BSRResult
-             * intact and never stop/reset: caller owns diagnosis/recovery. */
+            /* Preview faults preserve the public buffers and BASIC state.
+             * Keep original provenance (in particular BSR_OVERLAP). */
             if (step.status == BSR_INVALID_ARGUMENT ||
                 step.status == BSR_OVERLAP) {
                 scheduler->state = HW4_RUN_INVALID_ARGUMENT;
                 return outcome(HW4_RUN_INVALID_ARGUMENT, steps);
             }
-            /* Genuine executor failure: retain RUNNING + cursor for #195. */
             scheduler->state = HW4_RUN_EXECUTOR_ERROR;
             return outcome(HW4_RUN_EXECUTOR_ERROR, steps);
         }
-        ++steps;
-        if (scheduler->total_steps != SIZE_MAX) ++scheduler->total_steps;
-        if (!receiver->preflight(receiver->context, output, *written,
-                                 events, *event_written)) {
+        if (!receiver->preflight(receiver->context,
+                                 scheduler->preview_output,
+                                 scheduler->preview_written,
+                                 scheduler->preview_events,
+                                 scheduler->preview_event_written)) {
             scheduler->display_failure = HW4_RUN_DISPLAY_PREFLIGHT_FAILED;
             scheduler->state = HW4_RUN_DISPLAY_ERROR;
             return outcome(HW4_RUN_DISPLAY_ERROR, steps);
         }
+        /* One serialized commit: callbacks are pure and may not change
+         * borrowed BASIC state between preview and commit. */
+        {
+            const size_t preview_bytes = scheduler->preview_written;
+            const size_t preview_events = scheduler->preview_event_written;
+            size_t j;
+            bool same;
+            step = bsr_step_events(scheduler->runtime, output, output_capacity,
+                                   written, events, event_capacity, event_written);
+            scheduler->last_result = step;
+            same = step.status == BSR_OK && step.executor_status == BE_OK &&
+                   *written == preview_bytes && *event_written == preview_events;
+            if (same && preview_bytes != 0u)
+                same = memcmp(output, scheduler->preview_output, preview_bytes) == 0;
+            for (j = 0u; same && j < preview_events; ++j) {
+                const BEVideoEvent *a = &events[j];
+                const BEVideoEvent *b = &scheduler->preview_events[j];
+                same = a->type == b->type && a->pen == b->pen &&
+                       a->print_offset == b->print_offset &&
+                       a->ink == b->ink && a->colour == b->colour;
+            }
+            if (!same) {
+                scheduler->display_failure = HW4_RUN_DISPLAY_COMMIT_MISMATCH;
+                scheduler->state = HW4_RUN_DISPLAY_ERROR;
+                return outcome(HW4_RUN_DISPLAY_ERROR, steps);
+            }
+        }
+        ++steps; /* only successful verified commits count */
+        if (scheduler->total_steps != SIZE_MAX) ++scheduler->total_steps;
         if (!receiver->replay(receiver->context, output, *written,
                               events, *event_written)) {
             scheduler->display_failure = HW4_RUN_DISPLAY_REPLAY_FAILED;

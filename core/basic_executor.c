@@ -503,7 +503,7 @@ static int logic_tokens_present(const uint8_t *b, size_t length, size_t start)
     while (p < length) {
         uint8_t t = b[p];
         if (t == 0xebu) return 0; /* No scan of IF THEN arm. */
-        if (t == (uint8_t)'( || t == 0xfeu ||
+        if (t == (uint8_t)'(' || t == 0xfeu ||
             t == 0xfau || t == 0xfcu || t == 0xfdu) return 1;
         if (t == 0x02u || t == 0x03u || t == 0x04u) {
             BasicVariableRef ref;

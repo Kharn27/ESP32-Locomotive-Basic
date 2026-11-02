@@ -332,6 +332,7 @@ static int bl_logic_present(const uint8_t *body, size_t len, size_t start)
     size_t p = start;
     while (p < len) {
         uint8_t t = body[p];
+        if (t == 0xebu) return 0; /* IF THEN terminates the condition. */
         if (t == (uint8_t)'(' || t == 0xfeu ||
             t == 0xfau || t == 0xfcu || t == 0xfdu) return 1;
         if (t == 0x02u || t == 0x03u || t == 0x04u) {

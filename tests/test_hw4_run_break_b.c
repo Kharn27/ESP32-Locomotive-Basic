@@ -342,10 +342,12 @@ static int diagnostic_provenance_matrix(void)
     DIAG_CASE(wrong_next,0u,BE_NEXT_VARIABLE_MISMATCH,CPC_DIAG_NEXT_UNEXPECTED,
               CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE,20u,
               "Unexpected NEXT in 20\n","CPC_NEXT_ORACLE");
-    DIAG_CASE(goto_missing,0u,BE_MISSING_TARGET,CPC_DIAG_HOST_GENERIC,
-              CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
-    DIAG_CASE(if_missing,1u,BE_MISSING_TARGET,CPC_DIAG_HOST_GENERIC,
-              CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
+    DIAG_CASE(goto_missing,0u,BE_MISSING_TARGET,CPC_DIAG_GOTO_MISSING_TARGET,
+              CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE,10u,
+              "Line does not exist in 10\n","CPC_GOTO_ORACLE");
+    DIAG_CASE(if_missing,1u,BE_MISSING_TARGET,CPC_DIAG_IF_MISSING_TARGET,
+              CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE,20u,
+              "Line does not exist in 20\n","CPC_IF_ORACLE");
     DIAG_CASE(f9_one,1u,BE_DIVISION_BY_ZERO,CPC_DIAG_DIVISION_INTEGER_ZERO,
               CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE,20u,
               "Division by zero in 20\n","CPC_F9_ZERO_ORACLE");
@@ -359,6 +361,7 @@ static int diagnostic_provenance_matrix(void)
               CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
     /* A failed BSR status by itself can never make a CPC origin. */
     CHECK(strcmp(hw4_run_diag_source(CPC_DIAG_ORIGIN_HOST),"HOST")==0);
+    CHECK(strcmp(hw4_run_diag_source((CpcDiagOrigin)999),"HOST")==0);
     puts("HW4-RUN-BREAK-B-C2 DIAG 11/11 real BSR cases, UART provenance + TFT text");
     return 0;
 }

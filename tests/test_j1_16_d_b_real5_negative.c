@@ -333,7 +333,7 @@ static int stored_value_separation(void) {
     CHECK(send(&f,"RUN").status==BSR_OK);
     v.type=(uint8_t)BVT_REAL;
     memcpy(v.data.real5,values[2],5u);
-    v.data.real5[4]=0x81u; /* hybrid negative/sign/exponent */
+    v.data.real5[4]=0x82u; /* non-attested signed hybrid */
     CHECK(bvs_assign(&f.store,&key,&v)==BVS_OK);
     CHECK(fail(&f,BE_UNSUPPORTED,sizeof(f.output))==0);
     return 0;

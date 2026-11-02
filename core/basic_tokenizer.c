@@ -1091,7 +1091,21 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (status != BT_OK) {
                 return status;
             }
-            if (index < length && ascii_letter(source[index])) {
+            if (index < length && keyword_matches(source, length, index,
+                                                  "PRINT", &count)) {
+                status = inline_if_print8(source, length, &index, out);
+                if (status != BT_OK) return status;
+                status = spaces(source, length, &index, out);
+                if (status != BT_OK) return status;
+                if (keyword_matches(source, length, index, "ELSE", &count)) {
+                    index += count;
+                    status = emit(out, 0x01u);
+                    if (status == BT_OK) status = emit(out, 0x97u);
+                    if (status == BT_OK) status = spaces(source, length, &index, out);
+                    if (status == BT_OK)
+                        status = inline_if_print8(source, length, &index, out);
+                }
+            } else if (index < length && ascii_letter(source[index])) {
                 /* IF ... THEN C%=81 [ELSE C%=42]; 01 97 is a CPC
                  * lexical ELSE separator, not a colon supplied by source. */
                 status = inline_if_assignment(source, length, &index, out);

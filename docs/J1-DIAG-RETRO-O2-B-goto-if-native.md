@@ -10,11 +10,11 @@ Mandat : [#246](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/246). B
 - Tests : six témoins O2, GOSUB/PEN/RETURN/NEXT, `AFTER` IF faux, `LIST` intact, atomicité, `Ready` unique, erreurs falsifiées, chaînes/REM/références opaques, origine/curseur invalide, buffer trop court.
 - Aucun changement `core/`, firmware, CMake, workflow, archives CPC ou `screen_review.json`. Le raccord CONSOLE existant avant `bsr_stop()` est conservé.
 
-**Réserve UART :** le logger firmware existant reconnaît les provenances PEN, GOSUB et RETURN, mais pas encore les provenances GOTO/IF. Les catégories `GOTO_MISSING_TARGET_CPC` et `IF_TAKEN_MISSING_TARGET_CPC` et le texte écran sont discriminants ; le champ log historique `origin` peut afficher `HOST_NOT_CPC_ERR` à tort. Le fichier firmware est laissé intact conformément au mandat ; demander au Pilotage si une dérogation doit être envisagée.
+**Raccord UART C1 autorisé par Pilotage (#247, commentaire #6575844646) :** `integration/hw4_run_diag_source.h` distingue explicitement `CPC_GOTO_ORACLE` et `CPC_IF_ORACLE` sans toucher au firmware, et `tests/test_hw4_run_break_b.c` contrôle les deux vrais scénarios GOTO/IF (catégorie, origine, ligne, texte exact, Ready unique) et le repli `HOST` pour une origine hors domaine. Les mappings PEN/GOSUB/RETURN/NEXT/F9 et le témoin MOD restent inchangés. Aucune réécriture des origines par `BEStatus` seul.
 
 ## Matrice oracle imposée
 
-Chaque programme est précédé de `NEW`, puis exécuté avec `RUN`. Résultats issus de #246 / [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) ; captures CPC ROM/Caprice32 acquises, **revue humaine formelle encore en attente**.
+Chaque programme est précédé de `NEW`, puis exécuté avec `RUN`. Résultats issus de #246 / [#237](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/237) ; captures CPC ROM/Caprice32 acquises et **attestation humaine du PO désormais versionnée dans #237 fusionnée**.
 
 | Programme | Sortie après RUN (avant Ready unique) | ERR/ERL oracle |
 |---|---|---|
@@ -38,7 +38,7 @@ Chaque programme est précédé de `NEW`, puis exécuté avec `RUN`. Résultats 
 
 Comparer à configuration et toolchain identiques les `idf.py size` CONSOLE de `main@5d43a9c7…` et de la PR au HEAD exact (Flash Code, image, IRAM, DRAM) avec liens vers les jobs. Heap, marge pile, DMA, LCD requièrent des preuves **physiques** ; ne pas inventer de nombres.
 
-A2 [#243](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/243) intégrée à `main@f3d11eb8a8723a85f08bb5317852a594780c831a`. Réconciliation non destructive par commit à deux parents sur branche O2-B : conserver F9/FB et valeurs historiques des catégories/provenances ; revérifier le corpus F9/MOD et les cinq CI sur ce HEAD. Oracle #237 toujours distinct, en attente de revue humaine et fusion Pilotage.
+A2 [#243](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/243) intégrée à `main@f3d11eb8a8723a85f08bb5317852a594780c831a`. Réconciliation non destructive par commit à deux parents sur branche O2-B : conserver F9/FB et valeurs historiques des catégories/provenances ; revérifier le corpus F9/MOD et les cinq CI sur ce HEAD. Oracle #237 intégré par Pilotage dans `main@08447cedcbbd2c9d66fcb2555184d9bca773c5fe` ; attestation PO versionnée. Les contrôles officiels A0/O2 et les CI du HEAD final #247 restent à fournir dans la remise développeur.
 
 ## Protocole PO — après gel SHA et feu vert Pilotage exclusivement
 

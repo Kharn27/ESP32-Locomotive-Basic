@@ -1,0 +1,116 @@
+name: HW4-ESC-ORACLE-R1 independent CPC keyboard candidate
+on:
+  pull_request:
+    paths:
+      - 'tests/oracles/hw4_esc_r1_capture.py'
+      - 'tests/oracles/hw4_esc_r1_verify.py'
+      - 'tests/fixtures/cpc6128/hw4_esc_r1/**'
+      - 'docs/HW4-ESC-ORACLE-R1.md'
+      - '.github/workflows/hw4-esc-oracle-r1.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: read
+
+# An archive-producing acquisition must not be cancelled by the next PR commit.
+concurrency:
+  group: hw4-esc-r1-cpc-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sealed-originals:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Permanent R1 29 PNG archive and external manifest seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '5eff0daedd5d41d37f05848c02913de3bf8aa4b47009a43a6986095d54b3e850  tests/fixtures/cpc6128/hw4_esc_r1/manifest.json' | sha256sum --check --status
+          python3 tests/oracles/hw4_esc_r1_verify.py --evidence tests/fixtures/cpc6128/hw4_esc_r1 --expected-manifest-sha256 5eff0daedd5d41d37f05848c02913de3bf8aa4b47009a43a6986095d54b3e850 --self-test
+          echo 'R1_C1_PERMANENT_ORIGINALS_AND_EXTERNAL_SEAL_PASS'
+  acquire:
+    # A new acquisition is never launched by a PR archive/verifier edit.
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'oracle/hw4-esc-r1-cpc'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: true
+      - name: Pin CPC source, ROM, interpreter and PR HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d ' ' -f 1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          python3 -m py_compile tests/oracles/hw4_esc_r1_capture.py tests/oracles/hw4_esc_r1_verify.py
+      - name: Acquire each ROM-backed ESC session and original PNGs (candidates only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/hw4_esc_r1_capture.py \
+            --caprice tests/oracles/caprice32 \
+            --output /tmp/hw4-esc-r1-captures
+      - name: Verify original files and prove tamper rejection (no CPC verdict)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/oracles/hw4_esc_r1_verify.py --evidence /tmp/hw4-esc-r1-captures --self-test
+      - name: Archive candidate original PNGs, source stamps and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hw4-esc-oracle-r1-candidate-${{ github.run_id }}
+          path: /tmp/hw4-esc-r1-captures/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Publish new independent originals on this PR branch only (anti-race)
+        if: success() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          DEST=tests/fixtures/cpc6128/hw4_esc_r1
+          if test -e "$DEST"; then
+            python3 tests/oracles/hw4_esc_r1_verify.py --evidence "$DEST" --self-test
+            echo 'R1_ORIGINAL_ARCHIVE_ALREADY_EXISTS_NOT_OVERWRITTEN'
+            exit 0
+          fi
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          REMOTE_HEAD="$(git ls-remote --exit-code origin refs/heads/oracle/hw4-esc-r1-cpc | cut -f 1)"
+          test "$REMOTE_HEAD" = "$EXPECTED_HEAD"
+          mkdir -p tests/fixtures/cpc6128
+          cp -a /tmp/hw4-esc-r1-captures "$DEST"
+          python3 tests/oracles/hw4_esc_r1_verify.py --evidence "$DEST" --self-test
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$DEST"
+          git commit -m 'test(hw4-esc-r1): archive original CPC ESC PNGs and SHA manifests'
+          test "$(git ls-remote --exit-code origin refs/heads/oracle/hw4-esc-r1-cpc | cut -f 1)" = "$EXPECTED_HEAD"
+          git push origin HEAD:refs/heads/oracle/hw4-esc-r1-cpc
+          echo 'R1_NEW_ORIGINAL_ARCHIVE_PUSHED_TO_PR_BRANCH'

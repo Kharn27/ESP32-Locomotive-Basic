@@ -527,19 +527,21 @@ static void test_c1_run_stop(void)
 /* C1-RUN-STOP-C2: read the actual production function's last return,
  * then use it with real BSR steps and the shared RUN action. This is not
  * a mocked return: the known bad firmware 'return true' becomes enum 1. */
+/* B: the CONSOLE now uses a bool replay callback, not an enum display
+ * function. Verify its exact success condition in production source;
+ * a literal 'return true' or 'return HW4_PEN_DISPLAY_OK' fails closed. */
 static Hw4PenDisplayResult c2_firmware_display_success(void)
 {
     const char *path=getenv("HW4_PEN_C2_CONSOLE_SOURCE");
     char line[512];
     bool in_function=false,ended=false,found=false;
-    Hw4PenDisplayResult result=HW4_PEN_DISPLAY_FATAL;
     FILE *file;
     assert(path!=NULL);
     file=fopen(path,"rb");
     assert(file!=NULL);
     while(fgets(line,sizeof(line),file)!=NULL) {
         if(!in_function) {
-            if(strstr(line,"static Hw4PenDisplayResult display_print_events(")!=NULL)
+            if(strstr(line,"static bool run_replay(")!=NULL)
                 in_function=true;
             continue;
         }
@@ -547,17 +549,15 @@ static Hw4PenDisplayResult c2_firmware_display_success(void)
             ended=true;
             break;
         }
-        if(strstr(line,"return true;")!=NULL) {
-            result=(Hw4PenDisplayResult)true;
+        if(strstr(line,"return s_run_video_failure==HW4_PEN_OK;")!=NULL)
             found=true;
-        } else if(strstr(line,"return HW4_PEN_DISPLAY_OK;")!=NULL) {
-            result=HW4_PEN_DISPLAY_OK;
-            found=true;
-        }
+        if(strstr(line,"return true;")!=NULL ||
+           strstr(line,"return HW4_PEN_DISPLAY_OK;")!=NULL)
+            found=false;
     }
     assert(fclose(file)==0);
     assert(in_function && ended && found);
-    return result;
+    return HW4_PEN_DISPLAY_OK;
 }
 
 static void test_c1_c2_successive_pen_lines_reach_end(void)

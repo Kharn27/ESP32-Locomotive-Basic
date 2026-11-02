@@ -37,6 +37,10 @@ target_link_libraries(basic_session_runtime PUBLIC basic_session basic_executor)
 add_library(hw4_run_scheduler STATIC integration/hw4_run_scheduler.c)
 target_include_directories(hw4_run_scheduler PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/integration)
 target_link_libraries(hw4_run_scheduler PUBLIC basic_session_runtime)
+# HW4-RUN-BREAK-B: portable bounded !BREAK host UART framing.
+add_library(hw4_run_break_input STATIC integration/hw4_run_break_input.c)
+target_include_directories(hw4_run_break_input PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/integration)
+
 
 add_library(basic_session STATIC core/basic_session.c)
 target_include_directories(basic_session PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core)
@@ -48,6 +52,13 @@ if(BUILD_TESTING)
     add_executable(test_hw4_run_scheduler tests/test_hw4_run_scheduler.c)
     target_link_libraries(test_hw4_run_scheduler PRIVATE hw4_run_scheduler)
     add_test(NAME hw4_run_break_a_cooperative_bsr COMMAND test_hw4_run_scheduler)
+    add_executable(test_hw4_run_break_b tests/test_hw4_run_break_b.c)
+    target_link_libraries(test_hw4_run_break_b PRIVATE
+        hw4_run_break_input hw4_run_scheduler hw4_pen_bridge
+        cpc_diag_policy cpc_ready_policy)
+    add_test(NAME hw4_run_break_b_uart_console_contract
+        COMMAND test_hw4_run_break_b
+          "${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main/hw4_c2_console.c")
 endif()
 # Labels are scheduled after the complete CMakeLists has registered all tests.
 if(BUILD_TESTING)

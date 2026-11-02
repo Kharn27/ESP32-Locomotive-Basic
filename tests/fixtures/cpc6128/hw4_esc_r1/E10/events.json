@@ -1,0 +1,14 @@
+{
+  "program": [],
+  "steps": [
+    "shot:boot",
+    "text:CONT\n",
+    "shot:without_context"
+  ],
+  "tail_hex": "43415033325f44454c415943415033325f44454c415943415033325f5343524e53484f5443415033325f44454c415943415033325f44454c4159434f4e540a43415033325f44454c415943415033325f44454c415943415033325f5343524e53484f5443415033325f44454c415943415033325f44454c415943415033325f45584954",
+  "checkpoint_labels": [
+    "boot",
+    "without_context"
+  ],
+  "command_provenance": "Caprice32 argv -a, macro BEL+CPC_ESC enum; no host UART"
+}

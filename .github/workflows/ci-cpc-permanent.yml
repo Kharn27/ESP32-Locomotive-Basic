@@ -22,6 +22,13 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: HW4-ESC-R1-C1 permanently sealed original manifest and 29 CPC PNGs
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '5eff0daedd5d41d37f05848c02913de3bf8aa4b47009a43a6986095d54b3e850  tests/fixtures/cpc6128/hw4_esc_r1/manifest.json' | sha256sum --check --status
+          python3 tests/oracles/hw4_esc_r1_verify.py --evidence tests/fixtures/cpc6128/hw4_esc_r1 --expected-manifest-sha256 5eff0daedd5d41d37f05848c02913de3bf8aa4b47009a43a6986095d54b3e850 --self-test
+          echo 'R1_C1_UNFILTERED_PERMANENT_ARCHIVE_PASS'
       - name: J0 provenance, SHA, printer/RUN/LIST and coordinated falsifications
         shell: bash
         run: |

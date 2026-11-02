@@ -17,7 +17,7 @@ FAMILIES = {
     "C99": ("basic-program.yml", "ci-arch.yml", "ci-opt3-routing.yml"),
     "CPC_PERMANENT": ("ci-cpc-permanent.yml", "cpc-oracle.yml"),
     "CPC_ACQUISITION": (
-        "cpc-oracle-image.yml",
+        "cpc-oracle-image.yml", "hw4-esc-oracle-r1.yml",
         "j1-2-a-boundaries.yml", "j1-3-a-subtraction.yml",
         "j1-4-a-multiplication.yml", "j1-5-a-division.yml",
         "j1-6-a-mod.yml", "j1-7-a-add-vars.yml",
@@ -34,6 +34,11 @@ FAMILIES = {
     "XTENSA": ("ci-xtensa.yml",),
 }
 EXPECTED_ROUTES = {
+    "hw4-esc-oracle-r1.yml": ("tests/oracles/hw4_esc_r1_capture.py",
+        "tests/oracles/hw4_esc_r1_verify.py",
+        "tests/fixtures/cpc6128/hw4_esc_r1/**",
+        "docs/HW4-ESC-ORACLE-R1.md",
+        ".github/workflows/hw4-esc-oracle-r1.yml"),
     "j1-6-a-mod.yml": ("tools/j1_6_mod_verify.py", "tests/fixtures/cpc6128/j1_integer_mod/**"),
     "j1-7-a-add-vars.yml": ("tools/j1_7_add_vars_verify.py", "tests/fixtures/cpc6128/j1_integer_add_vars/**"),
     "j1-8-a-sub-vars.yml": ("tools/j1_8_sub_vars_verify.py", "tests/fixtures/cpc6128/j1_integer_sub_vars/**"),
@@ -70,6 +75,32 @@ PAPER_IMAGE = ("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
                "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c")
 PAPER_ROM = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
 PAPER_CAPRICE = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+
+R1_WORKFLOW = "hw4-esc-oracle-r1.yml"
+R1_MANIFEST = "tests/fixtures/cpc6128/hw4_esc_r1/manifest.json"
+R1_VERIFIER = "tests/oracles/hw4_esc_r1_verify.py"
+# Independent seal; not derived from mutable archive JSON.
+R1_SEAL = "5eff0daedd5d41d37f05848c02913de3bf8aa4b47009a43a6986095d54b3e850"
+R1_SEAL_COMMAND = ("echo '" + R1_SEAL + "  " + R1_MANIFEST +
+                   "' | sha256sum --check --status")
+R1_VERIFY_COMMAND = ("python3 " + R1_VERIFIER +
+    " --evidence tests/fixtures/cpc6128/hw4_esc_r1"
+    " --expected-manifest-sha256 " + R1_SEAL + " --self-test")
+R1_SEALED_STEP = """      - name: Permanent R1 29 PNG archive and external manifest seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          """ + R1_SEAL_COMMAND + """
+          """ + R1_VERIFY_COMMAND + """
+          echo 'R1_C1_PERMANENT_ORIGINALS_AND_EXTERNAL_SEAL_PASS'"""
+R1_PERMANENT_STEP = """      - name: HW4-ESC-R1-C1 permanently sealed original manifest and 29 CPC PNGs
+        shell: bash
+        run: |
+          set -euo pipefail
+          """ + R1_SEAL_COMMAND + """
+          """ + R1_VERIFY_COMMAND + """
+          echo 'R1_C1_UNFILTERED_PERMANENT_ARCHIVE_PASS'"""
+
 
 
 # Exact in-job command contract. Never accept a grep match in an acquisition job.
@@ -160,7 +191,7 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(expected) == 32 and len(set(expected)) == 32,
+    demand(len(expected) == 33 and len(set(expected)) == 33,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(set(sources) == set(expected), "UNKNOWN_OR_MISSING_WORKFLOW")
     a0_paths = filters(sources[HW4_A0])
@@ -206,6 +237,7 @@ def audit(sources):
     audit_paper_permanent(sources)
     audit_cls_route(sources)
     audit_cls_permanent(sources)
+    audit_r1_permanent(sources)
     ea = (ROOT / "tools/j1_16_e_a_store.py").read_text()
     da = (ROOT / "tools/j1_16_d_a_store.py").read_text()
     demand("SEALED_E_A_ARCHIVE_MISMATCH" in ea and
@@ -213,6 +245,102 @@ def audit(sources):
            "SEALED_D_A_ARCHIVE_MISMATCH" in da,
            "E_A_C1_OR_D_A_SEAL_LOST")
 
+
+
+
+def r1_exact_step(job, expected, code):
+    header = expected.split("\n", 1)[0]
+    demand(job.count(header) == 1, code + "_MISSING")
+    tail = job.split(header, 1)[1]
+    boundary = re.search(r"(?m)^      - ", tail)
+    actual = header + (tail[:boundary.start()] if boundary else tail)
+    demand(actual.rstrip() == expected, code + "_ALTERED")
+
+
+def audit_r1_permanent(sources):
+    """A PR cannot bypass both independently pinned R1 checks."""
+    workflow = sources[R1_WORKFLOW]
+    required = EXPECTED_ROUTES[R1_WORKFLOW]
+    actual = filters(workflow)
+    demand(actual is not None and len(actual) == len(required)
+           and set(actual) == set(required), "R1_MANDATORY_FILTER_SET_MISMATCH")
+    demand("  push:\n    branches: [main]" in workflow,
+           "R1_MAIN_PUSH_MISSING")
+    marker = "\n  sealed-originals:\n"
+    demand(workflow.count(marker) == 1, "R1_SEALED_JOB_MISSING")
+    tail = workflow.split(marker, 1)[1]
+    boundary = re.search(r"(?m)^  [A-Za-z][\w-]*:[ \t]*$", tail)
+    job = tail[:boundary.start()] if boundary else tail
+    prefix = job.split("\n    steps:", 1)[0]
+    demand("    runs-on: ubuntu-24.04" in prefix
+           and not re.search(r"(?m)^    (?:if|needs|continue-on-error):",
+                             prefix),
+           "R1_SEALED_JOB_CONDITIONAL")
+    demand(job.count(R1_SEAL_COMMAND) == 1
+           and job.count(R1_VERIFY_COMMAND) == 1,
+           "R1_SEAL_COMMAND_MISSING")
+    r1_exact_step(job, R1_SEALED_STEP, "R1_SEALED_STEP")
+    demand("if: github.event_name == 'workflow_dispatch' && "
+           "github.ref_name == 'oracle/hw4-esc-r1-cpc'" in workflow,
+           "R1_UNREQUESTED_ACQUISITION")
+    permanent = sources["ci-cpc-permanent.yml"]
+    marker = "\n  sealed-evidence:\n"
+    demand(permanent.count(marker) == 1, "R1_PERMANENT_JOB_MISSING")
+    tail = permanent.split(marker, 1)[1]
+    boundary = re.search(r"(?m)^  [A-Za-z][\w-]*:[ \t]*$", tail)
+    job = tail[:boundary.start()] if boundary else tail
+    demand(job.count(R1_SEAL_COMMAND) == 1
+           and job.count(R1_VERIFY_COMMAND) == 1,
+           "R1_PERMANENT_SEAL_MISSING")
+    r1_exact_step(job, R1_PERMANENT_STEP, "R1_PERMANENT_STEP")
+
+
+def r1_negative_tests(sources):
+    """Only in-memory workflow mutations; original files never touched."""
+    original = sources[R1_WORKFLOW]
+    for required in EXPECTED_ROUTES[R1_WORKFLOW]:
+        needle = "      - '" + required + "'\n"
+        demand(needle in original, "R1_NEGATIVE_INERT_" + required)
+        altered = {**sources, R1_WORKFLOW: original.replace(needle, "", 1)}
+        try:
+            audit_r1_permanent(altered)
+        except UnsafeRoute as exc:
+            demand(str(exc) == "R1_MANDATORY_FILTER_SET_MISMATCH",
+                   "R1_FILTER_WRONG_REJECTION_" + required + ":" + str(exc))
+        else:
+            raise UnsafeRoute("R1_REMOVED_FILTER_ACCEPTED_" + required)
+        print("CI-OPT3 R1_FILTER_REMOVAL_REJECTED", required)
+    for label, workflow, before, after, expected in (
+        ("SEALED_JOB_SKIPPED", R1_WORKFLOW,
+         "  sealed-originals:\n    runs-on:",
+         "  sealed-originals:\n    if: false\n    runs-on:",
+         "R1_SEALED_JOB_CONDITIONAL"),
+        ("R1_SEAL_CHANGED", R1_WORKFLOW, R1_SEAL_COMMAND,
+         R1_SEAL_COMMAND.replace(R1_SEAL, "0" * 64),
+         "R1_SEAL_COMMAND_MISSING"),
+        ("PERMANENT_SEAL_CHANGED", "ci-cpc-permanent.yml",
+         R1_SEAL_COMMAND, R1_SEAL_COMMAND.replace(R1_SEAL, "0" * 64),
+         "R1_PERMANENT_SEAL_MISSING"),
+        ("PERMANENT_STEP_REMOVED", "ci-cpc-permanent.yml",
+         R1_PERMANENT_STEP + "\n", "",
+         "R1_PERMANENT_SEAL_MISSING"),
+    ):
+        src = sources[workflow]
+        demand(before in src, "R1_NEGATIVE_INERT_" + label)
+        altered = {**sources, workflow: src.replace(before, after, 1)}
+        try:
+            audit_r1_permanent(altered)
+        except UnsafeRoute as exc:
+            demand(str(exc) == expected,
+                   "R1_NEGATIVE_WRONG_REJECTION_" + label + ":" + str(exc))
+        else:
+            raise UnsafeRoute("R1_NEGATIVE_ACCEPTED_" + label)
+        print("CI-OPT3 R1_SEAL_BYPASS_REJECTED", label)
+    for proof in (R1_VERIFIER, R1_MANIFEST,
+                  "tests/fixtures/cpc6128/hw4_esc_r1/E03/screenshot_fake.png"):
+        demand(R1_WORKFLOW in triggered_names([proof], sources),
+               "R1_EVIDENCE_CHANGE_NOT_ROUTED_" + proof)
+        print("CI-OPT3 R1_EVIDENCE_PR_TRIGGER_VERIFIED", proof)
 
 
 def audit_cls_permanent(sources):
@@ -634,6 +762,7 @@ def paper_negative_tests(sources):
 
 
 def negative_tests(sources):
+    r1_negative_tests(sources)
     cls_route_negative_tests(sources)
     cls_permanent_negative_tests(sources)
     paper_negative_tests(sources)
@@ -755,7 +884,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=32 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=33 FAMILIES=5")
 
 
 if __name__ == "__main__":

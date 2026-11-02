@@ -1,4 +1,4 @@
-/* J1.20-B1: exact CPC RAM oracle + semantic LIST only, never RUN ABS.
+/* J1.20-B1/B2a: exact CPC RAM oracle, semantic LIST and bounded RUN ABS.
  * Reads the two immutable J1.20-A acquisitions, no synthesized oracle. */
 #include "basic_program.h"
 #include "basic_tokenizer.h"
@@ -34,9 +34,10 @@ static int load(const char *path, uint8_t *data, size_t cap, size_t *n)
     return 0;
 }
 
-/* A single genuine stored FF00 expression is fed to the unchanged executor,
- * with cursor/output/count and storage snapshot verified on failure. */
-static int run_stays_host_unsupported(const BasicProgram *whole)
+/* A single genuine stored FF00 expression is fed to the native executor.
+ * The three literal cases execute; all other isolated cases are rejected.
+ * Cursor/output/count are verified for both outcomes and RAM stays intact. */
+static int run_initial_abs(const BasicProgram *whole, const char *name)
 {
     BasicProgram isolated;
     BasicExecutor executor, before;
@@ -66,13 +67,26 @@ static int run_stays_host_unsupported(const BasicProgram *whole)
     {
         BEStatus result = be_step(&executor, output, sizeof(output), &written);
         size_t i;
-        CHECK(result != BE_OK && result != BE_END);
-        CHECK(result == BE_UNSUPPORTED || result == BE_UNKNOWN_TOKEN ||
-              result == BE_BAD_SEQUENCE || result == BE_TRUNCATED);
-        CHECK(memcmp(&before, &executor, sizeof(executor)) == 0);
+        if (strcmp(name, "a00") == 0 || strcmp(name, "a01") == 0 ||
+            strcmp(name, "an1") == 0) {
+            /* B2a GREEN: the three non-#8 PRINT ABS literals execute.
+             * Native LF differs from CPC printer transport CRLF. */
+            const char *want = strcmp(name, "a00") == 0 ? " 0 \n" : " 1 \n";
+            CHECK(result == BE_OK);
+            CHECK(written == 4u && memcmp(output, want, 4u) == 0);
+            CHECK(executor.cursor != before.cursor);
+            for (i = 4u; i < sizeof(output); ++i)
+                CHECK(output[i] == 0x6au);
+        } else {
+            CHECK(result != BE_OK && result != BE_END);
+            CHECK(result == BE_UNSUPPORTED || result == BE_UNKNOWN_TOKEN ||
+                  result == BE_BAD_SEQUENCE || result == BE_TRUNCATED);
+            CHECK(memcmp(&before, &executor, sizeof(executor)) == 0);
+            CHECK(written == 71u);
+            for (i = 0u; i < sizeof(output); ++i)
+                CHECK(output[i] == 0x6au);
+        }
         CHECK(memcmp(storage, backup, sizeof(storage)) == 0);
-        CHECK(written == 71u);
-        for (i = 0u; i < sizeof(output); ++i) CHECK(output[i] == 0x6au);
     }
     return 0;
 }
@@ -164,12 +178,15 @@ static int each_oracle(const char *root, const char *name)
     CHECK(sent == 112u);
     for (generated = 0u; generated < sizeof(rendered); ++generated)
         CHECK(rendered[generated] == 0x7cu);
-    /* Imported RAM is immutable across unsupported RUN and repeat listing. */
+    /* Imported RAM remains immutable after native ABS or rejected RUN. */
     memcpy(snap, import_storage, sizeof(snap));
-    CHECK(run_stays_host_unsupported(&imported) == 0);
+    CHECK(run_initial_abs(&imported, name) == 0);
     CHECK(memcmp(snap, import_storage, sizeof(snap)) == 0);
-    printf("ABS-B1 %s MATCH_EXACT_RAM original+repeat MATCH_SEMANTIC_LIST "
-           "RUN_HOST_UNSUPPORTED\n", name);
+    printf("ABS-B1/B2a %s MATCH_EXACT_RAM original+repeat MATCH_SEMANTIC_LIST "
+           "%s\n", name,
+           (strcmp(name, "a00") == 0 || strcmp(name, "a01") == 0 ||
+            strcmp(name, "an1") == 0) ?
+           "RUN_NATIVE_ABS_INTEGER_PASS" : "RUN_HOST_UNSUPPORTED");
     return 0;
 }
 
@@ -378,6 +395,302 @@ static int alias_list_roundtrip(void)
     return 0;
 }
 
+
+/* J1.20-B2a: existing ABS CTest, no new build registration or oracle edits.
+ * A%-sourced values ±7/±32767 are the only currently tokenized forms.
+ * No PRINT #8 emulation and no CPC diagnostic equivalence claim. */
+typedef struct {
+    BasicProgram program;
+    uint8_t program_bytes[256];
+    BasicVariableStore store;
+    BasicVariableEntry entries[2];
+    BasicExecutor executor;
+    uint8_t output[64];
+    size_t written;
+} AbsHarness;
+
+static int abs_prepare(AbsHarness *h, const char *statement, size_t capacity)
+{
+    uint8_t body[128];
+    size_t n=0u;
+    memset(h, 0, sizeof(*h));
+    CHECK(bp_init(&h->program,h->program_bytes,sizeof(h->program_bytes))==BP_OK);
+    CHECK(bt_tokenize((const uint8_t *)statement,strlen(statement),
+                      body,sizeof(body),&n)==BT_OK);
+    CHECK(bp_put(&h->program,10u,body,n)==BP_OK);
+    CHECK(capacity<=2u);
+    CHECK(bvs_init(&h->store,capacity ? h->entries : NULL,capacity)==BVS_OK);
+    CHECK(be_init_with_store(&h->executor,&h->program,&h->store)==BE_OK);
+    return 0;
+}
+
+static int abs_seed(AbsHarness *h, const char *name, int16_t v)
+{
+    BasicVariableKey key={0};
+    BasicVariableValue value={0};
+    key.type=(uint8_t)BVT_INTEGER;
+    key.name_length=(uint8_t)strlen(name);
+    CHECK(key.name_length==1u);
+    key.name[0]=(uint8_t)name[0];
+    value.type=(uint8_t)BVT_INTEGER;
+    value.data.integer=v;
+    CHECK(bvs_assign(&h->store,&key,&value)==BVS_OK);
+    return 0;
+}
+
+static int abs_assert_b(AbsHarness *h, int16_t expected)
+{
+    BasicVariableKey key={0};
+    BasicVariableValue value={0};
+    key.type=(uint8_t)BVT_INTEGER;
+    key.name_length=1u;
+    key.name[0]=(uint8_t)'B';
+    CHECK(bvs_get(&h->store,&key,&value)==BVS_OK);
+    CHECK(value.type==(uint8_t)BVT_INTEGER);
+    CHECK(value.data.integer==expected);
+    return 0;
+}
+
+/* Rejected steps, including PREVIEW, preserve all owners and public outputs.
+ * The program capacity and unoccupied store entries are compared too. */
+static int abs_rejected(AbsHarness *h, BEStatus expected, size_t capacity)
+{
+    BasicProgram p=h->program;
+    BasicVariableStore v=h->store;
+    BasicExecutor e=h->executor;
+    BasicVariableEntry entries[2];
+    uint8_t bytes[sizeof(h->program_bytes)];
+    uint8_t old_output[sizeof(h->output)];
+    size_t n=797u, event_count=799u;
+    memcpy(entries,h->entries,sizeof(entries));
+    memcpy(bytes,h->program_bytes,sizeof(bytes));
+    memset(h->output,0x71,sizeof(h->output));
+    memcpy(old_output,h->output,sizeof(old_output));
+    CHECK(be_preview_step_events(&h->executor,h->output,capacity,
+                                  &n,NULL,0u,&event_count)==expected);
+    CHECK(n==797u && event_count==799u);
+    CHECK(memcmp(&p,&h->program,sizeof(p))==0);
+    CHECK(memcmp(&v,&h->store,sizeof(v))==0);
+    CHECK(memcmp(&e,&h->executor,sizeof(e))==0);
+    CHECK(memcmp(entries,h->entries,sizeof(entries))==0);
+    CHECK(memcmp(bytes,h->program_bytes,sizeof(bytes))==0);
+    CHECK(memcmp(old_output,h->output,sizeof(old_output))==0);
+    CHECK(be_step(&h->executor,h->output,capacity,&n)==expected);
+    CHECK(n==797u);
+    CHECK(memcmp(&p,&h->program,sizeof(p))==0);
+    CHECK(memcmp(&v,&h->store,sizeof(v))==0);
+    CHECK(memcmp(&e,&h->executor,sizeof(e))==0);
+    CHECK(memcmp(entries,h->entries,sizeof(entries))==0);
+    CHECK(memcmp(bytes,h->program_bytes,sizeof(bytes))==0);
+    CHECK(memcmp(old_output,h->output,sizeof(old_output))==0);
+    return 0;
+}
+
+static int abs_native_green(void)
+{
+    static const struct {
+        const char *source;
+        int with_a, assignment;
+        int16_t a, value;
+        const char *print;
+    } cases[]={
+        {"PRINT ABS(0)",0,0,0,0," 0 \n"},
+        {"PRINT ABS(1)",0,0,0,1," 1 \n"},
+        {"PRINT ABS(-1)",0,0,0,1," 1 \n"},
+        {"PRINT ABS(A%)",1,0,0,0," 0 \n"},
+        {"PRINT ABS(A%)",1,0,7,7," 7 \n"},
+        {"PRINT ABS(A%)",1,0,-7,7," 7 \n"},
+        {"PRINT ABS(A%)",1,0,32767,32767," 32767 \n"},
+        {"PRINT ABS(A%)",1,0,-32767,32767," 32767 \n"},
+        {"B%=ABS(A%)",1,1,7,7,""},
+        {"B%=ABS(A%)",1,1,-7,7,""}
+    };
+    size_t i;
+    for (i=0u;i<sizeof(cases)/sizeof(cases[0]);++i) {
+        AbsHarness h;
+        BasicExecutor initial;
+        BasicVariableStore prior_store;
+        BasicVariableEntry prior_entries[2];
+        uint8_t initial_program[sizeof(h.program_bytes)];
+        uint8_t preview[64], committed[64];
+        size_t n=211u, event_count=213u;
+        size_t want=strlen(cases[i].print);
+        CHECK(abs_prepare(&h,cases[i].source,2u)==0);
+        if (cases[i].with_a) CHECK(abs_seed(&h,"A",cases[i].a)==0);
+        initial=h.executor;
+        prior_store=h.store;
+        memcpy(prior_entries,h.entries,sizeof(prior_entries));
+        memcpy(initial_program,h.program_bytes,sizeof(initial_program));
+        memset(preview,0x55,sizeof(preview));
+        CHECK(be_preview_step_events(&h.executor,preview,sizeof(preview),
+                                     &n,NULL,0u,&event_count)==BE_OK);
+        CHECK(n==want && event_count==0u);
+        CHECK(memcmp(preview,cases[i].print,want)==0);
+        CHECK(memcmp(&h.executor,&initial,sizeof(initial))==0);
+        CHECK(memcmp(&h.store,&prior_store,sizeof(prior_store))==0);
+        CHECK(memcmp(h.entries,prior_entries,sizeof(prior_entries))==0);
+        CHECK(memcmp(h.program_bytes,initial_program,sizeof(initial_program))==0);
+        memset(committed,0x66,sizeof(committed));
+        n=214u;
+        CHECK(be_step(&h.executor,committed,sizeof(committed),&n)==BE_OK);
+        CHECK(n==want && memcmp(committed,cases[i].print,want)==0);
+        CHECK(memcmp(committed,preview,want)==0);
+        CHECK(h.executor.cursor!=initial.cursor);
+        CHECK(memcmp(h.program_bytes,initial_program,sizeof(initial_program))==0);
+        if (cases[i].assignment) CHECK(abs_assert_b(&h,cases[i].value)==0);
+        else CHECK(memcmp(h.entries,prior_entries,sizeof(prior_entries))==0);
+    }
+    return 0;
+}
+
+static int abs_negative_green(void)
+{
+    static const char *const malformed[]={
+        "PRINT ABS()", "PRINT ABS(\"X\")", "PRINT ABS(1,2)"
+    };
+    size_t i;
+    for(i=0u;i<sizeof(malformed)/sizeof(malformed[0]);++i) {
+        AbsHarness h;
+        CHECK(abs_prepare(&h,malformed[i],2u)==0);
+        CHECK(abs_rejected(&h,BE_UNSUPPORTED,sizeof(h.output))==0);
+    }
+    {
+        AbsHarness h;
+        CHECK(abs_prepare(&h,"PRINT ABS(-32768)",2u)==0);
+        CHECK(abs_rejected(&h,BE_UNSUPPORTED,sizeof(h.output))==0);
+        CHECK(abs_prepare(&h,"PRINT ABS(A%)",2u)==0);
+        CHECK(abs_seed(&h,"A",INT16_MIN)==0);
+        CHECK(abs_rejected(&h,BE_UNSUPPORTED,sizeof(h.output))==0);
+        CHECK(abs_prepare(&h,"B%=ABS(A%)",2u)==0);
+        CHECK(abs_seed(&h,"A",INT16_MIN)==0);
+        CHECK(abs_rejected(&h,BE_UNSUPPORTED,sizeof(h.output))==0);
+        CHECK(abs_prepare(&h,"PRINT ABS(A%)",2u)==0);
+        CHECK(abs_rejected(&h,BE_VARIABLE_NOT_FOUND,sizeof(h.output))==0);
+        CHECK(abs_prepare(&h,"PRINT ABS(1)",2u)==0);
+        CHECK(abs_rejected(&h,BE_NO_SPACE,3u)==0);
+        CHECK(abs_prepare(&h,"B%=ABS(A%)",1u)==0);
+        CHECK(abs_seed(&h,"A",7)==0);
+        CHECK(abs_rejected(&h,BE_STORE_FULL,sizeof(h.output))==0);
+    }
+    /* Raw, forged token sequences bypass the tokenizer on purpose. */
+    {
+        static const uint8_t raw[][13]={
+            {0xbfu,' ',0xffu,0x00u,'(',0x0fu}, /* missing ')' */
+            {0xbfu,' ',0xffu,0x00u,'(',0x0fu,')',0x0fu}, /* suffix */
+            {0xbfu,' ',0xffu,0x00u,'(',0x1au,0xffu} /* truncated 1A word */
+        };
+        const size_t lengths[]={6u,8u,7u};
+        for(i=0u;i<3u;++i) {
+            AbsHarness h;
+            BEStatus actual;
+            uint8_t saved[sizeof(h.output)];
+            BasicExecutor before;
+            size_t n=123u;
+            CHECK(abs_prepare(&h,"PRINT ABS(1)",2u)==0);
+            CHECK(bp_put(&h.program,10u,raw[i],lengths[i])==BP_OK);
+            CHECK(be_init_with_store(&h.executor,&h.program,&h.store)==BE_OK);
+            before=h.executor;
+            memset(h.output,0x5au,sizeof(h.output));
+            memcpy(saved,h.output,sizeof(saved));
+            actual=be_step(&h.executor,h.output,sizeof(h.output),&n);
+            CHECK(actual!=BE_OK && actual!=BE_END);
+            CHECK(n==123u && memcmp(&h.executor,&before,sizeof(before))==0);
+            CHECK(memcmp(h.output,saved,sizeof(saved))==0);
+        }
+    }
+    /* FF 00 inside REM, quote and numeric payload must never be
+     * interpreted as the reached ABS function (opaque-token probes). */
+    {
+        static const uint8_t opaque[][7]={
+            {0xc5u,' ',0xffu,0x00u},
+            {0xbfu,' ','"',0xffu,0x00u,'"'},
+            {0xbfu,' ',0x19u,0xffu,0x00u}
+        };
+        const size_t sizes[]={4u,6u,5u};
+        for(i=0u;i<3u;++i) {
+            AbsHarness h;
+            CHECK(abs_prepare(&h,"PRINT ABS(1)",2u)==0);
+            CHECK(bp_put(&h.program,10u,opaque[i],sizes[i])==BP_OK);
+            CHECK(be_init_with_store(&h.executor,&h.program,&h.store)==BE_OK);
+            CHECK(abs_rejected(&h,BE_BAD_SEQUENCE,sizeof(h.output))==0);
+        }
+    }
+    return 0;
+}
+
+
+/* End-to-end numbered BASIC: assignment A%, PRINT ABS(A%), assignment
+ * B%=ABS(A%), PRINT B%. No injected A% and no printer transport. */
+static int abs_program_green(void)
+{
+    static const struct {
+        const char *assignment;
+        const char *expected;
+        int16_t value;
+    } cases[]={
+        {"A%=0"," 0 \n",0},
+        {"A%=7"," 7 \n",7},
+        {"A%=-7"," 7 \n",7},
+        {"A%=32767"," 32767 \n",32767},
+        {"A%=-32767"," 32767 \n",32767}
+    };
+    size_t i;
+    for(i=0u;i<sizeof(cases)/sizeof(cases[0]);++i) {
+        AbsHarness h;
+        BasicVariableKey key={0};
+        BasicVariableValue v={0};
+        const char *lines[]={"PRINT ABS(A%)","B%=ABS(A%)","PRINT B%"};
+        uint8_t body[128];
+        size_t j,n;
+        CHECK(abs_prepare(&h,cases[i].assignment,2u)==0);
+        for(j=0u;j<3u;++j) {
+            n=0u;
+            CHECK(bt_tokenize((const uint8_t *)lines[j],strlen(lines[j]),
+                              body,sizeof(body),&n)==BT_OK);
+            CHECK(bp_put(&h.program,(uint16_t)(20u+j*10u),body,n)==BP_OK);
+        }
+        CHECK(be_init_with_store(&h.executor,&h.program,&h.store)==BE_OK);
+        n=77u;
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_OK);
+        CHECK(n==0u);
+        key.type=(uint8_t)BVT_INTEGER;
+        key.name_length=1u;
+        key.name[0]=(uint8_t)'A';
+        CHECK(bvs_get(&h.store,&key,&v)==BVS_OK);
+        CHECK(v.data.integer==(cases[i].assignment[3]=='-' ?
+                  (int16_t)(-cases[i].value) : cases[i].value));
+        n=77u;
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_OK);
+        CHECK(n==strlen(cases[i].expected));
+        CHECK(memcmp(h.output,cases[i].expected,n)==0);
+        n=77u;
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_OK);
+        CHECK(n==0u && abs_assert_b(&h,cases[i].value)==0);
+        n=77u;
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_OK);
+        CHECK(n==strlen(cases[i].expected));
+        CHECK(memcmp(h.output,cases[i].expected,n)==0);
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_END);
+    }
+    /* The real A%=-32768 assignment is legal; its ABS use is not. */
+    {
+        AbsHarness h;
+        uint8_t body[128];
+        size_t n=0u;
+        CHECK(abs_prepare(&h,"A%=-32768",2u)==0);
+        CHECK(bt_tokenize((const uint8_t *)"PRINT ABS(A%)",
+                          strlen("PRINT ABS(A%)"),
+                          body,sizeof(body),&n)==BT_OK);
+        CHECK(bp_put(&h.program,20u,body,n)==BP_OK);
+        CHECK(be_init_with_store(&h.executor,&h.program,&h.store)==BE_OK);
+        n=23u;
+        CHECK(be_step(&h.executor,h.output,sizeof(h.output),&n)==BE_OK);
+        CHECK(n==0u);
+        CHECK(abs_rejected(&h,BE_UNSUPPORTED,sizeof(h.output))==0);
+    }
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     size_t i;
@@ -387,6 +700,11 @@ int main(int argc, char **argv)
     CHECK(negatives()==0);
     CHECK(program_atomicity()==0);
     CHECK(alias_list_roundtrip()==0);
-    puts("J1.20-B1 16/16 MATCH_EXACT_RAM, LIST source-semantic, RUN unsupported");
+    CHECK(abs_native_green()==0);
+    CHECK(abs_negative_green()==0);
+    CHECK(abs_program_green()==0);
+    puts("J1.20-B1/B2a 16/16 MATCH_EXACT_RAM, LIST source-semantic; "
+         "isolated RUN: 3/16 RUN_NATIVE_ABS_INTEGER_PASS, "
+         "13/16 RUN_HOST_UNSUPPORTED; B2a INTEGER tests PASS");
     return 0;
 }

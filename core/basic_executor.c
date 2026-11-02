@@ -136,6 +136,7 @@ static BEStatus emit_decimal(BEEmitter *out, uint8_t value)
     return BE_OK;
 }
 
+
 /* CPC INTEGER variable PRINT: sign/alignment and trailing blank.
  * Transport newline belongs to execute_line(), never to this formatter.
  * Widen before negation so INT16_MIN is representable. */
@@ -208,6 +209,78 @@ static BEStatus binding_error(BVBStatus status)
         case BVB_OVERLAPPING_MEMORY: return BE_OVERLAP;
         default: return BE_BAD_SEQUENCE;
     }
+}
+
+/* J1.20-B2a. Decode exactly one FF 00 '(' INTEGER ')' expression.
+ * No generic function parser, REAL5 conversion, CPU signed overflow or
+ * mutation of caller cursor/result on failure. Variables are read-only.
+ * Only an int16_t result is expressible in this increment; ABS(-32768)
+ * is TYPE_UNVERIFIED (CPC prints 32768) and fails closed. */
+static BEStatus abs_integer(const uint8_t *body, size_t length,
+                            size_t *at, const BasicVariableStore *variables,
+                            int16_t *result)
+{
+    size_t p=*at;
+    int negative=0;
+    int32_t signed_value;
+    uint8_t token;
+    if (length-p < 3u) return BE_TRUNCATED;
+    if (body[p++] != 0xffu || body[p++] != 0x00u ||
+        body[p++] != (uint8_t)'(')
+        return BE_BAD_SEQUENCE;
+    if (p==length) return BE_TRUNCATED;
+    if (body[p] == 0xf5u) {
+        negative=1;
+        ++p;
+        if (p==length) return BE_TRUNCATED;
+    }
+    token=body[p++];
+    if (token>=0x0eu && token<=0x17u) {
+        signed_value=(int32_t)(token-0x0eu);
+    } else if (token==0x19u) {
+        if (p==length) return BE_TRUNCATED;
+        signed_value=(int32_t)body[p++];
+        if (signed_value<10) return BE_BAD_SEQUENCE;
+    } else if (token==0x1au) {
+        uint32_t word;
+        if (length-p<2u) return BE_TRUNCATED;
+        word=(uint32_t)body[p] | ((uint32_t)body[p+1u]<<8);
+        p+=2u;
+        if (word<256u) return BE_BAD_SEQUENCE;
+        if (word>(uint32_t)INT16_MAX) return BE_UNSUPPORTED;
+        signed_value=(int32_t)word;
+    } else if (token==0x02u && !negative) {
+        BasicVariableKey key;
+        BasicVariableValue value;
+        size_t consumed=0u;
+        BVBStatus st;
+        if (variables==NULL) return BE_UNSUPPORTED;
+        st=bvb_read_explicit(body,length,p-1u,variables,
+                             &key,&consumed,&value);
+        if (st!=BVB_OK) return binding_error(st);
+        if (key.type!=(uint8_t)BVT_INTEGER ||
+            value.type!=(uint8_t)BVT_INTEGER)
+            return BE_INVALID_TYPE;
+        if (consumed>length-(p-1u)) return BE_BAD_SEQUENCE;
+        p=p-1u+consumed;
+        signed_value=(int32_t)value.data.integer;
+    } else {
+        /* Includes sealed F5 1F 00 00 00 00 90 (negative minimum),
+         * syntactically invalid strings, comma and nested expressions. */
+        return BE_UNSUPPORTED;
+    }
+    if (negative) signed_value=-signed_value; /* int32 only */
+    if (signed_value==(int32_t)INT16_MIN) return BE_UNSUPPORTED;
+    if (signed_value<0) signed_value=-signed_value; /* bounded int32 */
+    if (signed_value>(int32_t)INT16_MAX) return BE_UNSUPPORTED;
+    if (p==length) return BE_TRUNCATED;
+    if (body[p++]!=(uint8_t)')') return BE_UNSUPPORTED;
+    /* Caller independently checks exact statement end; reject any suffix
+     * here to avoid a partial PRINT/assignment on ambiguous expressions. */
+    if (p!=length) return BE_UNSUPPORTED;
+    *at=p;
+    *result=(int16_t)signed_value;
+    return BE_OK;
 }
 
 /* J1.14-B inline IF arm: parse a complete INTEGER BVR EF immediate,
@@ -881,6 +954,15 @@ static BEStatus execute_line(const BasicProgram *program,
                         status = emit_integer(out, value.data.integer);
                         if (status != BE_OK) return status;
                     }
+                } else if (token == 0xffu) {
+                    int16_t absolute;
+                    size_t function_start=pos-1u;
+                    status=abs_integer(body,length,&function_start,variables,
+                                       &absolute);
+                    if (status!=BE_OK) return status;
+                    pos=function_start;
+                    status=emit_integer(out,absolute);
+                    if (status!=BE_OK) return status;
                 } else if (token == 0x0du) {
                     static const uint8_t half_print[] = {
                         0xbfu, (uint8_t)' ', 0x0du, 0u, 0u, 0xc1u
@@ -1276,6 +1358,12 @@ static BEStatus execute_line(const BasicProgram *program,
                 *next = line->next_offset;
                 return BE_OK;
             }
+            if (body[pos] == 0xffu) {
+                status=abs_integer(body,length,&pos,variables,
+                                   &value.data.integer);
+                if (status!=BE_OK) return status;
+                reference_rhs=1;
+            } else {
             literal = body[pos++];
             if (literal == 0xf5u) {
                 /* Tokenized CPC unary minus, not a signed-byte encoding.
@@ -1339,6 +1427,7 @@ static BEStatus execute_line(const BasicProgram *program,
             } else {
                 return BE_BAD_SEQUENCE;
             }
+            } /* ABS RHS vs existing INTEGER forms. */
             if (!reference_rhs) {
                 int32_t signed_value = negative ? -magnitude : magnitude;
                 if (signed_value < INT16_MIN || signed_value > INT16_MAX) {

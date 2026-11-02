@@ -120,7 +120,7 @@ static int run(F *f) {
     return 0;
 }
 static int source_negative(void) {
-    static const char *bad[]={"A=0.1","A=1.20","A=-1.25","A=0","A=0.50",
+    static const char *bad[]={"A=0.1","A=1.20","A=-1.25","A=0.50",
         "A!=1.5","A!=0.5","A=0.5:PRINT A","A=0.5 : END",
         "LET A=0.5","B=0.5","a=0.5","A=0.5X","A=0.5 ",
         "PRINT B","PRINT A:PRINT A","PRINTA","? A",

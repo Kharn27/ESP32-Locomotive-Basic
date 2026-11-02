@@ -44,6 +44,8 @@ const char *cpc_diag_policy_category(CpcDiagCategory category)
         case CPC_DIAG_RETURN_UNEXPECTED: return "RETURN_UNEXPECTED_CPC";
         case CPC_DIAG_NEXT_UNEXPECTED: return "NEXT_UNEXPECTED_CPC";
         case CPC_DIAG_DIVISION_INTEGER_ZERO: return "INTEGER_F9_DIVISION_BY_ZERO_CPC";
+        case CPC_DIAG_GOTO_MISSING_TARGET: return "GOTO_MISSING_TARGET_CPC";
+        case CPC_DIAG_IF_MISSING_TARGET: return "IF_TAKEN_MISSING_TARGET_CPC";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -59,6 +61,8 @@ const char *cpc_diag_policy_message(CpcDiagCategory category)
         case CPC_DIAG_RETURN_UNEXPECTED: return "Unexpected RETURN";
         case CPC_DIAG_NEXT_UNEXPECTED: return "Unexpected NEXT";
         case CPC_DIAG_DIVISION_INTEGER_ZERO: return "Division by zero";
+        case CPC_DIAG_GOTO_MISSING_TARGET: return "Line does not exist";
+        case CPC_DIAG_IF_MISSING_TARGET: return "Line does not exist";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -84,7 +88,8 @@ bool cpc_diag_policy_write(CpcText *text,CpcDiagCategory category)
  * unrecognised/ambiguous prefix, return 0 (host diagnostic), not a CPC claim.
  * No execution, store lookup, allocation or mutation occurs here. */
 static uint8_t reached_flow(const BasicProgram *program,
-                            const BasicProgramLine *line, size_t at)
+                            const BasicProgramLine *line, size_t at,
+                            size_t *flow_at)
 {
     const uint8_t *body=program->data+line->body_offset;
     const size_t length=line->body_length;
@@ -94,8 +99,10 @@ static uint8_t reached_flow(const BasicProgram *program,
         while(at<length && body[at]==' ') ++at;
         if(at==length) break;
         if(body[at]==0x9fu || body[at]==0xa0u ||
-           body[at]==0xa1u || body[at]==0xc9u)
+           body[at]==0xa1u || body[at]==0xc9u) {
+            if(flow_at != NULL) *flow_at = at;
             return body[at]; /* GOSUB, GOTO, IF, RETURN respectively */
+        }
         if(body[at]==0xc5u ||
            (body[at]==0x01u && at+1U<length && body[at+1U]==0xc0u))
             return 0U; /* REM or apostrophe */
@@ -114,8 +121,8 @@ static uint8_t reached_flow(const BasicProgram *program,
                 separated=true;
                 break;
             }
-            if(token==0x02u || token==0x03u || token==0x04u ||
-               token==0x0du) {
+            if((token>=0x02u && token<=0x04u) ||
+               (token>=0x0bu && token<=0x0du)) {
                 BasicVariableRef reference;
                 if(bvr_decode(body,length,p-1U,&reference)!=BVR_OK ||
                    reference.consumed==0U ||
@@ -392,6 +399,118 @@ static bool f9_zero_assignment(const BasicSessionRuntime *runtime,
     return pos == length; /* no second statement, comment, or payload */
 }
 
+/* Reject a forged continuation pointing into an opaque string/reference or
+ * numeric payload. The executor itself only resumes at statement boundaries.
+ * This lexical walk is read-only and bounded by the stored record. */
+static bool o2b_statement_start(const BasicProgram *program,
+                                const BasicProgramLine *line, size_t at)
+{
+    const uint8_t *body = program->data + line->body_offset;
+    size_t pos = 0U;
+    while (pos < line->body_length) {
+        next_skip_spaces(body, line->body_length, &pos);
+        if (pos == at) return true;
+        if (pos > at || !next_skip_statement(body, line->body_length, &pos))
+            return false;
+    }
+    return false;
+}
+
+/* Verify independently of the status enum that the reached instruction
+ * actually refers to an absent line. For IF, consult only the existing
+ * INTEGER values; never evaluate inline arms, run BASIC or alter the store.
+ * This mirrors the already-implemented direct THEN line syntax. */
+static bool o2b_missing_target(const BasicSessionRuntime *runtime,
+                               const BasicProgramLine *line,
+                               size_t at, uint8_t opcode)
+{
+    const BasicProgram *program = runtime->program;
+    const uint8_t *body = program->data + line->body_offset;
+    const size_t length = line->body_length;
+    size_t pos = at + 1U;
+    uint16_t destination;
+    BasicProgramLine target;
+
+    if (bp_validate(program) != BP_OK ||
+        !o2b_statement_start(program, line, runtime->executor.statement_offset) ||
+        at >= length || body[at] != opcode) return false;
+    if (opcode == 0xa1u) {
+        BasicVariableKey lhs_key;
+        BasicVariableValue lhs_value;
+        size_t used = 0U;
+        int taken;
+        if (runtime->variables == NULL ||
+            runtime->executor.variables != runtime->variables) return false;
+        /* IF cannot be reached after a preceding statement in this executor.
+         * At a genuine continuation it must be the first executed token. */
+        {
+            size_t first = runtime->executor.statement_offset;
+            next_skip_spaces(body, length, &first);
+            if (first != at) return false;
+        }
+        next_skip_spaces(body, length, &pos);
+        if (pos == length || body[pos] != 0x02u ||
+            bvb_read_explicit(body, length, pos, runtime->variables,
+                              &lhs_key, &used, &lhs_value) != BVB_OK ||
+            lhs_key.type != (uint8_t)BVT_INTEGER ||
+            lhs_value.type != (uint8_t)BVT_INTEGER ||
+            used > length - pos) return false;
+        pos += used;
+        taken = lhs_value.data.integer != 0;
+        next_skip_spaces(body, length, &pos);
+        if (pos == length) return false;
+        if (body[pos] == 0xefu || body[pos] == 0xf2u ||
+            body[pos] == 0xf1u || body[pos] == 0xf3u ||
+            body[pos] == 0xeeu || body[pos] == 0xf0u) {
+            const uint8_t rel = body[pos++];
+            BasicVariableKey rhs_key;
+            BasicVariableValue rhs_value;
+            size_t rhs_used = 0U;
+            const int16_t lhs = lhs_value.data.integer;
+            int16_t rhs;
+            next_skip_spaces(body, length, &pos);
+            if (pos == length || body[pos] != 0x02u ||
+                bvb_read_explicit(body, length, pos, runtime->variables,
+                                  &rhs_key, &rhs_used, &rhs_value) != BVB_OK ||
+                rhs_key.type != (uint8_t)BVT_INTEGER ||
+                rhs_value.type != (uint8_t)BVT_INTEGER ||
+                rhs_used > length - pos) return false;
+            rhs = rhs_value.data.integer;
+            if (rel == 0xefu) taken = lhs == rhs;
+            else if (rel == 0xf2u) taken = lhs != rhs;
+            else if (rel == 0xf1u) taken = lhs < rhs;
+            else if (rel == 0xf3u) taken = lhs <= rhs;
+            else if (rel == 0xeeu) taken = lhs > rhs;
+            else taken = lhs >= rhs;
+            pos += rhs_used;
+            next_skip_spaces(body, length, &pos);
+        }
+        if (!taken || pos == length || body[pos++] != 0xebu)
+            return false; /* THEN */
+    } else if (opcode != 0xa0u) {
+        return false;
+    }
+    {
+        const size_t argument_start = pos;
+        next_skip_spaces(body, length, &pos);
+        /* GOTO executor requires a space before 1E; IF does not. */
+        if (pos == length || body[pos++] != 0x1eu ||
+            (opcode == 0xa0u && pos - 1U == argument_start) ||
+            length - pos < 2U) return false;
+    }
+    destination = (uint16_t)((uint16_t)body[pos] |
+                  ((uint16_t)body[pos + 1U] << 8));
+    pos += 2U;
+    if (destination == 0U) return false;
+    next_skip_spaces(body, length, &pos);
+    if (opcode == 0xa1u) {
+        if (pos != length) return false;
+    } else if (pos < length && body[pos] != 0x01u) {
+        return false;
+    }
+    return bp_find(program, destination, &target) == BP_NOT_FOUND;
+}
+
 /* bsr_step_events() preserves failed cursor, output and RUNNING state.
  * Resolve from the real stored record BEFORE bsr_stop(), with no side
  * effects. Status numbers are host enums, never historical CPC ERR codes. */
@@ -404,6 +523,7 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
     BasicProgramLine line;
     size_t cursor;
     uint8_t flow;
+    size_t flow_at = 0U;
     uint16_t next_line = 0u;
     if(result.status!=BSR_EXECUTOR_ERROR ||
        runtime==NULL || runtime->state!=BSR_RUNNING ||
@@ -448,10 +568,18 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
         diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE;
     } else {
         flow=reached_flow(runtime->program,&line,
-                          runtime->executor.statement_offset);
+                          runtime->executor.statement_offset,&flow_at);
         if(result.executor_status==BE_MISSING_TARGET && flow==0x9fu) {
             diagnostic.category=CPC_DIAG_GOSUB_MISSING_TARGET;
             diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE;
+        } else if(result.executor_status==BE_MISSING_TARGET &&
+                  (flow==0xa0u || flow==0xa1u) &&
+                  o2b_missing_target(runtime,&line,flow_at,flow)) {
+            diagnostic.category=flow==0xa0u ?
+                CPC_DIAG_GOTO_MISSING_TARGET : CPC_DIAG_IF_MISSING_TARGET;
+            diagnostic.origin=flow==0xa0u ?
+                CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE :
+                CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE;
         } else if(result.executor_status==BE_RETURN_WITHOUT_GOSUB &&
                   flow==0xc9u) {
             diagnostic.category=CPC_DIAG_RETURN_UNEXPECTED;
@@ -495,8 +623,12 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
        diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE) {
         prefix=pen_prefix;
         prefix_length=sizeof(pen_prefix)-1U;
-    } else if(diagnostic.category==CPC_DIAG_GOSUB_MISSING_TARGET &&
-              diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE) {
+    } else if((diagnostic.category==CPC_DIAG_GOSUB_MISSING_TARGET &&
+               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE) ||
+              (diagnostic.category==CPC_DIAG_GOTO_MISSING_TARGET &&
+               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE) ||
+              (diagnostic.category==CPC_DIAG_IF_MISSING_TARGET &&
+               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE)) {
         prefix=gosub_prefix;
         prefix_length=sizeof(gosub_prefix)-1U;
     } else if(diagnostic.category==CPC_DIAG_RETURN_UNEXPECTED &&

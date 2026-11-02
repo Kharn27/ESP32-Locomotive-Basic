@@ -207,9 +207,28 @@ static void tests(void)
                "Line does not exist in 10\n", 1);
     CHECK_CASE(resume_colon, 2U, BE_MISSING_TARGET,
                "Line does not exist in 10\n", 1);
-    /* BE_MISSING_TARGET alone cannot prove GOSUB (GOTO and IF use it). */
-    CHECK_CASE(goto_missing, 0U, BE_MISSING_TARGET, "ERROR\n", 0);
-    CHECK_CASE(if_missing, 1U, BE_MISSING_TARGET, "ERROR\n", 0);
+    /* O2-B: CPC ROM-backed target errors at actual numbered loci. */
+    {
+        static const char *goto10[] = {
+            "10 GOTO 999", "20 PRINT \"NEVER\""
+        };
+        static const char *goto370[] = {
+            "370 GOTO 999", "400 PRINT \"NEVER\""
+        };
+        static const char *if520[] = {
+            "510 A%=1", "520 IF A% THEN 999", "530 PRINT \"NEVER\""
+        };
+        CHECK_CASE(goto10, 0U, BE_MISSING_TARGET,
+                   "Line does not exist in 10\n", 1);
+        CHECK_CASE(goto370, 0U, BE_MISSING_TARGET,
+                   "Line does not exist in 370\n", 1);
+        CHECK_CASE(if520, 1U, BE_MISSING_TARGET,
+                   "Line does not exist in 520\n", 1);
+    }
+    CHECK_CASE(goto_missing, 0U, BE_MISSING_TARGET,
+               "Line does not exist in 10\n", 1);
+    CHECK_CASE(if_missing, 1U, BE_MISSING_TARGET,
+               "Line does not exist in 20\n", 1);
     CHECK_CASE(pen, 0U, BE_INVALID_PEN,
                "Improper argument in 10\n", 1);
     /* A1b RED: original/repeat J1.12-A ROM-backed PNG text.
@@ -546,8 +565,224 @@ static void test_f9_provenance(void)
     assert(diagnosis.category == CPC_DIAG_HOST_GENERIC);
 }
 
+/* O2-B fail-closed: a synthetic host status alone is never CPC evidence. */
+static void test_o2b_false_and_forged(void)
+{
+    BSRResult r, spoof;
+    CpcStepDiagnostic diag;
+    BasicProgramLine line;
+    size_t cursor;
+    uint8_t bytes[64];
+    size_t written = 55U;
+    setup();
+    submit("10 A%=0");
+    submit("20 IF A% THEN 999");
+    submit("30 PRINT \"AFTER\"");
+    submit("RUN");
+    assert(step().status == BSR_OK);
+    r = step();
+    assert(r.status == BSR_OK && f.written == 0U);
+    /* IF false has no missing-target failure, even with an absent THEN line. */
+    spoof = r;
+    spoof.status = BSR_EXECUTOR_ERROR;
+    spoof.executor_status = BE_MISSING_TARGET;
+    assert(bp_find(&f.program, 20U, &line) == BP_OK);
+    f.runtime.executor.cursor = line.offset;
+    f.runtime.executor.statement_offset = 0U;
+    diag = cpc_diag_policy_step(spoof, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime.executor.cursor = line.next_offset;
+    r = step();
+    assert(r.status == BSR_OK && f.written == sizeof("AFTER\n") - 1U);
+    assert(memcmp(f.output, "AFTER\n", f.written) == 0);
+    assert(step().status == BSR_END);
+
+    setup();
+    submit("10 PRINT \"GOTO 999\"");
+    submit("20 GOTO 30");
+    submit("30 END");
+    submit("RUN");
+    r = step();
+    assert(r.status == BSR_OK);
+    spoof = r;
+    spoof.status = BSR_EXECUTOR_ERROR;
+    spoof.executor_status = BE_MISSING_TARGET;
+    diag = cpc_diag_policy_step(spoof, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC); /* existing target */
+    f.runtime.executor.cursor = 0U;
+    diag = cpc_diag_policy_step(spoof, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC); /* PRINT not flow */
+    cursor = 0U;
+    assert(bp_next(&f.program, &cursor, &line) == BP_OK);
+    /* A token-like byte within a quoted string is not a statement. */
+    f.storage[line.body_offset + 8U] = 0xa0U;
+    f.runtime.executor.statement_offset = 8U;
+    diag = cpc_diag_policy_step(spoof, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime.executor.statement_offset = line.body_length;
+    diag = cpc_diag_policy_step(spoof, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime.executor.statement_offset = 0U;
+    f.runtime.executor.cursor = f.program.size;
+    diag = cpc_diag_policy_step(spoof, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime.executor.cursor = 0U;
+    f.runtime.state = BSR_IDLE;
+    diag = cpc_diag_policy_step(spoof, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime.state = BSR_RUNNING;
+    spoof.status = BSR_SESSION_ERROR;
+    diag = cpc_diag_policy_step(spoof, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+
+    /* Unknown category/origin pairing never partially writes diagnostics. */
+    diag.category = CPC_DIAG_GOSUB_MISSING_TARGET;
+    diag.origin = CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE;
+    diag.line_number = 370U;
+    memset(bytes, 0xa9, sizeof bytes);
+    assert(!cpc_diag_policy_format_step(diag, bytes, sizeof bytes, &written));
+    assert(written == 55U);
+    for(size_t i=0U;i<sizeof bytes;++i) assert(bytes[i] == 0xa9U);
+}
+
+
+/* The failed RUN must not damage stored BASIC; LIST remains byte-exact. */
+static void test_o2b_list_preserved(void)
+{
+    static const char expected[] =
+        "370 GOTO 999\n400 PRINT \"NEVER\"\n";
+    BasicProgram before_program;
+    uint8_t before_bytes[PROGRAM_CAP];
+    BSRResult result;
+    CpcStepDiagnostic diag;
+    setup();
+    submit("370 GOTO 999");
+    submit("400 PRINT \"NEVER\"");
+    submit("RUN");
+    before_program = f.program;
+    memcpy(before_bytes, f.storage, sizeof before_bytes);
+    result = step();
+    assert(result.status == BSR_EXECUTOR_ERROR &&
+           result.executor_status == BE_MISSING_TARGET);
+    diag = cpc_diag_policy_step(result, &f.runtime);
+    assert(diag.category == CPC_DIAG_GOTO_MISSING_TARGET &&
+           diag.origin == CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE &&
+           diag.line_number == 370U);
+    assert(bsr_stop(&f.runtime).status == BSR_OK);
+    assert(memcmp(&before_program, &f.program, sizeof f.program) == 0);
+    assert(memcmp(before_bytes, f.storage, sizeof before_bytes) == 0);
+    submit("LIST");
+    assert(f.written == sizeof(expected) - 1U);
+    assert(memcmp(f.output, expected, f.written) == 0);
+}
+
+/* A missing-target status with REM, an unknown source, or another phase is
+ * host only. Direct (non-numbered) GOTO isn't a witnessed O2-B RUN locus. */
+static void test_o2b_other_origins(void)
+{
+    BSRResult r;
+    CpcStepDiagnostic diag;
+    setup();
+    submit("10 REM GOTO 999");
+    submit("20 PRINT \"AFTER\"");
+    submit("RUN");
+    r = step();
+    assert(r.status == BSR_OK);
+    r.status = BSR_EXECUTOR_ERROR;
+    r.executor_status = BE_MISSING_TARGET;
+    f.runtime.executor.cursor = 0U;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime.executor.program = NULL;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    /* No CPC sentence is inferred from a direct input/source selection. */
+    diag.category = cpc_diag_policy_select(
+        (const uint8_t *)"GOTO 999", sizeof("GOTO 999") - 1U, r);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+}
+
+
+/* A CPC-looking opcode inside the payload byte of PRINT 160 is not executable.
+ * A corrupted stored line number must likewise never be interpolated. */
+static void test_o2b_opaque_payload_and_forged_line(void)
+{
+    BSRResult r;
+    CpcStepDiagnostic diag;
+    BasicProgramLine line;
+    size_t cursor = 0U, payload = 0U;
+    bool found = false;
+    setup();
+    submit("10 PRINT 160");
+    submit("RUN");
+    r = step();
+    assert(r.status == BSR_OK);
+    r.status = BSR_EXECUTOR_ERROR;
+    r.executor_status = BE_MISSING_TARGET;
+    assert(bp_next(&f.program, &cursor, &line) == BP_OK);
+    for(size_t i = 0U; i + 1U < line.body_length; ++i) {
+        if(f.storage[line.body_offset + i] == 0x19U &&
+           f.storage[line.body_offset + i + 1U] == 0xa0U) {
+            payload = i + 1U;
+            found = true;
+            break;
+        }
+    }
+    assert(found);
+    f.runtime.executor.cursor = line.offset;
+    f.runtime.executor.statement_offset = payload;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+
+    setup();
+    submit("10 GOTO 999");
+    submit("RUN");
+    r = step();
+    assert(r.status == BSR_EXECUTOR_ERROR &&
+           r.executor_status == BE_MISSING_TARGET);
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_GOTO_MISSING_TARGET);
+    /* Zero-line record is corrupt, not an authoritative source line. */
+    f.storage[2] = 0U;
+    f.storage[3] = 0U;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+}
+
+
+/* IF attribution must use the same store actually wired to the executor. */
+static void test_o2b_if_store_origin(void)
+{
+    BSRResult r;
+    CpcStepDiagnostic diag;
+    setup();
+    submit("10 A%=1");
+    submit("20 IF A% THEN 999");
+    submit("RUN");
+    assert(step().status == BSR_OK);
+    r = step();
+    assert(r.status == BSR_EXECUTOR_ERROR &&
+           r.executor_status == BE_MISSING_TARGET);
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_IF_MISSING_TARGET &&
+           diag.origin == CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE &&
+           diag.line_number == 20U);
+    f.runtime.executor.variables = NULL;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+    f.runtime.executor.variables = &f.store;
+    f.runtime.variables = NULL;
+    diag = cpc_diag_policy_step(r, &f.runtime);
+    assert(diag.category == CPC_DIAG_HOST_GENERIC);
+}
+
 int main(void)
 {
+    test_o2b_if_store_origin();
+    test_o2b_opaque_payload_and_forged_line();
+    test_o2b_list_preserved();
+    test_o2b_other_origins();
+    test_o2b_false_and_forged();
     tests();
     test_next_provenance();
     test_next_success();

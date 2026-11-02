@@ -19,6 +19,10 @@ static inline const char *hw4_run_diag_source(CpcDiagOrigin origin)
             return "CPC_NEXT_ORACLE";
         case CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE:
             return "CPC_F9_ZERO_ORACLE";
+        case CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE:
+            return "CPC_GOTO_ORACLE";
+        case CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE:
+            return "CPC_IF_ORACLE";
         case CPC_DIAG_ORIGIN_HOST:
             return "HOST";
     }

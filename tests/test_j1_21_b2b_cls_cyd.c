@@ -160,6 +160,30 @@ static int reject_after_assignment(const char *assign, const char *second) {
     CHECK(unchanged(&before) == 0);
     return 0;
 }
+/* Executable RED witness: reproduce BASE's old step-first scheduler order
+ * (not the production scheduler). Video rejects only AFTER BSR committed.
+ * GREEN uses reject_case() below to prove this path is eliminated. */
+static int legacy_step_first_red_witness(void) {
+    static Snapshot before;
+    BSRResult old_step;
+    CHECK(setup() == 0);
+    CHECK(submit("10 PRINT \"NO\":INK 1,26:CLS").status == BSR_OK);
+    CHECK(start() == 0);
+    capture(&before);
+    old_step = bsr_step_events(&f.runtime, f.output, sizeof(f.output),
+                               &f.written, f.events, EVENTS, &f.event_written);
+    CHECK(old_step.status == BSR_OK && f.written == 3u &&
+          f.event_written == 2u);
+    CHECK(hw4_pen_preflight(&f.text, f.output, f.written,
+                           f.events, f.event_written) ==
+          HW4_PEN_SET_INK_UNSUPPORTED);
+    CHECK(f.runtime.executor.cursor != before.runtime.executor.cursor);
+    CHECK(f.written != before.written);
+    CHECK(!memcmp(f.vram, before.vram, sizeof(f.vram)));
+    CHECK(!memcmp(f.image, before.image, sizeof(f.image)));
+    puts("J1.21-B2b RED witness: step-first commits before rejected INK");
+    return 0;
+}
 static int rejected_preflight_is_atomic(void) {
     /* Would fail with the old step -> preflight order: cursor advanced. */
     CHECK(reject_case("10 PRINT \"A\":CLS:PRINT \"B\"", true,
@@ -281,6 +305,7 @@ static int replay_failure_and_mismatch(void) {
     return 0;
 }
 int main(void) {
+    CHECK(legacy_step_first_red_witness() == 0);
     CHECK(rejected_preflight_is_atomic() == 0);
     CHECK(cls_program() == 0);
     CHECK(ordered_inline() == 0);

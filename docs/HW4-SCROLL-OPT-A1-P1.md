@@ -42,6 +42,8 @@ P1 n'altère ni le quantum RUN ni le nombre de bandes dans ce mode : `HW4-SCROLL
 
 **T2/T3 conditionnels :** seulement si la photo T1 indique un axe vertical, des marges fixes et une tranche plausible, saisir **manuellement** `!VPROBE ACK` (le log dit `operator_claim=1 physical_pass=UNVERIFIED`, pas une certification), puis `!VPROBE UP`, `!VPROBE DOWN`, `!VPROBE WRAP` (26 déplacements de 8 px), `!VPROBE MARK` (8 écritures RAMWR après rotation VSP). Photographier chaque étape, observer wraps, direction, bande blanche aux rasters prévus, bords et ghosting. `!VPROBE OFF` restitue ensuite le rendu logique **entier**. `!SHOT` n'est autorisé qu'une fois OFF ; confronter capture logique et **photo TFT physique**, et tester curseur / `!CLS` / orientation tactile 10↔9↔10 / LIST / RUN. Les commandes BASIC normales sont **rejetées** pendant un diagnostic figé sans muter le programme. `!VPROBE OFF` peut être utilisé à n'importe quelle étape non-faulted.
 
+**Limite de mesure P1 :** pendant VSCR ON, le mode diagnostic fige la CONSOLE et interdit volontairement l'exécution de BASIC : le témoin FOR/NEXT n'est exécuté qu'en OFF (avant la sonde ou après restauration). Les temps/commandes du motif ON ne sont **pas** comparables à un RUN ON et ne prouvent aucune amélioration de scroll BASIC ; l'intégration et le benchmark RUN OFF/ON appartiennent à A1-P2, hors mandat.
+
 **T4/T5/T6 et falsifications :**
 | Test | Action | PASS/FAIL |
 |---|---|---|
@@ -51,7 +53,7 @@ P1 n'altère ni le quantum RUN ni le nombre de bandes dans ce mode : `HW4-SCROLL
 | T3 | MARK après VSP | Pixels blancs à la bonne ligne sans casser les marges ; sinon FAIL |
 | T4 | OFF, rotation, !SHOT, curseur, !CLS, LIST/RUN/BREAK | VSP normalisé, repaint plein, aucune perte de programme, aucun ghosting ; capture logique ≠ preuve TFT |
 | T5 | Policy hôte + commandes inconnues/invalides, ACK sans T1, MARK avant ACK, orientation non10, 0/26 lignes (C99) | Reject fail-closed et aucune commande LCD sans état valide ; faute injectée en mock uniquement ; DMA réel fault ⇒ STOP sans retry |
-| T6 | OFF/ON, mêmes CPU/SPI/HEAD, `HW4-SCROLL-A0`, photos/vidéos UART | Journaliser bandes/bytes/latence vs CPU/BASIC. **P1 n'est PAS un benchmark d'accélération P2** |
+| T6 | RUN FOR/NEXT en OFF ; diagnostic VSCR ON isolé (motif), CPU/SPI/HEAD identiques | Rapporter A0 OFF séparément des compteurs VSCR ON. **Aucune comparaison RUN OFF/ON ni promesse de fluidité en P1** |
 
 Sauvegarder logs bruts UART 115200 avec SHA, commandes, `HW4-VSCR-P1`, `DEVICE_MEMORY` (heap libre/largest/minimum, stack margin, dma_transfers, dma_fault, dma_timeouts, lcd_error), `HW4-SCROLL-A0`, `LCD_METRICS`, plus photos du motif OFF/T1/T2/T3/T4. Toute faute DMA interrompt les tests : aucun retry. Exiger `dma_fault=0 dma_timeouts=0 lcd_error=ESP_OK` pour les étapes PASS. Pile et heap doivent être comparées au même profil CONSOLE et à la base.
 

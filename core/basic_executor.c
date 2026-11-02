@@ -1306,8 +1306,11 @@ static BEStatus execute_line(const BasicProgram *program,
             if (pos == length) {
                 return BE_TRUNCATED;
             }
-            if (body[pos] == (uint8_t)'(' &&
-                logic_tokens_present(body, length, pos)) {
+            /* Match tokenizer/LIST dispatch: NOT, AND, OR and XOR need
+             * no opening parenthesis. The scanner examines ONLY the IF
+             * condition (stops at THEN, skips opaque BVR cache bytes), so
+             * logical tokens in THEN/ELSE cannot change legacy IF routing. */
+            if (logic_tokens_present(body, length, pos)) {
                 int16_t condition;
                 status = evaluate_logical_integer(body, length, &pos,
                                                   variables, 1, &condition);

@@ -50,8 +50,10 @@ static void setup(void)
     assert(cpc_video_init(&f.video, f.vram, sizeof(f.vram), CPC_MODE_1));
     assert(cpc_video_set_ink(&f.video, 0U, 1U)); /* boot blue */
     assert(cpc_video_set_ink(&f.video, 1U, 24U)); /* boot yellow */
-    assert(cpc_video_set_ink(&f.video, 2U, 6U)); /* configured red */
-    assert(cpc_video_set_ink(&f.video, 3U, 18U)); /* configured green */
+    /* Historical PEN15 / red-green fixture: explicitly non-default
+     * now that CONSOLE boot and !CLS use genuine CPC cyan/red. */
+    assert(cpc_video_set_ink(&f.video, 2U, 6U)); /* experimental red */
+    assert(cpc_video_set_ink(&f.video, 3U, 18U)); /* PEN15 green witness */
     assert(cpc_video_set_text_colors(&f.video, 1U, 0U));
     assert(cpc_text_init(&f.text, &f.video, glyph, NULL));
     assert(f.video.pen == 1U && f.video.paper == 0U);
@@ -330,9 +332,9 @@ static void test_scrolling_preserves_text_counters(void)
 }
 
 
-/* C1 regression: actual CONSOLE !CLS wrapper invokes the real
- * cpc_uart_console_clear(); no fake video reset or substituted sink.
- * The same source must FAIL on C1 red and PASS after palette restoration. */
+/* Historical experimental INK2 red/INK3 green C1 witness: real BSR and
+ * cpc_uart_console_clear() path. After !CLS the CPC palette is checked
+ * before explicitly restoring this legacy colour witness for replay. */
 static void run_c1_colour_cases(void)
 {
     const uint8_t expected_pen[] = {2U,3U,15U,4U};
@@ -395,12 +397,14 @@ static void test_c1_real_console_cls_palette(void)
     assert(f.video.mode==CPC_MODE_1 && f.video.paper==0U &&
            f.video.pen==1U);
     assert(f.video.ink[0]==1U && f.video.ink[1]==24U);
-    /* C1 RED EXPECTATION: original cpc_uart_console_clear resets mode and
-     * overwrites INK2/3 with defaults (20/6), not boot's 6/18. */
-    assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+    /* !CLS now restores CPC cyan/red: the prior green PEN15 context
+     * is NOT inherited. Keep the historical experimental witness explicit. */
+    assert(f.video.ink[2]==20U && f.video.ink[3]==6U);
     assert(f.text.bytes_received==0U && f.text.glyphs_drawn==0U);
+    assert(cpc_video_set_ink(&f.video,2U,6U)); /* experimental red */
+    assert(cpc_video_set_ink(&f.video,3U,18U)); /* PEN15 green witness */
     assert(cpc_uart_console_prompt(&f.text,&cleared) && !cleared);
-    run_c1_colour_cases(); /* colour and PEN16 still valid after !CLS */
+    run_c1_colour_cases(); /* historic context explicitly configured */
 }
 
 
@@ -434,7 +438,7 @@ static void test_j118b_ink_explicit_reject_no_partial_replay(void)
     assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
     assert(f.program.size==original_program_size);
     assert(hw4_pen_console_clear(&f.text)); /* real C1 !CLS path */
-    assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+    assert(f.video.ink[2]==20U && f.video.ink[3]==6U);
     assert_rejected_replay(f.events,3U,f.output,f.written,
                            HW4_PEN_SET_INK_UNSUPPORTED);
     assert(f.program.size==original_program_size);
@@ -462,7 +466,10 @@ static void test_c1_run_stop_case(bool ink_only)
         if(run_index==1U) {
             assert(hw4_pen_console_clear(&f.text)); /* real C1 !CLS */
             assert(f.program.size==original_size);
-            assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+            assert(f.video.ink[2]==20U && f.video.ink[3]==6U);
+            /* Retain the old red/green test context, explicitly. */
+            assert(cpc_video_set_ink(&f.video,2U,6U));
+            assert(cpc_video_set_ink(&f.video,3U,18U));
         }
         assert(submit("RUN").status==BSR_OK);
         for(unsigned i=0U;i<4U;++i) {
@@ -582,7 +589,7 @@ static void test_c1_c2_successive_pen_lines_reach_end(void)
         bool ready=false,cleared=false;
         if(pass!=0U) {
             assert(hw4_pen_console_clear(&f.text)); /* real !CLS */
-            assert(f.video.ink[2]==6U && f.video.ink[3]==18U);
+            assert(f.video.ink[2]==20U && f.video.ink[3]==6U);
             assert(f.program.size==stored);
         }
         assert(submit("RUN").status==BSR_OK);

@@ -198,7 +198,7 @@ static int print_negative(void) {
     CHECK(send(&f,"10 PRINT A").status==BSR_OK);
     CHECK(send(&f,"RUN").status==BSR_OK);
     CHECK(fail(&f,BE_VARIABLE_NOT_FOUND,sizeof(f.output))==0);
-    value.type=(uint8_t)BVT_REAL;value.data.real5[4]=0x81u;
+    value.type=(uint8_t)BVT_REAL;value.data.real5[4]=0x82u; /* non-witness store */
     CHECK(bvs_assign(&f.store,&key,&value)==BVS_OK);
     CHECK(fail(&f,BE_UNSUPPORTED,sizeof(f.output))==0);
     value.data.real5[4]=0x80u;

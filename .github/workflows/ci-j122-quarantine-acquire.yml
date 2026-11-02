@@ -19,7 +19,7 @@ concurrency:
 jobs:
   j122-c1-acquire-quarantine-only:
     # Disposable harness only. NEVER merge this job into the product branch.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/infra/j1-22-a-acquire-only'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/infra/j1-22-a-acquire-only' && !contains(github.event.head_commit.message, '[j122-evidence-transfer]')
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     permissions:
@@ -138,3 +138,49 @@ jobs:
             ${{ runner.temp }}/j122-negative-absent.log
           retention-days: 14
           if-no-files-found: warn
+
+  j122-c1-original-artifact-transfer-readonly:
+    # Temporary read-only transport. Not a re-acquisition or sealed-verifier PASS.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/infra/j1-22-a-acquire-only' && contains(github.event.head_commit.message, '[j122-evidence-transfer]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    env:
+      ORIGINAL_RUN: '41464839712'
+      ORIGINAL_ARTIFACT: '13151175880'
+      ORIGINAL_MANIFEST_SHA256: 'f77f770972ddf8f3710b43a36e43fd554a11edd9c98b099ac26497a514f49b92'
+      ORIGINAL_ZIP_SHA256: '60977e10abae836f6c59adc3f54b51829abc8a5e65e802efb289fcd0f053df3b'
+    steps:
+      - name: Read ORIGINAL external artifact by immutable ID, verify bytes, expose transport only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/infra/j1-22-a-acquire-only
+          test "$GITHUB_EVENT_NAME" = push
+          test "$GITHUB_REPOSITORY" = Kharn27/ESP32-Locomotive-Basic
+          curl --fail --silent --show-error --location \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ORIGINAL_ARTIFACT/zip" \
+            --output "$RUNNER_TEMP/original-41464839712.zip"
+          echo "$ORIGINAL_ZIP_SHA256  $RUNNER_TEMP/original-41464839712.zip" | sha256sum -c
+          mkdir -p "$RUNNER_TEMP/verify-original"
+          unzip -q "$RUNNER_TEMP/original-41464839712.zip" -d "$RUNNER_TEMP/verify-original"
+          echo "$ORIGINAL_MANIFEST_SHA256  $RUNNER_TEMP/verify-original/archive/manifest.json" | sha256sum -c
+          (
+            cd "$RUNNER_TEMP/verify-original"
+            sha256sum -c external/original-files-sha256.txt > "$RUNNER_TEMP/j122-external-check.txt"
+            test "$(wc -l < "$RUNNER_TEMP/j122-external-check.txt")" -eq 385
+            grep '^PR_HEAD=787af8a9159d573c3f6444248666001e3b159ce8$' external/provenance.txt
+            grep '^HARNESS_SHA=758617718e1be070b1dec9e2827d7ae2584235f1$' external/provenance.txt
+          )
+          echo 'J122_C1_ORIGINAL_ARTIFACT_BYTES_MATCH_INDEPENDENT_AUDIT'
+          echo 'J122_B64_ARCHIVE_BEGIN'
+          base64 -w 0 "$RUNNER_TEMP/original-41464839712.zip" | fold -w 1024 | sed 's/^/J122_EVIDENCE_CHUNK /'
+          echo 'J122_B64_ARCHIVE_END'
+          echo 'J122_C1_READONLY_TRANSPORT_COMPLETE'

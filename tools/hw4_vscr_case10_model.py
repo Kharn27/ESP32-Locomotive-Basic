@@ -121,16 +121,19 @@ class Case10Model:
     def physical(self) -> list[str]:
         return [self.gram[self._address(y)] for y in range(HEIGHT)]
 
-    def shot(self) -> list[str]:
-        """Like !SHOT, read logical rows, never GRAM or cursor hardware."""
-        return self.logical.copy()
-
-    def visible_with_cursor(self) -> list[str]:
-        visible = self.physical()
+    def _with_overlay(self, rows: list[str]) -> list[str]:
+        image = rows.copy()
         if self.cursor is not None:
             x, y = self.cursor
-            visible[y] = f"OVERLAY:x{x}:" + visible[y]
-        return visible
+            image[y] = f"OVERLAY:x{x}:" + image[y]
+        return image
+
+    def shot(self) -> list[str]:
+        """Like real !SHOT, render logical rows INCLUDING cursor overlay."""
+        return self._with_overlay(self.logical)
+
+    def visible_with_cursor(self) -> list[str]:
+        return self._with_overlay(self.physical())
 
     def set_cursor(self, x: int, y: int) -> None:
         if not 0 <= x < WIDTH or not TOP <= y < TOP + VIEW:

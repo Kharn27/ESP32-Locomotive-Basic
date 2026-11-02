@@ -5,6 +5,9 @@
  */
 #include "basic_session_runtime.h"
 #include "hw4_pen_bridge.h"
+#include "hw4_run_scheduler.h"
+#include "hw4_run_break_input.h"
+#include "hw4_run_diag_source.h"
 #include "basic_variable_store.h"
 #include "j1_15_c_string_arena.h"
 #include "cpc_font.h"
@@ -48,7 +51,10 @@ enum {
     LCD_HEIGHT = 240,
     LCD_ROWS_PER_BAND = 8,
     CPC_ROWS = 25,
-    RUN_STEP_BUDGET = 256,
+    RUN_QUANTUM = 8, /* eight BASIC steps max per app_main iteration */
+    RUN_UART_POLL_BYTES = 16,
+    RUN_UART_DRAIN_BYTES = 768, /* bounded UART RX ring+FIFO drain */
+    RUN_LOG_QUANTA = 64,
     PEN_EVENT_CAPACITY = 3, /* A0 DRAM guard: 3 typed events, no heap/VRAM */
     ECHO_IDLE_MS = 20,
     TOUCH_POLL_MS = 20,
@@ -93,6 +99,15 @@ static uint32_t s_shot_seq;
  * also contain cursor, text or !CLS writes. Never label it scroll-exclusive. */
 static Hw4ScrollMetrics s_scroll_metrics;
 static Hw4TouchT1 s_touch; /* CONSOLE only; 0 heap, 0 extra tasks */
+static Hw4RunScheduler s_run_scheduler;
+static Hw4RunBreakInput s_run_input;
+static bool s_run_active;
+static bool s_run_skip_crlf_lf;
+static size_t s_run_quanta;
+static uint64_t s_run_break_requested_us;
+static const char *s_run_break_source;
+static CpcReadyTransition s_run_ready_transition;
+static Hw4PenStatus s_run_video_failure;
 /* B2-C1 instrumentation: bounded histogram, never a second framebuffer. */
 static struct {
     uint32_t flushes, bands, max_us, histogram[12];
@@ -375,11 +390,14 @@ static bool repaint_dirty(void)
     }
     if(s_text.scrolls<s_scroll_reported) s_scroll_reported=0U; /* !CLS */
     if(s_text.scrolls>s_scroll_reported) {
-        printf("HW4-C3-B2 SCREEN_SCROLL rows=%u total=%u "
-               "policy=mode1_vram program_preserved=1\n",
-               (unsigned)(s_text.scrolls-s_scroll_reported),
-               (unsigned)s_text.scrolls);
-        s_scroll_reported=s_text.scrolls;
+        /* No UART log per scroll during an infinite RUN; preserve metric. */
+        if(!s_run_active || s_run_quanta%RUN_LOG_QUANTA==0U) {
+            printf("HW4-C3-B2 SCREEN_SCROLL rows=%u total=%u "
+                   "policy=mode1_vram program_preserved=1\n",
+                   (unsigned)(s_text.scrolls-s_scroll_reported),
+                   (unsigned)s_text.scrolls);
+            s_scroll_reported=s_text.scrolls;
+        }
     }
     return true;
 }
@@ -403,54 +421,24 @@ static bool display_bytes(const char *kind,const uint8_t *data,size_t size)
                (unsigned)(s_text.bytes_clipped-clipped_before));
     return true; /* final frame is flushed by prompt */
 }
-/* Preflight ALL typed events before changing ANY pixel or sink counter.
- * One original PRINT_BYTES log is retained, not fragments/escape codes. */
-static Hw4PenDisplayResult display_print_events(size_t event_count)
+/* Exact PEN/INK whole-step preflight and ordered replay; no per-step logs. */
+static bool run_preflight(void *ctx,const uint8_t *bytes,size_t length,
+                          const BEVideoEvent *events,size_t count)
 {
-    Hw4PenStatus validation=hw4_pen_preflight(&s_text,s_basic.output,
-                            s_basic.written,s_basic.scratch.events,event_count);
-    if(validation!=HW4_PEN_OK) {
-        printf("HW4-PEN-A VIDEO_REJECT category=%s status=%d printed=0 event_applied=0 print_applied=0\n",
-               validation==HW4_PEN_SET_INK_UNSUPPORTED ?
-               "SET_INK_UNSUPPORTED" : "PEN_PREFLIGHT", (int)validation);
-        (void)bsr_stop(&s_basic.runtime);
-        return display_error() ? HW4_PEN_DISPLAY_REJECT_DIAGNOSED :
-                                 HW4_PEN_DISPLAY_FATAL;
-    }
-    if(s_basic.written>0U)
-        log_bytes("PRINT_BYTES",s_basic.output,s_basic.written);
-    const size_t clipped_before=s_text.bytes_clipped;
-    Hw4PenStatus replay=hw4_pen_replay(&s_text,s_basic.output,
-                             s_basic.written,s_basic.scratch.events,event_count);
-    if(replay!=HW4_PEN_OK) {
-        printf("HW4-PEN-A VIDEO_REPLAY_FAILURE status=%d\n",(int)replay);
-        (void)fail("PEN_REPLAY",(int)replay);
-        return HW4_PEN_DISPLAY_FATAL;
-    }
-    for(size_t i=0U;i<event_count;++i) {
-        uint8_t mapped=0U;
-        if(hw4_pen_pixel_index(&s_video,s_basic.scratch.events[i].pen,&mapped)
-           !=HW4_PEN_OK) {
-            (void)fail("PEN_CONTEXT_CHANGED",-1);
-            return HW4_PEN_DISPLAY_FATAL;
-        }
-        printf("HW4-PEN-A VIDEO_EVENT type=SET_TEXT_PEN logical=%u "
-               "pixel=%u print_offset=%u order=%u/%u "
-               "renderer=MODE1\n",
-               (unsigned)s_basic.scratch.events[i].pen,(unsigned)mapped,
-               (unsigned)s_basic.scratch.events[i].print_offset,
-               (unsigned)(i+1U),(unsigned)event_count);
-    }
-    if(s_text.bytes_clipped>clipped_before)
-        printf("HW4-C3-B2 SCREEN_OUTPUT_CLIPPED bytes=%u "
-               "policy=unexpected_clip\n",
-               (unsigned)(s_text.bytes_clipped-clipped_before));
-    return HW4_PEN_DISPLAY_OK;
+    (void)ctx;
+    s_run_video_failure=hw4_pen_preflight(&s_text,bytes,length,events,count);
+    return s_run_video_failure==HW4_PEN_OK;
+}
+static bool run_replay(void *ctx,const uint8_t *bytes,size_t length,
+                       const BEVideoEvent *events,size_t count)
+{
+    (void)ctx;
+    s_run_video_failure=hw4_pen_replay(&s_text,bytes,length,events,count);
+    return s_run_video_failure==HW4_PEN_OK;
 }
 static bool display_error(void)
 {
-    /* The UART reject, RUN step and budget errors are host-only; no ROM
-     * diagnosis can be inferred from their internal numeric statuses. */
+    /* UART, renderer and host contract rejects are never CPC ROM errors. */
     printf("HW4-DIAG-A DIAG_POLICY origin=runtime_or_uart "
            "category=HOST_GENERIC message=ERROR\n");
     if(!cpc_diag_policy_write(&s_text,CPC_DIAG_HOST_GENERIC))
@@ -516,66 +504,93 @@ static bool basic_submit(const uint8_t *source,size_t length,
                                           s_basic.written)) return false;
     return true;
 }
+/* RUN submitted by the real BSR; this starts, but does not execute, it. */
 static bool basic_run(void)
 {
-    unsigned steps=0U;
-    printf("HW4-C2 BSR_RUN state=%u budget=%u\n",
-           (unsigned)s_basic.runtime.state,RUN_STEP_BUDGET);
-    for(steps=0U;steps<RUN_STEP_BUDGET;++steps) {
-        size_t event_count=0U;
-        s_basic.written=0U;
-        BSRResult r=bsr_step_events(&s_basic.runtime,s_basic.output,
-                             sizeof(s_basic.output),&s_basic.written,
-                             s_basic.scratch.events,PEN_EVENT_CAPACITY,&event_count);
-        if(r.status==BSR_END) {
-            printf("HW4-C2 BSR_END status=BE_END steps=%u\n",steps);
-            return true;
+    hw4_run_break_input_init(&s_run_input);
+    if(!hw4_run_scheduler_init(&s_run_scheduler,&s_basic.runtime))
+        return fail("RUN_SCHEDULER_INIT",-1);
+    s_run_active=true;
+    s_run_quanta=0U;
+    s_run_break_requested_us=0U;
+    s_run_break_source="none";
+    s_run_video_failure=HW4_PEN_OK;
+    s_run_ready_transition=CPC_READY_RUN_RETURN;
+    printf("HW4-RUN-B RUN_START quantum=%u uart_poll_max=%u "
+           "budget=none sha=%s\n",RUN_QUANTUM,RUN_UART_POLL_BYTES,
+           HW4_SHOT_GIT_SHA);
+    return true;
+}
+static bool basic_run_slice(void)
+{
+    Hw4RunReceiver receiver={run_preflight,run_replay,NULL,NULL};
+    size_t event_count=0U;
+    Hw4RunSlice slice;
+    s_basic.written=0U;
+    slice=hw4_run_scheduler_slice(&s_run_scheduler,RUN_QUANTUM,&receiver,
+                       s_basic.output,sizeof(s_basic.output),&s_basic.written,
+                       s_basic.scratch.events,PEN_EVENT_CAPACITY,&event_count);
+    if(s_run_quanta!=SIZE_MAX) ++s_run_quanta;
+    if(slice.state==HW4_RUN_YIELDED) {
+        /* NO Ready, prompt, stop or restart at a quantum boundary. */
+        if(!repaint_dirty()) return false;
+        if(s_run_quanta%RUN_LOG_QUANTA==0U) {
+            printf("HW4-RUN-B YIELD quanta=%u steps=%u state=RUNNING "
+                   "program_preserved=1 sha=%s\n",
+                   (unsigned)s_run_quanta,
+                   (unsigned)s_run_scheduler.total_steps,HW4_SHOT_GIT_SHA);
+            if(s_run_quanta%(RUN_LOG_QUANTA*8U)==0U)
+                memory_report("run_running");
         }
-        if(r.status!=BSR_OK || r.executor_status!=BE_OK) {
-            const char *pen_diag=r.executor_status==BE_INVALID_PEN ?
-                "INVALID_PEN" : r.executor_status==BE_UNSUPPORTED ?
-                "UNSUPPORTED_UNVERIFIED" : r.executor_status==BE_NO_EVENT_SPACE ?
-                "EVENT_CAPACITY" : "HOST_GENERIC";
-            printf("HW4-C2 BSR_STEP_FAIL BSR=%d BE=%d step=%u\n",
-                   (int)r.status,(int)r.executor_status,steps);
-            /* The failed step is atomic; the executor still points to the
-             * authentic numbered BASIC record. Resolve BEFORE bsr_stop(). */
-            CpcStepDiagnostic diagnostic=cpc_diag_policy_step(
-                r,&s_basic.runtime);
-            const char *diag_origin=
-                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE ?
-                    "CPC_PEN_ORACLE" :
-                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_GOSUB_CPC_ORACLE ?
-                    "CPC_GOSUB_ORACLE" :
-                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_RETURN_CPC_ORACLE ?
-                    "CPC_RETURN_ORACLE" : "HOST_NOT_CPC_ERR";
-            printf("HW4-PEN-A STEP_DIAG category=%s events_applied=0 "
-                   "print_applied=0 origin=%s basic_line=%u host_cpc_err=none\n",
-                   pen_diag,diag_origin,(unsigned)diagnostic.line_number);
-            printf("HW4-DIAG-PEN-A DIAG_POLICY category=%s line=%u "
-                   "source=%s message=%s\n",
-                   cpc_diag_policy_category(diagnostic.category),
-                   (unsigned)diagnostic.line_number,diag_origin,
-                   cpc_diag_policy_message(diagnostic.category));
-            (void)bsr_stop(&s_basic.runtime);
-            if(!cpc_diag_policy_write_step(&s_text,diagnostic))
-                return fail("STEP_DIAG_TEXT",-1);
-            return true;
-        }
-        if(event_count!=0U) {
-            /* Shared pure C99 decision: diagnosed reject exits RUN to Ready. */
-            Hw4PenRunAction next=hw4_pen_run_after_display(
-                display_print_events(event_count));
-            if(next==HW4_PEN_RUN_DONE) return true;
-            if(next==HW4_PEN_RUN_FATAL) return false;
-        } else if(s_basic.written>0U &&
-                  !display_bytes("PRINT_BYTES",s_basic.output,s_basic.written))
-            return false;
+        return true;
     }
-    (void)bsr_stop(&s_basic.runtime);
-    printf("HW4-C2 BSR_STEP_BUDGET_EXCEEDED limit=%u "
-           "runtime_stopped=1\n",RUN_STEP_BUDGET);
-    return display_error();
+    s_run_active=false;
+    if(slice.state==HW4_RUN_EXECUTOR_ERROR) {
+        const BSRResult r=s_run_scheduler.last_result;
+        /* Resolve authentic PEN 16/L20 cursor BEFORE the only error stop. */
+        const CpcStepDiagnostic diag=cpc_diag_policy_step(r,&s_basic.runtime);
+        printf("HW4-DIAG-PEN-A DIAG_POLICY category=%s line=%u "
+               "source=%s message=%s\n",
+               cpc_diag_policy_category(diag.category),
+               (unsigned)diag.line_number,
+               hw4_run_diag_source(diag.origin),
+               cpc_diag_policy_message(diag.category));
+        (void)bsr_stop(&s_basic.runtime);
+        if(!cpc_diag_policy_write_step(&s_text,diag))
+            return fail("RUN_STEP_DIAG",-1);
+    } else if(slice.state==HW4_RUN_DISPLAY_ERROR) {
+        printf("HW4-PEN-A VIDEO_REJECT status=%d phase=%d "
+               "preflight_atomic=%u pixel_rollback=%s\n",
+               (int)s_run_video_failure,(int)s_run_scheduler.display_failure,
+               (unsigned)(s_run_scheduler.display_failure==
+                          HW4_RUN_DISPLAY_PREFLIGHT_FAILED),
+               s_run_scheduler.display_failure==HW4_RUN_DISPLAY_PREFLIGHT_FAILED ?
+                   "NO_PIXELS_APPLIED" : "PARTIAL_UNVERIFIED");
+        /* Fail-stop: cannot roll back an already partly replayed video step. */
+        (void)bsr_stop(&s_basic.runtime);
+        if(!display_error()) return false;
+    } else if(slice.state==HW4_RUN_INVALID_ARGUMENT) {
+        printf("HW4-RUN-B CONTRACT_REJECT bsr=%d "
+               "policy=host_not_cpc\n",(int)s_run_scheduler.last_result.status);
+        (void)bsr_stop(&s_basic.runtime);
+        if(!display_error()) return false;
+    } else if(slice.state!=HW4_RUN_ENDED && slice.state!=HW4_RUN_BROKEN) {
+        return fail("RUN_STATE",(int)slice.state);
+    }
+    printf("HW4-RUN-B RUN_TERMINAL state=%u quanta=%u steps=%u "
+           "break_source=%s stop_calls=%u latency_us=%llu "
+           "ignored_input_lines=%u overflow_input_lines=%u "
+           "sha=%s program_preserved=1\n",
+           (unsigned)slice.state,(unsigned)s_run_quanta,
+           (unsigned)s_run_scheduler.total_steps,s_run_break_source,
+           s_run_scheduler.stop_calls,
+           (unsigned long long)(s_run_break_requested_us ?
+               (uint64_t)esp_timer_get_time()-s_run_break_requested_us : 0U),
+           (unsigned)s_run_input.ignored_lines,
+           (unsigned)s_run_input.overflow_lines,
+           HW4_SHOT_GIT_SHA);
+    memory_report("run_terminal");
+    return apply_ready_policy(s_run_ready_transition) && prompt();
 }
 static bool is_command(const uint8_t *source,size_t n,const char *word)
 {
@@ -624,7 +639,14 @@ static bool execute_line(void)
         transition=CPC_READY_HOST_CLS; /* screen-only, no CPC equivalent */
     } else if(is_command(source,length,"!DEMO")) {
         if(!diagnostic_demo()) return false;
-        transition=CPC_READY_HOST_DEMO; /* retain existing host behavior */
+        if(s_run_active) {
+            s_run_ready_transition=CPC_READY_HOST_DEMO;
+            return true;
+        }
+        transition=CPC_READY_HOST_DEMO;
+    } else if(is_command(source,length,"!BREAK")) {
+        printf("HW4-RUN-B HOST_BREAK_NOOP reason=NOT_RUNNING\n");
+        transition=CPC_READY_UNCHARACTERIZED_DIRECT;
     } else {
         size_t a=0U,b=length;
         while(a<b && source[a]==' ') ++a;
@@ -638,8 +660,10 @@ static bool execute_line(void)
         if(had_diagnostic) {
             transition=CPC_READY_BASIC_DIAGNOSTIC;
         } else {
-            if(run && s_basic.runtime.state==BSR_RUNNING)
+            if(run && s_basic.runtime.state==BSR_RUNNING) {
                 if(!basic_run()) return false;
+                return true; /* RUN yields, no Ready/prompt until terminal */
+            }
             transition=run ? CPC_READY_RUN_RETURN :
                        list ? CPC_READY_LIST_RETURN :
                        new_program ? CPC_READY_NEW_RETURN :
@@ -738,6 +762,45 @@ void app_main(void)
            "command_flush=1 dma_fail_stop=1\n",ECHO_IDLE_MS,ECHO_MAX_BYTES);
     for(;;) {
         if(!touch_poll()) return;
+        if(s_run_active) {
+            /* UART is polled before every quantum; no editor/SHOT in RUN. */
+            for(unsigned i=0U;i<RUN_UART_POLL_BYTES;++i) {
+                uint8_t byte=0U;
+                const int n=uart_read_bytes(UART_NUM_0,&byte,1U,0);
+                if(n<0) { (void)fail("RUN_UART_READ",n); return; }
+                if(n==0) break;
+                const Hw4BreakInputEvent event=
+                    hw4_run_break_input_feed(&s_run_input,byte);
+                if(event==HW4_BREAK_INPUT_REQUEST) {
+                    s_run_break_source=byte==(uint8_t)'\r' ? "UART_CR" : "UART_LF";
+                    s_run_break_requested_us=(uint64_t)esp_timer_get_time();
+                    s_run_skip_crlf_lf=byte==(uint8_t)'\r';
+                    if(!hw4_run_scheduler_request_break(&s_run_scheduler)) {
+                        (void)fail("RUN_BREAK_REQUEST",-1); return;
+                    }
+                    /* Drain the existing UART0 RX queue (512 ring + FIFO)
+                     * without importing another IRAM ringbuffer primitive.
+                     * Discard all typed-ahead BASIC, E3 and !SHOT bytes.
+                     * A late asynchronous CRLF LF is swallowed below. */
+                    unsigned discarded=0U;
+                    for(;discarded<RUN_UART_DRAIN_BYTES;++discarded) {
+                        uint8_t ignored=0U;
+                        const int consumed=uart_read_bytes(UART_NUM_0,
+                                                          &ignored,1U,0);
+                        if(consumed<0) {
+                            (void)fail("RUN_UART_DRAIN",consumed); return;
+                        }
+                        if(consumed==0) break;
+                    }
+                    printf("HW4-RUN-B UART_DRAIN discarded=%u max=%u\n",
+                           discarded,RUN_UART_DRAIN_BYTES);
+                    break;
+                }
+            }
+            if(!basic_run_slice()) return;
+            vTaskDelay(1); /* mandatory cooperative yield between quanta */
+            continue;
+        }
         uint8_t ch=0U;
         int got=uart_read_bytes(UART_NUM_0,&ch,1U,
                                 pdMS_TO_TICKS(echo_pending ? ECHO_IDLE_MS : TOUCH_POLL_MS));
@@ -751,6 +814,10 @@ void app_main(void)
                 echo_pending=0U;
             }
             continue;
+        }
+        if(s_run_skip_crlf_lf) {
+            s_run_skip_crlf_lf=false;
+            if(ch==(uint8_t)'\n') continue;
         }
         UartLineEvent event=uart_line_feed_screen(&s_line,ch);
         if(event==UART_LINE_SCREENSHOT) {

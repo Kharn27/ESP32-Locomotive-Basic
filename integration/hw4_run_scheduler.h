@@ -8,10 +8,8 @@
 
 /* At most 128 BASIC steps per host turn. Owner yields/polls between turns. */
 #define HW4_RUN_QUANTUM_MAX 128u
-/* B2b: static, caller-owned (scheduler descriptor) preview staging. Separate
- * from public output/event arrays. CONSOLE owns a static scheduler; no heap. */
-#define HW4_RUN_PREVIEW_BYTES 4096u
-#define HW4_RUN_PREVIEW_EVENTS 8u
+/* Caller owns staging storage and its bounded descriptor; no allocation.
+ * CONSOLE reuses inactive tokenizer scratch during RUN to meet DRAM gate. */
 typedef enum {
     HW4_RUN_IDLE = 0, HW4_RUN_RUNNING, HW4_RUN_YIELDED,
     HW4_RUN_BREAK_REQUESTED, HW4_RUN_BROKEN, HW4_RUN_ENDED,
@@ -40,6 +38,14 @@ typedef struct {
     void *context;
 } Hw4RunReceiver;
 typedef struct {
+    uint8_t *output;
+    size_t output_capacity;
+    BEVideoEvent *events;
+    size_t event_capacity;
+    size_t written;
+    size_t event_written;
+} Hw4RunPreview;
+typedef struct {
     BasicSessionRuntime *runtime; /* borrowed; RUN already submitted */
     Hw4RunState state;
     BSRResult last_result; /* intact for diagnostics before bsr_stop */
@@ -47,10 +53,7 @@ typedef struct {
     size_t total_steps; /* saturating statistic, not a total execution cap */
     unsigned stop_calls;
     bool break_pending;
-    uint8_t preview_output[HW4_RUN_PREVIEW_BYTES];
-    BEVideoEvent preview_events[HW4_RUN_PREVIEW_EVENTS];
-    size_t preview_written;
-    size_t preview_event_written;
+    Hw4RunPreview *preview; /* borrowed, must be bound before slice */
 } Hw4RunScheduler;
 typedef struct {
     Hw4RunState state;
@@ -62,8 +65,13 @@ typedef struct {
 bool hw4_run_scheduler_init(Hw4RunScheduler *scheduler,
                             BasicSessionRuntime *runtime);
 bool hw4_run_scheduler_request_break(Hw4RunScheduler *scheduler);
-/* Staging arrays are part of the caller-owned scheduler. For CONSOLE this is
- * static; pass capacities <= HW4_RUN_PREVIEW_BYTES/EVENTS. A preflight reject
+/* Bind disjoint caller-owned staging before RUN slices. Rebind after init.
+ * Staging capacity may be smaller than public capacity: if a step cannot
+ * preview in that bound it fails without any BASIC/public/video mutation. */
+bool hw4_run_scheduler_bind_preview(Hw4RunScheduler *scheduler,
+                                    Hw4RunPreview *preview);
+/* Staging arrays are caller-owned and static for CONSOLE. Provide a private
+ * buffer for output and events disjoint from public output/events. A preflight reject
  * leaves public output/events/counts untouched, as does a preview failure.
  * After preflight, commit into public arrays; compare before video replay.
  * A post-commit divergence fails closed (no replay), NOT a BASIC rollback.

@@ -222,6 +222,7 @@ static BEStatus print8_piece(const uint8_t *body, size_t length, size_t *at,
     size_t p = *at;
     int closed = 0;
     BEStatus st;
+    skip_spaces(body, length, &p);
     if (length - p < 4u || body[p++] != (uint8_t)'#' ||
         body[p++] != 0x16u || body[p++] != (uint8_t)',')
         return BE_BAD_SEQUENCE;

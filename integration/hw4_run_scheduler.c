@@ -21,8 +21,22 @@ bool hw4_run_scheduler_init(Hw4RunScheduler *scheduler,
     scheduler->total_steps = 0u;
     scheduler->stop_calls = 0u;
     scheduler->break_pending = false;
-    scheduler->preview_written = 0u;
-    scheduler->preview_event_written = 0u;
+    scheduler->preview = NULL;
+    return true;
+}
+
+bool hw4_run_scheduler_bind_preview(Hw4RunScheduler *scheduler,
+                                    Hw4RunPreview *preview)
+{
+    if (scheduler == NULL || preview == NULL ||
+        scheduler->runtime == NULL ||
+        (scheduler->state != HW4_RUN_RUNNING &&
+         scheduler->state != HW4_RUN_YIELDED) ||
+        preview->output == NULL || preview->output_capacity == 0u ||
+        (preview->events == NULL && preview->event_capacity != 0u) ||
+        preview->event_capacity > SIZE_MAX / sizeof(BEVideoEvent))
+        return false;
+    scheduler->preview = preview;
     return true;
 }
 
@@ -56,8 +70,12 @@ static bool arguments_ok(const Hw4RunScheduler *scheduler, size_t quantum,
            event_written != NULL &&
            (events != NULL || event_capacity == 0u) &&
            event_capacity <= SIZE_MAX / sizeof(*events) &&
-           output_capacity <= HW4_RUN_PREVIEW_BYTES &&
-           event_capacity <= HW4_RUN_PREVIEW_EVENTS;
+           scheduler->preview != NULL &&
+           scheduler->preview->output != NULL &&
+           scheduler->preview->output_capacity != 0u &&
+           (scheduler->preview->events != NULL ||
+            scheduler->preview->event_capacity == 0u) &&
+           scheduler->preview->event_capacity <= SIZE_MAX / sizeof(*events);
 }
 
 /* The preview validates its OWN scratch; it cannot validate the public
@@ -83,13 +101,15 @@ static bool regions_overlap(Hw4RunRegion a, Hw4RunRegion b)
 #endif
 }
 
-static bool public_overlap(const BasicSessionRuntime *runtime,
+static bool public_overlap(const Hw4RunScheduler *scheduler,
                            const uint8_t *output, size_t output_capacity,
                            const size_t *written, const BEVideoEvent *events,
                            size_t event_capacity, const size_t *event_written)
 {
-    Hw4RunRegion parts[10];
+    Hw4RunRegion parts[15];
     size_t n = 0u, i, j;
+    const BasicSessionRuntime *runtime = scheduler->runtime;
+    const Hw4RunPreview *preview = scheduler->preview;
     const BasicProgram *p = runtime->program;
     const BasicVariableStore *v = runtime->variables;
     if (p == NULL || p->data == NULL) return false; /* BSR reports invalid */
@@ -100,6 +120,13 @@ static bool public_overlap(const BasicSessionRuntime *runtime,
     parts[n++] = (Hw4RunRegion){written, sizeof(*written)};
     parts[n++] = (Hw4RunRegion){events, event_capacity * sizeof(*events)};
     parts[n++] = (Hw4RunRegion){event_written, sizeof(*event_written)};
+    parts[n++] = (Hw4RunRegion){scheduler, sizeof(*scheduler)};
+    parts[n++] = (Hw4RunRegion){preview->output, preview->output_capacity};
+    parts[n++] = (Hw4RunRegion){preview->events,
+                               preview->event_capacity * sizeof(*preview->events)};
+    parts[n++] = (Hw4RunRegion){&preview->written, sizeof(preview->written)};
+    parts[n++] = (Hw4RunRegion){&preview->event_written,
+                               sizeof(preview->event_written)};
     if (v != NULL) {
         if (v->capacity > SIZE_MAX / sizeof(BasicVariableEntry))
             return false; /* BSR validates invalid store separately */
@@ -125,7 +152,7 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
                       events, event_capacity, event_written))
         return outcome(HW4_RUN_INVALID_ARGUMENT, 0u);
 
-    if (public_overlap(scheduler->runtime, output, output_capacity,
+    if (public_overlap(scheduler, output, output_capacity,
                        written, events, event_capacity, event_written)) {
         BSRResult overlap = {BSR_OVERLAP, {BS_OK, BT_OK, BP_OK, BL_OK}, BE_OK};
         scheduler->last_result = overlap;
@@ -149,10 +176,17 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
         }
         /* Stage on B2a's side-effect-free executor before asking VIDEO.
          * Neither output nor events (nor their public lengths) are touched. */
+        Hw4RunPreview *preview = scheduler->preview;
+        const size_t preview_output_capacity =
+            output_capacity < preview->output_capacity ?
+                output_capacity : preview->output_capacity;
+        const size_t preview_event_capacity =
+            event_capacity < preview->event_capacity ?
+                event_capacity : preview->event_capacity;
         step = bsr_preview_step_events(
-            scheduler->runtime, scheduler->preview_output, output_capacity,
-            &scheduler->preview_written, scheduler->preview_events,
-            event_capacity, &scheduler->preview_event_written);
+            scheduler->runtime, preview->output, preview_output_capacity,
+            &preview->written, preview->events, preview_event_capacity,
+            &preview->event_written);
         scheduler->last_result = step;
         if (step.status == BSR_END) {
             /* Only commit advances RUNNING -> IDLE; no video for END. */
@@ -180,10 +214,10 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
             return outcome(HW4_RUN_EXECUTOR_ERROR, steps);
         }
         if (!receiver->preflight(receiver->context,
-                                 scheduler->preview_output,
-                                 scheduler->preview_written,
-                                 scheduler->preview_events,
-                                 scheduler->preview_event_written)) {
+                                 preview->output,
+                                 preview->written,
+                                 preview->events,
+                                 preview->event_written)) {
             scheduler->display_failure = HW4_RUN_DISPLAY_PREFLIGHT_FAILED;
             scheduler->state = HW4_RUN_DISPLAY_ERROR;
             return outcome(HW4_RUN_DISPLAY_ERROR, steps);
@@ -191,8 +225,8 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
         /* One serialized commit: callbacks are pure and may not change
          * borrowed BASIC state between preview and commit. */
         {
-            const size_t preview_bytes = scheduler->preview_written;
-            const size_t preview_events = scheduler->preview_event_written;
+            const size_t preview_bytes = preview->written;
+            const size_t preview_events = preview->event_written;
             size_t j;
             bool same;
             step = bsr_step_events(scheduler->runtime, output, output_capacity,
@@ -201,10 +235,10 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
             same = step.status == BSR_OK && step.executor_status == BE_OK &&
                    *written == preview_bytes && *event_written == preview_events;
             if (same && preview_bytes != 0u)
-                same = memcmp(output, scheduler->preview_output, preview_bytes) == 0;
+                same = memcmp(output, preview->output, preview_bytes) == 0;
             for (j = 0u; same && j < preview_events; ++j) {
                 const BEVideoEvent *a = &events[j];
-                const BEVideoEvent *b = &scheduler->preview_events[j];
+                const BEVideoEvent *b = &preview->events[j];
                 same = a->type == b->type && a->pen == b->pen &&
                        a->print_offset == b->print_offset &&
                        a->ink == b->ink && a->colour == b->colour;

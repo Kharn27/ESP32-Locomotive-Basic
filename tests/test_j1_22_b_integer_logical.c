@@ -335,6 +335,142 @@ static int independent_variable_names(void)
     return 0;
 }
 
+
+/* C1: internal native tokenize -> LIST -> RUN consistency regression.
+ * These are deliberately NOT new independent CPC oracle observations.
+ * Include classic IF paths and ensure THEN/ELSE arm text is not scanned as
+ * a logical condition. The 24 CPC oracle entries above stay unchanged. */
+typedef struct {
+    const char *source;
+    const char *expected_output;
+    int a_value;
+    int b_value;
+    int supply_a;
+    int supply_b;
+    int poison_cache;
+} IFDispatchCase;
+
+static int c1_if_dispatch_case(const IFDispatchCase *c)
+{
+    Fixture f;
+    BasicVariableKey key;
+    BasicVariableValue value;
+    BasicExecutor saved;
+    BasicVariableEntry saved_entries[8];
+    uint8_t saved_storage[1024], saved_output[256];
+    char expected_list[512];
+    size_t n = 0u, i, references = 0u;
+    size_t saved_written, saved_count;
+    CHECK(init(&f) == 0);
+    CHECK(bt_tokenize((const uint8_t *)c->source, strlen(c->source),
+                      f.tokens, sizeof(f.tokens), &n) == BT_OK);
+    if (c->poison_cache) {
+        /* Imported CPC reference caches are opaque, even if their
+         * bytes look like logical opcodes. */
+        for (i = 0u; i + 2u < n; ++i) {
+            if (f.tokens[i] == 0x02u) {
+                f.tokens[i + 1u] = 0xfau;
+                f.tokens[i + 2u] = 0xfeu;
+                ++references;
+                i += 3u;
+            }
+        }
+        CHECK(references == 2u);
+    }
+    CHECK(bp_put(&f.program, 10u, f.tokens, n) == BP_OK);
+    CHECK(add(&f, 20u, "END") == 0);
+    if (c->supply_a || c->supply_b) {
+        memset(&value, 0, sizeof(value));
+        value.type = (uint8_t)BVT_INTEGER;
+        if (c->supply_a) {
+            key = integer_key("A");
+            value.data.integer = (int16_t)c->a_value;
+            CHECK(bvs_assign(&f.store, &key, &value) == BVS_OK);
+        }
+        if (c->supply_b) {
+            key = integer_key("B");
+            value.data.integer = (int16_t)c->b_value;
+            CHECK(bvs_assign(&f.store, &key, &value) == BVS_OK);
+        }
+    }
+    CHECK(snprintf(expected_list, sizeof(expected_list),
+                   "10 %s\n20 END\n", c->source) > 0);
+    CHECK(bl_list_program(&f.program, f.listing, sizeof(f.listing),
+                          &n) == BL_OK);
+    CHECK(n == strlen(expected_list));
+    CHECK(memcmp(f.listing, expected_list, n) == 0);
+    CHECK(be_init_with_store(&f.executor, &f.program, &f.store) == BE_OK);
+    saved = f.executor;
+    memcpy(saved_entries, f.entries, sizeof(saved_entries));
+    memcpy(saved_storage, f.storage, sizeof(saved_storage));
+    saved_count = f.store.count;
+    memset(f.output, 0x6bu, sizeof(f.output));
+    memcpy(saved_output, f.output, sizeof(saved_output));
+    f.written = 1234u;
+    saved_written = f.written;
+    /* Both the branch and its output must remain uncommitted on a
+     * too-small output buffer. Test the entire buffer as a canary. */
+    CHECK(be_step(&f.executor, f.output, 1u, &f.written) == BE_NO_SPACE);
+    CHECK(memcmp(&f.executor, &saved, sizeof(saved)) == 0);
+    CHECK(memcmp(f.entries, saved_entries, sizeof(saved_entries)) == 0);
+    CHECK(memcmp(f.storage, saved_storage, sizeof(saved_storage)) == 0);
+    CHECK(memcmp(f.output, saved_output, sizeof(saved_output)) == 0);
+    CHECK(f.store.count == saved_count && f.written == saved_written);
+    CHECK(be_step(&f.executor, f.output, sizeof(f.output),
+                  &f.written) == BE_OK);
+    CHECK(f.written == strlen(c->expected_output));
+    CHECK(memcmp(f.output, c->expected_output, f.written) == 0);
+    for (i = f.written; i < sizeof(f.output); ++i)
+        CHECK(f.output[i] == 0x6bu);
+    CHECK(f.store.count == saved_count);
+    CHECK(memcmp(f.entries, saved_entries, sizeof(saved_entries)) == 0);
+    CHECK(memcmp(f.storage, saved_storage, sizeof(saved_storage)) == 0);
+    CHECK(bp_validate(&f.program) == BP_OK);
+    return 0;
+}
+
+static int c1_if_dispatch(void)
+{
+    static const IFDispatchCase cases[] = {
+        {"IF NOT 0 THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"",
+         "TAKEN\n", 0, 0, 0, 0, 0},
+        {"IF 1 AND 1 THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"",
+         "TAKEN\n", 0, 0, 0, 0, 0},
+        {"IF 0 AND 1 THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"",
+         "BAD\n", 0, 0, 0, 0, 0},
+        {"IF A% AND 1 THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"",
+         "TAKEN\n", 1, 0, 1, 0, 0},
+        {"IF A% THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"",
+         "TAKEN\n", 1, 0, 1, 0, 0},
+        {"IF A% THEN PRINT #8,\"AND\" ELSE PRINT #8,\"XOR\"",
+         "AND\n", 1, 0, 1, 0, 0},
+        {"IF A%<B% THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"",
+         "TAKEN\n", 0, 1, 1, 1, 0},
+        {"IF A%<B% THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"",
+         "BAD\n", 2, 1, 1, 1, 0},
+        {"IF A%<B% THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"",
+         "TAKEN\n", 0, 1, 1, 1, 1}
+    };
+    Fixture f;
+    size_t i;
+    for (i = 0u; i < sizeof(cases)/sizeof(cases[0]); ++i) {
+        CHECK(c1_if_dispatch_case(&cases[i]) == 0);
+    }
+    /* Error in an unparenthesized logical IF: no branch, store or
+     * output may change. No CPC ERR number is inferred. */
+    CHECK(init(&f) == 0);
+    CHECK(add(&f, 10u,
+        "IF 1 AND (4\\0) THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"") == 0);
+    CHECK(be_init_with_store(&f.executor, &f.program, &f.store) == BE_OK);
+    CHECK(raw_step_failure(&f, BE_DIVISION_BY_ZERO) == 0);
+    CHECK(init(&f) == 0);
+    CHECK(add(&f, 10u,
+        "IF (32767+1) AND 1 THEN PRINT #8,\"TAKEN\" ELSE PRINT #8,\"BAD\"") == 0);
+    CHECK(be_init_with_store(&f.executor, &f.program, &f.store) == BE_OK);
+    CHECK(raw_step_failure(&f, BE_INTEGER_OVERFLOW) == 0);
+    return 0;
+}
+
 int main(void)
 {
     size_t i;
@@ -348,6 +484,7 @@ int main(void)
     CHECK(negative_scenarios()==0);
     CHECK(imported_negative_and_types()==0);
     CHECK(independent_variable_names()==0);
+    CHECK(c1_if_dispatch()==0);
     printf("J1.22-B native: 24 oracle scenarios + negative gates PASS\n");
     return 0;
 }

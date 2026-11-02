@@ -20,6 +20,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 DIR = ROOT / 'tests/fixtures/cpc6128/j1_22_a_integer_logical'
 BASE = '1d5edc630390bfb109d6596693ec63c8d8588a28'
+# Exact GitHub squash integration of the original externally sealed PR #259.
+# Integration ancestry may differ from the acquisition checkout after squash.
+SQUASH_INTEGRATION_SHA = '1fa329b275cb562d9a5647a560b5e952c1d27727'
 PHASE = 'J1.22-A'
 ROM = '31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562'
 CAPRICE = '8c778bf072a06fb7c23b9cccd179041db7f79a52'
@@ -488,6 +491,24 @@ def head_is_ancestor(head):
         ['git', '-C', str(ROOT), 'merge-base', '--is-ancestor', head, 'HEAD'],
         capture_output=True).returncode == 0
 
+def provenance_is_authorized(acquisition_head, permanent):
+    """Accept pinned original ancestry or exact PR #259 squash lineage only.
+
+    The immutable manifest still records the original acquisition HEAD. A
+    squash discards that commit ancestry; it does not alter any sealed bytes.
+    Never use the squash fallback for unsealed evidence or a different HEAD.
+    """
+    if not isinstance(acquisition_head, str) or not re.fullmatch(
+            r'[0-9a-f]{40}', acquisition_head):
+        return False
+    if permanent and acquisition_head != EXTERNAL_ACQUISITION_HEAD:
+        return False
+    if head_is_ancestor(acquisition_head):
+        return True
+    return (permanent and acquisition_head == EXTERNAL_ACQUISITION_HEAD
+            and head_is_ancestor(SQUASH_INTEGRATION_SHA))
+
+
 def oracle_modules():
     sys.path.insert(0, str(ROOT / 'tools'))
     sys.path.insert(0, str(ROOT / 'tests/oracles'))
@@ -595,7 +616,8 @@ def verify(out, permanent=True):
             m.get('oracle',{}).get('ghcr') == GHCR and
             m.get('oracle',{}).get('model') == 'CPC6128' and
             m.get('oracle',{}).get('basic') == '1.1', 'PROVENANCE_MISMATCH')
-    require(head_is_ancestor(m.get('acquisition_head')), 'FAKE_HEAD')
+    require(provenance_is_authorized(m.get('acquisition_head'), permanent),
+            'FAKE_HEAD')
     paths = {f'{s}/{c}/{f}' for s in SESSIONS for c in cases for f in FILESET}
     actual = {str(p.relative_to(out)) for p in out.rglob('*') if p.is_file()}
     require(actual == paths | {'manifest.json'} and set(m.get('files',{})) == paths,

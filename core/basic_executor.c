@@ -211,6 +211,51 @@ static BEStatus binding_error(BVBStatus status)
     }
 }
 
+
+/* Only the observed #8 quoted-string/INTEGER suffix is emitted into the
+ * host PRINT channel. No printer peripheral is modelled by this helper.
+ * The caller's two-phase step preflights output and store atomicity. */
+static BEStatus print8_piece(const uint8_t *body, size_t length, size_t *at,
+                             const BasicVariableStore *variables,
+                             BEEmitter *out, int allow_reference)
+{
+    size_t p = *at;
+    int closed = 0;
+    BEStatus st;
+    if (length - p < 4u || body[p++] != (uint8_t)'#' ||
+        body[p++] != 0x16u || body[p++] != (uint8_t)',')
+        return BE_BAD_SEQUENCE;
+    skip_spaces(body, length, &p);
+    if (p == length || body[p++] != (uint8_t)'"') return BE_BAD_SEQUENCE;
+    while (p < length) {
+        uint8_t c = body[p++];
+        if (c == (uint8_t)'"') { closed = 1; break; }
+        if (c < 0x20u || c > 0x7eu) return BE_BAD_SEQUENCE;
+        st = emit(out, c);
+        if (st != BE_OK) return st;
+    }
+    if (!closed) return BE_TRUNCATED;
+    if (allow_reference && p < length && body[p] == (uint8_t)';') {
+        BasicVariableKey key;
+        BasicVariableValue value;
+        size_t consumed = 0u;
+        BVBStatus resolved;
+        ++p;
+        if (p == length) return BE_TRUNCATED;
+        if (variables == NULL) return BE_UNSUPPORTED;
+        resolved = bvb_read_explicit(body, length, p, variables,
+                                      &key, &consumed, &value);
+        if (resolved != BVB_OK) return binding_error(resolved);
+        if (key.type != (uint8_t)BVT_INTEGER ||
+            value.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+        p += consumed;
+        st = emit_integer(out, value.data.integer);
+        if (st != BE_OK) return st;
+    }
+    *at = p;
+    return BE_OK;
+}
+
 /* J1.20-B2a. Decode exactly one FF 00 '(' INTEGER ')' expression.
  * No generic function parser, REAL5 conversion, CPU signed overflow or
  * mutation of caller cursor/result on failure. Variables are read-only.
@@ -1086,7 +1131,12 @@ static BEStatus execute_line(const BasicProgram *program,
             skip_spaces(body, length, &pos);
             if (pos < length && body[pos] != 0x01u) {
                 token = body[pos++];
-                if (token == (uint8_t)'"') {
+                if (token == (uint8_t)'#') {
+                    --pos;
+                    status = print8_piece(body, length, &pos, variables,
+                                          out, 1);
+                    if (status != BE_OK) return status;
+                } else if (token == (uint8_t)'"') {
                     /* A quoted string may contain raw 0x01 (or ':').
                      * Only the closing quote or end of body terminates it.
                      * 0x01 separates statements only outside strings. */

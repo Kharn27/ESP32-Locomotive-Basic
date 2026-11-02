@@ -1,0 +1,5 @@
+ 0 
+ 0 
+10 LOCATE 2,3
+20 PRINT "LBLOC"
+30 END

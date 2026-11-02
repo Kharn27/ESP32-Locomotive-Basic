@@ -1064,7 +1064,10 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 }
                 status = bl_logic_expression(body, length, &pos, out, 1);
                 if (status != BL_OK) return status;
-                space_start = pos;
+                /* bl_logic_expression already wrote trailing lexical spaces.
+                 * Do not insert a second separator before THEN. */
+                space_start = pos > 0u && body[pos - 1u] == (uint8_t)' '
+                            ? pos - 1u : pos;
             } else {
             decoded = bvr_decode(body, length, pos, &reference);
             if (decoded == BVR_TRUNCATED) {

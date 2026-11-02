@@ -71,7 +71,8 @@ class GeometryTests(unittest.TestCase):
 
 class PixelMappingTests(unittest.TestCase):
     def check(self, v):
-        self.assertEqual(v.physical(), v.shot())
+        self.assertEqual(v.physical(), v.logical)
+        self.assertEqual(v.visible_with_cursor(), v.shot())
         self.assertEqual(v.physical()[:20], [f"TOP:{i}" for i in range(20)])
         self.assertEqual(v.physical()[220:], [f"BOTTOM:{i}" for i in range(20)])
         self.assertTrue(all(x.startswith("HIDDEN:") for i, x in enumerate(v.gram)
@@ -132,10 +133,10 @@ class PixelMappingTests(unittest.TestCase):
         v = model(80)
         before = v.shot()
         v.set_cursor(20, 150)
-        self.assertNotEqual(v.visible_with_cursor(), before)
-        self.assertEqual(v.shot(), before)
+        self.assertNotEqual(v.shot(), before)
+        self.assertEqual(v.visible_with_cursor(), v.shot())
         v.scroll("down", 1)
-        self.assertEqual(v.visible_with_cursor()[150], "OVERLAY:x20:" + v.shot()[150])
+        self.assertEqual(v.shot()[150], "OVERLAY:x20:" + v.logical[150])
         self.check(v)
 
     def test_clear_disable_restart(self):

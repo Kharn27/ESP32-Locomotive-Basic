@@ -16,7 +16,8 @@ typedef struct {
     CpcVideo video;
     CpcText text;
     uint8_t image[PROGRAM], temp[256], output[OUTPUT], vram[CPC_VIDEO_BYTES];
-    BEVideoEvent events[EVENTS];
+    BEVideoEvent events[EVENTS], preview_events[EVENTS];
+    Hw4RunPreview preview;
     size_t written, event_written, replay_calls, preflight_calls;
     bool reject, replay_fail, corrupt_preview;
     Hw4PenStatus last_video;
@@ -47,6 +48,9 @@ static BSRResult submit(const char *line) {
 static int start(void) {
     CHECK(submit("RUN").status == BSR_OK);
     CHECK(hw4_run_scheduler_init(&f.scheduler, &f.runtime));
+    f.preview=(Hw4RunPreview){f.temp,sizeof(f.temp),
+                              f.preview_events,EVENTS,0u,0u};
+    CHECK(hw4_run_scheduler_bind_preview(&f.scheduler, &f.preview));
     return 0;
 }
 static bool preflight(void *ctx, const uint8_t *bytes, size_t n,
@@ -58,7 +62,7 @@ static bool preflight(void *ctx, const uint8_t *bytes, size_t n,
     if (p->corrupt_preview && n > 0u) {
         /* Deliberate contract-violating injection, to exercise mismatch
          * fail-stop. Normal callbacks are pure. No video touched. */
-        p->scheduler.preview_output[0] ^= 1u;
+        p->preview.output[0] ^= 1u;
     }
     return p->last_video == HW4_PEN_OK;
 }

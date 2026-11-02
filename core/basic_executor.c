@@ -211,6 +211,52 @@ static BEStatus binding_error(BVBStatus status)
     }
 }
 
+
+/* Only the observed #8 quoted-string/INTEGER suffix is emitted into the
+ * host PRINT channel. No printer peripheral is modelled by this helper.
+ * The caller's two-phase step preflights output and store atomicity. */
+static BEStatus print8_piece(const uint8_t *body, size_t length, size_t *at,
+                             const BasicVariableStore *variables,
+                             BEEmitter *out, int allow_reference)
+{
+    size_t p = *at;
+    int closed = 0;
+    BEStatus st;
+    skip_spaces(body, length, &p);
+    if (length - p < 4u || body[p++] != (uint8_t)'#' ||
+        body[p++] != 0x16u || body[p++] != (uint8_t)',')
+        return BE_BAD_SEQUENCE;
+    skip_spaces(body, length, &p);
+    if (p == length || body[p++] != (uint8_t)'"') return BE_BAD_SEQUENCE;
+    while (p < length) {
+        uint8_t c = body[p++];
+        if (c == (uint8_t)'"') { closed = 1; break; }
+        if (c < 0x20u || c > 0x7eu) return BE_BAD_SEQUENCE;
+        st = emit(out, c);
+        if (st != BE_OK) return st;
+    }
+    if (!closed) return BE_TRUNCATED;
+    if (allow_reference && p < length && body[p] == (uint8_t)';') {
+        BasicVariableKey key;
+        BasicVariableValue value;
+        size_t consumed = 0u;
+        BVBStatus resolved;
+        ++p;
+        if (p == length) return BE_TRUNCATED;
+        if (variables == NULL) return BE_UNSUPPORTED;
+        resolved = bvb_read_explicit(body, length, p, variables,
+                                      &key, &consumed, &value);
+        if (resolved != BVB_OK) return binding_error(resolved);
+        if (key.type != (uint8_t)BVT_INTEGER ||
+            value.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+        p += consumed;
+        st = emit_integer(out, value.data.integer);
+        if (st != BE_OK) return st;
+    }
+    *at = p;
+    return BE_OK;
+}
+
 /* J1.20-B2a. Decode exactly one FF 00 '(' INTEGER ')' expression.
  * No generic function parser, REAL5 conversion, CPU signed overflow or
  * mutation of caller cursor/result on failure. Variables are read-only.
@@ -443,6 +489,239 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
     return BE_OK;
 }
 
+
+
+/* J1.22-B: bounded shunting-yard evaluator for CPC INTEGER16 expressions.
+ * Tokens, not ASCII, are the input. Values are int32_t until checked;
+ * two's-complement bit operations use unsigned 16-bit patterns explicitly.
+ * The evaluation is pure and shared by both transactional step passes. */
+#define BE_EXPR_STACK 32u
+#define BE_EXPR_NEG 0x80u
+
+static int logic_tokens_present(const uint8_t *b, size_t length, size_t start)
+{
+    size_t p = start;
+    int after_reference = 0;
+    while (p < length) {
+        uint8_t t = b[p];
+        if (t == 0xebu) return 0; /* No scan of IF THEN arm. */
+        if (t == (uint8_t)'(' || t == 0xfeu) return 1;
+        if (t == 0xfau || t == 0xfcu || t == 0xfdu) {
+            /* J1.13-B imported malformed-relation guard: a forged
+             * '<' -> AND directly between two adjacent CPC BVR records
+             * is not a source-tokenizable logical word (AND needs a
+             * lexical boundary before the following identifier).
+             * Keep this old IF shape on its strict legacy error path. */
+            if (after_reference && p + 1u < length &&
+                (b[p + 1u] == 0x02u || b[p + 1u] == 0x03u ||
+                 b[p + 1u] == 0x04u)) return 0;
+            return 1;
+        }
+        if (t == 0x02u || t == 0x03u || t == 0x04u) {
+            BasicVariableRef ref;
+            if (bvr_decode(b, length, p, &ref) != BVR_OK) return 0;
+            p += ref.consumed;
+            after_reference = 1;
+        } else if (t == 0x19u) {
+            if (length - p < 2u) return 0;
+            p += 2u;
+            after_reference = 0;
+        } else if (t == 0x1au) {
+            if (length - p < 3u) return 0;
+            p += 3u;
+            after_reference = 0;
+        } else if (t == 0x1fu) {
+            if (length - p < 6u) return 0;
+            p += 6u;
+            after_reference = 0;
+        } else if (t == 0xffu) {
+            return 0; /* sealed ABS is the separate legacy path */
+        } else {
+            ++p;
+            after_reference = 0;
+        }
+    }
+    return 0;
+}
+
+static unsigned int logic_precedence(uint8_t op)
+{
+    switch (op) {
+    case BE_EXPR_NEG: return 9u;
+    case 0xf6u: return 8u; /* * */
+    case 0xf9u: case 0xfbu: return 7u; /* \, MOD */
+    case 0xf4u: case 0xf5u: return 6u; /* + - */
+    case 0xeeu: case 0xefu: case 0xf0u:
+    case 0xf1u: case 0xf2u: case 0xf3u: return 5u;
+    case 0xfeu: return 4u; /* NOT */
+    case 0xfau: return 3u; /* AND */
+    case 0xfdu: return 2u; /* XOR */
+    case 0xfcu: return 1u; /* OR */
+    default: return 0u;
+    }
+}
+
+static BEStatus logic_apply(int32_t *values, size_t *count, uint8_t op)
+{
+    int32_t x, y, result;
+    if (op == BE_EXPR_NEG || op == 0xfeu) {
+        uint16_t bits;
+        if (*count == 0u) return BE_BAD_SEQUENCE;
+        x = values[*count - 1u];
+        if (op == BE_EXPR_NEG) result = -x;
+        else {
+            if (x < INT16_MIN || x > INT16_MAX)
+                return BE_INTEGER_OVERFLOW;
+            bits = (uint16_t)x;
+            bits = (uint16_t)~bits;
+            result = bits >= 0x8000u ? (int32_t)bits - 65536 : (int32_t)bits;
+        }
+        if (result < INT16_MIN || result > INT16_MAX)
+            return BE_INTEGER_OVERFLOW;
+        values[*count - 1u] = result;
+        return BE_OK;
+    }
+    if (*count < 2u) return BE_BAD_SEQUENCE;
+    y = values[--*count];
+    x = values[*count - 1u];
+    if (x < INT16_MIN || x > INT16_MAX ||
+        y < INT16_MIN || y > INT16_MAX) return BE_INTEGER_OVERFLOW;
+    switch (op) {
+    case 0xf4u: result = x + y; break;
+    case 0xf5u: result = x - y; break;
+    case 0xf6u: result = x * y; break;
+    case 0xf9u: case 0xfbu:
+        if (y == 0) return BE_DIVISION_BY_ZERO;
+        result = op == 0xf9u ? x / y : x % y;
+        break;
+    case 0xfau: case 0xfcu: case 0xfdu: {
+        uint16_t a = (uint16_t)x, b = (uint16_t)y, bits;
+        bits = op == 0xfau ? (uint16_t)(a & b) :
+               op == 0xfcu ? (uint16_t)(a | b) : (uint16_t)(a ^ b);
+        result = bits >= 0x8000u ? (int32_t)bits - 65536 : (int32_t)bits;
+        break;
+    }
+    case 0xeeu: result = x > y ? -1 : 0; break;
+    case 0xefu: result = x == y ? -1 : 0; break;
+    case 0xf0u: result = x >= y ? -1 : 0; break;
+    case 0xf1u: result = x < y ? -1 : 0; break;
+    case 0xf2u: result = x != y ? -1 : 0; break;
+    case 0xf3u: result = x <= y ? -1 : 0; break;
+    default: return BE_BAD_SEQUENCE;
+    }
+    if (result < INT16_MIN || result > INT16_MAX)
+        return BE_INTEGER_OVERFLOW;
+    values[*count - 1u] = result;
+    return BE_OK;
+}
+
+static BEStatus evaluate_logical_integer(const uint8_t *body, size_t length,
+                                         size_t *at,
+                                         const BasicVariableStore *variables,
+                                         int stop_then, int16_t *number)
+{
+    int32_t values[BE_EXPR_STACK];
+    uint8_t operators[BE_EXPR_STACK];
+    size_t used = 0u, nops = 0u, pos = *at;
+    unsigned int depth = 0u;
+    int need_operand = 1;
+    while (pos < length) {
+        uint8_t token;
+        skip_spaces(body, length, &pos);
+        if (pos == length) break;
+        token = body[pos];
+        if (stop_then && token == 0xebu && depth == 0u && !need_operand)
+            break;
+        if (need_operand) {
+            int32_t v = 0;
+            size_t amount = 1u;
+            if (token == (uint8_t)'(' || token == 0xf5u || token == 0xfeu) {
+                uint8_t op = token == 0xf5u ? BE_EXPR_NEG : token;
+                if (nops == BE_EXPR_STACK) return BE_UNSUPPORTED;
+                if (token == (uint8_t)'(') ++depth;
+                operators[nops++] = op;
+                ++pos;
+                continue;
+            }
+            if (token >= 0x0eu && token <= 0x17u) {
+                v = (int32_t)(token - 0x0eu);
+            } else if (token == 0x19u) {
+                if (length - pos < 2u) return BE_TRUNCATED;
+                v = (int32_t)body[pos + 1u];
+                if (v < 10) return BE_BAD_SEQUENCE;
+                amount = 2u;
+            } else if (token == 0x1au) {
+                if (length - pos < 3u) return BE_TRUNCATED;
+                v = (int32_t)((uint32_t)body[pos + 1u] |
+                    ((uint32_t)body[pos + 2u] << 8));
+                if (v < 256 || v > INT16_MAX) return BE_BAD_SEQUENCE;
+                amount = 3u;
+            } else if (token == 0x1fu) {
+                static const uint8_t nmin[5] = {0u, 0u, 0u, 0u, 0x90u};
+                if (length - pos < 6u) return BE_TRUNCATED;
+                if (nops == 0u || operators[nops - 1u] != BE_EXPR_NEG ||
+                    memcmp(body + pos + 1u, nmin, sizeof(nmin)) != 0)
+                    return BE_BAD_SEQUENCE;
+                v = 32768;
+                amount = 6u;
+            } else if (token == 0x02u || token == 0x03u ||
+                       token == 0x04u) {
+                BasicVariableKey key;
+                BasicVariableValue value;
+                size_t consumed = 0u;
+                BVBStatus resolved;
+                if (variables == NULL) return BE_UNSUPPORTED;
+                resolved = bvb_read_explicit(body, length, pos, variables,
+                                              &key, &consumed, &value);
+                if (resolved != BVB_OK) return binding_error(resolved);
+                if (key.type != (uint8_t)BVT_INTEGER ||
+                    value.type != (uint8_t)BVT_INTEGER)
+                    return BE_INVALID_TYPE;
+                v = (int32_t)value.data.integer;
+                amount = consumed;
+            } else return unexpected(token);
+            if (used == BE_EXPR_STACK) return BE_UNSUPPORTED;
+            values[used++] = v;
+            pos += amount;
+            need_operand = 0;
+        } else if (token == (uint8_t)')') {
+            BEStatus st;
+            if (depth == 0u) return BE_BAD_SEQUENCE;
+            while (nops != 0u && operators[nops - 1u] != (uint8_t)'(') {
+                st = logic_apply(values, &used, operators[--nops]);
+                if (st != BE_OK) return st;
+            }
+            if (nops == 0u) return BE_BAD_SEQUENCE;
+            --nops; --depth; ++pos;
+        } else {
+            unsigned int prec = logic_precedence(token);
+            BEStatus st;
+            if (prec == 0u || token == 0xfeu) return unexpected(token);
+            while (nops != 0u && operators[nops - 1u] != (uint8_t)'(' &&
+                   logic_precedence(operators[nops - 1u]) >= prec) {
+                st = logic_apply(values, &used, operators[--nops]);
+                if (st != BE_OK) return st;
+            }
+            if (nops == BE_EXPR_STACK) return BE_UNSUPPORTED;
+            operators[nops++] = token;
+            need_operand = 1;
+            ++pos;
+        }
+    }
+    if (need_operand) return BE_TRUNCATED;
+    if (depth != 0u) return BE_BAD_SEQUENCE;
+    while (nops != 0u) {
+        BEStatus st;
+        if (operators[nops - 1u] == (uint8_t)'(') return BE_BAD_SEQUENCE;
+        st = logic_apply(values, &used, operators[--nops]);
+        if (st != BE_OK) return st;
+    }
+    if (used != 1u || values[0] < INT16_MIN || values[0] > INT16_MAX)
+        return BE_INTEGER_OVERFLOW;
+    *at = pos;
+    *number = (int16_t)values[0];
+    return BE_OK;
+}
 
 /* FOR/NEXT INTEGER literals are the same strictly bounded CPC encodings
  * already admitted by the scalar assignment path, not REAL expressions. */
@@ -872,7 +1151,12 @@ static BEStatus execute_line(const BasicProgram *program,
             skip_spaces(body, length, &pos);
             if (pos < length && body[pos] != 0x01u) {
                 token = body[pos++];
-                if (token == (uint8_t)'"') {
+                if (token == (uint8_t)'#') {
+                    --pos;
+                    status = print8_piece(body, length, &pos, variables,
+                                          out, 1);
+                    if (status != BE_OK) return status;
+                } else if (token == (uint8_t)'"') {
                     /* A quoted string may contain raw 0x01 (or ':').
                      * Only the closing quote or end of body terminates it.
                      * 0x01 separates statements only outside strings. */
@@ -1040,6 +1324,17 @@ static BEStatus execute_line(const BasicProgram *program,
             if (pos == length) {
                 return BE_TRUNCATED;
             }
+            /* Match tokenizer/LIST dispatch: NOT, AND, OR and XOR need
+             * no opening parenthesis. The scanner examines ONLY the IF
+             * condition (stops at THEN, skips opaque BVR cache bytes), so
+             * logical tokens in THEN/ELSE cannot change legacy IF routing. */
+            if (logic_tokens_present(body, length, pos)) {
+                int16_t condition;
+                status = evaluate_logical_integer(body, length, &pos,
+                                                  variables, 1, &condition);
+                if (status != BE_OK) return status;
+                take_branch = condition != 0;
+            } else {
             if (body[pos] != 0x02u) {
                 return BE_BAD_SEQUENCE;
             }
@@ -1090,12 +1385,44 @@ static BEStatus execute_line(const BasicProgram *program,
                 skip_spaces(body, length, &pos);
                 if (pos == length) return BE_TRUNCATED;
             }
+            } /* Legacy IF variable/relational condition. */
             if (body[pos++] != 0xebu) {
                 return BE_BAD_SEQUENCE;
             }
             skip_spaces(body, length, &pos);
             if (pos == length) {
                 return BE_TRUNCATED;
+            }
+            if (body[pos] == 0xbfu) {
+                size_t then_start = pos, else_start = 0u, p = pos;
+                BEEmitter check = {NULL, 0u};
+                ++p;
+                status = print8_piece(body, length, &p, variables, &check, 0);
+                if (status != BE_OK) return status;
+                skip_spaces(body, length, &p);
+                if (p < length) {
+                    if (length - p < 2u || body[p] != 0x01u ||
+                        body[p + 1u] != 0x97u) return BE_BAD_SEQUENCE;
+                    p += 2u;
+                    skip_spaces(body, length, &p);
+                    else_start = p;
+                    if (p == length || body[p++] != 0xbfu)
+                        return BE_BAD_SEQUENCE;
+                    status = print8_piece(body, length, &p, variables,
+                                          &check, 0);
+                    if (status != BE_OK) return status;
+                    skip_spaces(body, length, &p);
+                }
+                if (p != length) return BE_BAD_SEQUENCE;
+                if (take_branch || else_start != 0u) {
+                    p = (take_branch ? then_start : else_start) + 1u;
+                    status = print8_piece(body, length, &p, variables, out, 0);
+                    if (status != BE_OK) return status;
+                    status = emit(out, (uint8_t)'\n');
+                    if (status != BE_OK) return status;
+                }
+                *next = line->next_offset;
+                return BE_OK;
             }
             if (body[pos] == 0x02u) {
                 BEAssignment then_arm = {0};
@@ -1358,7 +1685,13 @@ static BEStatus execute_line(const BasicProgram *program,
                 *next = line->next_offset;
                 return BE_OK;
             }
-            if (body[pos] == 0xffu) {
+            if (logic_tokens_present(body, length, pos)) {
+                status = evaluate_logical_integer(body, length, &pos,
+                                                  variables, 0,
+                                                  &value.data.integer);
+                if (status != BE_OK) return status;
+                reference_rhs = 1;
+            } else if (body[pos] == 0xffu) {
                 status=abs_integer(body,length,&pos,variables,
                                    &value.data.integer);
                 if (status!=BE_OK) return status;

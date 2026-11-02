@@ -468,6 +468,162 @@ static BTStatus scalar_real_statement(BTEmitter *out, int assignment,
     return BT_OK;
 }
 
+
+
+/* J1.22-B: bounded inline PRINT #8 string arms of observed IF conditions. */
+static BTStatus inline_if_print8(const uint8_t *src, size_t length,
+                                  size_t *at, BTEmitter *out)
+{
+    size_t n = 0u;
+    BTStatus st;
+    if (!keyword_matches(src, length, *at, "PRINT", &n))
+        return BT_UNSUPPORTED_CONSTRUCT;
+    *at += n;
+    st = emit(out, 0xbfu);
+    if (st == BT_OK) st = spaces(src, length, at, out);
+    if (st != BT_OK) return st;
+    if (length - *at < 3u || src[*at] != (uint8_t)'#' ||
+        src[*at + 1u] != (uint8_t)'8' ||
+        src[*at + 2u] != (uint8_t)',')
+        return BT_UNSUPPORTED_CONSTRUCT;
+    *at += 3u;
+    st = emit(out, (uint8_t)'#');
+    if (st == BT_OK) st = emit(out, 0x16u);
+    if (st == BT_OK) st = emit(out, (uint8_t)',');
+    if (st == BT_OK) st = spaces(src, length, at, out);
+    if (st != BT_OK) return st;
+    if (*at == length || src[*at] != (uint8_t)'"')
+        return BT_UNSUPPORTED_CONSTRUCT;
+    {
+        size_t start = *at;
+        st = quoted_string(src, length, at, out);
+        if (st != BT_OK) return st;
+        if (*at - start < 2u || src[*at - 1u] != (uint8_t)'"')
+            return BT_MALFORMED_INPUT;
+    }
+    return BT_OK;
+}
+
+/* J1.22-B: recognize only the INTEGER logical-expression subset measured
+ * by J1.22-A. This pass encodes CPC tokens, not evaluated values. */
+static int logical_keyword_in_source(const uint8_t *src, size_t length,
+                                     size_t start)
+{
+    size_t i, used;
+    static const char *const words[] = {"AND", "OR", "XOR", "NOT"};
+    for (i = start; i < length; ++i) {
+        size_t j;
+        if (src[i] == (uint8_t)':' || src[i] == (uint8_t)'"') break;
+        if (keyword_matches(src, length, i, "THEN", &used)) break;
+        if (i > start && identifier_continuation(src[i - 1u])) continue;
+        for (j = 0u; j < sizeof(words) / sizeof(words[0]); ++j)
+            if (keyword_matches(src, length, i, words[j], &used)) return 1;
+    }
+    return 0;
+}
+
+static BTStatus tokenize_logic_integer(const uint8_t *src, size_t length,
+                                        size_t *at, BTEmitter *out,
+                                        int stop_then)
+{
+    size_t p = *at;
+    unsigned int depth = 0u;
+    int operand = 1, unary_minus = 0;
+    BTStatus st;
+    while (p < length) {
+        size_t n = 0u;
+        uint8_t c;
+        st = spaces(src, length, &p, out);
+        if (st != BT_OK) return st;
+        if (p == length) break;
+        if (stop_then && !operand && depth == 0u &&
+            keyword_matches(src, length, p, "THEN", &n))
+            break;
+        c = src[p];
+        if (operand) {
+            if (c == (uint8_t)'(') {
+                if (depth == 16u) return BT_UNSUPPORTED_CONSTRUCT;
+                ++depth; ++p;
+                st = emit(out, (uint8_t)'(');
+                unary_minus = 0;
+            } else if (keyword_matches(src, length, p, "NOT", &n)) {
+                p += n;
+                st = emit(out, 0xfeu);
+                unary_minus = 0;
+            } else if (c == (uint8_t)'-') {
+                ++p;
+                st = emit(out, 0xf5u);
+                unary_minus = 1;
+            } else if (ascii_digit(c)) {
+                unsigned int magnitude, limit = unary_minus ? 32768u : 32767u;
+                st = decimal(src, length, &p, limit, &magnitude);
+                if (st != BT_OK) return st;
+                if (magnitude == 32768u) {
+                    static const uint8_t nmin[6] = {
+                        0x1fu, 0u, 0u, 0u, 0u, 0x90u
+                    };
+                    size_t j;
+                    for (j = 0u; st == BT_OK && j < sizeof(nmin); ++j)
+                        st = emit(out, nmin[j]);
+                } else if (magnitude < 10u) {
+                    st = emit(out, (uint8_t)(0x0eu + magnitude));
+                } else if (magnitude <= 255u) {
+                    st = emit(out, 0x19u);
+                    if (st == BT_OK) st = emit(out, (uint8_t)magnitude);
+                } else {
+                    st = emit(out, 0x1au);
+                    if (st == BT_OK) st = emit(out, (uint8_t)(magnitude & 255u));
+                    if (st == BT_OK) st = emit(out, (uint8_t)(magnitude >> 8));
+                }
+                operand = 0;
+                unary_minus = 0;
+            } else if (ascii_letter(c)) {
+                st = explicit_variable(src, length, &p, out, BVR_TYPE_INTEGER);
+                operand = 0;
+                unary_minus = 0;
+            } else {
+                return BT_UNSUPPORTED_CONSTRUCT;
+            }
+        } else if (c == (uint8_t)')' && depth != 0u) {
+            --depth; ++p;
+            st = emit(out, (uint8_t)')');
+        } else {
+            uint8_t token;
+            if (keyword_matches(src, length, p, "AND", &n)) token = 0xfau;
+            else if (keyword_matches(src, length, p, "MOD", &n)) token = 0xfbu;
+            else if (keyword_matches(src, length, p, "OR", &n)) token = 0xfcu;
+            else if (keyword_matches(src, length, p, "XOR", &n)) token = 0xfdu;
+            else if (c == (uint8_t)'<' && p + 1u < length &&
+                     src[p + 1u] == (uint8_t)'>') { token = 0xf2u; n = 2u; }
+            else if (c == (uint8_t)'<' && p + 1u < length &&
+                     src[p + 1u] == (uint8_t)'=') { token = 0xf3u; n = 2u; }
+            else if (c == (uint8_t)'>' && p + 1u < length &&
+                     src[p + 1u] == (uint8_t)'=') { token = 0xf0u; n = 2u; }
+            else {
+                n = 1u;
+                switch (c) {
+                    case '+': token = 0xf4u; break;
+                    case '-': token = 0xf5u; break;
+                    case '*': token = 0xf6u; break;
+                    case '\\': token = 0xf9u; break;
+                    case '<': token = 0xf1u; break;
+                    case '>': token = 0xeeu; break;
+                    case '=': token = 0xefu; break;
+                    default: return BT_UNSUPPORTED_CONSTRUCT;
+                }
+            }
+            p += n;
+            st = emit(out, token);
+            operand = 1;
+            unary_minus = 0;
+        }
+        if (st != BT_OK) return st;
+    }
+    if (operand || depth != 0u) return BT_MALFORMED_INPUT;
+    *at = p;
+    return BT_OK;
+}
+
 static BTStatus one_pass(const uint8_t *source, size_t length,
                          BTEmitter *out)
 {
@@ -567,13 +723,25 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 index += 3u;
                 if (index == length) return BT_UNSUPPORTED_CONSTRUCT;
             }
-            if (stream8 && !keyword_matches(source, length, index, "ABS", &count) &&
+            if (stream8 && !(length - index >= 9u &&
+                memcmp(source + index, "\"VALUE=\";", 9u) == 0) &&
+                !keyword_matches(source, length, index, "ABS", &count) &&
                 !(length - index == 2u && source[index] == (uint8_t)'B' &&
                   source[index + 1u] == (uint8_t)'%') &&
                 !(length - index == 2u && source[index] == (uint8_t)'8' &&
                   source[index + 1u] == (uint8_t)'8'))
                 return BT_UNSUPPORTED_CONSTRUCT;
-            if (keyword_matches(source, length, index, "ABS", &count)) {
+            if (stream8 && length - index >= 9u &&
+                memcmp(source + index, "\"VALUE=\";", 9u) == 0) {
+                size_t i;
+                for (i = 0u; i < 9u; ++i) {
+                    status = emit(out, source[index + i]);
+                    if (status != BT_OK) return status;
+                }
+                index += 9u;
+                status = explicit_variable(source, length, &index, out,
+                                           BVR_TYPE_INTEGER);
+            } else if (keyword_matches(source, length, index, "ABS", &count)) {
                 status = abs_expression(source, length, &index, out, 1);
             } else if (source[index] == (uint8_t)'"') {
                 status = quoted_string(source, length, &index, out);
@@ -704,6 +872,9 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 status = spaces(source, length, &index, out);
             }
             if (status == BT_OK &&
+                logical_keyword_in_source(source, length, index)) {
+                status = tokenize_logic_integer(source, length, &index, out, 0);
+            } else if (status == BT_OK &&
                 keyword_matches(source, length, index, "ABS", &count)) {
                 /* Only B%=ABS(A%) is a sealed INTEGER assignment form. */
                 if (length < 8u || source[0] != (uint8_t)'B' ||
@@ -853,6 +1024,12 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                                            BVR_TYPE_INTEGER);
         } else if (statement == ST_IF) {
             unsigned int line;
+            if (index < length &&
+                (source[index] == (uint8_t)'(' ||
+                 logical_keyword_in_source(source, length, index))) {
+                status = tokenize_logic_integer(source, length, &index, out, 1);
+                if (status != BT_OK) return status;
+            } else {
             if (index == length || !ascii_letter(source[index])) {
                 return BT_UNSUPPORTED_CONSTRUCT;
             }
@@ -902,6 +1079,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                     status = spaces(source, length, &index, out);
                 if (status != BT_OK) return status;
             }
+            } /* legacy explicit-variable IF condition */
             if (!keyword_matches(source, length, index, "THEN", &count)) {
                 return BT_UNSUPPORTED_CONSTRUCT;
             }
@@ -913,7 +1091,21 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (status != BT_OK) {
                 return status;
             }
-            if (index < length && ascii_letter(source[index])) {
+            if (index < length && keyword_matches(source, length, index,
+                                                  "PRINT", &count)) {
+                status = inline_if_print8(source, length, &index, out);
+                if (status != BT_OK) return status;
+                status = spaces(source, length, &index, out);
+                if (status != BT_OK) return status;
+                if (keyword_matches(source, length, index, "ELSE", &count)) {
+                    index += count;
+                    status = emit(out, 0x01u);
+                    if (status == BT_OK) status = emit(out, 0x97u);
+                    if (status == BT_OK) status = spaces(source, length, &index, out);
+                    if (status == BT_OK)
+                        status = inline_if_print8(source, length, &index, out);
+                }
+            } else if (index < length && ascii_letter(source[index])) {
                 /* IF ... THEN C%=81 [ELSE C%=42]; 01 97 is a CPC
                  * lexical ELSE separator, not a colon supplied by source. */
                 status = inline_if_assignment(source, length, &index, out);

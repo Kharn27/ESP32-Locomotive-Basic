@@ -84,6 +84,13 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_listing PRIVATE basic_listing basic_tokenizer)
     add_test(NAME basic_listing COMMAND test_basic_listing)
 
+    # J1.22-B: CPC-backed 24 INTEGER logical expressions and atomic failures.
+    add_executable(test_j1_22_b_integer_logical tests/test_j1_22_b_integer_logical.c)
+    target_link_libraries(test_j1_22_b_integer_logical PRIVATE
+        basic_executor basic_tokenizer basic_listing basic_variable_store)
+    add_test(NAME j1_22_b_integer_logical_native
+        COMMAND test_j1_22_b_integer_logical)
+
     add_executable(test_basic_executor tests/test_basic_executor.c)
     target_link_libraries(test_basic_executor PRIVATE basic_executor basic_tokenizer)
     add_test(NAME basic_executor COMMAND test_basic_executor)

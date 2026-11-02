@@ -13,7 +13,8 @@ typedef struct {
     uint8_t image[STORAGE];
     uint8_t temporary[256];
     uint8_t output[OUTPUT];
-    BEVideoEvent events[EVENTS];
+    BEVideoEvent events[EVENTS], preview_events[EVENTS];
+    Hw4RunPreview preview;
     size_t written, event_written;
 } Fixture;
 typedef struct {
@@ -38,6 +39,9 @@ static BSRResult submit(const char *source) {
 static int run(void) {
     CHECK(submit("RUN").status==BSR_OK);
     CHECK(hw4_run_scheduler_init(&f.scheduler,&f.runtime));
+    f.preview=(Hw4RunPreview){f.temporary,sizeof(f.temporary),
+                              f.preview_events,EVENTS,0u,0u};
+    CHECK(hw4_run_scheduler_bind_preview(&f.scheduler,&f.preview));
     return 0;
 }
 /* Preflight stays pure: no PRINT or PEN mutation, including rejected INK. */

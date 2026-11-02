@@ -217,6 +217,124 @@ static int negative_scenarios(void)
     return 0;
 }
 
+
+/* Distinct from the authentic 24 CPC observations: structural and
+ * transactional host-only negative tests. No new CPC claim is inferred. */
+static int raw_step_failure(Fixture *f, BEStatus expected)
+{
+    BasicExecutor executor = f->executor;
+    BasicVariableEntry entries[8];
+    uint8_t data[1024], out[256];
+    size_t original_count = f->store.count;
+    memcpy(entries, f->entries, sizeof(entries));
+    memcpy(data, f->storage, sizeof(data));
+    memset(f->output, 0x5bu, sizeof(f->output));
+    memcpy(out, f->output, sizeof(out));
+    f->written = 741u;
+    CHECK(be_step(&f->executor, f->output, sizeof(f->output),
+                  &f->written) == expected);
+    CHECK(memcmp(&f->executor, &executor, sizeof(executor)) == 0);
+    CHECK(memcmp(f->entries, entries, sizeof(entries)) == 0);
+    CHECK(memcmp(f->storage, data, sizeof(data)) == 0);
+    CHECK(memcmp(f->output, out, sizeof(out)) == 0);
+    CHECK(f->store.count == original_count && f->written == 741u);
+    return 0;
+}
+
+static int imported_negative_and_types(void)
+{
+    Fixture f;
+    size_t n = 0u, i, op = SIZE_MAX, rhs = SIZE_MAX;
+    BasicVariableKey key;
+    static const uint8_t empty[] = {0u};
+    const char *source = "A%=1 AND 2";
+
+    CHECK(init(&f)==0);
+    CHECK(bt_tokenize((const uint8_t *)source, strlen(source), f.tokens,
+                      sizeof(f.tokens), &n) == BT_OK);
+    for (i=0u;i<n;++i)
+        if (f.tokens[i]==0xfau) {op=i;break;}
+    CHECK(op!=SIZE_MAX);
+    /* Truncated after FA: not an empty successful expression. */
+    CHECK(bp_put(&f.program,10u,f.tokens,op+1u)==BP_OK);
+    CHECK(be_init_with_store(&f.executor,&f.program,&f.store)==BE_OK);
+    CHECK(raw_step_failure(&f, BE_TRUNCATED)==0);
+    /* A forged operator byte in an otherwise authentic token stream. */
+    CHECK(init(&f)==0);
+    CHECK(bt_tokenize((const uint8_t *)source,strlen(source),f.tokens,
+                      sizeof(f.tokens),&n)==BT_OK);
+    CHECK(op+2u<n);
+    f.tokens[op+2u]=0xffu;
+    CHECK(bp_put(&f.program,10u,f.tokens,n)==BP_OK);
+    CHECK(be_init_with_store(&f.executor,&f.program,&f.store)==BE_OK);
+    CHECK(raw_step_failure(&f,BE_UNKNOWN_TOKEN)==0);
+
+    CHECK(init(&f)==0);
+    CHECK(add(&f,10u,"A%=Q% AND 3")==0);
+    CHECK(be_init_with_store(&f.executor,&f.program,&f.store)==BE_OK);
+    CHECK(raw_step_failure(&f,BE_VARIABLE_NOT_FOUND)==0);
+
+    /* Inject a syntactically correct STRING BVR into a native INTEGER
+     * expression, with a real typed STRING entry present. */
+    CHECK(init(&f)==0);
+    CHECK(bt_tokenize((const uint8_t *)"A%=Q% AND 3",11u,
+                      f.tokens,sizeof(f.tokens),&n)==BT_OK);
+    for (i=1u;i<n;++i) if(f.tokens[i]==0x02u) { rhs=i; break; }
+    CHECK(rhs!=SIZE_MAX);
+    f.tokens[rhs]=0x03u;
+    CHECK(bp_put(&f.program,10u,f.tokens,n)==BP_OK);
+    key=integer_key("Q");
+    key.type=(uint8_t)BVT_STRING;
+    CHECK(bvs_assign_string(&f.store,&key,empty,0u)==BVS_OK);
+    CHECK(be_init_with_store(&f.executor,&f.program,&f.store)==BE_OK);
+    CHECK(raw_step_failure(&f,BE_INVALID_TYPE)==0);
+
+    /* Full destination store: assignment must reject without side effects. */
+    CHECK(init(&f)==0);
+    CHECK(add(&f,10u,"A%=5 AND 3")==0);
+    for(i=0u;i<8u;++i) {
+        BasicVariableKey occupied=integer_key("Z");
+        occupied.name[0]=(uint8_t)('B'+(uint8_t)i);
+        CHECK(bvs_create(&f.store,&occupied,&n)==BVS_OK);
+    }
+    CHECK(be_init_with_store(&f.executor,&f.program,&f.store)==BE_OK);
+    CHECK(raw_step_failure(&f,BE_STORE_FULL)==0);
+
+    /* Full executor or buffer overlap is rejected before any mutation. */
+    CHECK(init(&f)==0);
+    CHECK(add(&f,10u,"A%=NOT 5")==0);
+    CHECK(be_init_with_store(&f.executor,&f.program,&f.store)==BE_OK);
+    {
+        BasicExecutor saved = f.executor;
+        f.written=999u;
+        CHECK(be_step(&f.executor,(uint8_t *)&f.executor,4u,
+                      &f.written)==BE_OVERLAP);
+        CHECK(memcmp(&f.executor,&saved,sizeof(saved))==0);
+        CHECK(f.written==999u);
+    }
+    return 0;
+}
+
+static int independent_variable_names(void)
+{
+    Fixture f;
+    BasicVariableValue value;
+    BasicVariableKey key;
+    CHECK(init(&f)==0);
+    CHECK(add(&f,10u,"LONG%=5 AND 3")==0);
+    CHECK(add(&f,20u,"OTHER%=LONG% XOR 2")==0);
+    CHECK(be_init_with_store(&f.executor,&f.program,&f.store)==BE_OK);
+    CHECK(be_step(&f.executor,f.output,sizeof(f.output),&f.written)==BE_OK);
+    key=integer_key("LONG");
+    CHECK(bvs_get(&f.store,&key,&value)==BVS_OK &&
+          value.data.integer==1);
+    CHECK(be_step(&f.executor,f.output,sizeof(f.output),&f.written)==BE_OK);
+    key=integer_key("OTHER");
+    CHECK(bvs_get(&f.store,&key,&value)==BVS_OK &&
+          value.data.integer==3);
+    return 0;
+}
+
 int main(void)
 {
     size_t i;
@@ -228,6 +346,8 @@ int main(void)
         }
     }
     CHECK(negative_scenarios()==0);
+    CHECK(imported_negative_and_types()==0);
+    CHECK(independent_variable_names()==0);
     printf("J1.22-B native: 24 oracle scenarios + negative gates PASS\n");
     return 0;
 }

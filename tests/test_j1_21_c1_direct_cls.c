@@ -80,7 +80,7 @@ static void buffers(void) {
 static int positive_exact(void) {
     static const char *const cases[]={"CLS","cls","cLs"," ClS","CLS ",
                                       "   cLs   "};
-    uint8_t tokens[32],same[32];size_t n=17u,i,j;
+    uint8_t tokens[32];size_t n=17u,i,j;
     CHECK(reset()==0);
     CHECK(submit("10 REM KEEP").status==BSR_OK);
     CHECK(submit("20 END").status==BSR_OK);
@@ -94,8 +94,6 @@ static int positive_exact(void) {
         CHECK(f.events[0].print_offset==0u && f.events[0].pen==0u);
         CHECK(f.events[0].ink==0u && f.events[0].colour==0u);
         CHECK(counters_and_canaries(0u,1u)==0);
-        memcpy(same,f.output,sizeof(same));
-        CHECK(memcmp(same,f.output,sizeof(same))==0);
         /* repeated direct preparation has no retained state */
         buffers();
         CHECK(direct(cases[i],0u,EV).status==BSR_OK);
@@ -173,8 +171,13 @@ static int invalid_more(void) {
     const uint8_t *src=(const uint8_t *)"CLS";
     CHECK(reset()==0);
     snapshot();buffers();
-    CHECK(nonmutating_failure(direct_raw(src,3u,f.output,OUT,&f.written,
-                     f.events,0u,&f.event_written),BSR_EXECUTOR_ERROR)==0);
+    {
+        BSRResult no_space=direct_raw(src,3u,f.output,OUT,&f.written,
+                                     f.events,0u,&f.event_written);
+        CHECK(no_space.status==BSR_EXECUTOR_ERROR &&
+              no_space.executor_status==BE_NO_EVENT_SPACE);
+        CHECK(unchanged()==0 && counters_and_canaries(999u,888u)==0);
+    }
     CHECK(nonmutating_failure(direct_raw(src,3u,NULL,OUT,&f.written,
                      f.events,EV,&f.event_written),BSR_INVALID_ARGUMENT)==0);
     CHECK(nonmutating_failure(direct_raw(NULL,3u,f.output,OUT,&f.written,

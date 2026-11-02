@@ -779,10 +779,9 @@ static BEStatus execute_line(const BasicProgram *program,
             return comment_end(body, length, pos + 1u,
                                line->next_offset, next);
         }
-        if (token == 0x8au) { /* B2a RED falsification: former unsupported CLS. */
+        if (token == 0x8au) { /* CPC CLS: no direct firmware side effect. */
             status = emit_clear_event(events, out->length);
             if (status != BE_OK) return status;
-            return BE_UNKNOWN_TOKEN; /* deliberately rejected AFTER pure probe */
         } else if (token == 0xbbu) { /* PEN immediate, not a byte-stream escape. */
             uint8_t pen;
             status = pen_argument(body, length, &pos, &pen);

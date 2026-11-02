@@ -191,14 +191,14 @@ static int print_and_colours(void) {
 static int flow_and_stores(void) {
     size_t i;
     const struct {const char *lines[5];size_t count,steps;} cases[] = {
-        {{"10 A%=1","20 PRINT A%","30 END"},3u,4u},
-        {{"10 A=0","20 PRINT A","30 END"},3u,4u},
-        {{"10 A=-1","20 PRINT A","30 END"},3u,4u},
-        {{"10 A$=\"BONJOUR\"","20 PRINT A$","30 END"},3u,4u},
-        {{"10 GOTO 30","20 PRINT \"NEVER\"","30 PRINT \"YES\"","40 END"},4u,4u},
-        {{"10 GOSUB 30","20 END","30 PRINT \"SUB\"","40 RETURN"},4u,5u},
-        {{"10 A%=1","20 IF A% THEN 40","30 PRINT \"NEVER\"","40 END"},4u,4u},
-        {{"10 FOR I%=1 TO 2","20 PRINT I%","30 NEXT I%","40 END"},4u,8u}
+        {{"10 A%=1","20 PRINT A%","30 END"},3u,3u},
+        {{"10 A=0","20 PRINT A","30 END"},3u,3u},
+        {{"10 A=-1","20 PRINT A","30 END"},3u,3u},
+        {{"10 A$=\"BONJOUR\"","20 PRINT A$","30 END"},3u,3u},
+        {{"10 GOTO 30","20 PRINT \"NEVER\"","30 PRINT \"YES\"","40 END"},4u,3u},
+        {{"10 GOSUB 30","20 END","30 PRINT \"SUB\"","40 RETURN"},4u,4u},
+        {{"10 A%=1","20 IF A% THEN 40","30 PRINT \"NEVER\"","40 END"},4u,3u},
+        {{"10 FOR I%=1 TO 2","20 PRINT I%","30 NEXT I%","40 END"},4u,6u}
     };
     for(i=0u;i<sizeof(cases)/sizeof(cases[0]);++i) {
         size_t j;

@@ -324,6 +324,120 @@ static BLStatus abs_expression(const uint8_t *b, size_t len,
     return append_byte(out, (uint8_t)')');
 }
 
+
+/* J1.22-B: detokenize typed logical INTEGER expressions. Opaque BVR
+ * caches are skipped as records, not inspected for operator bytes. */
+static int bl_logic_present(const uint8_t *body, size_t len, size_t start)
+{
+    size_t p = start;
+    while (p < len) {
+        uint8_t t = body[p];
+        if (t == (uint8_t)'(' || t == 0xfeu ||
+            t == 0xfau || t == 0xfcu || t == 0xfdu) return 1;
+        if (t == 0x02u || t == 0x03u || t == 0x04u) {
+            BasicVariableRef ref;
+            if (bvr_decode(body, len, p, &ref) != BVR_OK) return 0;
+            p += ref.consumed;
+        } else if (t == 0x19u) {
+            if (len - p < 2u) return 0;
+            p += 2u;
+        } else if (t == 0x1au) {
+            if (len - p < 3u) return 0;
+            p += 3u;
+        } else if (t == 0x1fu) {
+            if (len - p < 6u) return 0;
+            p += 6u;
+        } else if (t == 0xffu) return 0;
+        else ++p;
+    }
+    return 0;
+}
+
+static BLStatus bl_logic_expression(const uint8_t *b, size_t len,
+                                    size_t *at, BLEmitter *out,
+                                    int stop_then)
+{
+    size_t p = *at;
+    unsigned int depth = 0u;
+    int operand = 1, neg = 0;
+    BLStatus st;
+    while (p < len) {
+        uint8_t t;
+        st = append_spaces(b, len, &p, out);
+        if (st != BL_OK) return st;
+        if (p == len) break;
+        t = b[p];
+        if (stop_then && t == 0xebu && depth == 0u && !operand) break;
+        if (operand) {
+            if (t == (uint8_t)'(') {
+                if (depth == 16u) return BL_BAD_SEQUENCE;
+                ++depth; ++p; neg = 0;
+                st = append_byte(out, (uint8_t)'(');
+            } else if (t == 0xfeu) {
+                ++p; neg = 0;
+                st = append_word(out, "NOT");
+            } else if (t == 0xf5u) {
+                ++p; neg = 1;
+                st = append_byte(out, (uint8_t)'-');
+            } else if (t >= 0x0eu && t <= 0x17u) {
+                ++p; neg = 0; operand = 0;
+                st = append_decimal(out, (unsigned int)(t - 0x0eu));
+            } else if (t == 0x19u) {
+                if (len - p < 2u) return BL_TRUNCATED;
+                if (b[p + 1u] < 10u) return BL_BAD_SEQUENCE;
+                st = append_decimal(out, (unsigned int)b[p + 1u]);
+                p += 2u; neg = 0; operand = 0;
+            } else if (t == 0x1au) {
+                unsigned int n;
+                if (len - p < 3u) return BL_TRUNCATED;
+                n = (unsigned int)b[p + 1u] |
+                    ((unsigned int)b[p + 2u] << 8);
+                if (n < 256u || n > 32767u) return BL_BAD_SEQUENCE;
+                st = append_decimal(out, n);
+                p += 3u; neg = 0; operand = 0;
+            } else if (t == 0x1fu && neg) {
+                static const uint8_t bits[5] = {0u,0u,0u,0u,0x90u};
+                if (len - p < 6u) return BL_TRUNCATED;
+                if (memcmp(b + p + 1u, bits, sizeof(bits)) != 0)
+                    return BL_BAD_SEQUENCE;
+                st = append_word(out, "32768");
+                p += 6u; neg = 0; operand = 0;
+            } else if (t == 0x02u) {
+                st = for_reference(b, len, &p, out);
+                neg = 0; operand = 0;
+            } else return t >= 0x80u ? BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
+        } else if (t == (uint8_t)')' && depth != 0u) {
+            --depth; ++p;
+            st = append_byte(out, (uint8_t)')');
+        } else {
+            const char *word;
+            switch (t) {
+                case 0xf4u: word = "+"; break;
+                case 0xf5u: word = "-"; break;
+                case 0xf6u: word = "*"; break;
+                case 0xf9u: word = "\\"; break;
+                case 0xfbu: word = "MOD"; break;
+                case 0xfau: word = "AND"; break;
+                case 0xfcu: word = "OR"; break;
+                case 0xfdu: word = "XOR"; break;
+                case 0xeeu: word = ">"; break;
+                case 0xefu: word = "="; break;
+                case 0xf0u: word = ">="; break;
+                case 0xf1u: word = "<"; break;
+                case 0xf2u: word = "<>"; break;
+                case 0xf3u: word = "<="; break;
+                default: return t >= 0x80u ? BL_UNKNOWN_TOKEN : BL_BAD_SEQUENCE;
+            }
+            st = append_word(out, word);
+            ++p; operand = 1; neg = 0;
+        }
+        if (st != BL_OK) return st;
+    }
+    if (operand || depth != 0u) return BL_BAD_SEQUENCE;
+    *at = p;
+    return BL_OK;
+}
+
 static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
 {
     size_t pos = 0;
@@ -517,6 +631,12 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (status != BL_OK) return status;
                 if (pos != length) return BL_BAD_SEQUENCE;
                 return BL_OK; /* Autonomous STRING line: no suffix. */
+            }
+            if (bl_logic_present(body, length, pos - 1u)) {
+                --pos;
+                status = bl_logic_expression(body, length, &pos, out, 0);
+                if (status != BL_OK) return status;
+                return pos == length ? BL_OK : BL_BAD_SEQUENCE;
             }
             if (t == 0xffu) {
                 /* B%=ABS(A%) is the only sealed ABS assignment stream. */
@@ -887,6 +1007,15 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             if (pos == length) {
                 return BL_TRUNCATED;
             }
+            if (bl_logic_present(body, length, pos)) {
+                if (pos == space_start) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) return status;
+                }
+                status = bl_logic_expression(body, length, &pos, out, 1);
+                if (status != BL_OK) return status;
+                space_start = pos;
+            } else {
             decoded = bvr_decode(body, length, pos, &reference);
             if (decoded == BVR_TRUNCATED) {
                 return BL_TRUNCATED;
@@ -947,6 +1076,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 status = append_spaces(body, length, &pos, out);
                 if (status != BL_OK) return status;
             }
+            } /* Existing explicit-variable IF condition. */
             if (pos == length || body[pos] != 0xebu) {
                 return BL_BAD_SEQUENCE;
             }

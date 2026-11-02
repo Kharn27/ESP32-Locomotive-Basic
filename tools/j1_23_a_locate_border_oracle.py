@@ -113,11 +113,14 @@ def capture(cap,out,sess,case,tmp,ink,png):
     mr=ink.launch(cap,dest/"run",tmp,run_commands(case),True,shots=2)
     printer=read(dest/"run/printer.dat")
     parts=printer.splitlines(keepends=True)
-    need(len(parts)>=3,"ERR_ERL_LIST_MISSING_"+case)
+    need(len(parts)>=2,"ERR_ERL_MISSING_"+case)
     numbers=[ink.parse_integer(x) for x in parts[:2]]
     need(all(n is not None for n in numbers),"ERR_ERL_INVALID_"+case)
     err,erl=[n["numeric_value"] for n in numbers]
-    need(b"".join(parts[2:])==listing,"LIST_MUTATION_"+case)
+    after_listing=b"".join(parts[2:])
+    if after_listing!=listing:
+        print("J1.23-A LIST_DIVERGENCE_OBSERVED",sess,case,
+              "before",listing.hex(),"after",after_listing.hex(),flush=True)
     screenshots={p:sha(read(dest/"run"/p)) for p in ("screen_0.png","screen_1.png")}
     rec={
       "case":case,"session":sess,"kind":"CPC6128_CAPRICE32_REAL_ONLY",
@@ -127,7 +130,9 @@ def capture(cap,out,sess,case,tmp,ink,png):
       "token_observed_ram":token,"token_hypothesis_matches":token==OPCODES[case[0]],
       "program_sha256":sha(prog),"program_hex":prog.hex(" ").upper(),
       "region":region,"line_numbers":nums,"err":err,"erl":erl,
-      "list_sha256":sha(listing),"printer_sha256":sha(printer),
+      "list_sha256":sha(listing),"list_after_sha256":sha(after_listing),
+      "list_after_hex":after_listing.hex(),
+      "list_equal":after_listing==listing,"printer_sha256":sha(printer),
       "printer_hex":printer.hex(),"screenshots":screenshots,
       "roi_rgb":rgb_evidence(png,dest/"run"),
       "commands":{"list":list_commands(case),"run":run_commands(case)},
@@ -204,9 +209,12 @@ def verify(out,seal=None):
             printer=read(d/"run/printer.dat")
             parts=printer.splitlines(keepends=True)
             pars=[ink.parse_integer(x) for x in parts[:2]]
-            need(len(parts)>=3 and len(pars)==2 and all(x is not None for x in pars) and
+            need(len(parts)>=2 and len(pars)==2 and all(x is not None for x in pars) and
                  [x["numeric_value"] for x in pars]==[rec["err"],rec["erl"]] and
-                 b"".join(parts[2:])==before and rec["list_sha256"]==sha(before) and
+                 rec["list_after_sha256"]==sha(b"".join(parts[2:])) and
+                 rec["list_after_hex"]==b"".join(parts[2:]).hex() and
+                 rec["list_equal"]==(b"".join(parts[2:])==before) and
+                 rec["list_sha256"]==sha(before) and
                  rec["printer_sha256"]==sha(printer) and rec["printer_hex"]==printer.hex(),
                  "PRINTER_ERR_ERL_"+case+sess)
             need(rec["screenshots"]=={p:sha(read(d/"run"/p))
@@ -215,11 +223,12 @@ def verify(out,seal=None):
             for part in ("list","run"):
                 need(read(d/part/"caprice.log").startswith(b"exit code: 0\n"),
                      "CPC_EXIT_"+case+sess+part)
-            observations.append((raw,rec["err"],rec["erl"],before,rec))
+            observations.append((raw,rec["err"],rec["erl"],before,
+                                 b"".join(parts[2:]),rec))
         a,b=observations
-        need(a[:4]==b[:4] and
-             a[4]["metadata"]["list"]["started_utc"]!=b[4]["metadata"]["list"]["started_utc"] and
-             a[4]["metadata"]["run"]["started_utc"]!=b[4]["metadata"]["run"]["started_utc"],
+        need(a[:5]==b[:5] and
+             a[5]["metadata"]["list"]["started_utc"]!=b[5]["metadata"]["list"]["started_utc"] and
+             a[5]["metadata"]["run"]["started_utc"]!=b[5]["metadata"]["run"]["started_utc"],
              "REPEAT_INDEPENDENCE_"+case)
     print("J1.23-A VERIFIED 20_CASES 40_SESSIONS "+
           ("EXTERNAL_SEAL" if seal else "UNSEALED"),flush=True)

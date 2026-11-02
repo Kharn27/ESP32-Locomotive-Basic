@@ -89,7 +89,7 @@ static BasicVariableKey integer_key(const char *name)
 static int test_case(const Oracle *c)
 {
     Fixture f;
-    char stmt[256],printer[128],expected_list[512];
+    char stmt[256],expected_list[512];
     size_t n,i;
     BasicVariableKey key=integer_key("A");
     BasicVariableValue value;

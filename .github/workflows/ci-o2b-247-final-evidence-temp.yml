@@ -1,0 +1,48 @@
+name: CI-O2B-247 final evidence (temporary; NEVER MERGE)
+on:
+  push:
+    branches:
+      - ci/o2b-final-proof-247-readonly
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  verify-a0-and-o2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c416f3837dab6ba9302d7ed545ed489dd91bdc7d
+          persist-credentials: false
+      - name: Freeze and inventory source
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=c416f3837dab6ba9302d7ed545ed489dd91bdc7d
+          test "$(git rev-parse HEAD)" = "$expected"
+          python3 --version
+          git status --short
+          test -f tools/j1_diag_retro_a0_verify.py
+          test -f tools/j1_diag_retro_o2_verify.py
+          test -f tests/fixtures/cpc6128/j1_diag_goto_if_missing/capture/screen_review.json
+          test -f tests/fixtures/cpc6128/j1_diag_goto_if_missing/capture/o2-cpc-raw-41259031518.tar.xz
+      - name: Official A0 historical raw witness self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_diag_retro_a0_verify.py --self-test
+      - name: Official O2 from Git-versioned tar.xz and PO review
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          capture=tests/fixtures/cpc6128/j1_diag_goto_if_missing/capture
+          printf '%s  %s\n' '72a57f80f9b2dc278ff23ab7a1cf558ceb322155f639907b2c62673a695bcb5d' "$capture/o2-cpc-raw-41259031518.tar.xz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/o2-247-from-git-tar"
+          tar -xJf "$capture/o2-cpc-raw-41259031518.tar.xz" -C "$RUNNER_TEMP/o2-247-from-git-tar"
+          cp "$capture/screen_review.json" "$RUNNER_TEMP/o2-247-from-git-tar/screen_review.json"
+          python3 tools/j1_diag_retro_o2_verify.py --check-sources --self-test
+          python3 tools/j1_diag_retro_o2_verify.py --verify "$RUNNER_TEMP/o2-247-from-git-tar"

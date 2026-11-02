@@ -526,7 +526,8 @@ static bool basic_run_slice(void)
     Hw4RunReceiver receiver={run_preflight,run_replay,NULL,NULL};
     size_t event_count=0U;
     Hw4RunSlice slice;
-    s_basic.written=0U;
+    /* B2b: do NOT touch public written here; preview writes only its
+     * private scheduler staging. Public bytes/counts commit after preflight. */
     slice=hw4_run_scheduler_slice(&s_run_scheduler,RUN_QUANTUM,&receiver,
                        s_basic.output,sizeof(s_basic.output),&s_basic.written,
                        s_basic.scratch.events,PEN_EVENT_CAPACITY,&event_count);
@@ -566,6 +567,15 @@ static bool basic_run_slice(void)
                           HW4_RUN_DISPLAY_PREFLIGHT_FAILED),
                s_run_scheduler.display_failure==HW4_RUN_DISPLAY_PREFLIGHT_FAILED ?
                    "NO_PIXELS_APPLIED" : "PARTIAL_UNVERIFIED");
+        if(s_run_scheduler.display_failure==HW4_RUN_DISPLAY_REPLAY_FAILED)
+            printf("HW4_RUN_DISPLAY_REPLAY_FAILED policy=FAIL_STOP "
+                   "rollback=IMPOSSIBLE committed_basic=1\n");
+        else if(s_run_scheduler.display_failure==HW4_RUN_DISPLAY_COMMIT_MISMATCH)
+            printf("HW4_RUN_DISPLAY_COMMIT_MISMATCH policy=FAIL_STOP "
+                   "replay=NOT_STARTED\n");
+        else
+            printf("HW4_RUN_DISPLAY_PREFLIGHT_FAILED policy=NO_BASIC_COMMIT "
+                   "replay=NOT_STARTED\n");
         /* Fail-stop: cannot roll back an already partly replayed video step. */
         (void)bsr_stop(&s_basic.runtime);
         if(!display_error()) return false;

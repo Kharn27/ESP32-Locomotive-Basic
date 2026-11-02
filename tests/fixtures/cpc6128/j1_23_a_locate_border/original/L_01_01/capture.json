@@ -1,0 +1,154 @@
+{
+  "border_flash": "NOT_INFERRED_FROM_STILL_PNG",
+  "case": "L_01_01",
+  "command": "LOCATE 1,1",
+  "commands": {
+    "list": [
+      "MODE 1",
+      "NEW",
+      "10 LOCATE 1,1",
+      "20 PRINT \"LBLOC\"",
+      "30 END",
+      "LIST",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
+      "LIST #8",
+      "CAP32_DELAY CAP32_EXIT"
+    ],
+    "run": [
+      "MODE 1",
+      "NEW",
+      "10 LOCATE 1,1",
+      "20 PRINT \"LBLOC\"",
+      "30 END",
+      "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "RUN",
+      "CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+      "PRINT #8,ERR",
+      "PRINT #8,ERL",
+      "LIST #8",
+      "CAP32_DELAY CAP32_EXIT"
+    ]
+  },
+  "cursor": "PENDING_VISUAL_INSPECTION",
+  "diagnostic_text": "PENDING_MANUAL_SCREEN_INSPECTION",
+  "erl": 0,
+  "err": 0,
+  "kind": "CPC6128_CAPRICE32_REAL_ONLY",
+  "line_numbers": [
+    10,
+    20,
+    30
+  ],
+  "list_after_hex": "3130204c4f4341544520312c310d0a3230205052494e5420224c424c4f43220d0a333020454e440d0a",
+  "list_after_sha256": "fe318f8dcd82700a21e0c1efa7ea66add90b7b25b95df60d3cf9856cb10b162f",
+  "list_equal": true,
+  "list_sha256": "fe318f8dcd82700a21e0c1efa7ea66add90b7b25b95df60d3cf9856cb10b162f",
+  "metadata": {
+    "list": {
+      "commands": [
+        "MODE 1",
+        "NEW",
+        "10 LOCATE 1,1",
+        "20 PRINT \"LBLOC\"",
+        "30 END",
+        "LIST",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
+        "LIST #8",
+        "CAP32_DELAY CAP32_EXIT"
+      ],
+      "finished_utc": "2026-11-02T22:56:21.853616+00:00",
+      "screenshot_height": 540,
+      "screenshot_width": 768,
+      "started_utc": "2026-11-02T22:56:20.603579+00:00"
+    },
+    "run": {
+      "commands": [
+        "MODE 1",
+        "NEW",
+        "10 LOCATE 1,1",
+        "20 PRINT \"LBLOC\"",
+        "30 END",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+        "PRINT #8,ERR",
+        "PRINT #8,ERL",
+        "LIST #8",
+        "CAP32_DELAY CAP32_EXIT"
+      ],
+      "finished_utc": "2026-11-02T22:56:34.517410+00:00",
+      "screenshot_height": 540,
+      "screenshot_width": 768,
+      "started_utc": "2026-11-02T22:56:21.855480+00:00"
+    }
+  },
+  "printer_hex": "2030200d0a2030200d0a3130204c4f4341544520312c310d0a3230205052494e5420224c424c4f43220d0a333020454e440d0a",
+  "printer_sha256": "9fbe2e1895a964ca3333376cf6bc5fb62c44cffae268a16af54e74341d97aa22",
+  "program_hex": "0A 00 0A 00 A9 20 0F 2C 0F 00 0E 00 14 00 BF 20 22 4C 42 4C 4F 43 22 00 06 00 1E 00 98 00 00 00",
+  "program_sha256": "8480408dcfe8f78d1ad596875ab40b984b870e7d0a7ee0f62d40f4c57c248d52",
+  "region": {
+    "bank": "physical bank 0, Gate Array RAM config 0",
+    "base_pointer_address": 44644,
+    "base_pointer_value": 367,
+    "end_exclusive": 400,
+    "end_pointer_address": 44646,
+    "length": 32,
+    "line_numbers": [
+      10,
+      20,
+      30
+    ],
+    "records": [
+      {
+        "length": 10,
+        "line": 10,
+        "offset": 0,
+        "terminator_offset": 9
+      },
+      {
+        "length": 14,
+        "line": 20,
+        "offset": 10,
+        "terminator_offset": 23
+      },
+      {
+        "length": 6,
+        "line": 30,
+        "offset": 24,
+        "terminator_offset": 29
+      }
+    ],
+    "sentinel_offset": 30,
+    "snapshot_data_offset": 256,
+    "snapshot_program_offset": 624,
+    "start_address": 368,
+    "terminator_hex": "0000"
+  },
+  "roi_rgb": {
+    "border_left": {
+      "after_sha256": "025363b1e07d6e9c4d7af2e4fda546c8a952b83b2382ee024fe18af513d5d061",
+      "before_sha256": "025363b1e07d6e9c4d7af2e4fda546c8a952b83b2382ee024fe18af513d5d061",
+      "changed_bytes": 0
+    },
+    "text": {
+      "after_sha256": "edddd06dc5f59f287613801314718bed9231c7451c3a16a353880e73a9323971",
+      "before_sha256": "91598a063126bd41a9ddcc44a4cb581361cc7497c76996b8cfecf26a7a7c2e45",
+      "changed_bytes": 14028
+    },
+    "text_top_left": {
+      "after_sha256": "b0a949fc13a9973346d86dc6645ae3f44f012fd1547ddcb1093256fc4bdfae7e",
+      "before_sha256": "00af5863d88970dea89be80b397389860b4687eae8401dab40f4aec5dde162cc",
+      "changed_bytes": 8868
+    }
+  },
+  "screenshots": {
+    "screen_0.png": "729e4475cf4185e4037006947694d540505b05993324e85ee888c07e68c15f90",
+    "screen_1.png": "1bad623863a675f360257bd521a9381e60bc206c71be8e9a58f9205b8159d7cf"
+  },
+  "session": "original",
+  "source_ascii": "10 LOCATE 1,1\n20 PRINT \"LBLOC\"\n30 END\n",
+  "source_sha256": "42d86b6832658a6c162de8f820e3da7232fb18364b111e72db96bc74dd8b4abe",
+  "token_expected_hypothesis": 169,
+  "token_hypothesis_matches": true,
+  "token_observed_ram": 169
+}

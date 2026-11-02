@@ -1,0 +1,8 @@
+exit code: 0
+Using configuration file: /__w/_temp/j123a/original/L_40_25/run/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j123a/original/L_40_25/run/screenshot_20261102_225637.png
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j123a/original/L_40_25/run/screenshot_20261102_225648.png
+
+[stderr]

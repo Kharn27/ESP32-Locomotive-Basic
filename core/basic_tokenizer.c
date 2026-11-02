@@ -469,6 +469,41 @@ static BTStatus scalar_real_statement(BTEmitter *out, int assignment,
 }
 
 
+
+/* J1.22-B: bounded inline PRINT #8 string arms of observed IF conditions. */
+static BTStatus inline_if_print8(const uint8_t *src, size_t length,
+                                  size_t *at, BTEmitter *out)
+{
+    size_t n = 0u;
+    BTStatus st;
+    if (!keyword_matches(src, length, *at, "PRINT", &n))
+        return BT_UNSUPPORTED_CONSTRUCT;
+    *at += n;
+    st = emit(out, 0xbfu);
+    if (st == BT_OK) st = spaces(src, length, at, out);
+    if (st != BT_OK) return st;
+    if (length - *at < 3u || src[*at] != (uint8_t)'#' ||
+        src[*at + 1u] != (uint8_t)'8' ||
+        src[*at + 2u] != (uint8_t)',')
+        return BT_UNSUPPORTED_CONSTRUCT;
+    *at += 3u;
+    st = emit(out, (uint8_t)'#');
+    if (st == BT_OK) st = emit(out, 0x16u);
+    if (st == BT_OK) st = emit(out, (uint8_t)',');
+    if (st == BT_OK) st = spaces(src, length, at, out);
+    if (st != BT_OK) return st;
+    if (*at == length || src[*at] != (uint8_t)'"')
+        return BT_UNSUPPORTED_CONSTRUCT;
+    {
+        size_t start = *at;
+        st = quoted_string(src, length, at, out);
+        if (st != BT_OK) return st;
+        if (*at - start < 2u || src[*at - 1u] != (uint8_t)'"')
+            return BT_MALFORMED_INPUT;
+    }
+    return BT_OK;
+}
+
 /* J1.22-B: recognize only the INTEGER logical-expression subset measured
  * by J1.22-A. This pass encodes CPC tokens, not evaluated values. */
 static int logical_keyword_in_source(const uint8_t *src, size_t length,

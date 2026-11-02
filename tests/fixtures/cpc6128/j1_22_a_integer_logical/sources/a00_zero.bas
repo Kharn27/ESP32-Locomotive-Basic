@@ -1,0 +1,3 @@
+10 A%=0 AND -1
+20 PRINT #8,"VALUE=";A%
+30 END

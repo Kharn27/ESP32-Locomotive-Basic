@@ -185,6 +185,18 @@ jobs:
             --evidence tests/fixtures/cpc6128/j1_21_a_cls \
             --permanent --self-test
 
+      - name: J1.22-A 48 authentic CPC sessions external SHA seals (permanent, no acquisition)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_22_a_integer_logical_oracle.py --check-sources
+          echo '60977e10abae836f6c59adc3f54b51829abc8a5e65e802efb289fcd0f053df3b  tests/fixtures/cpc6128/j1_22_a_integer_logical/original-run-41464839712.zip' | sha256sum --check --status
+          mkdir -p "$RUNNER_TEMP/j122-permanent"
+          unzip -q tests/fixtures/cpc6128/j1_22_a_integer_logical/original-run-41464839712.zip -d "$RUNNER_TEMP/j122-permanent"
+          echo "f77f770972ddf8f3710b43a36e43fd554a11edd9c98b099ac26497a514f49b92  $RUNNER_TEMP/j122-permanent/archive/manifest.json" | sha256sum --check --status
+          python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); assert m["acquisition_head"]=="787af8a9159d573c3f6444248666001e3b159ce8"; assert m["oracle"]["rom_sha256"]=="31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"' "$RUNNER_TEMP/j122-permanent/archive/manifest.json"
+          python3 tools/j1_22_a_integer_logical_oracle.py --verify "$RUNNER_TEMP/j122-permanent/archive" --self-test
+
 
   pen-cpc-acquisition:
     if: (github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-17-a-pen-cpc' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref_name == 'oracle/j1-17-a-pen-cpc')

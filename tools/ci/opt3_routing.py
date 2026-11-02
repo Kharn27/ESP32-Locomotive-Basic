@@ -76,6 +76,25 @@ PAPER_IMAGE = ("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
 PAPER_ROM = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
 PAPER_CAPRICE = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
 
+# J1.22-A-C1: only this exact oracle may use the protected permanent CPC job.
+J122_TOOL = "tools/j1_22_a_integer_logical_oracle.py"
+J122_ZIP = "tests/fixtures/cpc6128/j1_22_a_integer_logical/original-run-41464839712.zip"
+J122_ZIP_SHA256 = "60977e10abae836f6c59adc3f54b51829abc8a5e65e802efb289fcd0f053df3b"
+J122_MANIFEST_SHA256 = "f77f770972ddf8f3710b43a36e43fd554a11edd9c98b099ac26497a514f49b92"
+J122_ROM_SHA256 = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
+J122_HEAD = "787af8a9159d573c3f6444248666001e3b159ce8"
+J122_PERMANENT_STEP = """      - name: J1.22-A 48 authentic CPC sessions external SHA seals (permanent, no acquisition)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_22_a_integer_logical_oracle.py --check-sources
+          echo '60977e10abae836f6c59adc3f54b51829abc8a5e65e802efb289fcd0f053df3b  tests/fixtures/cpc6128/j1_22_a_integer_logical/original-run-41464839712.zip' | sha256sum --check --status
+          mkdir -p "$RUNNER_TEMP/j122-permanent"
+          unzip -q tests/fixtures/cpc6128/j1_22_a_integer_logical/original-run-41464839712.zip -d "$RUNNER_TEMP/j122-permanent"
+          echo "f77f770972ddf8f3710b43a36e43fd554a11edd9c98b099ac26497a514f49b92  $RUNNER_TEMP/j122-permanent/archive/manifest.json" | sha256sum --check --status
+          python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); assert m["acquisition_head"]=="787af8a9159d573c3f6444248666001e3b159ce8"; assert m["oracle"]["rom_sha256"]=="31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"' "$RUNNER_TEMP/j122-permanent/archive/manifest.json"
+          python3 tools/j1_22_a_integer_logical_oracle.py --verify "$RUNNER_TEMP/j122-permanent/archive" --self-test"""
+
 R1_WORKFLOW = "hw4-esc-oracle-r1.yml"
 R1_MANIFEST = "tests/fixtures/cpc6128/hw4_esc_r1/manifest.json"
 R1_VERIFIER = "tests/oracles/hw4_esc_r1_verify.py"
@@ -237,6 +256,7 @@ def audit(sources):
     audit_paper_permanent(sources)
     audit_cls_route(sources)
     audit_cls_permanent(sources)
+    audit_j122_permanent(sources)
     audit_r1_permanent(sources)
     ea = (ROOT / "tools/j1_16_e_a_store.py").read_text()
     da = (ROOT / "tools/j1_16_d_a_store.py").read_text()
@@ -341,6 +361,69 @@ def r1_negative_tests(sources):
         demand(R1_WORKFLOW in triggered_names([proof], sources),
                "R1_EVIDENCE_CHANGE_NOT_ROUTED_" + proof)
         print("CI-OPT3 R1_EVIDENCE_PR_TRIGGER_VERIFIED", proof)
+
+
+def audit_j122_permanent(sources):
+    """Fail-closed single J1.22-A oracle in mandatory unfiltered permanent job."""
+    audit_paper_permanent(sources)
+    yml = sources[PAPER_WORKFLOW]
+    marker = "\n  sealed-evidence:"
+    demand(yml.count(marker) == 1, "J122_SEALED_JOB_MISSING")
+    tail = yml.split(marker, 1)[1]
+    end = re.search(r"(?m)^  [A-Za-z][\w-]*:[ \t]*$", tail)
+    job = tail[:end.start()] if end else tail
+    r1_exact_step(job, J122_PERMANENT_STEP, "J122_PERMANENT_STEP")
+    for path in (J122_TOOL, J122_ZIP,
+                 "tests/fixtures/cpc6128/j1_22_a_integer_logical/corpus.json"):
+        demand(PAPER_WORKFLOW in triggered_names([path], sources),
+               "J122_PERMANENT_UNROUTED_" + path)
+    return True
+
+
+def j122_permanent_negative_tests(sources):
+    """Deterministically falsify only in-memory route strings; never relax old audits."""
+    original = sources[PAPER_WORKFLOW]
+    step = J122_PERMANENT_STEP
+    demand(original.count(step) == 1, "J122_NEGATIVE_INERT")
+    def mutate(old, new):
+        demand(original.count(old) == 1, "J122_NEGATIVE_INERT")
+        return original.replace(old, new, 1)
+    cases = {
+        "STEP_REMOVED": (mutate(step + "\n", ""), "J122_PERMANENT_STEP_MISSING"),
+        "IF_FALSE": (mutate(step, step.replace("        shell: bash",
+            "        if: false\\n        shell: bash")), "J122_PERMANENT_STEP_ALTERED"),
+        "CONTINUE_ON_ERROR": (mutate(step, step.replace("        shell: bash",
+            "        continue-on-error: true\\n        shell: bash")), "J122_PERMANENT_STEP_ALTERED"),
+        "NO_SELF_TEST": (mutate(step, step.replace("--self-test", "")),
+            "J122_PERMANENT_STEP_ALTERED"),
+        "NO_CHECK_SOURCES": (mutate(step, step.replace("--check-sources", "")),
+            "J122_PERMANENT_STEP_ALTERED"),
+        "WRONG_ARCHIVE": (mutate(step, step.replace(J122_ZIP, "tests/fixtures/cpc6128/j1_19_a_paper/fake.zip")),
+            "J122_PERMANENT_STEP_ALTERED"),
+        "WRONG_ZIP_SHA": (mutate(step, step.replace(J122_ZIP_SHA256, "0" * 64)),
+            "J122_PERMANENT_STEP_ALTERED"),
+        "WRONG_MANIFEST_SHA": (mutate(step, step.replace(J122_MANIFEST_SHA256, "0" * 64)),
+            "J122_PERMANENT_STEP_ALTERED"),
+        "WRONG_ROM": (mutate(step, step.replace(J122_ROM_SHA256, "0" * 64)),
+            "J122_PERMANENT_STEP_ALTERED"),
+        "WRONG_HEAD": (mutate(step, step.replace(J122_HEAD, "0" * 40)),
+            "J122_PERMANENT_STEP_ALTERED"),
+        "WEAK_SHELL": (mutate(step, step.replace("set -euo pipefail", "set +e")),
+            "J122_PERMANENT_STEP_ALTERED"),
+        "FAKE_VERIFIER": (mutate(step, step.replace(J122_TOOL, "tools/j1_99_unknown_oracle.py")),
+            "J122_PERMANENT_STEP_ALTERED"),
+    }
+    for label, (bad, expected) in cases.items():
+        try:
+            audit_j122_permanent({**sources, PAPER_WORKFLOW: bad})
+        except UnsafeRoute as exc:
+            demand(str(exc) == expected, "J122_WRONG_REJECTION_" + label + ":" + str(exc))
+        else:
+            raise UnsafeRoute("J122_ACCEPTED_TAMPERING_" + label)
+        print("CI-OPT3 J122_PERMANENT_FALSIFICATION_REJECTED", label)
+    demand(not HISTORICAL.intersection(triggered_names([J122_TOOL.replace("j1_22_a", "j1_99_unknown")], sources)),
+           "J122_UNKNOWN_ORACLE_REGISTERED")
+    print("CI-OPT3 J122_UNKNOWN_ORACLE_STILL_UNREGISTERED")
 
 
 def audit_cls_permanent(sources):
@@ -765,6 +848,7 @@ def negative_tests(sources):
     r1_negative_tests(sources)
     cls_route_negative_tests(sources)
     cls_permanent_negative_tests(sources)
+    j122_permanent_negative_tests(sources)
     paper_negative_tests(sources)
     paper_permanent_negative_tests(sources)
     paper_archive_negative_tests()
@@ -855,6 +939,10 @@ def check_diff(base, sources):
                 audit_cls_route(sources)
                 demand(PAPER_WORKFLOW in triggered_names([path], sources),
                        "CLS_WORKFLOW_UNROUTED")
+            elif path == J122_TOOL:
+                audit_j122_permanent(sources)
+                demand(PAPER_WORKFLOW in triggered_names([path], sources),
+                       "J122_WORKFLOW_UNROUTED")
             else:
                 demand(bool(HISTORICAL.intersection(triggered_names([path], sources))),
                        "UNREGISTERED_NEW_ORACLE_" + path)

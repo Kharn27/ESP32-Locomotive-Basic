@@ -1,0 +1,3 @@
+10 A%=5 XOR 3
+20 PRINT #8,"VALUE=";A%
+30 END

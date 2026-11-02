@@ -1149,7 +1149,37 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             if (pos == length) {
                 return BL_TRUNCATED;
             }
-            if (body[pos] == 0x02u) {
+            if (body[pos] == 0xbfu) {
+                if (pos == space_start) {
+                    status = append_byte(out, (uint8_t)' ');
+                    if (status != BL_OK) return status;
+                }
+                status = bl_inline_print8(body, length, &pos, out);
+                if (status != BL_OK) return status;
+                space_start = pos;
+                status = append_spaces(body, length, &pos, out);
+                if (status != BL_OK) return status;
+                if (pos < length && body[pos] == 0x01u &&
+                    pos + 1u < length && body[pos + 1u] == 0x97u) {
+                    if (pos == space_start) {
+                        status = append_byte(out, (uint8_t)' ');
+                        if (status != BL_OK) return status;
+                    }
+                    pos += 2u;
+                    status = append_word(out, "ELSE");
+                    if (status != BL_OK) return status;
+                    space_start = pos;
+                    status = append_spaces(body, length, &pos, out);
+                    if (status != BL_OK) return status;
+                    if (pos == length) return BL_TRUNCATED;
+                    if (pos == space_start) {
+                        status = append_byte(out, (uint8_t)' ');
+                        if (status != BL_OK) return status;
+                    }
+                    status = bl_inline_print8(body, length, &pos, out);
+                    if (status != BL_OK) return status;
+                }
+            } else if (body[pos] == 0x02u) {
                 /* THEN with one INTEGER arm, optionally followed by
                  * the ROM's 01 97 lexical ELSE (never a source colon). */
                 if (pos == space_start) {

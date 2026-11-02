@@ -370,7 +370,7 @@ def audit_j122_permanent(sources):
     marker = "\n  sealed-evidence:"
     demand(yml.count(marker) == 1, "J122_SEALED_JOB_MISSING")
     tail = yml.split(marker, 1)[1]
-    end = re.search(r"(?m)^  [A-Za-z][\\w-]*:[ \\t]*$", tail)
+    end = re.search(r"(?m)^  [A-Za-z][\w-]*:[ \t]*$", tail)
     job = tail[:end.start()] if end else tail
     r1_exact_step(job, J122_PERMANENT_STEP, "J122_PERMANENT_STEP")
     for path in (J122_TOOL, J122_ZIP,

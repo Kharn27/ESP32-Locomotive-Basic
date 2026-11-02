@@ -235,9 +235,9 @@ static int rollback_and_run(void)
     before=executor;
     memset(out,0x41,sizeof(out));
     memcpy(out_saved,out,sizeof(out_saved));
-    CHECK(be_step(&executor,out,sizeof(out),&count)==BE_UNKNOWN_TOKEN);
-    /* BE_UNKNOWN_TOKEN is the existing host-only unsupported path for 8A;
-     * no executor CLS dispatch, output, counter, program or video events. */
+    /* J1.21-B2 RED: CLS must require a typed video receiver, not
+     * silently succeed or remain an unrecognized token. */
+    CHECK(be_step(&executor,out,sizeof(out),&count)==BE_EVENT_RECEIVER_REQUIRED);
     CHECK(count==67u && memcmp(&executor,&before,sizeof(before))==0);
     CHECK(memcmp(out,out_saved,sizeof(out))==0);
     CHECK(memcmp(storage,stored,sizeof(stored))==0);
@@ -255,6 +255,6 @@ int main(int argc,char **argv)
     CHECK(rollback_and_run()==0);
     for(i=0u;i<sizeof(cases)/sizeof(cases[0]);++i)
         CHECK(oracle_case(argv[1],cases[i],i==6u)==0);
-    puts("CLS-B1 token 8A / CPC RAM original+repeat / LIST / rollback / RUN unsupported PASS");
+    puts("CLS-B1 token 8A / CPC RAM original+repeat / LIST / rollback / RUN receiver-required PASS");
     return 0;
 }

@@ -275,10 +275,11 @@ BSRResult bsr_submit(BasicSessionRuntime *runtime,
     return from_session(session_result);
 }
 
-BSRResult bsr_step_events(BasicSessionRuntime *runtime,
+static BSRResult step_events_impl(BasicSessionRuntime *runtime,
                           uint8_t *output, size_t output_capacity,
                           size_t *written, BEVideoEvent *events,
-                          size_t event_capacity, size_t *event_written)
+                          size_t event_capacity, size_t *event_written,
+                          int commit)
 {
     BEStatus status;
     if (runtime == NULL || runtime->program == NULL ||
@@ -309,14 +310,20 @@ BSRResult bsr_step_events(BasicSessionRuntime *runtime,
     if (runtime->state != BSR_RUNNING) {
         return simple(BSR_NOT_RUNNING);
     }
-    status = be_step_events(&runtime->executor, output, output_capacity,
-                            written, events, event_capacity, event_written);
+    status = commit ?
+        be_step_events(&runtime->executor, output, output_capacity,
+                       written, events, event_capacity, event_written) :
+        be_preview_step_events(&runtime->executor, output, output_capacity,
+                               written, events, event_capacity, event_written);
     if (status == BE_END) {
         BSRResult ended = simple(BSR_END);
-        runtime->state = BSR_IDLE;
-        runtime->executor.call_depth = 0u;
-        runtime->executor.statement_offset = 0u;
-        memset(runtime->executor.call_stack, 0, sizeof(runtime->executor.call_stack));
+        if (commit) {
+            runtime->state = BSR_IDLE;
+            runtime->executor.call_depth = 0u;
+            runtime->executor.statement_offset = 0u;
+            memset(runtime->executor.call_stack, 0,
+                   sizeof(runtime->executor.call_stack));
+        }
         ended.executor_status = BE_END;
         return ended;
     }
@@ -324,6 +331,24 @@ BSRResult bsr_step_events(BasicSessionRuntime *runtime,
         return from_executor(status);
     }
     return simple(BSR_OK);
+}
+
+BSRResult bsr_step_events(BasicSessionRuntime *runtime,
+                          uint8_t *output, size_t output_capacity,
+                          size_t *written, BEVideoEvent *events,
+                          size_t event_capacity, size_t *event_written)
+{
+    return step_events_impl(runtime, output, output_capacity, written,
+                            events, event_capacity, event_written, 1);
+}
+
+BSRResult bsr_preview_step_events(BasicSessionRuntime *runtime,
+                                  uint8_t *output, size_t output_capacity,
+                                  size_t *written, BEVideoEvent *events,
+                                  size_t event_capacity, size_t *event_written)
+{
+    return step_events_impl(runtime, output, output_capacity, written,
+                            events, event_capacity, event_written, 0);
 }
 
 BSRResult bsr_step(BasicSessionRuntime *runtime,

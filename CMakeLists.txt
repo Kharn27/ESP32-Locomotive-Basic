@@ -166,6 +166,15 @@ if(BUILD_TESTING)
              "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
+# J1.21-B2a: core-only CLS typed event and side-effect-free BSR preview.
+if(BUILD_TESTING)
+    add_executable(test_j1_21_b2a_cls_preview tests/test_j1_21_b2a_cls_preview.c)
+    target_link_libraries(test_j1_21_b2a_cls_preview PRIVATE
+        basic_session_runtime basic_variable_store)
+    add_test(NAME j1_21_b2a_cls_preview_commit_equivalence
+             COMMAND test_j1_21_b2a_cls_preview)
+endif()
+
 # J1.20-B1: ABS token FF00, 16 CPC original/repeat RAM images and semantic LIST.
 # No ABS runtime executable is registered or linked beyond the legacy engine.
 if(BUILD_TESTING)

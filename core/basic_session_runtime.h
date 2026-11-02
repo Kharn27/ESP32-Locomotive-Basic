@@ -89,4 +89,18 @@ BSRResult bsr_step_events(BasicSessionRuntime *runtime,
                           size_t *written, BEVideoEvent *events,
                           size_t event_capacity, size_t *event_written);
 
+/* B2a: preview of the next RUN step without advancing BSR_RUNNING,
+ * executor cursor, GOSUB/FOR stacks or INTEGER/STRING/REAL5 store.
+ * On BSR_OK, write output/events/counts only to caller's staging buffers.
+ * BSR_END and failures leave counters and all staging/state unchanged.
+ * Uses the same validation as bsr_step_events; preview again if any input
+ * or caller-owned buffer/capacity changes before commit. The B2b scheduler
+ * must compare staged and committed outputs/events before hardware replay
+ * and fail-stop on divergence (no physical rollback claim).
+ */
+BSRResult bsr_preview_step_events(BasicSessionRuntime *runtime,
+                                  uint8_t *output, size_t output_capacity,
+                                  size_t *written, BEVideoEvent *events,
+                                  size_t event_capacity, size_t *event_written);
+
 #endif

@@ -46,6 +46,10 @@ Hw4PenStatus hw4_pen_preflight(const CpcText *sink,
     if (video->pixels == NULL || video->mode != CPC_MODE_1 ||
         video->pen >= 4U || video->paper >= 4U ||
         video->cursor_column >= 40U || video->cursor_row >= 25U ||
+        cpc_video_width(video) != 320U ||
+        cpc_video_columns(video) != CPC_VIDEO_MODE1_COLUMNS ||
+        video->ink[0] >= 27U || video->ink[1] >= 27U ||
+        video->ink[2] >= 27U || video->ink[3] >= 27U ||
         sink->column > 40U || sink->row >= 25U ||
         SIZE_MAX - sink->bytes_received < byte_count ||
         SIZE_MAX - sink->glyphs_drawn < byte_count ||
@@ -58,13 +62,20 @@ Hw4PenStatus hw4_pen_preflight(const CpcText *sink,
         /* Reject J1.18-B INK before any PEN or PRINT slice is rendered. */
         if (events[i].type == BE_VIDEO_SET_INK)
             return HW4_PEN_SET_INK_UNSUPPORTED;
-        if (events[i].type != BE_VIDEO_SET_TEXT_PEN)
+        if (events[i].type != BE_VIDEO_SET_TEXT_PEN &&
+            events[i].type != BE_VIDEO_CLEAR_TEXT)
             return HW4_PEN_INVALID_EVENT;
         if (events[i].print_offset < previous ||
             events[i].print_offset > byte_count)
             return HW4_PEN_BAD_OFFSET;
-        status = hw4_pen_pixel_index(video, events[i].pen, &pixel);
-        if (status != HW4_PEN_OK) return status;
+        if (events[i].type == BE_VIDEO_CLEAR_TEXT) {
+            /* Reject malformed reserved fields at preflight, not mid-replay. */
+            if (events[i].pen != 0U || events[i].ink != 0U ||
+                events[i].colour != 0U) return HW4_PEN_INVALID_EVENT;
+        } else {
+            status = hw4_pen_pixel_index(video, events[i].pen, &pixel);
+            if (status != HW4_PEN_OK) return status;
+        }
         previous = events[i].print_offset;
     }
     return HW4_PEN_OK;
@@ -86,10 +97,14 @@ Hw4PenStatus hw4_pen_replay(CpcText *sink,
         if (next != cursor &&
             !cpc_text_write(sink, print_bytes + cursor, next - cursor))
             return HW4_PEN_RENDER_FAILED;
-        status = hw4_pen_pixel_index(sink->video, events[i].pen, &pixel);
-        if (status != HW4_PEN_OK) return HW4_PEN_RENDER_FAILED;
-        if (!cpc_video_set_text_colors(sink->video, pixel, sink->video->paper))
-            return HW4_PEN_RENDER_FAILED;
+        if (events[i].type == BE_VIDEO_CLEAR_TEXT) {
+            if (!cpc_text_clear(sink)) return HW4_PEN_RENDER_FAILED;
+        } else {
+            status = hw4_pen_pixel_index(sink->video, events[i].pen, &pixel);
+            if (status != HW4_PEN_OK) return HW4_PEN_RENDER_FAILED;
+            if (!cpc_video_set_text_colors(sink->video, pixel, sink->video->paper))
+                return HW4_PEN_RENDER_FAILED;
+        }
         cursor = next;
     }
     if (byte_count != cursor &&

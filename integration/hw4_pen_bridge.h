@@ -53,7 +53,7 @@ Hw4PenStatus hw4_pen_preflight(const CpcText *sink,
                                const uint8_t *print_bytes, size_t byte_count,
                                const BEVideoEvent *events, size_t event_count);
 
-/* Replay PRINT slices and typed events in source order. No effect on
+/* Replay PRINT slices and typed PEN/CLS events in source order. No effect on
  * validation error. On HW4_PEN_OK every PRINT byte is consumed exactly once,
  * in the same order, and every video event is applied exactly once.
  * This function owns no buffer: caller must ensure no concurrent mutations. */

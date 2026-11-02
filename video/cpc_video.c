@@ -117,6 +117,23 @@ bool cpc_video_set_text_colors(CpcVideo *v, unsigned pen, unsigned paper)
     v->paper = (uint8_t)paper;
     return true;
 }
+bool cpc_video_clear_text(CpcVideo *v)
+{
+    if (!valid(v) || v->mode != CPC_MODE_1 ||
+        cpc_video_width(v) != 320U || cpc_video_columns(v) != 40U ||
+        v->paper >= 4U || v->pen >= 4U ||
+        v->cursor_column >= 40U || v->cursor_row >= 25U)
+        return false;
+    /* MODE1 is packed 2 bits per pixel, four copies of PAPER per byte. */
+    memset(v->pixels, (uint8_t)(v->paper * UINT8_C(0x55)),
+           CPC_VIDEO_BYTES);
+    memset(v->cell_char, 0, sizeof(v->cell_char));
+    memset(v->cell_valid, 0, sizeof(v->cell_valid));
+    v->cursor_column = 0U;
+    v->cursor_row = 0U;
+    v->dirty_bands |= ALL_DIRTY;
+    return true;
+}
 bool cpc_video_put_cell(CpcVideo *v, unsigned column, unsigned row,
                         uint8_t ch, CpcGlyphRow glyph, void *context)
 {

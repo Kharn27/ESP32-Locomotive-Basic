@@ -32,4 +32,7 @@ bool cpc_text_init(CpcText *sink, CpcVideo *video,
  * cursor. A pending column 40 alone does not scroll until progression.
  * Failure on invalid arguments/overflow occurs before any mutation. */
 bool cpc_text_write(CpcText *sink, const uint8_t *bytes, size_t length);
+/* B2b CLS: same full-screen MODE1 domain, resets text cursor only.
+ * Counters and input digest are retained; no bytes are printed. */
+bool cpc_text_clear(CpcText *sink);
 #endif

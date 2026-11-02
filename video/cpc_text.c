@@ -78,3 +78,14 @@ bool cpc_text_write(CpcText *sink, const uint8_t *bytes, size_t length)
         return cpc_video_cursor(sink->video, 0U, sink->row + 1U, true);
     return cpc_video_cursor(sink->video, sink->column, sink->row, true);
 }
+
+bool cpc_text_clear(CpcText *sink)
+{
+    if (sink == NULL || sink->video == NULL || sink->glyph == NULL ||
+        sink->column > 40U || sink->row >= 25U)
+        return false;
+    if (!cpc_video_clear_text(sink->video)) return false;
+    sink->column = 0U;
+    sink->row = 0U;
+    return true;
+}

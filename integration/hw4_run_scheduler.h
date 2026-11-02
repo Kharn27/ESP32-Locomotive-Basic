@@ -8,6 +8,8 @@
 
 /* At most 128 BASIC steps per host turn. Owner yields/polls between turns. */
 #define HW4_RUN_QUANTUM_MAX 128u
+/* Caller owns staging storage and its bounded descriptor; no allocation.
+ * CONSOLE reuses inactive tokenizer scratch during RUN to meet DRAM gate. */
 typedef enum {
     HW4_RUN_IDLE = 0, HW4_RUN_RUNNING, HW4_RUN_YIELDED,
     HW4_RUN_BREAK_REQUESTED, HW4_RUN_BROKEN, HW4_RUN_ENDED,
@@ -15,7 +17,8 @@ typedef enum {
 } Hw4RunState;
 typedef enum {
     HW4_RUN_DISPLAY_NONE = 0, HW4_RUN_DISPLAY_PREFLIGHT_FAILED,
-    HW4_RUN_DISPLAY_REPLAY_FAILED
+    HW4_RUN_DISPLAY_REPLAY_FAILED,
+    HW4_RUN_DISPLAY_COMMIT_MISMATCH
 } Hw4RunDisplayFailure;
 
 /* Mandatory PRECHECK is read-only. REPLAY must consume ordered PRINT slices
@@ -35,6 +38,14 @@ typedef struct {
     void *context;
 } Hw4RunReceiver;
 typedef struct {
+    uint8_t *output;
+    size_t output_capacity;
+    BEVideoEvent *events;
+    size_t event_capacity;
+    size_t written;
+    size_t event_written;
+} Hw4RunPreview;
+typedef struct {
     BasicSessionRuntime *runtime; /* borrowed; RUN already submitted */
     Hw4RunState state;
     BSRResult last_result; /* intact for diagnostics before bsr_stop */
@@ -42,6 +53,7 @@ typedef struct {
     size_t total_steps; /* saturating statistic, not a total execution cap */
     unsigned stop_calls;
     bool break_pending;
+    Hw4RunPreview *preview; /* borrowed, must be bound before slice */
 } Hw4RunScheduler;
 typedef struct {
     Hw4RunState state;
@@ -53,7 +65,18 @@ typedef struct {
 bool hw4_run_scheduler_init(Hw4RunScheduler *scheduler,
                             BasicSessionRuntime *runtime);
 bool hw4_run_scheduler_request_break(Hw4RunScheduler *scheduler);
-/* No mutation on bad quantum/arguments. A valid YIELD never calls bsr_stop.
+/* Bind disjoint caller-owned staging before RUN slices. Rebind after init.
+ * Staging capacity may be smaller than public capacity: if a step cannot
+ * preview in that bound it fails without any BASIC/public/video mutation. */
+bool hw4_run_scheduler_bind_preview(Hw4RunScheduler *scheduler,
+                                    Hw4RunPreview *preview);
+/* Staging arrays are caller-owned and static for CONSOLE. Provide a private
+ * buffer for output and events disjoint from public output/events. A preflight reject
+ * leaves public output/events/counts untouched, as does a preview failure.
+ * After preflight, commit into public arrays; compare before video replay.
+ * A post-commit divergence fails closed (no replay), NOT a BASIC rollback.
+ * A failed replay is fail-stop; pixels already applied are not reversible.
+ * No mutation on bad quantum/arguments. A valid YIELD never calls bsr_stop.
  * Failed BSR or display status terminates driver without auto-stopping BSR:
  * owner can examine exact PEN error provenance before bsr_stop. */
 Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,

@@ -22,7 +22,8 @@ typedef struct {
     Hw4RunBreakInput parser;
     uint8_t image[2048],temporary[256],output[256];
     size_t written,event_written,ready_count;
-    BEVideoEvent events[4];
+    BEVideoEvent events[4], preview_events[4];
+    Hw4RunPreview preview;
     CpcVideo video;
     CpcText text;
     uint8_t vram[CPC_VIDEO_BYTES];
@@ -60,6 +61,9 @@ static int start_run(void)
 {
     CHECK(submit("RUN").status==BSR_OK);
     CHECK(hw4_run_scheduler_init(&f.scheduler,&f.runtime));
+    f.preview=(Hw4RunPreview){f.temporary,sizeof(f.temporary),
+                              f.preview_events,4u,0u,0u};
+    CHECK(hw4_run_scheduler_bind_preview(&f.scheduler,&f.preview));
     hw4_run_break_input_init(&f.parser);
     return 0;
 }

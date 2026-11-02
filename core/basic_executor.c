@@ -49,6 +49,26 @@ static BEStatus emit_pen_event(BEEventEmitter *events, uint8_t pen,
     return BE_OK;
 }
 
+/* PAPER is a tagged logical CPC text background, never RGB or a MODE1
+ * pixel index. The ink byte is the existing 0..15 logical-index payload;
+ * the type distinguishes PAPER from SET_INK. pen is always left zero.
+ * All historical fields, offsets and Xtensa 16-byte ABI are unchanged. */
+static BEStatus emit_paper_event(BEEventEmitter *events, uint8_t paper,
+                                 size_t print_offset)
+{
+    if (events->length == SIZE_MAX) return BE_NO_EVENT_SPACE;
+    if (events->data != NULL) {
+        BEVideoEvent *event = &events->data[events->length];
+        event->type = BE_VIDEO_SET_TEXT_PAPER;
+        event->pen = 0u;
+        event->ink = paper;
+        event->colour = 0u;
+        event->print_offset = print_offset;
+    }
+    ++events->length;
+    return BE_OK;
+}
+
 /* Logical CPC palette command: no PRINT bytes or renderer access.
  * Pen field remains reserved for BE_VIDEO_SET_TEXT_PEN consumers. */
 static BEStatus emit_ink_event(BEEventEmitter *events, uint8_t ink,
@@ -1033,6 +1053,43 @@ static BEStatus pen_argument(const uint8_t *body, size_t length,
     return BE_OK;
 }
 
+/* J1.19-A / B1: exactly the eight CPC PAPER BA literal encodings.
+ * Only 0/1/2/3/4/15 commit. 16/-1 have a distinct host diagnostic
+ * (CPC independently observed ERR=5/ERL=20 on numbered L20).
+ * Reject unsealed values without assuming a general PAPER expression
+ * grammar. No mutation of the cursor/payload on any parse failure. */
+static BEStatus paper_argument(const uint8_t *body, size_t length,
+                               size_t *pos, uint8_t *paper)
+{
+    size_t p = *pos;
+    uint8_t token;
+    unsigned int value;
+
+    skip_spaces(body, length, &p);
+    if (p == length || body[p] == 0x01u) return BE_BAD_SEQUENCE;
+    token = body[p++];
+    if (token >= 0x0eu && token <= 0x12u) {
+        value = (unsigned int)(token - 0x0eu);
+    } else if (token == 0x19u) {
+        if (p == length) return BE_TRUNCATED;
+        value = (unsigned int)body[p++];
+        if (value < 10u) return BE_BAD_SEQUENCE; /* noncanonical byte form */
+        if (value == 16u) return BE_INVALID_PAPER;
+        if (value != 15u) return BE_UNSUPPORTED; /* not in CPC J1.19-A */
+    } else if (token == 0xf5u) {
+        if (p == length) return BE_TRUNCATED;
+        if (body[p++] != 0x0fu) return BE_BAD_SEQUENCE;
+        return BE_INVALID_PAPER;
+    } else if (token >= 0x13u && token <= 0x17u) {
+        return BE_UNSUPPORTED; /* 5..9 are outside sealed evidence */
+    } else {
+        return unexpected(token);
+    }
+    *paper = (uint8_t)value;
+    *pos = p;
+    return BE_OK;
+}
+
 /* CPC INK A2 numeric operands; these bounds define the *token*
  * grammar only. Native execution is whitelisted by J1.18-A evidence. */
 static BEStatus ink_literal(const uint8_t *body, size_t length, size_t *pos,
@@ -1139,6 +1196,12 @@ static BEStatus execute_line(const BasicProgram *program,
             status = pen_argument(body, length, &pos, &pen);
             if (status != BE_OK) return status;
             status = emit_pen_event(events, pen, out->length);
+            if (status != BE_OK) return status;
+        } else if (token == 0xbau) { /* PAPER: text background, no renderer. */
+            uint8_t paper;
+            status = paper_argument(body, length, &pos, &paper);
+            if (status != BE_OK) return status;
+            status = emit_paper_event(events, paper, out->length);
             if (status != BE_OK) return status;
         } else if (token == 0xa2u) { /* INK: logical palette, no rendering. */
             uint8_t ink, colour;

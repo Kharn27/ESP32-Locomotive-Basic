@@ -100,7 +100,13 @@ static int equal_next(BSRStatus wanted, size_t output_cap,size_t event_cap,
         CHECK(memcmp(staged,committed,sizeof(staged))==0);
         CHECK(memcmp(events,committed_events,sizeof(events))==0);
     } else {
-        CHECK(n3==555u && ne3==444u && unchanged(&before)==0);
+        CHECK(n3==555u && ne3==444u);
+        CHECK(memcmp(&before.store,&f.store,sizeof(f.store))==0);
+        CHECK(memcmp(before.entries,f.entries,sizeof(f.entries))==0);
+        CHECK(memcmp(before.arena,f.arena,sizeof(f.arena))==0);
+        CHECK(memcmp(before.bytes,f.program_bytes,sizeof(f.program_bytes))==0);
+        if (wanted==BSR_END) CHECK(f.runtime.state==BSR_IDLE);
+        else CHECK(unchanged(&before)==0);
     }
     return 0;
 }

@@ -100,6 +100,12 @@ static uint32_t s_shot_seq;
 static Hw4ScrollMetrics s_scroll_metrics;
 static Hw4TouchT1 s_touch; /* CONSOLE only; 0 heap, 0 extra tasks */
 static Hw4RunScheduler s_run_scheduler;
+/* J1.21-B2b: tokenizer scratch is inactive for the whole RUN. Reuse it for
+ * private preview without increasing static DRAM by another 4096 bytes.
+ * The public events must NOT alias that union during RUN. */
+static BEVideoEvent s_run_public_events[PEN_EVENT_CAPACITY];
+static BEVideoEvent s_run_preview_events[PEN_EVENT_CAPACITY];
+static Hw4RunPreview s_run_preview;
 static Hw4RunBreakInput s_run_input;
 static bool s_run_active;
 static bool s_run_skip_crlf_lf;
@@ -510,6 +516,12 @@ static bool basic_run(void)
     hw4_run_break_input_init(&s_run_input);
     if(!hw4_run_scheduler_init(&s_run_scheduler,&s_basic.runtime))
         return fail("RUN_SCHEDULER_INIT",-1);
+    s_run_preview.output=s_basic.scratch.temporary;
+    s_run_preview.output_capacity=sizeof(s_basic.scratch.temporary);
+    s_run_preview.events=s_run_preview_events;
+    s_run_preview.event_capacity=PEN_EVENT_CAPACITY;
+    if(!hw4_run_scheduler_bind_preview(&s_run_scheduler,&s_run_preview))
+        return fail("RUN_SCHEDULER_SCRATCH",-1);
     s_run_active=true;
     s_run_quanta=0U;
     s_run_break_requested_us=0U;
@@ -530,7 +542,7 @@ static bool basic_run_slice(void)
      * private scheduler staging. Public bytes/counts commit after preflight. */
     slice=hw4_run_scheduler_slice(&s_run_scheduler,RUN_QUANTUM,&receiver,
                        s_basic.output,sizeof(s_basic.output),&s_basic.written,
-                       s_basic.scratch.events,PEN_EVENT_CAPACITY,&event_count);
+                       s_run_public_events,PEN_EVENT_CAPACITY,&event_count);
     if(s_run_quanta!=SIZE_MAX) ++s_run_quanta;
     if(slice.state==HW4_RUN_YIELDED) {
         /* NO Ready, prompt, stop or restart at a quantum boundary. */

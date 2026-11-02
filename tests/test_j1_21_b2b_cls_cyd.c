@@ -136,12 +136,32 @@ static int reject_case(const char *line, bool force, Hw4PenStatus reason) {
     CHECK(step(1u).state == HW4_RUN_INVALID_ARGUMENT);
     return 0;
 }
+static int reject_after_assignment(const char *assign, const char *second) {
+    static Snapshot before; Hw4RunSlice s;
+    CHECK(setup() == 0);
+    CHECK(submit(assign).status == BSR_OK);
+    CHECK(submit(second).status == BSR_OK);
+    CHECK(start() == 0);
+    CHECK(step(1u).state == HW4_RUN_YIELDED);
+    CHECK(f.scheduler.total_steps == 1u);
+    f.written = 171u; f.event_written = 172u;
+    memset(f.output, 0x35, sizeof(f.output));
+    memset(f.events, 0x57, sizeof(f.events));
+    f.reject = true;
+    capture(&before);
+    s = step(1u);
+    CHECK(s.state == HW4_RUN_DISPLAY_ERROR && s.steps == 0u);
+    CHECK(f.scheduler.display_failure == HW4_RUN_DISPLAY_PREFLIGHT_FAILED);
+    CHECK(f.replay_calls == 1u && f.preflight_calls == 2u);
+    CHECK(unchanged(&before) == 0);
+    return 0;
+}
 static int rejected_preflight_is_atomic(void) {
     /* Would fail with the old step -> preflight order: cursor advanced. */
     CHECK(reject_case("10 PRINT \"A\":CLS:PRINT \"B\"", true,
                       HW4_PEN_OK) == 0);
-    CHECK(reject_case("10 A%=7:CLS", true, HW4_PEN_OK) == 0);
-    CHECK(reject_case("10 A$=\"X\":CLS", true, HW4_PEN_OK) == 0);
+    CHECK(reject_after_assignment("10 A%=7", "20 PRINT A%:CLS") == 0);
+    CHECK(reject_after_assignment("10 A$=\\"X\\"", "20 PRINT A$:CLS") == 0);
     CHECK(reject_case("10 PEN 2:PRINT \"NO\":INK 1,26:CLS",
                       false, HW4_PEN_SET_INK_UNSUPPORTED) == 0);
     return 0;

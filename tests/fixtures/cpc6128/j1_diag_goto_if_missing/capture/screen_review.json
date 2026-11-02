@@ -1,0 +1,122 @@
+{
+  "GOTO_MISSING": {
+    "case": "GOTO_MISSING",
+    "provenance": "CPC_SCREEN_HUMAN_VISUAL",
+    "reviewed_original_and_repeat": true,
+    "reviewer": "PO Kharn27 — accord visuel explicite 2026-11-02; six originaux vus, repeats identiques SHA256",
+    "original": {
+      "png_sha256": "45cb5f805ec940d9d2b21a535bbaed496a17055debc8bc7181e77f573dc7dfcf",
+      "post_run_output_lines": [
+        "Line does not exist in 10"
+      ],
+      "ready_count": 1
+    },
+    "repeat": {
+      "png_sha256": "45cb5f805ec940d9d2b21a535bbaed496a17055debc8bc7181e77f573dc7dfcf",
+      "post_run_output_lines": [
+        "Line does not exist in 10"
+      ],
+      "ready_count": 1
+    }
+  },
+  "IF_TAKEN_MISSING": {
+    "case": "IF_TAKEN_MISSING",
+    "provenance": "CPC_SCREEN_HUMAN_VISUAL",
+    "reviewed_original_and_repeat": true,
+    "reviewer": "PO Kharn27 — accord visuel explicite 2026-11-02; six originaux vus, repeats identiques SHA256",
+    "original": {
+      "png_sha256": "b4a1339fc4d01f0024ef63a42fc7c2bbf702459b72c698d510a7a06fe8a78a8b",
+      "post_run_output_lines": [
+        "Line does not exist in 20"
+      ],
+      "ready_count": 1
+    },
+    "repeat": {
+      "png_sha256": "b4a1339fc4d01f0024ef63a42fc7c2bbf702459b72c698d510a7a06fe8a78a8b",
+      "post_run_output_lines": [
+        "Line does not exist in 20"
+      ],
+      "ready_count": 1
+    }
+  },
+  "IF_UNTAKEN_MISSING": {
+    "case": "IF_UNTAKEN_MISSING",
+    "provenance": "CPC_SCREEN_HUMAN_VISUAL",
+    "reviewed_original_and_repeat": true,
+    "reviewer": "PO Kharn27 — accord visuel explicite 2026-11-02; six originaux vus, repeats identiques SHA256",
+    "original": {
+      "png_sha256": "5d3c00d3ec0b521332fe99e4102ce46795205c7ec51741efa70f607301e0b6b1",
+      "post_run_output_lines": [
+        "AFTER"
+      ],
+      "ready_count": 1
+    },
+    "repeat": {
+      "png_sha256": "5d3c00d3ec0b521332fe99e4102ce46795205c7ec51741efa70f607301e0b6b1",
+      "post_run_output_lines": [
+        "AFTER"
+      ],
+      "ready_count": 1
+    }
+  },
+  "GOSUB_CONTROL": {
+    "case": "GOSUB_CONTROL",
+    "provenance": "CPC_SCREEN_HUMAN_VISUAL",
+    "reviewed_original_and_repeat": true,
+    "reviewer": "PO Kharn27 — accord visuel explicite 2026-11-02; six originaux vus, repeats identiques SHA256",
+    "original": {
+      "png_sha256": "39ea4fba39ccc946b33f4b665395137c41a212ae6ed68275396e9f5796fa0b73",
+      "post_run_output_lines": [
+        "Line does not exist in 10"
+      ],
+      "ready_count": 1
+    },
+    "repeat": {
+      "png_sha256": "39ea4fba39ccc946b33f4b665395137c41a212ae6ed68275396e9f5796fa0b73",
+      "post_run_output_lines": [
+        "Line does not exist in 10"
+      ],
+      "ready_count": 1
+    }
+  },
+  "GOTO_RENUMBERED": {
+    "case": "GOTO_RENUMBERED",
+    "provenance": "CPC_SCREEN_HUMAN_VISUAL",
+    "reviewed_original_and_repeat": true,
+    "reviewer": "PO Kharn27 — accord visuel explicite 2026-11-02; six originaux vus, repeats identiques SHA256",
+    "original": {
+      "png_sha256": "8e2e0ef05fd8903fa374dcbaf3e68704183b2b4c60f05f01a68d3174d32ed1a2",
+      "post_run_output_lines": [
+        "Line does not exist in 370"
+      ],
+      "ready_count": 1
+    },
+    "repeat": {
+      "png_sha256": "8e2e0ef05fd8903fa374dcbaf3e68704183b2b4c60f05f01a68d3174d32ed1a2",
+      "post_run_output_lines": [
+        "Line does not exist in 370"
+      ],
+      "ready_count": 1
+    }
+  },
+  "IF_TAKEN_RENUMBERED": {
+    "case": "IF_TAKEN_RENUMBERED",
+    "provenance": "CPC_SCREEN_HUMAN_VISUAL",
+    "reviewed_original_and_repeat": true,
+    "reviewer": "PO Kharn27 — accord visuel explicite 2026-11-02; six originaux vus, repeats identiques SHA256",
+    "original": {
+      "png_sha256": "ffd945e705943e7b3023f8cc60803551e98de89ab722468a5d83f8e4ea508365",
+      "post_run_output_lines": [
+        "Line does not exist in 520"
+      ],
+      "ready_count": 1
+    },
+    "repeat": {
+      "png_sha256": "ffd945e705943e7b3023f8cc60803551e98de89ab722468a5d83f8e4ea508365",
+      "post_run_output_lines": [
+        "Line does not exist in 520"
+      ],
+      "ready_count": 1
+    }
+  }
+}

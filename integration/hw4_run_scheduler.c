@@ -60,6 +60,60 @@ static bool arguments_ok(const Hw4RunScheduler *scheduler, size_t quantum,
            event_capacity <= HW4_RUN_PREVIEW_EVENTS;
 }
 
+/* The preview validates its OWN scratch; it cannot validate the public
+ * destination regions, which must still be disjoint before preflight.
+ * Mirror the BSR public-region overlap contract WITHOUT writing there. */
+typedef struct {
+    const void *pointer;
+    size_t length;
+} Hw4RunRegion;
+
+static bool regions_overlap(Hw4RunRegion a, Hw4RunRegion b)
+{
+    if (a.length == 0u || b.length == 0u) return false;
+#if defined(UINTPTR_MAX)
+    {
+        const uintptr_t x = (uintptr_t)a.pointer, y = (uintptr_t)b.pointer;
+        return x <= y ? y - x < a.length : x - y < b.length;
+    }
+#else
+    (void)a;
+    (void)b;
+    return false; /* same C99 portability contract as BSR */
+#endif
+}
+
+static bool public_overlap(const BasicSessionRuntime *runtime,
+                           const uint8_t *output, size_t output_capacity,
+                           const size_t *written, const BEVideoEvent *events,
+                           size_t event_capacity, const size_t *event_written)
+{
+    Hw4RunRegion parts[10];
+    size_t n = 0u, i, j;
+    const BasicProgram *p = runtime->program;
+    const BasicVariableStore *v = runtime->variables;
+    if (p == NULL || p->data == NULL) return false; /* BSR reports invalid */
+    parts[n++] = (Hw4RunRegion){runtime, sizeof(*runtime)};
+    parts[n++] = (Hw4RunRegion){p, sizeof(*p)};
+    parts[n++] = (Hw4RunRegion){p->data, p->capacity};
+    parts[n++] = (Hw4RunRegion){output, output_capacity};
+    parts[n++] = (Hw4RunRegion){written, sizeof(*written)};
+    parts[n++] = (Hw4RunRegion){events, event_capacity * sizeof(*events)};
+    parts[n++] = (Hw4RunRegion){event_written, sizeof(*event_written)};
+    if (v != NULL) {
+        if (v->capacity > SIZE_MAX / sizeof(BasicVariableEntry))
+            return false; /* BSR validates invalid store separately */
+        parts[n++] = (Hw4RunRegion){v, sizeof(*v)};
+        parts[n++] = (Hw4RunRegion){v->entries,
+                                   v->capacity * sizeof(BasicVariableEntry)};
+        parts[n++] = (Hw4RunRegion){v->string_arena, v->string_capacity};
+    }
+    for (i = 0u; i < n; ++i)
+        for (j = i + 1u; j < n; ++j)
+            if (regions_overlap(parts[i], parts[j])) return true;
+    return false;
+}
+
 Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
                                    size_t quantum, const Hw4RunReceiver *receiver,
                                    uint8_t *output, size_t output_capacity,
@@ -71,6 +125,13 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
                       events, event_capacity, event_written))
         return outcome(HW4_RUN_INVALID_ARGUMENT, 0u);
 
+    if (public_overlap(scheduler->runtime, output, output_capacity,
+                       written, events, event_capacity, event_written)) {
+        BSRResult overlap = {BSR_OVERLAP, {BS_OK, BT_OK, BP_OK, BL_OK}, BE_OK};
+        scheduler->last_result = overlap;
+        scheduler->state = HW4_RUN_INVALID_ARGUMENT;
+        return outcome(HW4_RUN_INVALID_ARGUMENT, 0u);
+    }
     scheduler->state = scheduler->break_pending ? HW4_RUN_BREAK_REQUESTED
                                                 : HW4_RUN_RUNNING;
     while (steps < quantum) {

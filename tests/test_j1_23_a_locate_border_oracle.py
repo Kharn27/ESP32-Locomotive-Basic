@@ -9,7 +9,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
-    "j123_oracle", ROOT / "tools/j1_23_a_locate_border_oracle.py")
+    "j123_oracle", ROOT / "tools/j1_23_a_locate_border_evidence.py")
 oracle = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(oracle)
 

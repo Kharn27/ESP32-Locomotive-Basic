@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Host-only contract checks. These are NOT observations by the CPC."""
 import importlib.util
+import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -62,6 +64,45 @@ class J123OracleContract(unittest.TestCase):
         self.assertTrue(all(0 <= x0 < x1 <= 768 and 0 <= y0 < y1 <= 540
                             for x0,y0,x1,y1 in oracle.RECTS.values()))
 
+
+    def test_independent_sha256_of_committed_archive(self):
+        evidence = ROOT / "tests/fixtures/cpc6128/j1_23_a_locate_border"
+        manifest = (evidence/"manifest.json").read_bytes()
+        self.assertEqual(hashlib.sha256(manifest).hexdigest(),
+                         "31addf9025214ea4f4f5ea3d8f592cb0cffbfac4c0fd962d2fee9fa30266a1f8")
+        data = json.loads(manifest)
+        self.assertEqual(data["acquisition_head"],
+                         "83a78f17bfb9a2233e372922c3bed4ad785d9f3f")
+        self.assertEqual(set(data["files"]),oracle.inventory())
+        for path, expected in data["files"].items():
+            with self.subTest(path=path):
+                self.assertEqual(hashlib.sha256((evidence/path).read_bytes()).hexdigest(),
+                                 expected)
+
+    def test_cpc_captured_repeat_and_counterexamples(self):
+        evidence = ROOT / "tests/fixtures/cpc6128/j1_23_a_locate_border"
+        for case in oracle.CASES:
+            original = json.loads((evidence/"original"/case/"capture.json").read_bytes())
+            repeat = json.loads((evidence/"repeat"/case/"capture.json").read_bytes())
+            with self.subTest(case=case):
+                self.assertEqual(original["token_observed_ram"],oracle.OPCODES[case[0]])
+                self.assertTrue(original["token_hypothesis_matches"])
+                self.assertEqual((original["err"],original["erl"]),
+                                 (repeat["err"],repeat["erl"]))
+                self.assertEqual(original["program_hex"],repeat["program_hex"])
+                self.assertEqual(original["printer_hex"],repeat["printer_hex"])
+                self.assertEqual(original["list_after_hex"],repeat["list_after_hex"])
+        def capture(case):
+            return json.loads((evidence/"original"/case/"capture.json").read_bytes())
+        self.assertEqual((capture("L_41_01")["err"],capture("L_01_26")["err"]),
+                         (0,0))
+        self.assertEqual((capture("B_27")["err"],capture("B_27")["erl"]),
+                         (0,0))
+        self.assertEqual((capture("B_MISSING")["err"],capture("B_MISSING")["erl"]),
+                         (22,10))
+        self.assertFalse(capture("L_MISSING")["list_equal"])
+        self.assertEqual((capture("L_MISSING")["err"],capture("L_MISSING")["erl"]),
+                         (0,10))  # Printer probe is not the screen Syntax error.
 
 if __name__ == "__main__":
     unittest.main()

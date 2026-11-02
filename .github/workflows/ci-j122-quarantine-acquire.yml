@@ -1,0 +1,140 @@
+# TEMPORARY QUARANTINE-ONLY ACQUISITION — DO NOT MERGE INTO main.
+# Triggered by THIS FILE being added/updated on its dedicated branch.
+name: J1.22-A CPC6128 acquisition (quarantine push only)
+
+on:
+  push:
+    branches:
+      - infra/j1-22-a-acquire-only
+    paths:
+      - .github/workflows/ci-j122-quarantine-acquire.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: j122-quarantine-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  j122-c1-acquire-quarantine-only:
+    # Disposable harness only. NEVER merge this job into the product branch.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/infra/j1-22-a-acquire-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      PR_HEAD: 787af8a9159d573c3f6444248666001e3b159ce8
+      PR_BRANCH: oracle/j1-22-a-integer-logical-expressions
+      BASE_SHA: 1d5edc630390bfb109d6596693ec63c8d8588a28
+      HARNESS_SHA: ${{ github.sha }}
+    steps:
+      - name: Checkout exactly the PR HEAD under test (not harness SHA)
+        uses: actions/checkout@v4
+        with:
+          ref: 787af8a9159d573c3f6444248666001e3b159ce8
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+      - name: Verify harness branch, immutable PR HEAD, ancestry, ROM and Caprice32
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$GITHUB_EVENT_NAME" = push
+          test "$GITHUB_REF" = refs/heads/infra/j1-22-a-acquire-only
+          test "$HARNESS_SHA" != "$PR_HEAD"
+          test "$(git rev-parse HEAD)" = "$PR_HEAD"
+          test "$(git ls-remote --exit-code origin refs/heads/infra/j1-22-a-acquire-only | awk '{print $1}')" = "$HARNESS_SHA"
+          test "$(git ls-remote --exit-code origin refs/heads/$PR_BRANCH | awk '{print $1}')" = "$PR_HEAD"
+          git merge-base --is-ancestor "$BASE_SHA" "$PR_HEAD"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          echo "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562  tests/oracles/caprice32/rom/cpc6128.rom" | sha256sum --check
+          test -s tests/oracles/caprice32/rom/amsdos.rom
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          tests/oracles/caprice32/cap32 --version
+          echo "J122_C1_HARNESS_SHA=$HARNESS_SHA"
+          echo "J122_C1_PR_HEAD=$PR_HEAD"
+          echo "J122_C1_ROM_AND_CAPRICE_PIN_PASS"
+      - name: Offline tests on pinned PR HEAD, including missing-evidence rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/j1_22_a_integer_logical_oracle.py
+          python3 tools/j1_22_a_integer_logical_oracle.py --check-sources --self-test
+          python3 -m unittest discover -s tests -p 'test_j1_22_a_integer_logical_oracle.py' -v
+          if python3 tools/j1_22_a_integer_logical_oracle.py --verify "$RUNNER_TEMP/j122-absent" >"$RUNNER_TEMP/j122-negative-absent.log" 2>&1; then
+            echo J122_C1_FALSE_PERMANENT_PASS
+            exit 1
+          fi
+          grep -F 'MISSING_OR_SYMLINK_' "$RUNNER_TEMP/j122-negative-absent.log"
+          echo J122_C1_OFFLINE_GUARDS_PASS
+      - name: CPC6128 24 cases, independent original and repeat (96 Caprice32 processes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_22_a_integer_logical_oracle.py \
+            --acquire tests/oracles/caprice32 \
+            --head "$PR_HEAD" --output "$RUNNER_TEMP/j122-original"
+          python3 tools/j1_22_a_integer_logical_oracle.py \
+            --verify-unsealed "$RUNNER_TEMP/j122-original"
+          test "$(find "$RUNNER_TEMP/j122-original" -type f | wc -l)" -eq 385
+          test "$(find "$RUNNER_TEMP/j122-original" -name program.bin | wc -l)" -eq 48
+          test "$(find "$RUNNER_TEMP/j122-original" -name caprice.log | wc -l)" -eq 96
+          test "$(find "$RUNNER_TEMP/j122-original" -name screen.png | wc -l)" -eq 96
+          if find "$RUNNER_TEMP/j122-original" -type f \( -name '*.sna' -o -name '*.rom' -o -name '*.dsk' -o -name 'cap32.cfg' \) | grep .; then
+            echo J122_C1_FORBIDDEN_BINARY_IN_EVIDENCE
+            exit 1
+          fi
+          echo J122_C1_48_INDEPENDENT_SESSIONS_UNSEALED
+      - name: Package unaltered original CPC evidence and machine-verifiable identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/j122-package/archive" "$RUNNER_TEMP/j122-package/external"
+          cp -a "$RUNNER_TEMP/j122-original/." "$RUNNER_TEMP/j122-package/archive/"
+          (
+            cd "$RUNNER_TEMP/j122-package"
+            find archive -type f -print0 | sort -z | xargs -0 sha256sum > external/original-files-sha256.txt
+            sha256sum archive/manifest.json > external/original-manifest-sha256.txt
+            test "$(wc -l < external/original-files-sha256.txt)" -eq 385
+          )
+          {
+            printf 'ACQUISITION_STATUS=UNSEALED_PENDING_EXTERNAL_INDEPENDENT_REVIEW\n'
+            printf 'RUN_ID=%s\nRUN_ATTEMPT=%s\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+            printf 'HARNESS_SHA=%s\nPR_HEAD=%s\n' "$HARNESS_SHA" "$PR_HEAD"
+            printf 'BASE_SHA=%s\n' "$BASE_SHA"
+            printf 'CAPRICE_COMMIT=%s\n' 8c778bf072a06fb7c23b9cccd179041db7f79a52
+            printf 'CPC_ROM_SHA256=%s\n' 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+            printf 'GHCR_IMAGE=%s\n' ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+          } > "$RUNNER_TEMP/j122-package/external/provenance.txt"
+          echo J122_C1_ARTIFACT_PREPARED_NOT_EXTERNALLY_SEALED
+      - name: Publish authentic original archive for independent SHA verification
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: j122-cpc-original-${{ github.run_id }}-pr-787af8a9159d573c3f6444248666001e3b159ce8
+          path: ${{ runner.temp }}/j122-package/
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
+      - name: Preserve incomplete traces for debugging without declaring oracle success
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: j122-cpc-INCOMPLETE-debug-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/j122-original/
+            ${{ runner.temp }}/j122-negative-absent.log
+          retention-days: 14
+          if-no-files-found: warn

@@ -103,4 +103,28 @@ BSRResult bsr_preview_step_events(BasicSessionRuntime *runtime,
                                   size_t *written, BEVideoEvent *events,
                                   size_t event_capacity, size_t *event_written);
 
+
+/* J1.21-C1: pure/direct command preparation for the future C2 host.
+ * Recognizes only an idle "CLS" (ASCII case-insensitive, outer spaces);
+ * emits exactly one BE_VIDEO_CLEAR_TEXT with print_offset=0, zero PRINT
+ * bytes, and sets written=0/event_written=1. This does NOT execute,
+ * submit, insert a line, render pixels, or alter any BASIC/store state.
+ * Existing bsr_submit keeps its RUN/LIST/NEW and unsupported-direct behavior.
+ *
+ * All regions (entire buffer capacities, source extent, both counters,
+ * BSR/program/store/entries/string arena) must be pairwise disjoint.
+ * Valid pointers required even for zero capacities; events may be NULL
+ * only with capacity=0. On ANY failure every byte/counter is untouched.
+ * BSR_BUSY denotes recognized CLS during RUNNING. Unsupported/malformed
+ * direct source returns BSR_SESSION_ERROR with existing BSStatus provenance.
+ * Missing event receiver returns BE_EVENT_RECEIVER_REQUIRED; non-NULL
+ * events with zero capacity returns BE_NO_EVENT_SPACE.
+ * No caller scratch, heap, new persistent state or global variables.
+ */
+BSRResult bsr_prepare_direct_events(BasicSessionRuntime *runtime,
+                                    const uint8_t *source, size_t source_length,
+                                    uint8_t *output, size_t output_capacity,
+                                    size_t *written, BEVideoEvent *events,
+                                    size_t event_capacity, size_t *event_written);
+
 #endif

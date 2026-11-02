@@ -370,3 +370,116 @@ BSRResult bsr_stop(BasicSessionRuntime *runtime)
     memset(runtime->executor.call_stack, 0, sizeof(runtime->executor.call_stack));
     return simple(BSR_OK);
 }
+
+/* C1 direct preparation is deliberately distinct from bsr_submit: the
+ * latter cannot report typed events, so it must NOT silently accept CLS.
+ * Source classification lives here, not in the future C2 firmware. */
+static int direct_has_separator(const uint8_t *source, size_t length)
+{
+    size_t i;
+    int quoted = 0;
+    for (i = 0u; i < length; ++i) {
+        if (source[i] == (uint8_t)'"') quoted = !quoted;
+        else if (!quoted && source[i] == (uint8_t)':') return 1;
+    }
+    return 0;
+}
+
+/* Separate from the existing submit/step overlap rules so all caller-owned
+ * event regions and the immutable source are covered BEFORE any writes. */
+static int direct_overlap(const BasicSessionRuntime *runtime,
+                          const uint8_t *source, size_t source_length,
+                          const uint8_t *output, size_t output_capacity,
+                          const size_t *written, const BEVideoEvent *events,
+                          size_t event_capacity, const size_t *event_written)
+{
+    const void *parts[11];
+    size_t lengths[11];
+    size_t n = 0u, i, j;
+    const BasicVariableStore *v = runtime->variables;
+    parts[n] = runtime; lengths[n++] = sizeof(*runtime);
+    parts[n] = runtime->program; lengths[n++] = sizeof(*runtime->program);
+    parts[n] = runtime->program->data; lengths[n++] = runtime->program->capacity;
+    parts[n] = source; lengths[n++] = source_length;
+    parts[n] = output; lengths[n++] = output_capacity;
+    parts[n] = written; lengths[n++] = sizeof(*written);
+    parts[n] = events; lengths[n++] = event_capacity * sizeof(*events);
+    parts[n] = event_written; lengths[n++] = sizeof(*event_written);
+    if (v != NULL) {
+        parts[n] = v; lengths[n++] = sizeof(*v);
+        parts[n] = v->entries;
+        lengths[n++] = v->capacity * sizeof(BasicVariableEntry);
+        parts[n] = v->string_arena; lengths[n++] = v->string_capacity;
+    }
+    for (i = 0u; i < n; ++i)
+        for (j = i + 1u; j < n; ++j)
+            if (overlaps(parts[i], lengths[i], parts[j], lengths[j]))
+                return 1;
+    return 0;
+}
+
+BSRResult bsr_prepare_direct_events(BasicSessionRuntime *runtime,
+                                    const uint8_t *source, size_t source_length,
+                                    uint8_t *output, size_t output_capacity,
+                                    size_t *written, BEVideoEvent *events,
+                                    size_t event_capacity, size_t *event_written)
+{
+    size_t first, last, i;
+    BPStatus bp;
+    BEVideoEvent clear = {BE_VIDEO_CLEAR_TEXT, 0u, 0u, 0u, 0u};
+    if (runtime == NULL || runtime->program == NULL ||
+        runtime->program->data == NULL || source == NULL ||
+        output == NULL || written == NULL || event_written == NULL ||
+        (events == NULL && event_capacity != 0u) ||
+        event_capacity > SIZE_MAX / sizeof(*events))
+        return simple(BSR_INVALID_ARGUMENT);
+    if (runtime->variables != NULL) {
+        BEStatus store_status = bsr_store_error(bvs_validate(runtime->variables));
+        if (store_status != BE_OK) return from_executor(store_status);
+        if (runtime->variables->capacity >
+            SIZE_MAX / sizeof(BasicVariableEntry))
+            return simple(BSR_INVALID_ARGUMENT);
+    }
+    if (direct_overlap(runtime, source, source_length, output, output_capacity,
+                       written, events, event_capacity, event_written))
+        return simple(BSR_OVERLAP);
+    bp = bp_validate(runtime->program);
+    if (bp != BP_OK) {
+        BSResult session = {BS_PROGRAM_ERROR, BT_OK, bp, BL_OK};
+        return from_session(session);
+    }
+    for (i = 0u; i < source_length; ++i) {
+        if (source[i] == 0u || source[i] == (uint8_t)'\r' ||
+            source[i] == (uint8_t)'\n') {
+            BSResult session = {BS_MALFORMED_INPUT, BT_OK, BP_OK, BL_OK};
+            return from_session(session);
+        }
+    }
+    first = 0u;
+    while (first < source_length && source[first] == (uint8_t)' ')
+        ++first;
+    last = source_length;
+    while (last > first && source[last - 1u] == (uint8_t)' ')
+        --last;
+    if (direct_has_separator(source + first, last - first)) {
+        BSResult session = {BS_MULTIPLE_DIRECT, BT_OK, BP_OK, BL_OK};
+        return from_session(session);
+    }
+    if (!command_is(source + first, last - first, "CLS")) {
+        BSResult session = {BS_UNSUPPORTED_DIRECT, BT_OK, BP_OK, BL_OK};
+        return from_session(session);
+    }
+    if (runtime->state != BSR_IDLE)
+        return simple(BSR_BUSY);
+    if (events == NULL)
+        return from_executor(BE_EVENT_RECEIVER_REQUIRED);
+    if (event_capacity == 0u)
+        return from_executor(BE_NO_EVENT_SPACE);
+
+    /* All preflight/classification/capacity checks succeeded. No BASIC,
+     * program, cursor, stack, store or output byte is ever touched. */
+    events[0] = clear;
+    *written = 0u;
+    *event_written = 1u;
+    return simple(BSR_OK);
+}

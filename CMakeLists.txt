@@ -99,6 +99,12 @@ if(BUILD_TESTING)
     target_link_libraries(test_basic_pen_events PRIVATE basic_session_runtime)
     add_test(NAME basic_pen_events COMMAND test_basic_pen_events
              "${CMAKE_CURRENT_SOURCE_DIR}")
+    # J1.19-B2: typed logical PAPER events and sealed 8-case runtime matrix.
+    add_executable(test_j1_19_b2_paper_native
+                   tests/test_j1_19_b2_paper_native.c)
+    target_link_libraries(test_j1_19_b2_paper_native PRIVATE
+                          basic_session_runtime basic_variable_store)
+    add_test(NAME j1_19_b2_paper_native COMMAND test_j1_19_b2_paper_native)
     # J1.18-B: 13 CPC A2 records, eight native logical palette events.
     add_executable(test_basic_ink_events tests/test_basic_ink_events.c)
     target_link_libraries(test_basic_ink_events PRIVATE basic_session_runtime)

@@ -933,6 +933,17 @@ if(BUILD_TESTING)
     endif()
 endif()
 
+# J1.16-E-B: bounded implicit REAL5 0/1/-1 plus three historic witnesses.
+if(BUILD_TESTING)
+    add_executable(test_j1_16_e_b_real5_small tests/test_j1_16_e_b_real5_small.c)
+    target_link_libraries(test_j1_16_e_b_real5_small PRIVATE
+        basic_session_runtime basic_variable_store)
+    add_test(NAME j1_16_e_b_native_real5_small_cpc_partial
+        COMMAND test_j1_16_e_b_real5_small
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_real5_scalar"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cpc6128/j1_16_e_a_small_store")
+endif()
+
 # HW4-TOUCH-T1: ESP-IDF-independent PENIRQ gesture state machine.
 # The console compiles this SAME source; CI tests mock GPIO and time.
 if(BUILD_TESTING)

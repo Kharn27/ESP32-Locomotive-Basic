@@ -501,27 +501,45 @@ static BEStatus evaluate_integer_binary(const uint8_t *body, size_t length,
 static int logic_tokens_present(const uint8_t *b, size_t length, size_t start)
 {
     size_t p = start;
+    int after_reference = 0;
     while (p < length) {
         uint8_t t = b[p];
         if (t == 0xebu) return 0; /* No scan of IF THEN arm. */
-        if (t == (uint8_t)'(' || t == 0xfeu ||
-            t == 0xfau || t == 0xfcu || t == 0xfdu) return 1;
+        if (t == (uint8_t)'(' || t == 0xfeu) return 1;
+        if (t == 0xfau || t == 0xfcu || t == 0xfdu) {
+            /* J1.13-B imported malformed-relation guard: a forged
+             * '<' -> AND directly between two adjacent CPC BVR records
+             * is not a source-tokenizable logical word (AND needs a
+             * lexical boundary before the following identifier).
+             * Keep this old IF shape on its strict legacy error path. */
+            if (after_reference && p + 1u < length &&
+                (b[p + 1u] == 0x02u || b[p + 1u] == 0x03u ||
+                 b[p + 1u] == 0x04u)) return 0;
+            return 1;
+        }
         if (t == 0x02u || t == 0x03u || t == 0x04u) {
             BasicVariableRef ref;
             if (bvr_decode(b, length, p, &ref) != BVR_OK) return 0;
             p += ref.consumed;
+            after_reference = 1;
         } else if (t == 0x19u) {
             if (length - p < 2u) return 0;
             p += 2u;
+            after_reference = 0;
         } else if (t == 0x1au) {
             if (length - p < 3u) return 0;
             p += 3u;
+            after_reference = 0;
         } else if (t == 0x1fu) {
             if (length - p < 6u) return 0;
             p += 6u;
+            after_reference = 0;
         } else if (t == 0xffu) {
             return 0; /* sealed ABS is the separate legacy path */
-        } else ++p;
+        } else {
+            ++p;
+            after_reference = 0;
+        }
     }
     return 0;
 }

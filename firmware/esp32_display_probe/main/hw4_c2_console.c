@@ -402,8 +402,15 @@ static bool repaint_dirty(void)
             ok=hw4_batch16_flush(&s_video.dirty_bands,send_batch16,&sent,&count);
             if(ok && (count.logical_bands!=sent.logical_done ||
                       count.physical_transfers!=sent.physical_done ||
-                      count.pixel_bytes!=(uint64_t)sent.logical_done*CYD_LCD_DMA_BYTES))
-                return fail("BATCH16_ACCOUNTING",-1);
+                      count.pixel_bytes!=(uint64_t)sent.logical_done*CYD_LCD_DMA_BYTES)) {
+                /* Internal accounting inconsistency: stop with all dirty
+                 * retained, no new send and no false claim of a clean GRAM. */
+                s_video.dirty_bands |= pending;
+                (void)cyd_lcd_backlight(false);
+                ok=false;
+                printf("HW4-A1-C0 ACCOUNTING_FAIL pending=0x%08x retry=0\n",
+                       (unsigned)s_video.dirty_bands);
+            }
         } else {
             ok=cpc_video_flush_dirty(&s_video,send_dirty_band,&sent);
         }

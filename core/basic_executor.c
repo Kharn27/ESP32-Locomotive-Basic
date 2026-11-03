@@ -1075,7 +1075,10 @@ static int while_colon_shape_supported(const uint8_t *b, size_t n)
         else if (token == 0xbfu) kind[count++] = PRINT;
         else if (token == 0xd5u) kind[count++] = CLOSE;
         else return 0;
-        if (while_statement_end(b, n, p, &end) != BE_OK) return 0;
+        /* A malformed standalone WHILE/WEND retains its existing typed
+         * diagnostic. C2 rejects only unsupported composed records. */
+        if (while_statement_end(b, n, p, &end) != BE_OK)
+            return !colon;
         if (end == n) break;
         colon = 1;
         if (end + 1u == n || b[end + 1u] == 0xc0u) return 0;

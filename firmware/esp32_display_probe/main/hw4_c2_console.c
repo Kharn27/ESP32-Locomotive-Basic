@@ -92,6 +92,9 @@ static CpcUartEditor s_edit;
 static CpcScreenNavigation s_nav;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
 static size_t s_scroll_reported;
+/* CONSOLE-only bounded observations; no hot-loop UART or heap. */
+static uint64_t s_spi40_run_started_us;
+static uint32_t s_spi40_full25_flushes;
 /* Boot-specific tag plus monotonic seq: unique captures in a monitor session. */
 static uint32_t s_shot_boot_tag;
 static uint32_t s_shot_seq;
@@ -160,6 +163,9 @@ static void lcd_metrics_report(const char *stage)
            (unsigned)s_lcd_metrics.idle_echo_batches,
            (unsigned)s_lcd_metrics.command_echo_batches,
            (unsigned)s_lcd_metrics.max_echo_batch);
+    printf("HW4-SPI40 FULL25_COUNT stage=%s count=%u "
+           "full25_quantiles=NOT_INSTRUMENTED\n",
+           stage,(unsigned)s_spi40_full25_flushes);
 }
 
 
@@ -383,6 +389,7 @@ static bool repaint_dirty(void)
         ++s_lcd_metrics.histogram[bin];
         if(ok) hw4_scroll_flush(&s_scroll_metrics,sent,us,
                                 (uint64_t)sent*CYD_LCD_DMA_BYTES);
+        if(ok && sent==CPC_ROWS) ++s_spi40_full25_flushes;
         if(!ok) {
             CydLcdDiagnostics d;
             bool got=cyd_lcd_diagnostics(&d);
@@ -531,6 +538,7 @@ static bool basic_run(void)
     printf("HW4-RUN-B RUN_START quantum=%u uart_poll_max=%u "
            "budget=none sha=%s\n",RUN_QUANTUM,RUN_UART_POLL_BYTES,
            HW4_SHOT_GIT_SHA);
+    s_spi40_run_started_us=(uint64_t)esp_timer_get_time();
     return true;
 }
 static bool basic_run_slice(void)
@@ -599,6 +607,12 @@ static bool basic_run_slice(void)
     } else if(slice.state!=HW4_RUN_ENDED && slice.state!=HW4_RUN_BROKEN) {
         return fail("RUN_STATE",(int)slice.state);
     }
+    printf("HW4-SPI40 RUN_DURATION requested_spi_hz=%u "
+           "elapsed_us=%llu window=basic_run_start_to_terminal "
+           "includes_uart=1 sha=%s\n",
+           cyd_lcd_requested_spi_hz(),
+           (unsigned long long)((uint64_t)esp_timer_get_time()-s_spi40_run_started_us),
+           HW4_SHOT_GIT_SHA);
     printf("HW4-RUN-B RUN_TERMINAL state=%u quanta=%u steps=%u "
            "break_source=%s stop_calls=%u latency_us=%llu "
            "ignored_input_lines=%u overflow_input_lines=%u "
@@ -726,8 +740,17 @@ void app_main(void)
     printf("HW4-C2 START project=%s version=%s idf=%s "
            "target=esp32 ON_DEVICE_UNVERIFIED\n",
            desc->project_name,desc->version,esp_get_idf_version());
+    /* Requested clock, not a verified divider or measured electrical SCLK. */
+    printf("HW4-SPI40 BOOT requested_spi_hz=%u variant=%s "
+           "clock_source=esp_lcd_io_cfg effective_spi_hz=UNMEASURED "
+           "electrical_spi_hz=UNMEASURED spi_host=SPI2 spi_mode=0 "
+           "dma_bytes=%u build_sha=%s build_version=%s idf=%s cpu_mhz=%u\n",
+           cyd_lcd_requested_spi_hz(),
+           cyd_lcd_requested_spi_hz()==40000000U?"SPI40":"SPI20",
+           (unsigned)CYD_LCD_DMA_BYTES,HW4_SHOT_GIT_SHA,
+           desc->version,esp_get_idf_version(),
+           (unsigned)CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ);
     memory_report("before_lcd");
-    esp_err_t e=cyd_lcd_init();
     if(e!=ESP_OK) { (void)fail("LCD_INIT",(int)e); return; }
     printf("HW4-C2 LCD_INIT_PASS dma_bytes=%u\n",CYD_LCD_DMA_BYTES);
     e=cyd_lcd_orientation(10U,cpc_video_palette_rgb565(1U));

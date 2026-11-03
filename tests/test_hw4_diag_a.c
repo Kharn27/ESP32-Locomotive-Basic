@@ -154,11 +154,115 @@ static void real_historical_cases(void)
     assert(ready_count==5U);
     (void)real_submit("GOTO 999",CPC_DIAG_HOST_GENERIC,
         CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
-    (void)real_submit("listt",CPC_DIAG_HOST_GENERIC,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+    (void)real_submit("listt",CPC_DIAG_DIRECT_LISTT_SYNTAX,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"Syntax errorReady");
     (void)real_submit("0",CPC_DIAG_HOST_GENERIC,
         CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
     assert(ready_count==8U);
+}
+/* A strictly proven direct typo maps to ROM CB49 / error 2; everything
+ * merely BS_UNSUPPORTED_DIRECT continues to be a HOST diagnostic. */
+static void exact_direct_syntax_and_preservation(void)
+{
+    init_console();
+    (void)real_submit("10 PRINT 2",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_NUMBERED_STORED,false,"");
+    (void)real_submit("LISTT",CPC_DIAG_DIRECT_LISTT_SYNTAX,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"Syntax errorReady");
+    (void)real_submit("  LiStT  ",CPC_DIAG_DIRECT_LISTT_SYNTAX,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"Syntax errorReady");
+    (void)real_submit("LISTTT",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+    (void)real_submit("LISTT:RUN",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+    (void)real_submit("LISTT 1",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+    (void)real_submit("GOTO 999",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+    (void)real_submit("MODE 1",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+    (void)real_submit("PAPER 2",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+    (void)real_submit("AUTO",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+    /* All ten diagnostics leave the original program byte-identical,
+     * including its trailing capacity. LIST still reveals it unchanged. */
+    (void)real_submit("LIST",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_LIST_RETURN,false,"10 PRINT 2Ready");
+    assert(ready_count==11U);
+    canaries();
+}
+static void direct_syntax_format_and_origin(void)
+{
+    uint8_t data[32],before[32];
+    size_t n=999U;
+    static const uint8_t wanted[]="Syntax error\n";
+    assert(cpc_diag_policy_direct_origin(CPC_DIAG_DIRECT_LISTT_SYNTAX)==
+           CPC_DIAG_ORIGIN_DIRECT_LISTT_ROM_CB49);
+    assert(cpc_diag_policy_direct_origin(CPC_DIAG_HOST_GENERIC)==
+           CPC_DIAG_ORIGIN_HOST);
+    assert(cpc_diag_policy_direct_origin(CPC_DIAG_LINE_DOES_NOT_EXIST)==
+           CPC_DIAG_ORIGIN_HOST);
+    assert(strcmp(cpc_diag_policy_message(CPC_DIAG_DIRECT_LISTT_SYNTAX),
+                  "Syntax error")==0);
+    assert(strcmp(cpc_diag_policy_category(CPC_DIAG_DIRECT_LISTT_SYNTAX),
+                  "DIRECT_LISTT_SYNTAX_ROM_CB49")==0);
+    memset(data,0x5a,sizeof data);
+    memcpy(before,data,sizeof before);
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_LISTT_SYNTAX,
+                                           data,sizeof(wanted)-2U,&n));
+    assert(n==999U && memcmp(data,before,sizeof data)==0);
+    assert(cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_LISTT_SYNTAX,
+                                          data,sizeof(wanted)-1U,&n));
+    assert(n==sizeof(wanted)-1U);
+    assert(memcmp(data,wanted,n)==0 && data[n]==0x5aU);
+    memset(data,0x5a,sizeof data);
+    n=999U;
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_COUNT,
+                                           data,sizeof data,&n));
+    assert(n==999U && data[0]==0x5aU);
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_LISTT_SYNTAX,
+                                           NULL,0U,&n));
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_LISTT_SYNTAX,
+                                           data,sizeof data,NULL));
+    assert(cpc_diag_policy_format_direct(CPC_DIAG_HOST_GENERIC,
+                                          data,sizeof data,&n));
+    assert(n==sizeof("ERROR\n")-1U && memcmp(data,"ERROR\n",n)==0);
+}
+static void direct_syntax_false_status(void)
+{
+    init_console();
+    const uint8_t src[]="LISTT";
+    basic.written=0U;
+    BSRResult r=bsr_submit(&basic.runtime,src,sizeof(src)-1U,
+                          basic.temporary,sizeof basic.temporary,
+                          basic.output,sizeof basic.output,&basic.written);
+    assert(r.status==BSR_SESSION_ERROR &&
+           r.session.status==BS_UNSUPPORTED_DIRECT);
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,r)==
+           CPC_DIAG_DIRECT_LISTT_SYNTAX);
+    BSRResult fake=r;
+    fake.status=BSR_BUSY;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.status=BSR_OVERLAP;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.session.status=BS_TOKENIZER_ERROR;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.session.tokenizer_status=BT_UNSUPPORTED_CONSTRUCT;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.session.program_status=BP_NO_SPACE;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.session.listing_status=BL_NO_SPACE;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    assert(cpc_diag_policy_select(NULL,0U,r)==CPC_DIAG_HOST_GENERIC);
+    assert(cpc_diag_policy_select((const uint8_t *)"LISTT\n",6U,r)==
+           CPC_DIAG_HOST_GENERIC);
 }
 static void wrong_status_and_host_guards(void)
 {
@@ -225,10 +329,14 @@ static void scroll_diagnostic(void)
 int main(void)
 {
     real_historical_cases();
+    exact_direct_syntax_and_preservation();
+    direct_syntax_format_and_origin();
+    direct_syntax_false_status();
     wrong_status_and_host_guards();
     string_bonjour_and_run();
     scroll_diagnostic();
-    puts("HW4-DIAG-A native diagnostic PASS : deletion, NEW/LIST, "
-         "nonmatching errors, READY count, BONJOUR, canaries, scroll");
+    puts("HW4-DIAG-SYNTAX-A PASS : exact LISTT CB49 syntax, "
+         "Ready, host fallbacks, preserved program, format canaries, "
+         "historical DIAG-A matrix");
     return 0;
 }

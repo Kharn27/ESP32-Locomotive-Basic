@@ -192,7 +192,7 @@ static void core_unknown_direct_syntax_and_preservation(void)
         "GRAPHICS", "READ", "WHILE", "ON",
         "LISTT:RUN", "LISTT 1", "RUNN 5", "LISTT=1",
         "GOTO999", "A$", "A", "GO TO 10", "LISTT?",
-        "LISTT\t", "RUN 10"
+        "RUN 10"
     };
     for(size_t i=0U;i<sizeof(host)/sizeof(host[0]);++i)
         (void)real_submit(host[i],CPC_DIAG_HOST_GENERIC,
@@ -289,6 +289,34 @@ static void direct_syntax_false_status(void)
     /* The policy consumes CORE provenance, not a duplicate IO parser:
      * a fabricated mismatched source/result is not a real BSR witness. */
 }
+/* A tab is filtered by UART rather than passed as part of a direct
+ * command; an incomplete CSI followed by ENTER rejects the UART line.
+ * Neither transport path is entitled to manufacture a CPC diagnostic. */
+static void uart_transport_pre_bsr_guard(void)
+{
+    init_console();
+    memcpy(before_program,basic.program_bytes,sizeof before_program);
+    memcpy(before_output,basic.output,sizeof before_output);
+    memcpy(&before_runtime,&basic.runtime,sizeof before_runtime);
+    const size_t old_drawn=text.glyphs_drawn;
+    for(size_t i=0U;i<5U;++i)
+        assert(uart_line_feed(&line,(uint8_t)"LISTT"[i])==UART_LINE_APPEND);
+    assert(uart_line_feed(&line,'\t')==UART_LINE_IGNORED);
+    assert(line.length==5U && memcmp(line.data,"LISTT",5U)==0);
+    assert(uart_line_feed(&line,0x1bU)==UART_LINE_IGNORED);
+    assert(uart_line_feed(&line,'[')==UART_LINE_IGNORED);
+    assert(uart_line_feed(&line,'\r')==UART_LINE_REJECTED);
+    assert(line.poisoned && line.rejected_ansi_incomplete);
+    assert(basic.program.size==2U && basic.written==0U);
+    assert(memcmp(before_program,basic.program_bytes,
+                  sizeof before_program)==0);
+    assert(memcmp(before_output,basic.output,sizeof before_output)==0);
+    assert(memcmp(&before_runtime,&basic.runtime,sizeof before_runtime)==0);
+    assert(text.glyphs_drawn==old_drawn);
+    uart_line_ack(&line);
+    assert(line.length==0U);
+    canaries();
+}
 static void wrong_status_and_host_guards(void)
 {
     init_console();
@@ -357,6 +385,7 @@ int main(void)
     core_unknown_direct_syntax_and_preservation();
     direct_syntax_format_and_origin();
     direct_syntax_false_status();
+    uart_transport_pre_bsr_guard();
     wrong_status_and_host_guards();
     string_bonjour_and_run();
     scroll_diagnostic();

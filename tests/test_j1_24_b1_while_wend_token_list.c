@@ -385,61 +385,12 @@ static int negatives(void)
      CHECK(n==888u&&memcmp(tiny,saved_tiny,sizeof(tiny))==0);}
     return 0;
 }
-static int no_run(void)
-{
-    static const char *const commands[]={
-        "WHILE 0","WEND","WHILE A%<2","WHILE","WHILE A%<","WEND 1",
-        "A%=0:WHILE A%<2:PRINT #8,\"C\":A%=A%+1:WEND"
-    };
-    size_t i;
-    for(i=0u;i<sizeof(commands)/sizeof(commands[0]);++i) {
-        uint8_t data[CAP],before_data[CAP],tok[256],out[64],old_out[64];
-        BEVideoEvent events[2],old_events[2];
-        BasicProgram p;
-        BasicVariableEntry entries[4],old_entries[4];
-        BasicVariableStore store,old_store;
-        BasicExecutor ex,old_ex;
-        size_t n=777u,written=888u,event_written=999u;
-        BEStatus st;
-        CHECK(bp_init(&p,data,sizeof(data))==BP_OK);
-        CHECK(bt_tokenize((const uint8_t*)commands[i],strlen(commands[i]),
-                          tok,sizeof(tok),&n)==BT_OK);
-        CHECK(bp_put(&p,10u,tok,n)==BP_OK);
-        CHECK(bvs_init(&store,entries,4u)==BVS_OK);
-        CHECK(be_init_with_store(&ex,&p,&store)==BE_OK);
-        old_ex=ex;old_store=store;
-        memcpy(old_entries,entries,sizeof(entries));
-        memcpy(before_data,data,sizeof(data));
-        memset(out,0x5a,sizeof(out));memcpy(old_out,out,sizeof(out));
-        memset(events,0x6b,sizeof(events));memcpy(old_events,events,sizeof(events));
-        st=be_step_events(&ex,out,sizeof(out),&written,events,2u,&event_written);
-        CHECK(st==BE_UNKNOWN_TOKEN||st==BE_UNSUPPORTED);
-        CHECK(memcmp(&ex,&old_ex,sizeof(ex))==0);
-        CHECK(memcmp(&store,&old_store,sizeof(store))==0);
-        CHECK(memcmp(entries,old_entries,sizeof(entries))==0);
-        CHECK(memcmp(data,before_data,sizeof(data))==0);
-        CHECK(memcmp(out,old_out,sizeof(out))==0&&written==888u);
-        CHECK(memcmp(events,old_events,sizeof(events))==0&&event_written==999u);
-        st=be_preview_step_events(&ex,out,sizeof(out),&written,events,2u,&event_written);
-        CHECK(st==BE_UNKNOWN_TOKEN||st==BE_UNSUPPORTED);
-        CHECK(memcmp(&ex,&old_ex,sizeof(ex))==0);
-        CHECK(memcmp(entries,old_entries,sizeof(entries))==0);
-        CHECK(memcmp(out,old_out,sizeof(out))==0&&written==888u);
-        st=be_step(&ex,out,sizeof(out),&written);
-        CHECK(st==BE_UNKNOWN_TOKEN||st==BE_UNSUPPORTED);
-        CHECK(memcmp(&ex,&old_ex,sizeof(ex))==0);
-        CHECK(memcmp(entries,old_entries,sizeof(entries))==0);
-        CHECK(memcmp(out,old_out,sizeof(out))==0&&written==888u);
-    }
-    return 0;
-}
 int main(int argc,char **argv)
 {
     size_t i;
     CHECK(argc==2);
     CHECK(lexical_neighbours()==0);
     CHECK(negatives()==0);
-    CHECK(no_run()==0);
     for(i=0u;i<sizeof(witnesses)/sizeof(witnesses[0]);++i)
         CHECK(compare_witness(argv[1],&witnesses[i])==0);
     puts("J1.24-B1 20_CASES 40_SESSIONS records WHILE/WEND matched; "

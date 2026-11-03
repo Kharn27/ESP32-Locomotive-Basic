@@ -35,6 +35,8 @@ int main(void)
     f=frame(1U,0U,146000U);
     assert(hw4_dp_record(&p,&f));
     assert(p.completed==3U && p.gaps==2U && p.gap_sum_us==46000U);
+    assert(p.trace_size==3U && p.trace[0].scrolls==3U &&
+           p.trace[1].gap_us==40000U && p.trace[2].scrolls==0U);
     assert(p.classes[HW4_DP_PARTIAL].n==2U);
     assert(p.classes[HW4_DP_SCROLL_ASSOCIATED].n==2U);
     assert(p.classes[HW4_DP_PARTIAL].one_scroll==1U);
@@ -77,6 +79,14 @@ int main(void)
     f=frame(25U,0U,1U); f.wall_us=UINT64_C(10000000000);
     assert(hw4_dp_record(&p,&f));
     assert(hw4_dp_quantile_upper(&p.classes[HW4_DP_FULL25],95U)==UINT32_MAX);
+    hw4_dp_reset(&p);
+    for(unsigned i=1U;i<=20U;++i) {
+        f=frame(1U,i%3U,(uint64_t)i*5000U);
+        assert(hw4_dp_record(&p,&f));
+    }
+    assert(p.completed==20U && p.trace_size==HW4_DP_TRACE_CAP);
+    assert(p.trace_next==4U && p.trace[4].seq==5U);
+    assert(p.trace[3].seq==20U);
     puts("HW4-DISP-PROFILE-A host accounting PASS");
     return 0;
 }

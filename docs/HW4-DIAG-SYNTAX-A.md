@@ -31,8 +31,8 @@ Le firmware CONSOLE utilise déjà `bsr_submit → cpc_diag_policy_select → cp
 |---|---|---|
 | inconnues lexicales | `LISTT`, `LiStT`, `RUNN`, `rUnN`, `PRONT`, `CLSS`, `WHILLE`, `LISTTT` | `Syntax error\n` + `Ready` |
 | mots CPC connus non exécutables | `GOTO 999`, `MODE 1`, `PAPER 2`, `AUTO`, `CONT`, `GRAPHICS`, `READ`, `WHILE`, `ON` | `ERROR\n` + `Ready` |
-| formes ambiguës | `LISTT:RUN`, `LISTT 1`, `RUNN 5`, `LISTT=1`, `GOTO999`, `A$`, `A`, `GO TO 10`, `LISTT?`, `LISTT\t`, `RUN 10` | `ERROR\n` + `Ready` |
-| refus de contexte synthétiques | `BSR_BUSY`, `BSR_OVERLAP`, `BSR_EXECUTOR_ERROR`, `BS_UNSUPPORTED_DIRECT`, `BS_TOKENIZER_ERROR`, BT/BP/BL non OK, source nulle ou vide | `HOST_GENERIC` |
+| formes ambiguës | `LISTT:RUN`, `LISTT 1`, `RUNN 5`, `LISTT=1`, `GOTO999`, `A$`, `A`, `GO TO 10`, `LISTT?`, `RUN 10` | `ERROR\n` + `Ready` |
+| transport UART en amont | tabulation `\t` ignorée sans insertion ; CSI incomplet `ESC [` puis CR refusé par UART | aucun diagnostic BASIC, aucune émission Ready par la politique |\n| refus de contexte synthétiques | `BSR_BUSY`, `BSR_OVERLAP`, `BSR_EXECUTOR_ERROR`, `BS_UNSUPPORTED_DIRECT`, `BS_TOKENIZER_ERROR`, BT/BP/BL non OK, source nulle ou vide | `HOST_GENERIC` |
 | historique | `10` absent, `NEW`, `LIST`, `RUN`, `GOTO 999`, chaîne `BONJOUR`, scroll | comportement antérieur |
 
 Le programme `10 PRINT 2` est stocké avant les essais et son `LIST` final doit reproduire exactement `10 PRINT 2\n`. Le formatage direct est testé avec capacité insuffisante, sortie gardée par canaris et compteur inchangé.

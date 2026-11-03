@@ -115,7 +115,7 @@ static int rebuild(BasicProgram *p, const uint8_t *listing, size_t count)
         char line[128];
         size_t size;
         CHECK(end != NULL);
-        size = (size_t)(end - listing - at);
+        size = (size_t)(end - (listing + at));
         CHECK(size > 0u && size < sizeof(line));
         memcpy(line, listing + at, size);
         line[size] = '\0';

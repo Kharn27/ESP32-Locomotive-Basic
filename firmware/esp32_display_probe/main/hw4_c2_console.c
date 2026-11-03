@@ -120,6 +120,20 @@ static void disp_report(const char *stage)
            (unsigned)p->gaps,
            (unsigned long long)(p->gaps ? p->gap_sum_us/p->gaps:0U),
            (unsigned)p->gap_min_us,(unsigned)p->gap_max_us);
+    printf("HW4-DISP-PROFILE TRACE_INFO run=%u stage=%s retained=%u "
+           "total=%u truncated=%u order=completion gap_scope=between_completed\n",
+           s_disp_run_seq,stage,(unsigned)p->trace_size,
+           (unsigned)p->completed,(unsigned)(p->completed>p->trace_size));
+    for(unsigned i=0U;i<p->trace_size;++i) {
+        const unsigned idx=(p->trace_next+HW4_DP_TRACE_CAP-p->trace_size+i)
+            %HW4_DP_TRACE_CAP;
+        const Hw4DpTrace *t=&p->trace[idx];
+        printf("HW4-DISP-PROFILE TRACE run=%u seq=%u bands=%u "
+               "scrolls=%u wall_us=%u completion_gap_us=%u\n",
+               s_disp_run_seq,(unsigned)t->seq,(unsigned)t->bands,
+               (unsigned)t->scrolls,(unsigned)t->wall_us,
+               (unsigned)t->gap_us);
+    }
     for(unsigned i=0U;i<HW4_DP_CLASSES;++i) {
         const Hw4DpClass *c=&p->classes[i];
         const char *name=i==HW4_DP_FULL25 ? "full25" :

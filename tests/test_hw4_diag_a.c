@@ -200,9 +200,9 @@ static void direct_syntax_format_and_origin(void)
     assert(cpc_diag_policy_direct_origin(CPC_DIAG_DIRECT_LISTT_SYNTAX)==
            CPC_DIRECT_DIAG_ORIGIN_LISTT_ROM_CB49);
     assert(cpc_diag_policy_direct_origin(CPC_DIAG_HOST_GENERIC)==
-           CPC_DIAG_ORIGIN_HOST);
+           CPC_DIRECT_DIAG_ORIGIN_HOST);
     assert(cpc_diag_policy_direct_origin(CPC_DIAG_LINE_DOES_NOT_EXIST)==
-           CPC_DIAG_ORIGIN_HOST);
+           CPC_DIRECT_DIAG_ORIGIN_HOST);
     assert(strcmp(cpc_diag_policy_message(CPC_DIAG_DIRECT_LISTT_SYNTAX),
                   "Syntax error")==0);
     assert(strcmp(cpc_diag_policy_category(CPC_DIAG_DIRECT_LISTT_SYNTAX),

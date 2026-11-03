@@ -28,7 +28,7 @@
 - A0→HEAD initial : **+1120 o** DRAM ; garde A0 **FAIL**, dépassement **864 o**.
 - Le binaire complet inclut des composants additionnels et padding ; la table ci-dessus utilise les *sections ELF*, pas la taille du binaire compressé/archivé.
 
-**Analyse symboles ELF :** HEAD initial `s_disp_profile` **824 o** (26.2.1 de l'ancienne structure), `s_lcd_metrics` **88 o** inchangés, `s_scroll_metrics` **216 o** inchangés, `s_text` passe de **44** à **64 o**. Une partie restante du delta vient des autres champs de contexte de profilage et de l'alignement BSS.
+**Analyse symboles ELF :** HEAD initial `s_disp_profile` **824 o** (structure initiale), `s_lcd_metrics` **88 o** inchangés, `s_scroll_metrics` **216 o** inchangés, `s_text` passe de **44** à **64 o**. Une partie restante du delta vient des autres champs de contexte de profilage et de l'alignement BSS.
 
 ## Correction C1 réellement proposée dans ce HEAD
 
@@ -40,7 +40,7 @@ Compression **sans perte de l'information auparavant rapportable** :
 4. `zero_scroll` est **exactement** `n - one_scroll - multi_scroll` pour les échantillons acceptés.
 5. Histogrammes **32 bits** des 3 classes, min/mean/p50_upper/p95_upper/max, totaux **64 bits** des phases, catégories, séquences `scrolls=0/1/n`, contrôle de monotonie, rejets atomiques et saturations conservés. Aucun déplacement d'allocation ou raccourcissement d'une plage de compteur.
 
-Sur le layout C99 64-bit de l'ancien agrégateur : 824 o → **640 o** calculés à partir des nouveaux champs (confirmation Xtensa et CI à récupérer sur HEAD final). La trace seule passe de **320 → 208 o**. Les journaux UART conservent les mêmes colonnes, le décodeur remplaçant la lecture directe des structures précédentes.
+D'après le layout C99 des deux structures : **824 → 640 o** (delta **−184 o**, à confirmer sur Xtensa et sur le HEAD final de la PR). La trace seule passe de **320 → 208 o**. Les journaux UART conservent les mêmes colonnes, le décodeur remplaçant la lecture directe des structures précédentes.
 
 ### Situation et limites
 

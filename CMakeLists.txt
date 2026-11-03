@@ -534,6 +534,9 @@ if(BUILD_TESTING)
     add_executable(test_hw4_disp_profile tests/test_hw4_disp_profile.c)
     target_link_libraries(test_hw4_disp_profile PRIVATE hw4_disp_profile)
     add_test(NAME hw4_disp_profile_accounting COMMAND test_hw4_disp_profile)
+    add_executable(bench_hw4_disp_profile tests/bench_hw4_disp_profile.c)
+    target_link_libraries(bench_hw4_disp_profile PRIVATE hw4_disp_profile)
+    add_test(NAME hw4_disp_profile_host_overhead COMMAND bench_hw4_disp_profile)
 endif()
 
 # HW4-SCROLL-OPT-A0: portable bounded telemetry, no LCD or BASIC dependency.

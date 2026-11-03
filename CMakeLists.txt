@@ -190,6 +190,17 @@ if(BUILD_TESTING)
              "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
+# J1.24-B2: native bounded INTEGER WHILE/WEND (B1 CTest still enabled).
+if(BUILD_TESTING)
+    add_executable(test_j1_24_b2_while_wend_native
+                   tests/test_j1_24_b2_while_wend_native.c)
+    target_link_libraries(test_j1_24_b2_while_wend_native PRIVATE
+                          basic_session_runtime basic_variable_store)
+    add_test(NAME j1_24_b2_while_wend_native_cpc_semantic
+             COMMAND test_j1_24_b2_while_wend_native
+             "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
 # J1.24-B1: WHILE D6 / WEND D5 lexical-only CPC RAM + PRE-RUN LIST.
 # 20 original/repeat authentic ROM-backed cases; no loop execution.
 if(BUILD_TESTING)

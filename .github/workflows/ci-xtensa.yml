@@ -265,7 +265,7 @@ jobs:
               grep -Fx "CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=160" "$cfg"
               python3 /project/tools/ci/verify_esp_app_version.py \
                 "$build/loco_esp32_display_probe.bin" "$EXPECTED_HEAD" loco_esp32_display_probe
-              idf.py -B "$build" size > "$out/size.txt"
+              idf.py -B "$build" size > "$out/size.txt" 2>&1
               xtensa-esp-elf-size -A "$build/loco_esp32_display_probe.elf" > "$out/sections.txt"
               xtensa-esp-elf-nm -S --defined-only "$build/loco_esp32_display_probe.elf" > "$out/symbols.txt"
               python3 /project/tools/ci/check_u1b_memory.py CONSOLE "$out/size.txt" \

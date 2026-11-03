@@ -110,6 +110,24 @@ static uint64_t disp_clock(void *context)
     (void)context;
     return (uint64_t)esp_timer_get_time();
 }
+static void disp_clock_overhead_report(void)
+{
+    enum { N=512 };
+    volatile uint64_t sink=0U;
+    const uint64_t a=disp_clock(NULL);
+    for(unsigned i=0U;i<N;++i) sink+=(uint64_t)i;
+    const uint64_t b=disp_clock(NULL);
+    for(unsigned i=0U;i<N;++i) sink+=disp_clock(NULL);
+    const uint64_t c=disp_clock(NULL);
+    const uint64_t baseline=b-a, instrumented=c-b;
+    printf("HW4-DISP-PROFILE CLOCK_OVERHEAD_ESTIMATE calls=%u "
+           "base_loop_us=%llu clock_loop_us=%llu "
+           "net_upper_us_per_call=%llu scope=task_wall_boot_calibration\\n",
+           N,(unsigned long long)baseline,(unsigned long long)instrumented,
+           (unsigned long long)(instrumented>baseline
+              ? (instrumented-baseline+N-1U)/N:0U));
+    (void)sink;
+}
 static void disp_report(const char *stage)
 {
     const Hw4DispProfile *p=&s_disp_profile;
@@ -878,6 +896,7 @@ void app_main(void)
     /* Non-secret boot discriminator with zero added RNG/IRAM linkage. */
     s_shot_boot_tag=esp_cpu_get_cycle_count() ^ (uint32_t)esp_timer_get_time();
     if(!uart_init()) return;
+    disp_clock_overhead_report(); /* one-time, outside RUN/repaint */
     e=cyd_lcd_backlight(true);
     if(e!=ESP_OK) { (void)fail("BACKLIGHT",(int)e); return; }
     memory_report("interactive_ready");

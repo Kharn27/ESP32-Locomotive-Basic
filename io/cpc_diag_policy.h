@@ -30,8 +30,7 @@ typedef enum {
     CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE,
-    CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE,
-    CPC_DIAG_ORIGIN_DIRECT_LISTT_ROM_CB49 /* ROM code 2, not CPC live oracle */
+    CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE
 } CpcDiagOrigin;
 
 typedef struct {
@@ -68,9 +67,14 @@ CpcDiagCategory cpc_diag_policy_select(const uint8_t *source, size_t length,
                                        BSRResult result);
 const char *cpc_diag_policy_category(CpcDiagCategory category);
 const char *cpc_diag_policy_message(CpcDiagCategory category);
-/* Provenance for the direct-input policy only. ROM_CB49 confirms the wording
- * of CPC code 2, not a fresh CPC run of LISTT. Other direct classes are HOST. */
-CpcDiagOrigin cpc_diag_policy_direct_origin(CpcDiagCategory category);
+/* Separate provenance domain: RUN-origin enum is consumed by an exhaustive
+ * integration switch and must keep its ABI unchanged. ROM CB49 proves CPC
+ * code 2 wording, not a new independent CPC run of LISTT. */
+typedef enum {
+    CPC_DIRECT_DIAG_ORIGIN_HOST = 0,
+    CPC_DIRECT_DIAG_ORIGIN_LISTT_ROM_CB49
+} CpcDirectDiagOrigin;
+CpcDirectDiagOrigin cpc_diag_policy_direct_origin(CpcDiagCategory category);
 /* Byte-exact formatter; insufficient capacity and rejected categories preserve
  * the ENTIRE buffer and count. No Ready; caller applies existing Ready policy. */
 bool cpc_diag_policy_format_direct(CpcDiagCategory category,

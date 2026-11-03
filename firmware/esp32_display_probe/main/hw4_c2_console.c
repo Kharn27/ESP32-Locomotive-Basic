@@ -20,6 +20,7 @@
 #include "cpc_video.h"
 #include "hw4_scroll_metrics.h"
 #include "hw4_touch_t1.h"
+#include "hw4_batch16_dma.h"
 #include "cyd_ili9341.h"
 #include "uart_line.h"
 #include "hw4_shot_uart.h"
@@ -92,6 +93,8 @@ static CpcUartEditor s_edit;
 static CpcScreenNavigation s_nav;
 static uint8_t s_vram[CPC_VIDEO_BYTES];
 static size_t s_scroll_reported;
+/* Explicit UART-only experiment; C zero-initialization means OFF. */
+static bool s_batch16_on;
 /* Boot-specific tag plus monotonic seq: unique captures in a monitor session. */
 static uint32_t s_shot_boot_tag;
 static uint32_t s_shot_seq;
@@ -218,26 +221,32 @@ static bool fail(const char *phase,int code)
     memory_report(phase);
     return false;
 }
-static bool render_band(unsigned top)
+static bool render_rows(unsigned top,unsigned height)
 {
-    uint8_t *const band=cyd_lcd_band(); /* unique driver-owned 5120 B */
-    uint16_t scan[LCD_WIDTH];           /* 640 B transient stack row */
-    if(band==NULL || top+LCD_ROWS_PER_BAND>LCD_HEIGHT)
+    uint8_t *const band=cyd_lcd_band(); /* only driver-owned DMA buffer */
+    uint16_t scan[LCD_WIDTH];           /* same 640 B transient stack row */
+    if(band==NULL || height==0U || top+height>LCD_HEIGHT ||
+       (size_t)height*LCD_WIDTH*2U>cyd_lcd_dma_capacity())
         return fail("LCD_BAND_ACCESS",-1);
-    for(unsigned dy=0;dy<LCD_ROWS_PER_BAND;++dy) {
+    for(unsigned dy=0U;dy<height;++dy) {
         if(!cpc_video_render_row(&s_video,top+dy,scan,LCD_WIDTH))
             return fail("VIDEO_RENDER",(int)(top+dy));
-        for(unsigned x=0;x<LCD_WIDTH;++x) {
-            size_t n=((size_t)dy*LCD_WIDTH+x)*2U;
+        for(unsigned x=0U;x<LCD_WIDTH;++x) {
+            const size_t n=((size_t)dy*LCD_WIDTH+x)*2U;
             band[n]=(uint8_t)(scan[x]>>8U);
             band[n+1U]=(uint8_t)scan[x];
         }
     }
-    /* DMA sender blocks for completion; a single app_main owns the band. */
-    esp_err_t e=cyd_lcd_send(0,(int)top,LCD_WIDTH,LCD_ROWS_PER_BAND);
+    /* The HAL waits for completion before this buffer is reused. */
+    esp_err_t e=cyd_lcd_send(0,(int)top,LCD_WIDTH,(int)height);
     if(e!=ESP_OK) return fail("LCD_DMA",(int)e);
     return true;
 }
+static bool render_band(unsigned top)
+{
+    return render_rows(top,LCD_ROWS_PER_BAND);
+}
+
 /* The only LCD owner renders the same logical RGB565 rows used by DMA.
  * Read-only: not a GRAM readback or a second framebuffer. The P0 decoder
  * deliberately preserves logical orientation; physical overlays are PO gate. */
@@ -351,44 +360,82 @@ static bool touch_poll(void)
     return true;
 }
 
+typedef struct {
+    unsigned logical_done, physical_done;
+} DirtySendCount;
 static bool send_dirty_band(void *context, unsigned row)
 {
-    unsigned *sent=(unsigned *)context;
+    DirtySendCount *sent=(DirtySendCount *)context;
     if(row>=CPC_ROWS ||
        !render_band(CPC_VIDEO_VIEW_TOP+row*LCD_ROWS_PER_BAND))
         return false;
-    ++(*sent);
+    ++sent->logical_done;
+    ++sent->physical_done;
+    return true;
+}
+static bool send_batch16(void *context,unsigned first,unsigned height)
+{
+    DirtySendCount *sent=(DirtySendCount *)context;
+    if(first>=CPC_ROWS || (height!=16U && height!=8U) ||
+       !render_rows(CPC_VIDEO_VIEW_TOP+first*LCD_ROWS_PER_BAND,height))
+        return false;
+    sent->logical_done+=height/LCD_ROWS_PER_BAND;
+    ++sent->physical_done;
     return true;
 }
 static bool repaint_dirty(void)
 {
     hw4_scroll_observe_text(&s_scroll_metrics,(uint32_t)s_text.scrolls);
     if(s_video.dirty_bands!=0U) {
-        unsigned sent=0U;
+        DirtySendCount sent={0U,0U};
+        const uint32_t pending=s_video.dirty_bands;
+        unsigned requested=0U;
+        for(uint32_t bits=pending;bits!=0U;bits&=bits-1U) ++requested;
+        const bool batch=hw4_batch16_eligible(
+            s_batch16_on,(int)s_video.mode,cyd_lcd_current_orientation(),pending);
         uint32_t start=esp_cpu_get_cycle_count();
-        /* Exactly ONE attempt. Real LCD errors latch s_fault, so preserve
-         * remaining dirty bands and fail-stop. Never retry the driver. */
-        bool ok=cpc_video_flush_dirty(&s_video,send_dirty_band,&sent);
-        /* CPU cycles modulo UINT32 wrap; CYD uses a fixed CPU clock.
-         * Avoid extra timer component and preserve HW3 OFF dependencies. */
+        /* Single app_main owns CpcVideo and LCD. Unlike the legacy drain,
+         * this path keeps both dirty bits until their joint DMA is complete. */
+        bool ok;
+        if(batch) {
+            Hw4Batch16Stats count={0U,0U,UINT64_C(0)};
+            ok=hw4_batch16_flush(&s_video.dirty_bands,send_batch16,&sent,&count);
+            if(ok && (count.logical_bands!=sent.logical_done ||
+                      count.physical_transfers!=sent.physical_done ||
+                      count.pixel_bytes!=(uint64_t)sent.logical_done*CYD_LCD_DMA_BYTES))
+                return fail("BATCH16_ACCOUNTING",-1);
+        } else {
+            ok=cpc_video_flush_dirty(&s_video,send_dirty_band,&sent);
+        }
+        /* Fixed CPU clock; modulo subtraction handles cycle counter wrap. */
         uint32_t elapsed=esp_cpu_get_cycle_count()-start;
         uint32_t us=elapsed/CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
         ++s_lcd_metrics.flushes;
-        s_lcd_metrics.bands+=sent;
-        s_lcd_metrics.spi_bytes+=(uint64_t)sent*CYD_LCD_DMA_BYTES;
+        s_lcd_metrics.bands+=sent.logical_done;
+        s_lcd_metrics.spi_bytes+=(uint64_t)sent.logical_done*CYD_LCD_DMA_BYTES;
         s_lcd_metrics.repaint_us+=(uint64_t)us;
         if(us>s_lcd_metrics.max_us) s_lcd_metrics.max_us=us;
         unsigned bin=0U;
         while(bin<11U && us>s_latency_bounds_us[bin]) ++bin;
         ++s_lcd_metrics.histogram[bin];
-        if(ok) hw4_scroll_flush(&s_scroll_metrics,sent,us,
-                                (uint64_t)sent*CYD_LCD_DMA_BYTES);
+        if(ok) hw4_scroll_flush(&s_scroll_metrics,sent.logical_done,us,
+                        (uint64_t)sent.logical_done*CYD_LCD_DMA_BYTES);
+        /* Individual samples outside the repaint clock; UART throughput
+         * can still affect end-to-end RUN and must be compared OFF/ON. */
+        printf("HW4-A1-C0 REPAINT_SAMPLE mode=%s path=%s "
+               "logical_dirty_bands=%u logical_completed=%u "
+               "physical_dma_transfers=%u spi_pixel_bytes=%llu "
+               "repaint_us=%u text_scrolls_total=%u success=%u\n",
+               s_batch16_on?"ON":"OFF",batch?"BATCH16":"LEGACY8",
+               requested,sent.logical_done,sent.physical_done,
+               (unsigned long long)((uint64_t)sent.logical_done*CYD_LCD_DMA_BYTES),
+               us,(unsigned)s_text.scrolls,(unsigned)ok);
         if(!ok) {
             CydLcdDiagnostics d;
             bool got=cyd_lcd_diagnostics(&d);
             printf("HW4-C3-B2-C1 LCD_FAIL_STOP pending=0x%08x "
                    "sent=%u dma_fault=%u lcd_error=%s retry=0\n",
-                   (unsigned)s_video.dirty_bands,sent,
+                   (unsigned)s_video.dirty_bands,sent.logical_done,
                    got ? (unsigned)d.dma_fault : 1U,
                    got ? esp_err_to_name(d.last_error) : "UNKNOWN");
             return false;
@@ -531,6 +578,9 @@ static bool basic_run(void)
     printf("HW4-RUN-B RUN_START quantum=%u uart_poll_max=%u "
            "budget=none sha=%s\n",RUN_QUANTUM,RUN_UART_POLL_BYTES,
            HW4_SHOT_GIT_SHA);
+    printf("HW4-A1-C0 RUN_CLOCK edge=start mode=%s timestamp_us=%llu\n",
+           s_batch16_on?"ON":"OFF",
+           (unsigned long long)esp_timer_get_time());
     return true;
 }
 static bool basic_run_slice(void)
@@ -599,6 +649,9 @@ static bool basic_run_slice(void)
     } else if(slice.state!=HW4_RUN_ENDED && slice.state!=HW4_RUN_BROKEN) {
         return fail("RUN_STATE",(int)slice.state);
     }
+    printf("HW4-A1-C0 RUN_CLOCK edge=end mode=%s timestamp_us=%llu\n",
+           s_batch16_on?"ON":"OFF",
+           (unsigned long long)esp_timer_get_time());
     printf("HW4-RUN-B RUN_TERMINAL state=%u quanta=%u steps=%u "
            "break_source=%s stop_calls=%u latency_us=%llu "
            "ignored_input_lines=%u overflow_input_lines=%u "
@@ -636,6 +689,32 @@ static bool diagnostic_demo(void)
     }
     return basic_run();
 }
+/* Preserve A0 cumulative schema. Snapshot deltas and exact per-frame
+ * samples separate OFF and ON statistics; hardware transfers include boot. */
+static void batch16_stats_report(void)
+{
+    CydLcdDiagnostics d;
+    const bool got=cyd_lcd_diagnostics(&d);
+    printf("HW4-A1-C0 STATS mode=%s boot_sha=%s "
+           "logical_completed_cumulative=%u "
+           "physical_dma_total_including_boot=%u "
+           "spi_pixel_bytes_cumulative=%llu repaint_us_cumulative=%llu "
+           "repaint_max_us_cumulative=%u "
+           "p50_upper_us_cumulative=%u p95_upper_us_cumulative=%u "
+           "timestamp_us=%llu histogram=",
+           s_batch16_on?"ON":"OFF",HW4_SHOT_GIT_SHA,
+           (unsigned)s_lcd_metrics.bands,
+           got?(unsigned)d.transfer_count:0U,
+           (unsigned long long)s_lcd_metrics.spi_bytes,
+           (unsigned long long)s_lcd_metrics.repaint_us,
+           (unsigned)s_lcd_metrics.max_us,
+           (unsigned)latency_quantile_upper(50U),
+           (unsigned)latency_quantile_upper(95U),
+           (unsigned long long)esp_timer_get_time());
+    for(unsigned i=0U;i<12U;++i)
+        printf("%s%u",i?",":"",(unsigned)s_lcd_metrics.histogram[i]);
+    printf("\n");
+}
 static bool execute_line(void)
 {
     const uint8_t *source=s_line.data;
@@ -651,6 +730,16 @@ static bool execute_line(void)
     const bool shot=is_command(source,length,"!SHOT");
     if(shot) {
         printf("HW4-SHOT-A HOST_COMMAND command=!SHOT basic_preserved=1\n");
+    } else if(is_command(source,length,"!DPROBE ON") ||
+              is_command(source,length,"!DPROBE OFF")) {
+        s_batch16_on=is_command(source,length,"!DPROBE ON");
+        printf("HW4-A1-C0 CONTROL mode=%s basic_preserved=1 "
+               "repaint_policy=full25_case10_only dma_buffer_bytes=%u "
+               "sha=%s\n",s_batch16_on?"ON":"OFF",
+               cyd_lcd_dma_capacity(),HW4_SHOT_GIT_SHA);
+        batch16_stats_report();
+    } else if(is_command(source,length,"!DPROBE STATS")) {
+        batch16_stats_report();
     } else if(is_command(source,length,"!CLS")) {
         printf("HW4-C2 DIAGNOSTIC_SCREEN_CLEAR source=!CLS "
                "program_preserved=1\n");
@@ -730,6 +819,9 @@ void app_main(void)
     esp_err_t e=cyd_lcd_init();
     if(e!=ESP_OK) { (void)fail("LCD_INIT",(int)e); return; }
     printf("HW4-C2 LCD_INIT_PASS dma_bytes=%u\n",CYD_LCD_DMA_BYTES);
+    printf("HW4-A1-C0 DMA_CONFIG unique_buffer=1 allocated_bytes=%u "
+           "mode=OFF default=1 spi_hz=20000000 cpu_mhz=%u\n",
+           cyd_lcd_dma_capacity(),(unsigned)CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ);
     e=cyd_lcd_orientation(10U,cpc_video_palette_rgb565(1U));
     if(e!=ESP_OK) { (void)fail("LCD_ORIENTATION",(int)e); return; }
     printf("HW4-C2 ORIENTATION_PASS case=%u\n",
@@ -779,7 +871,8 @@ void app_main(void)
     if(e!=ESP_OK) { (void)fail("BACKLIGHT",(int)e); return; }
     memory_report("interactive_ready");
     printf("HW4-C2 HELP submit_4_numbered_lines_then_RUN "
-           "LIST_NEW=real_BSR !DEMO=HW4-C1 !CLS=screen_only\n");
+           "LIST_NEW=real_BSR !DEMO=HW4-C1 !CLS=screen_only "
+           "!DPROBE_ON_OFF_STATS=host_only\n");
     if(!prompt()) return;
     if(!touch_init()) return;
     unsigned echo_pending=0U;

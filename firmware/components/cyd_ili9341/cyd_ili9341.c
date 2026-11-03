@@ -26,6 +26,13 @@
 #define LCD_NATIVE_H 320
 #define LCD_H 240
 #define LCD_TILE 8
+/* Only CONSOLE replaces its one DMA allocation with a 10240-byte buffer. */
+#ifndef CYD_LCD_DMA_CAPACITY_BYTES
+#define CYD_LCD_DMA_CAPACITY_BYTES CYD_LCD_DMA_BYTES
+#endif
+#if CYD_LCD_DMA_CAPACITY_BYTES != 5120U && CYD_LCD_DMA_CAPACITY_BYTES != 10240U
+#error "HW4 A1-C0 DMA budget must be 5120 or 10240 bytes"
+#endif
 #define LCD_SOFTWARE_ROTATE_CW 12U
 #define LCD_SOFTWARE_ROTATE_CCW 13U
 #ifndef LCD_BGR
@@ -53,13 +60,14 @@ static bool IRAM_ATTR on_color_done(esp_lcd_panel_io_handle_t io,
 }
 
 uint8_t *cyd_lcd_band(void) { return (s_panel && !s_fault) ? s_band : NULL; }
+unsigned cyd_lcd_dma_capacity(void) { return CYD_LCD_DMA_CAPACITY_BYTES; }
 esp_err_t cyd_lcd_send(int x, int y, int width, int height)
 {
     if (!s_panel || !s_done || s_fault) return ESP_ERR_INVALID_STATE;
     if (x < 0 || y < 0 || width <= 0 || height <= 0 ||
         x > s_width || width > s_width - x ||
         y > s_height || height > s_height - y ||
-        (size_t)width*(size_t)height > CYD_LCD_DMA_BYTES/2U)
+        (size_t)width*(size_t)height > CYD_LCD_DMA_CAPACITY_BYTES/2U)
         return ESP_ERR_INVALID_ARG;
     (void)xSemaphoreTake(s_done,0);
     esp_err_t err = esp_lcd_panel_draw_bitmap(s_panel,x,y,x+width,y+height,s_band);
@@ -158,7 +166,7 @@ esp_err_t cyd_lcd_init(void)
     err = gpio_set_level(LCD_BL, 0);
     if (err != ESP_OK) goto fail;
 
-    s_band = heap_caps_malloc(CYD_LCD_DMA_BYTES,
+    s_band = heap_caps_malloc(CYD_LCD_DMA_CAPACITY_BYTES,
                                   MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
     if (s_band == NULL) { err = ESP_ERR_NO_MEM; goto fail; }
     s_done = xSemaphoreCreateBinary();
@@ -170,7 +178,7 @@ esp_err_t cyd_lcd_init(void)
         .miso_io_num = -1,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = CYD_LCD_DMA_BYTES + 16,
+        .max_transfer_sz = CYD_LCD_DMA_CAPACITY_BYTES + 16,
     };
     err = spi_bus_initialize(LCD_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
     if (err != ESP_OK) goto fail;

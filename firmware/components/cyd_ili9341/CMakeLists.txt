@@ -4,3 +4,8 @@ if(NOT DEFINED HW3_LCD_BGR)
 endif()
 target_compile_definitions(${COMPONENT_LIB} PRIVATE LCD_BGR=${HW3_LCD_BGR})
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror -std=gnu17)
+
+# C0: only the CONSOLE build increases its unique DMA buffer to 10240 bytes.
+if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
+  target_compile_definitions(${COMPONENT_LIB} PRIVATE CYD_LCD_DMA_CAPACITY_BYTES=10240U)
+endif()

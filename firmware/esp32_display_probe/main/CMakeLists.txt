@@ -13,7 +13,7 @@ endif()
 if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
     idf_component_register(
         SRCS
-            "hw4_c2_console.c" "hw4_touch_t1.c" "cpc_font.c"
+            "hw4_c2_console.c" "hw4_batch16_dma.c" "hw4_touch_t1.c" "cpc_font.c"
             "../../../video/cpc_video.c" "../../../video/cpc_palette.c" "../../../video/cpc_boot.c"
             "../../../video/cpc_text.c" "../../../video/hw4_scroll_metrics.c"
             "../../../integration/hw4_pen_bridge.c"

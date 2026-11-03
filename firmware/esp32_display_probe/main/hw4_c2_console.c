@@ -436,7 +436,7 @@ static bool repaint_dirty(void)
                s_batch16_on?"ON":"OFF",batch?"BATCH16":"LEGACY8",
                requested,sent.logical_done,sent.physical_done,
                (unsigned long long)((uint64_t)sent.logical_done*CYD_LCD_DMA_BYTES),
-               us,(unsigned)s_text.scrolls,(unsigned)ok);
+               (unsigned)us,(unsigned)s_text.scrolls,(unsigned)ok);
         if(!ok) {
             CydLcdDiagnostics d;
             bool got=cyd_lcd_diagnostics(&d);

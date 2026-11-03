@@ -2171,7 +2171,8 @@ static BEStatus execute_line(const BasicProgram *program,
              * Do not commit a prefix, including if a comment follows it. */
             if (pos < length && body[pos] == 0x01u &&
                 !while_line_contains_loop(body, length)) return BE_UNSUPPORTED;
-            if (pos != length) {
+            if (pos != length && !(pos < length && body[pos] == 0x01u &&
+                                   while_line_contains_loop(body, length))) {
                 return BE_BAD_SEQUENCE;
             }
             value.type = (uint8_t)BVT_INTEGER;

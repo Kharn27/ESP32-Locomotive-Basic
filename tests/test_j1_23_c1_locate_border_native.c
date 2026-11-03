@@ -262,6 +262,11 @@ static int capacity_and_offsets(void)
     CHECK(r.status == BSR_EXECUTOR_ERROR &&
           r.executor_status == BE_NO_EVENT_SPACE);
     CHECK(fully_unchanged() == 0);
+    /* Reject aliased public staging before touching any pointed-to byte. */
+    r = bsr_step_events(&f.runtime, f.output, OUT, &f.written,
+                        (BEVideoEvent *)f.output, 2u, &f.event_written);
+    CHECK(r.status == BSR_OVERLAP);
+    CHECK(fully_unchanged() == 0);
     r = bsr_step(&f.runtime, f.output, OUT, &f.written);
     CHECK(r.status == BSR_EXECUTOR_ERROR &&
           r.executor_status == BE_EVENT_RECEIVER_REQUIRED);
@@ -284,6 +289,28 @@ static int capacity_and_offsets(void)
     CHECK(f.events[1].colour == 1u && f.events[1].print_offset == 4u);
     /* No event may leak into legacy PRINT bytes. */
     CHECK(memcmp(f.output + 4u, before.output + 4u, OUT - 4u) == 0);
+    {
+        uint8_t staged_print[4];
+        BEVideoEvent staged_events[2];
+        memcpy(staged_print, f.output, sizeof(staged_print));
+        memcpy(staged_events, f.events, sizeof(staged_events));
+        memset(f.output, 0xa5, sizeof(f.output));
+        memset(f.events, 0x5a, sizeof(f.events));
+        f.written = 801u;
+        f.event_written = 802u;
+        r = bsr_step_events(&f.runtime, f.output, OUT, &f.written,
+                            f.events, 2u, &f.event_written);
+        CHECK(r.status == BSR_OK && f.written == 4u && f.event_written == 2u);
+        CHECK(memcmp(f.output, staged_print, sizeof(staged_print)) == 0);
+        CHECK(memcmp(f.events, staged_events, sizeof(staged_events)) == 0);
+        CHECK(memcmp(f.output + 4u, before.output + 4u, OUT - 4u) == 0);
+        CHECK(memcmp(f.events + 2u, before.events + 2u,
+                     sizeof(f.events) - sizeof(staged_events)) == 0);
+        CHECK(f.runtime.executor.cursor != before.runtime.executor.cursor);
+        CHECK(memcmp(f.image, before.image, sizeof(f.image)) == 0);
+        CHECK(memcmp(f.entries, before.entries, sizeof(f.entries)) == 0);
+        CHECK(memcmp(f.arena, before.arena, sizeof(f.arena)) == 0);
+    }
     return 0;
 }
 static int malformed_and_unmeasured(void)
@@ -293,12 +320,20 @@ static int malformed_and_unmeasured(void)
     static const uint8_t unmeasured_l[] = {0xa9u,' ',0x11u,',',0x13u};
     static const uint8_t unmeasured_b[] = {0x82u,' ',0x0fu};
     static const uint8_t invalid_b[] = {0x82u,' ',0x19u,28u};
+    static const uint8_t printed_then_bad[] = {
+        0xbfu,' ','"','A','"',0x01u,0xa9u,' ',0x0eu,',',0x0fu
+    };
+    static const uint8_t event_then_missing[] = {
+        0xa9u,' ',0x0fu,',',0x0fu,0x01u,0x82u,' ',0x0fu,','
+    };
     static const struct {const uint8_t *body;size_t len;BEStatus status;} bad[] = {
         {truncated_l,sizeof(truncated_l),BE_TRUNCATED},
         {truncated_b,sizeof(truncated_b),BE_TRUNCATED},
         {unmeasured_l,sizeof(unmeasured_l),BE_UNSUPPORTED},
         {unmeasured_b,sizeof(unmeasured_b),BE_UNSUPPORTED},
-        {invalid_b,sizeof(invalid_b),BE_BAD_SEQUENCE}
+        {invalid_b,sizeof(invalid_b),BE_BAD_SEQUENCE},
+        {printed_then_bad,sizeof(printed_then_bad),BE_INVALID_LOCATE},
+        {event_then_missing,sizeof(event_then_missing),BE_OPERAND_MISSING}
     };
     size_t i;
     for (i=0u;i<sizeof(bad)/sizeof(bad[0]);++i) {

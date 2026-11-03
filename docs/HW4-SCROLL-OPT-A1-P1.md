@@ -1,5 +1,39 @@
 # HW4-SCROLL-OPT-A1-P1 — sonde VSCR ILI9341 case10 (expérimentale)
 
+## CLÔTURE PILOTAGE — RETOUR CYD RÉEL (03/11/2026)
+
+**DÉCISION FINALE : `STOP_POC` — configurations VSCR A/B case10 non validées — PR #274 à fermer sans fusion.** Les tests logiciels et la compilation Xtensa ne valent pas preuve d'un défilement matériel conforme. Ce rapport clôt le PoC **tel qu'implémenté**, pas toute possibilité VSCR sur toute orientation ou tout contrôleur ILI9341. La préservation des marges, l'axe réel et le mapping GRAM doivent être démontrés par photos, jamais inférés du seul `ESP_OK`.
+
+**Référence code physiquement flashée :** application `feb1b12` / SHA complet annoncé dans les captures logiques `feb1b1279e8e2980f1dac42a4b230917fd7e71cd` ; ESP-IDF 5.5.6 ; ESP32 CYD sans PSRAM ; `orientation case10 swap_xy=0 mirror_x=0 mirror_y=1 geometry=320x240`. Après compilation, les sept workflows de ce **HEAD code** étaient `SUCCESS`. Ce correctif de documentation de clôture ne modifie pas le firmware ni ne vaut nouveau test logiciel.
+
+| Épreuve | Observation indépendante PO (photo TFT + UART) | Décision |
+|---|---|---|
+| T0 OFF/PATTERN | Démarrage normal, couleurs et motif de diagnostic visibles ; `!VPROBE PATTERN` reconnu ; aucune faute rapportée. Le témoin FOR/NEXT complet n'est pas documenté dans cette campagne | T0 partiel |
+| T1A | `visible_start=0, tfa=20, vsa=200, bfa=100, shift=UP8` ; photos `1000054798.jpg`, `1000054799.jpg` ; marges visuellement stables mais **déplacement physique attendu non démontré** | `T1A_NOT_DEMONSTRATED` |
+| T1B | `visible_start=80, tfa=100, vsa=200, bfa=20, shift=UP8` ; photos `1000054800.jpg` (référence), `1000054801.jpg` (T1B) ; **apparition d'une rupture transversale au milieu des bandes colorées**, sans scroll propre de huit pixels de la fenêtre CPC | `T1B_GEOMETRY_FAIL` |
+| T2/T3 (ACK/UP/DOWN/WRAP/MARK) | Non autorisés après T1 ; aucune preuve RAMWR post-déplacement ni wrap | NON TESTÉS |
+| T4/T5/T6 complets | Pas de série de validation complète sur le CYD, ni d'essai physique de faute HAL/DMA, ni comparaison RUN OFF/ON | NON TESTÉS |
+
+**Extraits textuels du journal UART transmis par le PO :**
+
+```text
+HW4-VSCR-P1 BOOT state=OFF default=OFF axis=UNVERIFIED command=!VPROBE_PATTERN then_T1A_or_T1B
+HW4-VSCR-P1 PATTERN controller=OFF margins=20_200_20 photo_required=1 program_preserved=1
+HW4-VSCR-P1 T1 candidate=A visible_start=0 tfa=20 vsa=200 bfa=100 shift=UP8 axis=CONTROLLER_UNVERIFIED margins=PHOTO_REQUIRED
+HW4-C2 DEVICE_MEMORY stage=vscr_t1 heap8_free=252100 heap8_largest=126976 heap8_min=252100 stack_margin_bytes=3536 dma_transfers=155 dma_timeouts=0 dma_fault=0 lcd_error=ESP_OK
+HW4-VSCR-P1 T1 candidate=B visible_start=80 tfa=100 vsa=200 bfa=20 shift=UP8 axis=CONTROLLER_UNVERIFIED margins=PHOTO_REQUIRED
+HW4-C2 DEVICE_MEMORY stage=vscr_t1 heap8_free=252100 heap8_largest=126976 heap8_min=252100 stack_margin_bytes=4608 dma_transfers=187 dma_timeouts=0 dma_fault=0 lcd_error=ESP_OK
+```
+
+Les photos originales sont des **pièces transmises dans le chat Pilotage**, décrites ici par leur nom ; elles ne sont **pas** incluses en binaire dans le dépôt. Les logs ci-dessus sont des **extraits**, pas l'intégralité des journaux source. Voir les commentaires décisionnels [PR #274](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/274#issuecomment-6599293990) et [Issue #156](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/156#issuecomment-6599298508).
+
+**Précisions :** `!SHOT` et HOME/E3 produisent `source=LOGICAL_RGB565LE`, jamais une lecture GRAM. En mode diagnostic figé, `!SHOT` a été rejeté (`reason=DISPLAY_FROZEN`) comme prévu. Aucune erreur DMA/LCD signalée pendant T1A/T1B, mais l'absence d'erreur n'atteste pas la direction physique. L'aide UART imprimée `!VPROBE_PATTERN` est incorrecte : la commande reconnue est `!VPROBE PATTERN`. La consommation DRAM +256 o relevée dans la remise initiale était au plafond d'acceptation ; aucun déploiement de cette sonde n'est validé.
+
+**Arbitrage :** ne **pas** activer VSCR, ne pas poursuivre A1-P2, ne pas poursuivre la recherche de placements sur cette branche. Revenir à la base logicielle `main` et étudier **dans une mission distincte** une optimisation mesurable du chemin RGB565/SPI qui conserve le rendu classique et sa récupération fail-stop. Aucun gain de fluidité BASIC n'est revendiqué dans cette PR.
+
+---
+
+
 **Mandat :** [Pilotage #156 / #6588107754](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/156#issuecomment-6588107754). Base **main@3c9d3a679d5c5d9db4d659e7d2e1367914d7b7d8** après #270 fusionnée. **Statut à livraison : ON_DEVICE_VSCR_UNVERIFIED**. **Pas de A1-P2/A1-C, aucun gain revendiqué.** Le verdict binaire physique dépend de l'observation PO sur CYD, pas de ce code seul.
 
 ## Architecture, bornes et limitations

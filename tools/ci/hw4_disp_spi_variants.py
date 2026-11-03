@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """C3: compare the two real Xtensa image section tables and build identities."""
 import argparse
+import json
 import hashlib
 from pathlib import Path
 import re
@@ -22,7 +23,7 @@ def sizes(path):
 def main():
     ap=argparse.ArgumentParser()
     for variant in ("spi40","spi20"):
-        for item in ("sections","cache","bin"):
+        for item in ("sections","cache","bin","commands"):
             ap.add_argument(f"--{variant}-{item}",type=Path,required=True)
     args=ap.parse_args()
     m={}; digest={}
@@ -30,6 +31,15 @@ def main():
         section=getattr(args,variant+"_sections")
         cache=getattr(args,variant+"_cache").read_text()
         binary=getattr(args,variant+"_bin").read_bytes()
+        commands=json.loads(getattr(args,variant+"_commands").read_text())
+        lcd=[item for item in commands if
+             item.get("file","").endswith("/cyd_ili9341.c")]
+        assert len(lcd)==1,(variant,"LCD compile command missing or ambiguous")
+        command=lcd[0].get("command","")
+        if not command:
+            command=" ".join(lcd[0].get("arguments",[]))
+        assert "-DLCD_CLOCK_HZ="+str(hz)+"U" in command,(
+            variant,"HAL compiler did not receive requested clock")
         assert "CYD_LCD_SPI_HZ:STRING="+str(hz) in cache,(variant,"SPI cache")
         assert "LOCO_CYD_PROFILE:STRING=CONSOLE" in cache,variant
         assert binary,(variant,"missing image")
@@ -41,6 +51,7 @@ def main():
     assert m["spi40"]["iram"]==m["spi20"]["iram"],("IRAM mismatch",m)
     assert digest["spi40"]!=digest["spi20"],"SPI40 and SPI20 images unexpectedly identical"
     print("HW4-DISP-C3 TARGET_BUILD_VERIFIED=SPI40_AND_SPI20 "
+          "HAL_COMPILE_CLOCKS_VERIFIED=40000000_AND_20000000 "
           "clock_scope=requested_not_measured")
     print("| Metric | CONSOLE SPI40 | CONSOLE SPI20 fallback |")
     print("|---|---:|---:|")

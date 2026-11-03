@@ -5,7 +5,7 @@
 #include <stdint.h>
 enum { HW4_DP_BINS=12, HW4_DP_FULL25=0, HW4_DP_PARTIAL=1,
        HW4_DP_SCROLL_ASSOCIATED=2, HW4_DP_CLASSES=3,
-       HW4_DP_BAND_BYTES=5120 };
+       HW4_DP_BAND_BYTES=5120, HW4_DP_TRACE_CAP=16 };
 typedef struct {
     uint32_t bands;       /* 1..25 successfully submitted 8px MODE1 bands */
     uint32_t scrolls;     /* logical scrolls since prior successful repaint */
@@ -23,13 +23,19 @@ typedef struct {
     uint64_t wall_us, render_pack_us, submit_us, wait_us, other_us;
     uint64_t scroll_cpu_wall_us;
 } Hw4DpClass;
+/* Last 16 completed repaint samples (never every band/pixel). */
+typedef struct {
+    uint32_t seq, bands, scrolls, wall_us, gap_us;
+} Hw4DpTrace;
 typedef struct {
     Hw4DpClass classes[HW4_DP_CLASSES];
     uint32_t completed, rejected;
     uint64_t last_completed_us, gap_sum_us;
     uint32_t gaps, gap_min_us, gap_max_us;
+    Hw4DpTrace trace[HW4_DP_TRACE_CAP];
+    uint32_t trace_next, trace_size;
 } Hw4DispProfile;
-typedef char Hw4DpStaticBudget[(sizeof(Hw4DispProfile)<=512U)?1:-1];
+typedef char Hw4DpStaticBudget[(sizeof(Hw4DispProfile)<=896U)?1:-1];
 extern const uint32_t hw4_dp_bounds_us[HW4_DP_BINS];
 void hw4_dp_reset(Hw4DispProfile *p);
 bool hw4_dp_record(Hw4DispProfile *p, const Hw4DpFrame *f);

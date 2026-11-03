@@ -1048,6 +1048,53 @@ static int while_line_contains_loop(const uint8_t *b, size_t n)
     return 0;
 }
 
+
+/* Only colon transitions observed in the two B2 CPC scenarios are
+ * enabled. Classify *statement starts* after skipping opaque BVR caches,
+ * numeric payloads and quoted strings; never search source substrings.
+ * This is a local bounded structural admission check, not a parser for
+ * arbitrary compound BASIC lines. No string contents are inspected. */
+static int while_colon_shape_supported(const uint8_t *b, size_t n)
+{
+    enum { ASSIGN = 1, LOOP, PRINT, CLOSE };
+    uint8_t kind[5];
+    size_t p = 0u, count = 0u;
+    int colon = 0;
+
+    while (p < n) {
+        size_t end;
+        uint8_t token;
+        skip_spaces(b, n, &p);
+        if (p == n || b[p] == 0xc5u ||
+            (b[p] == 0x01u && p + 1u < n && b[p + 1u] == 0xc0u))
+            break;
+        if (count == sizeof(kind)) return 0;
+        token = b[p];
+        if (token == 0x02u) kind[count++] = ASSIGN; /* INTEGER only */
+        else if (token == 0xd6u) kind[count++] = LOOP;
+        else if (token == 0xbfu) kind[count++] = PRINT;
+        else if (token == 0xd5u) kind[count++] = CLOSE;
+        else return 0;
+        if (while_statement_end(b, n, p, &end) != BE_OK) return 0;
+        if (end == n) break;
+        colon = 1;
+        if (end + 1u == n || b[end + 1u] == 0xc0u) return 0;
+        p = end + 1u;
+    }
+    if (!colon) return 1; /* Standalone WHILE/WEND and typed errors. */
+    if (count == 2u) {
+        /* WHILE:PRINT on one record, or INTEGER assignment:WEND. */
+        return (kind[0] == LOOP && kind[1] == PRINT) ||
+               (kind[0] == ASSIGN && kind[1] == CLOSE);
+    }
+    /* A single INTEGER setup before WHILE; PRINT and one update
+     * inside the body; WEND closes the same record. */
+    return count == 5u &&
+           kind[0] == ASSIGN && kind[1] == LOOP &&
+           kind[2] == PRINT && kind[3] == ASSIGN &&
+           kind[4] == CLOSE;
+}
+
 /* The one B2 INTEGER condition grammar is: WHILE 0 or
  * WHILE <explicit INTEGER ref> <one of six relations> <small INTEGER>.
  * No general IF grammar, REAL5, STRING or arbitrary boolean expressions.
@@ -1490,7 +1537,14 @@ static BEStatus execute_line(const BasicProgram *program,
     size_t length = line->body_length;
     size_t pos = start_pos;
     int preceding_statement = 0;
+    int loop_in_record = while_line_contains_loop(body, length);
+    int allowed_loop_colon = loop_in_record &&
+                             while_colon_shape_supported(body, length);
     BEStatus status;
+
+    /* Refuse the entire non-oracled record before its first assignment,
+     * PRINT or WHILE can commit a step. Legacy non-loop lines are untouched. */
+    if (loop_in_record && !allowed_loop_colon) return BE_UNSUPPORTED;
 
     for (;;) {
         size_t argument_start, statement_start;
@@ -2176,9 +2230,9 @@ static BEStatus execute_line(const BasicProgram *program,
             /* Multi-statement lines with an assignment are not in J0.19.
              * Do not commit a prefix, including if a comment follows it. */
             if (pos < length && body[pos] == 0x01u &&
-                !while_line_contains_loop(body, length)) return BE_UNSUPPORTED;
+                !allowed_loop_colon) return BE_UNSUPPORTED;
             if (pos != length && !(pos < length && body[pos] == 0x01u &&
-                                   while_line_contains_loop(body, length))) {
+                                   allowed_loop_colon)) {
                 return BE_BAD_SEQUENCE;
             }
             value.type = (uint8_t)BVT_INTEGER;
@@ -2355,8 +2409,7 @@ static BEStatus execute_line(const BasicProgram *program,
                                line->next_offset, next);
         }
         ++pos;
-        if (executor->while_depth != 0u &&
-            while_line_contains_loop(body, length)) {
+        if (executor->while_depth != 0u && allowed_loop_colon) {
             *next = line->offset;
             flow->next_statement = pos;
             return BE_OK;

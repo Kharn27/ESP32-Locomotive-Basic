@@ -458,6 +458,72 @@ static int unsupported_and_malformed(void)
     CHECK(memcmp(f.out,"BEFORE\n",7u)==0);
     return 0;
 }
+
+/* C2 falsification: colon presence near a loop never admits arbitrary
+ * compound statements. Each rejected *reached* step is byte-exact on
+ * preview, eventful commit and simple commit (including the active frame). */
+static int colon_boundaries(void)
+{
+    Fixture f;
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"A%=0:B%=1:WHILE 0")==0);
+    CHECK(put(&f,20u,"WEND")==0);
+    CHECK(put(&f,30u,"PRINT B%")==0);
+    CHECK(init(&f)==0);
+    CHECK(fixture_failure(&f,BE_UNSUPPORTED)==0);
+
+    /* A second assignment before WHILE is not a permitted setup. */
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"A%=0:B%=1:WHILE A%<1:PRINT \"C\":A%=1:WEND")==0);
+    CHECK(init(&f)==0);
+    CHECK(fixture_failure(&f,BE_UNSUPPORTED)==0);
+
+    /* A false WHILE must not silently skip an unmeasured suffix. */
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"WHILE 0:PRINT \"BAD\":PRINT \"EXTRA\":WEND")==0);
+    CHECK(init(&f)==0);
+    CHECK(fixture_failure(&f,BE_UNSUPPORTED)==0);
+
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"A%=0")==0);
+    CHECK(put(&f,20u,"WHILE A%<1:PRINT \"X\":PRINT \"Y\":WEND")==0);
+    CHECK(init(&f)==0);
+    CHECK(success(&f)==0); /* setup already committed, not rolled back */
+    CHECK(fixture_failure(&f,BE_UNSUPPORTED)==0);
+
+    /* Active loop: PRINT:assignment:WEND and two assignments:WEND
+     * are not the cross-record assignment:WEND form. */
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"A%=0")==0);
+    CHECK(put(&f,20u,"WHILE A%<1")==0);
+    CHECK(put(&f,30u,"PRINT \"X\":A%=1:WEND")==0);
+    CHECK(init(&f)==0);
+    CHECK(success(&f)==0);
+    CHECK(success(&f)==0);
+    CHECK(f.ex.while_depth==1u);
+    CHECK(fixture_failure(&f,BE_UNSUPPORTED)==0);
+    CHECK(f.ex.while_depth==1u);
+
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"A%=0")==0);
+    CHECK(put(&f,20u,"WHILE A%<1")==0);
+    CHECK(put(&f,30u,"A%=1:B%=2:WEND")==0);
+    CHECK(init(&f)==0);
+    CHECK(success(&f)==0);
+    CHECK(success(&f)==0);
+    CHECK(f.ex.while_depth==1u);
+    CHECK(fixture_failure(&f,BE_UNSUPPORTED)==0);
+    CHECK(f.ex.while_depth==1u);
+
+    /* WEND does not authorize an additional statement in its record. */
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"A%=0:WHILE A%<1:PRINT \"C\":A%=1:WEND:PRINT \"TAIL\"")==0);
+    CHECK(init(&f)==0);
+    CHECK(fixture_failure(&f,BE_UNSUPPORTED)==0);
+    puts("J1.24-B2-C2 colon boundary: 7 non-oracled records atomically refused");
+    return 0;
+}
+
 static int session_resets(void)
 {
     Fixture f;
@@ -506,6 +572,7 @@ int main(int argc,char **argv)
     CHECK(depth_tests()==0);
     CHECK(low_capacity()==0);
     CHECK(unsupported_and_malformed()==0);
+    CHECK(colon_boundaries()==0);
     CHECK(session_resets()==0);
     for(i=0u;i<sizeof(cases)/sizeof(cases[0]);++i)
         CHECK(check_case(argv[1],&cases[i])==0);

@@ -220,8 +220,7 @@ static int negatives(void)
         {{0xa9u,' ',0x19u,0u,0u}, 3u}, /* Missing 8-bit literal payload. */
         {{0x82u,' ',0xf5u,0u,0u}, 3u}, /* Unary F5 without magnitude. */
         {{0x82u,' ',0x19u,26u,','}, 5u}, /* Not the sealed BORDER 1,. */
-        {{0xa9u,' ',0x0fu,',',0xf4u}, 5u}, /* + token without expression lhs. */
-        {{0xa9u,' ',0x0fu,',',0x0fu}, 5u} /* A valid statement, not corrupt. */
+        {{0xa9u,' ',0x0fu,',',0xf4u}, 5u} /* + token without right operand. */
     };
     uint8_t dest[128], saved[128], storage[CAP], saved_store[CAP];
     uint8_t temp[256], output[128], saved_output[128];
@@ -236,7 +235,7 @@ static int negatives(void)
                           dest,sizeof(dest),&written) != BT_OK);
         CHECK(written == 654u && memcmp(dest,saved,sizeof(dest)) == 0);
     }
-    for (i = 0u; i < sizeof(corrupt)/sizeof(corrupt[0])-1u; ++i) {
+    for (i = 0u; i < sizeof(corrupt)/sizeof(corrupt[0]); ++i) {
         memset(dest, 0x47, sizeof(dest));
         memcpy(saved, dest, sizeof(saved));
         written = 654u;
@@ -275,6 +274,27 @@ static int negatives(void)
     CHECK(written==654u && memcmp(output,saved_output,sizeof(output))==0);
     CHECK(bl_list_program(&p,storage,sizeof(storage),&written)==BL_OVERLAP);
     CHECK(written==654u && memcmp(storage,saved_store,sizeof(storage))==0);
+
+    /* A tiny program must refuse the CPC record before touching either
+     * its storage or the caller's output and length. */
+    {
+        uint8_t small[8], small_saved[8];
+        BasicProgram tiny;
+        memset(small, 0x54, sizeof(small));
+        CHECK(bp_init(&tiny, small, sizeof(small)) == BP_OK);
+        memcpy(small_saved, small, sizeof(small));
+        memset(output, 0x77, sizeof(output));
+        memcpy(saved_output, output, sizeof(output));
+        written = 654u;
+        result = bs_process_line(&tiny, (const uint8_t *)"10 BORDER 27",
+                                 strlen("10 BORDER 27"), temp, sizeof(temp),
+                                 output, sizeof(output), &written);
+        CHECK(result.status == BS_PROGRAM_ERROR &&
+              result.program_status == BP_NO_SPACE);
+        CHECK(written == 654u &&
+              memcmp(small, small_saved, sizeof(small)) == 0 &&
+              memcmp(output, saved_output, sizeof(output)) == 0);
+    }
 
     /* Native RUN must fail atomically for both not-yet-executable tokens. */
     for (i=0u;i<2u;++i) {

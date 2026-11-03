@@ -662,6 +662,8 @@ if(BUILD_TESTING)
     target_link_libraries(test_j1_24_b3_while_wend_diagnostics PRIVATE
                           cpc_diag_policy cpc_ready_policy
                           basic_session_runtime)
+    target_include_directories(test_j1_24_b3_while_wend_diagnostics
+                               PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/integration)
     add_test(NAME j1_24_b3_while_wend_cpc_diagnostics
              COMMAND test_j1_24_b3_while_wend_diagnostics)
 

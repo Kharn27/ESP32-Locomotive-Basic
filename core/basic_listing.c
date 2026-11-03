@@ -22,6 +22,8 @@ typedef enum {
     BL_ST_PAPER,
     BL_ST_LOCATE,
     BL_ST_BORDER,
+    BL_ST_WHILE,
+    BL_ST_WEND,
     BL_ST_EMPTY
 } BLStatement;
 
@@ -510,6 +512,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
 {
     size_t pos = 0;
     int seen_statement = 0;
+    int seen_while = 0; /* Restrict PRINT #8,"C" to sealed colon records. */
     BLStatus status;
 
     while (pos < length) {
@@ -569,6 +572,8 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0x02u: case 0x03u: statement = BL_ST_ASSIGN; status = BL_OK; break;
         case 0xa5u: statement = BL_ST_ASSIGN; status = append_word(out, "LET"); break;
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
+        case 0xd6u: statement = BL_ST_WHILE; status = append_word(out, "WHILE"); break;
+        case 0xd5u: statement = BL_ST_WEND; status = append_word(out, "WEND"); break;
         case 0xa9u: statement = BL_ST_LOCATE; status = append_word(out, "LOCATE"); break;
         case 0x82u: statement = BL_ST_BORDER; status = append_word(out, "BORDER"); break;
         case 0xbbu: statement = BL_ST_PEN; status = append_word(out, "PEN"); break;
@@ -596,6 +601,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             return BL_BAD_SEQUENCE;
         }
         seen_statement = 1;
+        if (statement == BL_ST_WHILE) seen_while = 1;
 
         space_start = pos;
         /* For implicit LET the initial 02 is already consumed. The next
@@ -900,6 +906,14 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 status = abs_expression(body, length, &pos, out, 1);
                 if (status != BL_OK) return status;
                 if (pos != length) return BL_BAD_SEQUENCE;
+            } else if (stream8 && t == (uint8_t)'"' &&
+                       seen_while && length - pos >= 2u &&
+                       body[pos] == (uint8_t)'C' &&
+                       body[pos + 1u] == (uint8_t)'"' &&
+                       (pos + 2u == length ||
+                        body[pos + 2u] == 0x01u)) {
+                status = append_word(out, "\"C\"");
+                pos += 2u;
             } else if (stream8 && t == (uint8_t)'"') {
                 static const uint8_t prefix[] = {
                     '"','V','A','L','U','E','=','"',';'
@@ -1266,6 +1280,51 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 if (status != BL_OK) return status;
             } else {
                 return BL_BAD_SEQUENCE;
+            }
+        } else if (statement == BL_ST_WHILE) {
+            /* Stop the existing INTEGER inverse at the CPC colon. This
+             * decodes D6 0E, D6 02(cache) relational immediates, and
+             * does not interpret a RUN condition or mutate any cache. */
+            size_t end = pos, cursor = pos;
+            while (end < length && body[end] != 0x01u) {
+                /* Variable references can have 01-like cache bytes.
+                 * Scan known opaque reference records without treating
+                 * their payload as a statement delimiter. */
+                if (body[end] == 0x02u) {
+                    BasicVariableRef ref;
+                    BVRStatus br = bvr_decode(body, length, end, &ref);
+                    if (br == BVR_TRUNCATED) return BL_TRUNCATED;
+                    if (br != BVR_OK || ref.family != BVR_FAMILY_EXPLICIT ||
+                        ref.explicit_type != BVR_TYPE_INTEGER)
+                        return BL_BAD_SEQUENCE;
+                    end += ref.consumed;
+                } else ++end;
+            }
+            if (end > pos) {
+                /* J1.24-A stored WHILE A%< without a right operand:
+                 * exact one-variable, one-incomplete-relation witness. */
+                if (body[end - 1u] == 0xf1u) {
+                    BasicVariableRef ref;
+                    if (bvr_decode(body, end, pos, &ref) != BVR_OK ||
+                        ref.family != BVR_FAMILY_EXPLICIT ||
+                        ref.explicit_type != BVR_TYPE_INTEGER ||
+                        ref.consumed + 1u != end - pos)
+                        return BL_BAD_SEQUENCE;
+                    status = for_reference(body, end, &cursor, out);
+                    if (status == BL_OK)
+                        status = append_byte(out, (uint8_t)'<');
+                } else {
+                    status = bl_logic_expression(body, end, &cursor, out, 0);
+                }
+                if (status != BL_OK) return status;
+                pos = end;
+            }
+        } else if (statement == BL_ST_WEND) {
+            if (pos < length && body[pos] != 0x01u) {
+                if (body[pos] != 0x0fu) return BL_BAD_SEQUENCE;
+                ++pos;
+                status = append_byte(out, (uint8_t)'1');
+                if (status != BL_OK) return status;
             }
         } else if (statement == BL_ST_LOCATE || statement == BL_ST_BORDER) {
             int first, second;

@@ -12,7 +12,7 @@ typedef struct {
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
     ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT, ST_PEN, ST_INK,
-    ST_PAPER, ST_CLS, ST_LOCATE, ST_BORDER
+    ST_PAPER, ST_CLS, ST_LOCATE, ST_BORDER, ST_WHILE, ST_WEND
 } BTStatement;
 
 typedef struct {
@@ -24,6 +24,8 @@ typedef struct {
 /* CPC keyword codes checked against basic.asm: E54A, E5DB, E4FF, E5A6, E63A, E663. */
 static const BTKeyword keywords[] = {
     {"PRINT", 0xbfu, ST_PRINT},
+    {"WHILE", 0xd6u, ST_WHILE}, /* J1.24-A ROM-backed RAM, original/repeat */
+    {"WEND",  0xd5u, ST_WEND}, /* J1.24-A ROM-backed RAM, original/repeat */
     {"LOCATE",0xa9u, ST_LOCATE}, /* J1.23-A original/repeat CPC RAM */
     {"BORDER",0x82u, ST_BORDER}, /* J1.23-A original/repeat CPC RAM */
     {"CLS",   0x8au, ST_CLS}, /* J1.21-A CPC6128 RAM oracle */
@@ -663,6 +665,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
     size_t index = 0;
     int expecting_statement = 1;
     int seen_statement = 0;
+    int seen_while = 0; /* Scope PRINT #8,"C" to the two measured colon lines. */
     BTStatus status;
 
     while (index < length) {
@@ -721,6 +724,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             return BT_UNSUPPORTED_CONSTRUCT;
         }
         seen_statement = 1;
+        if (statement == ST_WHILE) seen_while = 1;
 
         /* DFF0-E1C3: after REM or ', the remainder is opaque source
          * bytes. In particular colons, quotes and keyword spellings
@@ -756,7 +760,14 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 index += 3u;
                 if (index == length) return BT_UNSUPPORTED_CONSTRUCT;
             }
-            if (stream8 && !(length - index >= 9u &&
+            /* The two colon witnesses contain exactly PRINT #8,"C".
+             * Do not expand #8 grammar for standalone/unoracled sources. */
+            int while_colon_c = seen_while && length - index >= 3u &&
+                source[index] == (uint8_t)'"' &&
+                source[index + 1u] == (uint8_t)'C' &&
+                source[index + 2u] == (uint8_t)'"' &&
+                (index + 3u == length || source[index + 3u] == (uint8_t)':');
+            if (stream8 && !while_colon_c && !(length - index >= 9u &&
                 memcmp(source + index, "\"VALUE=\";", 9u) == 0) &&
                 !keyword_matches(source, length, index, "ABS", &count) &&
                 !(length - index == 2u && source[index] == (uint8_t)'B' &&
@@ -801,6 +812,40 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 }
             } else {
                 return BT_UNSUPPORTED_CONSTRUCT;
+            }
+        } else if (statement == ST_WHILE) {
+            /* Lexical B1 only: stop before CPC 01 (':'). Reuse the
+             * INTEGER expression tokens and opaque reference-cache format
+             * already supported for IF; never evaluate the expression. */
+            size_t limit = index, end = index;
+            while (end < length && source[end] != (uint8_t)':') ++end;
+            while (limit < end && source[limit] == (uint8_t)' ') ++limit;
+            if (limit == end) {
+                /* WHILE alone is an authentic stored CPC error witness. */
+                index = end;
+            } else {
+                size_t begin = index;
+                status = tokenize_logic_integer(source, end, &index, out, 0);
+                /* The CPC also stores WHILE A%< with missing RHS. This
+                 * one source is a negative RUN witness, not an expression. */
+                if (status == BT_MALFORMED_INPUT && end - begin == 3u &&
+                    ascii_upper(source[begin]) == (uint8_t)'A' &&
+                    source[begin + 1u] == (uint8_t)'%' &&
+                    source[begin + 2u] == (uint8_t)'<') {
+                    status = BT_OK;
+                    index = end;
+                }
+                if (status != BT_OK) return status;
+            }
+        } else if (statement == ST_WEND) {
+            /* CPC stores orphan WEND and WEND 1. The latter is the
+             * DIAG_CONTRADICTORY RUN witness; do not reject at storage. */
+            if (index < length && source[index] != (uint8_t)':') {
+                if (source[index] != (uint8_t)'1' ||
+                    (index + 1u != length && source[index + 1u] != (uint8_t)':'))
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                status = emit(out, 0x0fu);
+                ++index;
             }
         } else if (statement == ST_LOCATE || statement == ST_BORDER) {
             int first, second;

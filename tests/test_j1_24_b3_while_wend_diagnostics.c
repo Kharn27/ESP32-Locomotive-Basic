@@ -164,7 +164,10 @@ static int run_case(const char *const *lines,size_t line_count,
     CHECK(strstr(strstr(painted,"Ready")+5U,"Ready")==NULL);
     CHECK(strstr(painted,"AFTER")==NULL);
     CHECK(strstr(painted,"NEVER")==NULL);
-    CHECK(strstr(painted,"BEFORE") == (strlen(previous_print)?painted:NULL));
+    if(strcmp(previous_print,"BEFORE\n")==0)
+        CHECK(strstr(painted,"BEFORE")==painted);
+    else
+        CHECK(strstr(painted,"BEFORE")==NULL);
     CHECK(same_bytes(storage,f.program_bytes,sizeof storage));
     CHECK(same_bytes(entries,f.entries,sizeof entries));
     CHECK(f.store.capacity==store_before.capacity);

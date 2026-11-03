@@ -178,6 +178,19 @@ if(BUILD_TESTING)
 endif()
 
 
+# J1.23-B: only 82 BORDER and A9 LOCATE tokenization/LIST.
+# CPC J1.23-A original/repeat immutable RAM and LIST printer fixtures.
+# RUN is deliberately not enabled for either command.
+if(BUILD_TESTING)
+    add_executable(test_j1_23_b_locate_border_token_list
+                   tests/test_j1_23_b_locate_border_token_list.c)
+    target_link_libraries(test_j1_23_b_locate_border_token_list PRIVATE
+                          basic_session_runtime)
+    add_test(NAME j1_23_b_locate_border_cpc_lexical
+             COMMAND test_j1_23_b_locate_border_token_list
+             "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
 # J1.21-B1: CLS 8A lexical-only, exact sealed CPC RAM/LIST read-only.
 if(BUILD_TESTING)
     add_executable(test_basic_cls_token_list tests/test_basic_cls_token_list.c)

@@ -27,6 +27,8 @@ static char painted[512];
 static size_t painted_count;
 static unsigned ready_count;
 static uint8_t before_program[8192];
+static uint8_t before_output[4096];
+static BasicSessionRuntime before_runtime;
 
 static uint8_t glyph(void *context,uint8_t ch,unsigned row)
 {
@@ -84,6 +86,8 @@ static BSRResult real_submit(const char *command,
     assert(cpc_uart_console_end_line(&text));
     painted_count=0U;
     memcpy(before_program,basic.program_bytes,sizeof before_program);
+    memcpy(before_output,basic.output,sizeof before_output);
+    memcpy(&before_runtime,&basic.runtime,sizeof before_runtime);
     const size_t old_size=basic.program.size;
     basic.written=0U;
     BSRResult r=bsr_submit(&basic.runtime,line.data,line.length,
@@ -95,6 +99,9 @@ static BSRResult real_submit(const char *command,
         assert(basic.program.size==old_size);
         assert(memcmp(before_program,basic.program_bytes,
                       sizeof before_program)==0);
+        assert(memcmp(before_output,basic.output,sizeof before_output)==0);
+        assert(memcmp(&before_runtime,&basic.runtime,sizeof before_runtime)==0);
+        assert(basic.written==0U);
         assert(cpc_diag_policy_write(&text,category));
     } else if(basic.written) {
         assert(cpc_text_write(&text,basic.output,basic.written));
@@ -154,11 +161,161 @@ static void real_historical_cases(void)
     assert(ready_count==5U);
     (void)real_submit("GOTO 999",CPC_DIAG_HOST_GENERIC,
         CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
-    (void)real_submit("listt",CPC_DIAG_HOST_GENERIC,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+    (void)real_submit("listt",CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
+        CPC_READY_BASIC_DIAGNOSTIC,true,"Syntax errorReady");
     (void)real_submit("0",CPC_DIAG_HOST_GENERIC,
         CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
     assert(ready_count==8U);
+}
+/* Real UART -> BSR -> policy -> Ready, not a forged status or
+ * a list of typo special cases. The positive category belongs to the
+ * CORE lexical decision only. No CPC ERR/ERL are inferred. */
+static void core_unknown_direct_syntax_and_preservation(void)
+{
+    init_console();
+    (void)real_submit("10 PRINT 2",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_NUMBERED_STORED,false,"");
+
+    /* Unrelated unknown words and case/ASCII-space variants. */
+    static const char *unknown[]={
+        "LISTT", "  LiStT  ", "RUNN", "  rUnN  ",
+        "PRONT", "CLSS", "WHILLE", "LISTTT"
+    };
+    for(size_t i=0U;i<sizeof(unknown)/sizeof(unknown[0]);++i)
+        (void)real_submit(unknown[i],CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
+            CPC_READY_BASIC_DIAGNOSTIC,true,"Syntax errorReady");
+
+    /* Valid but unsupported direct CPC keywords, and all ambiguous
+     * syntax/argument forms, must never be rebranded as Syntax. */
+    static const char *host[]={
+        "GOTO 999", "MODE 1", "PAPER 2", "AUTO", "CONT",
+        "GRAPHICS", "READ", "WHILE", "ON",
+        "LISTT:RUN", "LISTT 1", "RUNN 5", "LISTT=1",
+        "GOTO999", "A$", "A", "GO TO 10", "LISTT?",
+        "RUN 10"
+    };
+    for(size_t i=0U;i<sizeof(host)/sizeof(host[0]);++i)
+        (void)real_submit(host[i],CPC_DIAG_HOST_GENERIC,
+            CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+
+    /* Every rejected input leaves the complete program and output intact;
+     * the real LIST still exposes the original numbered statement. */
+    (void)real_submit("LIST",CPC_DIAG_HOST_GENERIC,
+        CPC_READY_LIST_RETURN,false,"10 PRINT 2Ready");
+    assert(ready_count==
+           sizeof(unknown)/sizeof(unknown[0])+
+           sizeof(host)/sizeof(host[0])+1U);
+    canaries();
+}
+static void direct_syntax_format_and_origin(void)
+{
+    uint8_t data[32],before[32];
+    size_t n=999U;
+    static const uint8_t wanted[]="Syntax error\n";
+    assert(cpc_diag_policy_direct_origin(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX)==
+           CPC_DIRECT_DIAG_ORIGIN_CORE_UNKNOWN_LEXICAL);
+    assert(cpc_diag_policy_direct_origin(CPC_DIAG_HOST_GENERIC)==
+           CPC_DIRECT_DIAG_ORIGIN_HOST);
+    assert(cpc_diag_policy_direct_origin(CPC_DIAG_LINE_DOES_NOT_EXIST)==
+           CPC_DIRECT_DIAG_ORIGIN_HOST);
+    assert(strcmp(cpc_diag_policy_message(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX),
+                  "Syntax error")==0);
+    assert(strcmp(cpc_diag_policy_category(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX),
+                  "DIRECT_UNKNOWN_SYNTAX_CORE_LEXICAL")==0);
+    memset(data,0x5a,sizeof data);
+    memcpy(before,data,sizeof before);
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
+                                           data,sizeof(wanted)-2U,&n));
+    assert(n==999U && memcmp(data,before,sizeof data)==0);
+    assert(cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
+                                          data,sizeof(wanted)-1U,&n));
+    assert(n==sizeof(wanted)-1U);
+    assert(memcmp(data,wanted,n)==0 && data[n]==0x5aU);
+    memset(data,0x5a,sizeof data);
+    n=999U;
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_COUNT,
+                                           data,sizeof data,&n));
+    assert(n==999U && data[0]==0x5aU);
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
+                                           NULL,0U,&n));
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
+                                           data,sizeof data,NULL));
+    assert(cpc_diag_policy_format_direct(CPC_DIAG_HOST_GENERIC,
+                                          data,sizeof data,&n));
+    assert(n==sizeof("ERROR\n")-1U && memcmp(data,"ERROR\n",n)==0);
+}
+static void direct_syntax_false_status(void)
+{
+    init_console();
+    static const uint8_t src[]="LISTT";
+    basic.written=0U;
+    BSRResult r=bsr_submit(&basic.runtime,src,sizeof(src)-1U,
+                          basic.temporary,sizeof basic.temporary,
+                          basic.output,sizeof basic.output,&basic.written);
+    assert(r.status==BSR_SESSION_ERROR &&
+           r.session.status==BS_UNKNOWN_DIRECT &&
+           r.session.tokenizer_status==BT_OK &&
+           r.session.program_status==BP_OK &&
+           r.session.listing_status==BL_OK);
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,r)==
+           CPC_DIAG_DIRECT_UNKNOWN_SYNTAX);
+    BSRResult fake=r;
+    fake.status=BSR_BUSY;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.status=BSR_OVERLAP;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.status=BSR_EXECUTOR_ERROR;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.session.status=BS_UNSUPPORTED_DIRECT;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.session.status=BS_TOKENIZER_ERROR;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.session.tokenizer_status=BT_UNSUPPORTED_CONSTRUCT;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.session.program_status=BP_NO_SPACE;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.session.listing_status=BL_NO_SPACE;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    assert(cpc_diag_policy_select(NULL,0U,r)==CPC_DIAG_HOST_GENERIC);
+    assert(cpc_diag_policy_select(src,0U,r)==CPC_DIAG_HOST_GENERIC);
+    /* The policy consumes CORE provenance, not a duplicate IO parser:
+     * a fabricated mismatched source/result is not a real BSR witness. */
+}
+/* A tab is filtered by UART rather than passed as part of a direct
+ * command; an incomplete CSI followed by ENTER rejects the UART line.
+ * Neither transport path is entitled to manufacture a CPC diagnostic. */
+static void uart_transport_pre_bsr_guard(void)
+{
+    init_console();
+    memcpy(before_program,basic.program_bytes,sizeof before_program);
+    memcpy(before_output,basic.output,sizeof before_output);
+    memcpy(&before_runtime,&basic.runtime,sizeof before_runtime);
+    const size_t old_drawn=text.glyphs_drawn;
+    for(size_t i=0U;i<5U;++i)
+        assert(uart_line_feed(&line,(uint8_t)"LISTT"[i])==UART_LINE_APPEND);
+    assert(uart_line_feed(&line,'\t')==UART_LINE_IGNORED);
+    assert(line.length==5U && memcmp(line.data,"LISTT",5U)==0);
+    assert(uart_line_feed(&line,0x1bU)==UART_LINE_IGNORED);
+    assert(uart_line_feed(&line,'[')==UART_LINE_IGNORED);
+    assert(uart_line_feed(&line,'\r')==UART_LINE_REJECTED);
+    assert(line.poisoned && line.rejected_ansi_incomplete);
+    assert(basic.program.size==2U && basic.written==0U);
+    assert(memcmp(before_program,basic.program_bytes,
+                  sizeof before_program)==0);
+    assert(memcmp(before_output,basic.output,sizeof before_output)==0);
+    assert(memcmp(&before_runtime,&basic.runtime,sizeof before_runtime)==0);
+    assert(text.glyphs_drawn==old_drawn);
+    uart_line_ack(&line);
+    assert(line.length==0U);
+    canaries();
 }
 static void wrong_status_and_host_guards(void)
 {
@@ -225,10 +382,15 @@ static void scroll_diagnostic(void)
 int main(void)
 {
     real_historical_cases();
+    core_unknown_direct_syntax_and_preservation();
+    direct_syntax_format_and_origin();
+    direct_syntax_false_status();
+    uart_transport_pre_bsr_guard();
     wrong_status_and_host_guards();
     string_bonjour_and_run();
     scroll_diagnostic();
-    puts("HW4-DIAG-A native diagnostic PASS : deletion, NEW/LIST, "
-         "nonmatching errors, READY count, BONJOUR, canaries, scroll");
+    puts("HW4-DIAG-SYNTAX-A-C1 PASS: CORE BS_UNKNOWN_DIRECT matrix, "
+         "Ready, known/ambiguous host fallbacks, atomic program/output, "
+         "historical DIAG-A matrix");
     return 0;
 }

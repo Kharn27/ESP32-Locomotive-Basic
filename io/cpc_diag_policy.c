@@ -1,4 +1,4 @@
-/* HW4-DIAG-A: historical CPC wording only for missing numbered deletion. */
+/* HW4-DIAG-A / SYNTAX-A: exact CPC wording with strictly bounded origins. */
 #include "cpc_diag_policy.h"
 #include "basic_variable_ref.h"
 #include "basic_variable_binding.h"
@@ -21,6 +21,9 @@ static bool numbered_deletion(const uint8_t *source,size_t length)
     return i==length;
 }
 
+/* Direct syntax is selected from the typed CORE result only.
+ * Do not reparse command names here: BS_UNSUPPORTED_DIRECT includes valid
+ * non-executable CPC keywords and ambiguous input. */
 CpcDiagCategory cpc_diag_policy_select(const uint8_t *source,size_t length,
                                        BSRResult result)
 {
@@ -31,6 +34,13 @@ CpcDiagCategory cpc_diag_policy_select(const uint8_t *source,size_t length,
        result.session.listing_status==BL_OK &&
        numbered_deletion(source,length))
         return CPC_DIAG_LINE_DOES_NOT_EXIST;
+    if(source!=NULL && length!=0U &&
+       result.status==BSR_SESSION_ERROR &&
+       result.session.status==BS_UNKNOWN_DIRECT &&
+       result.session.tokenizer_status==BT_OK &&
+       result.session.program_status==BP_OK &&
+       result.session.listing_status==BL_OK)
+        return CPC_DIAG_DIRECT_UNKNOWN_SYNTAX;
     return CPC_DIAG_HOST_GENERIC;
 }
 
@@ -46,6 +56,7 @@ const char *cpc_diag_policy_category(CpcDiagCategory category)
         case CPC_DIAG_DIVISION_INTEGER_ZERO: return "INTEGER_F9_DIVISION_BY_ZERO_CPC";
         case CPC_DIAG_GOTO_MISSING_TARGET: return "GOTO_MISSING_TARGET_CPC";
         case CPC_DIAG_IF_MISSING_TARGET: return "IF_TAKEN_MISSING_TARGET_CPC";
+        case CPC_DIAG_DIRECT_UNKNOWN_SYNTAX: return "DIRECT_UNKNOWN_SYNTAX_CORE_LEXICAL";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -63,21 +74,55 @@ const char *cpc_diag_policy_message(CpcDiagCategory category)
         case CPC_DIAG_DIVISION_INTEGER_ZERO: return "Division by zero";
         case CPC_DIAG_GOTO_MISSING_TARGET: return "Line does not exist";
         case CPC_DIAG_IF_MISSING_TARGET: return "Line does not exist";
+        case CPC_DIAG_DIRECT_UNKNOWN_SYNTAX: return "Syntax error";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
 }
 
-bool cpc_diag_policy_write(CpcText *text,CpcDiagCategory category)
+CpcDirectDiagOrigin cpc_diag_policy_direct_origin(CpcDiagCategory category)
+{
+    return category==CPC_DIAG_DIRECT_UNKNOWN_SYNTAX
+           ? CPC_DIRECT_DIAG_ORIGIN_CORE_UNKNOWN_LEXICAL : CPC_DIRECT_DIAG_ORIGIN_HOST;
+}
+
+/* Literal "Syntax error" is the CPC ROM error-table wording:
+ * basic.asm CB49: LD A,$02; CD98: "Syntax" + compressed " error".
+ * Only the CORE lexical flag selects this display category; it does NOT
+ * independently prove the ROM's direct-command error path or ERR/ERL. */
+bool cpc_diag_policy_format_direct(CpcDiagCategory category,
+                                   uint8_t *output, size_t capacity,
+                                   size_t *written)
 {
     static const uint8_t generic[]="ERROR\n";
     static const uint8_t line_absent[]="Line does not exist\n";
-    if(text==NULL) return false;
-    if(category==CPC_DIAG_HOST_GENERIC)
-        return cpc_text_write(text,generic,sizeof(generic)-1U);
-    if(category==CPC_DIAG_LINE_DOES_NOT_EXIST)
-        return cpc_text_write(text,line_absent,sizeof(line_absent)-1U);
-    return false;
+    static const uint8_t syntax[]="Syntax error\n";
+    const uint8_t *bytes;
+    size_t n;
+    if(output==NULL || written==NULL) return false;
+    switch(category) {
+        case CPC_DIAG_HOST_GENERIC:
+            bytes=generic; n=sizeof(generic)-1U; break;
+        case CPC_DIAG_LINE_DOES_NOT_EXIST:
+            bytes=line_absent; n=sizeof(line_absent)-1U; break;
+        case CPC_DIAG_DIRECT_UNKNOWN_SYNTAX:
+            bytes=syntax; n=sizeof(syntax)-1U; break;
+        default: return false;
+    }
+    if(capacity<n) return false;
+    memcpy(output,bytes,n);
+    *written=n;
+    return true;
+}
+
+bool cpc_diag_policy_write(CpcText *text,CpcDiagCategory category)
+{
+    uint8_t bytes[sizeof("Line does not exist\n")];
+    size_t n=0U;
+    if(text==NULL ||
+       !cpc_diag_policy_format_direct(category,bytes,sizeof(bytes),&n))
+        return false;
+    return cpc_text_write(text,bytes,n);
 }
 
 /* Identify the first potentially failing flow statement actually reached

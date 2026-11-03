@@ -1,0 +1,81 @@
+name: HW4-DISP-PROFILE-C3 SPI40/20 build-time variant verification
+on:
+  pull_request:
+    paths:
+      - 'firmware/components/cyd_ili9341/**'
+      - 'firmware/esp32_display_probe/**'
+      - 'video/hw4_disp_profile.*'
+      - 'tools/ci/hw4_disp_spi_*.py'
+      - '.github/workflows/hw4-disp-profile-c3.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  clock-policy:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Positive and negative build-time frequency selector tests
+        run: |
+          set -euo pipefail
+          python3 tools/ci/hw4_disp_spi_policy.py
+
+  two-variants-xtensa:
+    needs: clock-policy
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Compile both CONSOLE variants from exactly one Git HEAD
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          docker run --rm -v "$PWD:/project" -w /project -e IDF_GIT_SAFE_DIR=/project -e EXPECTED_HEAD="$EXPECTED_HEAD" espressif/idf:v5.5.6 bash -lc '
+            set -euo pipefail
+            idf.py --version | grep -Fx "ESP-IDF v5.5.6"
+            cd /project/firmware/esp32_display_probe
+            mkdir -p reports/hw4-c3
+            for hz in 40000000 20000000; do
+              if test "$hz" = 40000000; then tag=spi40; else tag=spi20; fi
+              build="build-hw4-c3-$tag"
+              out="reports/hw4-c3/$tag"
+              config="$PWD/sdkconfig.hw4-c3-$tag"
+              mkdir -p "$out"
+              idf.py -B "$build" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE=CONSOLE -DCYD_LCD_SPI_HZ="$hz" set-target esp32 > "$out/set-target.log" 2>&1 || { cat "$out/set-target.log"; exit 1; }
+              idf.py -B "$build" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE=CONSOLE -DCYD_LCD_SPI_HZ="$hz" build > "$out/build.log" 2>&1 || { tail -100 "$out/build.log"; exit 1; }
+              grep -Fx "CYD_LCD_SPI_HZ:STRING=$hz" "$build/CMakeCache.txt"
+              grep -Fx "LOCO_CYD_PROFILE:STRING=CONSOLE" "$build/CMakeCache.txt"
+              grep -F "REQUESTED_SPI_HZ=$hz" "$out/set-target.log"
+              xtensa-esp-elf-size -A "$build/loco_esp32_display_probe.elf" > "$out/elf-sections.txt"
+              xtensa-esp-elf-nm -S --defined-only "$build/loco_esp32_display_probe.elf" > "$out/symbols.txt"
+              grep -F " cyd_lcd_requested_spi_hz" "$out/symbols.txt"
+              cp "$build/CMakeCache.txt" "$out/CMakeCache.txt"
+              sha256sum "$build/loco_esp32_display_probe.bin" > "$out/firmware-sha256.txt"
+              python3 /project/tools/ci/verify_esp_app_version.py "$build/loco_esp32_display_probe.bin" "$EXPECTED_HEAD" loco_esp32_display_probe
+              echo "C3_COMPILED=$tag REQUESTED_SPI_HZ=$hz SOURCE_SHA=$EXPECTED_HEAD"
+            done
+            python3 /project/tools/ci/hw4_disp_spi_variants.py --spi40-sections reports/hw4-c3/spi40/elf-sections.txt --spi40-cache reports/hw4-c3/spi40/CMakeCache.txt --spi40-bin build-hw4-c3-spi40/loco_esp32_display_probe.bin --spi20-sections reports/hw4-c3/spi20/elf-sections.txt --spi20-cache reports/hw4-c3/spi20/CMakeCache.txt --spi20-bin build-hw4-c3-spi20/loco_esp32_display_probe.bin | tee reports/hw4-c3/variant-comparison.md
+          '
+          cat firmware/esp32_display_probe/reports/hw4-c3/variant-comparison.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hw4-disp-profile-c3-spi40-spi20
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            firmware/esp32_display_probe/reports/hw4-c3/
+            firmware/esp32_display_probe/build-hw4-c3-spi40/loco_esp32_display_probe.bin
+            firmware/esp32_display_probe/build-hw4-c3-spi20/loco_esp32_display_probe.bin

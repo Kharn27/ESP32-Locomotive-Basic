@@ -12,7 +12,7 @@ typedef struct {
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
     ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT, ST_PEN, ST_INK,
-    ST_PAPER, ST_CLS
+    ST_PAPER, ST_CLS, ST_LOCATE, ST_BORDER
 } BTStatement;
 
 typedef struct {
@@ -24,6 +24,8 @@ typedef struct {
 /* CPC keyword codes checked against basic.asm: E54A, E5DB, E4FF, E5A6, E63A, E663. */
 static const BTKeyword keywords[] = {
     {"PRINT", 0xbfu, ST_PRINT},
+    {"LOCATE",0xa9u, ST_LOCATE}, /* J1.23-A original/repeat CPC RAM */
+    {"BORDER",0x82u, ST_BORDER}, /* J1.23-A original/repeat CPC RAM */
     {"CLS",   0x8au, ST_CLS}, /* J1.21-A CPC6128 RAM oracle */
     {"PEN",   0xbbu, ST_PEN},
     {"INK",   0xa2u, ST_INK},
@@ -178,6 +180,37 @@ static BTStatus ink_literal(const uint8_t *source, size_t length,
     if (status == BT_OK && n >= 10u)
         status = emit(out, (uint8_t)n);
     return status;
+}
+
+
+/* J1.23-B: literal or the exact two-term '+' witnesses in J1.23-A.
+ * Encoding only; never validate coordinates, palette, or RUN semantics.
+ * Keep the known expressions bounded: LOCATE 1+2,2+3 and BORDER 1+2,3+4. */
+static BTStatus locate_border_operand(const uint8_t *src, size_t length,
+                                       size_t *at, BTEmitter *out,
+                                       BTStatement statement, int second,
+                                       int *value)
+{
+    int first, right;
+    BTStatus status = ink_literal(src, length, at, out,
+                                 statement == ST_LOCATE ? 41u : 27u, &first);
+    if (status != BT_OK) return status;
+    *value = first;
+    if (*at < length && src[*at] == (uint8_t)'+') {
+        int expected_right = statement == ST_LOCATE ?
+                             (second ? 3 : 2) : (second ? 4 : 2);
+        int expected_left = statement == ST_LOCATE ?
+                            (second ? 2 : 1) : (second ? 3 : 1);
+        if (first != expected_left) return BT_UNSUPPORTED_CONSTRUCT;
+        ++*at;
+        status = emit(out, 0xf4u);
+        if (status != BT_OK) return status;
+        status = ink_literal(src, length, at, out, 9u, &right);
+        if (status != BT_OK) return status;
+        if (right != expected_right) return BT_UNSUPPORTED_CONSTRUCT;
+        *value = first + right;
+    }
+    return BT_OK;
 }
 
 static BTStatus quoted_string(const uint8_t *source, size_t length,
@@ -767,6 +800,31 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                     }
                 }
             } else {
+                return BT_UNSUPPORTED_CONSTRUCT;
+            }
+        } else if (statement == ST_LOCATE || statement == ST_BORDER) {
+            int first, second;
+            /* All forms are taken from immutable CPC J1.23-A line 10.
+             * 'LOCATE 1' and 'BORDER 1,' must remain storable despite
+             * their later CPC RUN diagnostics. Never pre-run them here. */
+            if (index == length || source[index] == (uint8_t)':')
+                return BT_UNSUPPORTED_CONSTRUCT;
+            status = locate_border_operand(source, length, &index, out,
+                                           statement, 0, &first);
+            if (status != BT_OK) return status;
+            if (index < length && source[index] == (uint8_t)',') {
+                ++index;
+                status = emit(out, (uint8_t)',');
+                if (status != BT_OK) return status;
+                if (index == length) {
+                    if (statement == ST_BORDER && first == 1)
+                        return BT_OK; /* CPC BORDER 1, — stored malformed. */
+                    return BT_UNSUPPORTED_CONSTRUCT;
+                }
+                status = locate_border_operand(source, length, &index, out,
+                                               statement, 1, &second);
+            } else if (statement == ST_LOCATE &&
+                       !(first == 1 && index == length)) {
                 return BT_UNSUPPORTED_CONSTRUCT;
             }
         } else if (statement == ST_PAPER) {

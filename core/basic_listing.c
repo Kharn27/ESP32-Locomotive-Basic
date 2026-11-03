@@ -20,6 +20,8 @@ typedef enum {
     BL_ST_PEN,
     BL_ST_INK,
     BL_ST_PAPER,
+    BL_ST_LOCATE,
+    BL_ST_BORDER,
     BL_ST_EMPTY
 } BLStatement;
 
@@ -255,6 +257,37 @@ static BLStatus ink_literal(const uint8_t *body, size_t length,
     return append_decimal(out, n);
 }
 
+
+
+/* J1.23-B: strict inverse of CPC line-10 A9/82 immediate witnesses.
+ * '+' is an F4 lexical token; nothing here evaluates coordinates or inks. */
+static BLStatus locate_border_operand(const uint8_t *body, size_t length,
+                                      size_t *pos, BLEmitter *out,
+                                      BLStatement statement, int second,
+                                      int *value)
+{
+    int first, right;
+    BLStatus status = ink_literal(body, length, pos, out,
+                                 statement == BL_ST_LOCATE ? 41u : 27u,
+                                 &first);
+    if (status != BL_OK) return status;
+    *value = first;
+    if (*pos < length && body[*pos] == 0xf4u) {
+        int expected_left = statement == BL_ST_LOCATE ?
+                            (second ? 2 : 1) : (second ? 3 : 1);
+        int expected_right = statement == BL_ST_LOCATE ?
+                             (second ? 3 : 2) : (second ? 4 : 2);
+        if (first != expected_left) return BL_BAD_SEQUENCE;
+        ++*pos;
+        status = append_byte(out, (uint8_t)'+');
+        if (status != BL_OK) return status;
+        status = ink_literal(body, length, pos, out, 9u, &right);
+        if (status != BL_OK) return status;
+        if (right != expected_right) return BL_BAD_SEQUENCE;
+        *value = first + right;
+    }
+    return BL_OK;
+}
 
 /* Only the sealed J1.20-A FF 00 ABS operands, without RUN decoding. */
 static BLStatus abs_expression(const uint8_t *b, size_t len,
@@ -536,6 +569,8 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0x02u: case 0x03u: statement = BL_ST_ASSIGN; status = BL_OK; break;
         case 0xa5u: statement = BL_ST_ASSIGN; status = append_word(out, "LET"); break;
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
+        case 0xa9u: statement = BL_ST_LOCATE; status = append_word(out, "LOCATE"); break;
+        case 0x82u: statement = BL_ST_BORDER; status = append_word(out, "BORDER"); break;
         case 0xbbu: statement = BL_ST_PEN; status = append_word(out, "PEN"); break;
         case 0xa2u: statement = BL_ST_INK; status = append_word(out, "INK"); break;
         case 0xbau: statement = BL_ST_PAPER; status = append_word(out, "PAPER"); break;
@@ -1230,6 +1265,33 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 status = append_decimal(out, line);
                 if (status != BL_OK) return status;
             } else {
+                return BL_BAD_SEQUENCE;
+            }
+        } else if (statement == BL_ST_LOCATE || statement == BL_ST_BORDER) {
+            int first, second;
+            if (pos == length || body[pos] == 0x01u)
+                return BL_BAD_SEQUENCE;
+            if (pos == space_start) {
+                status = append_byte(out, (uint8_t)' ');
+                if (status != BL_OK) return status;
+            }
+            status = locate_border_operand(body, length, &pos, out,
+                                           statement, 0, &first);
+            if (status != BL_OK) return status;
+            if (pos < length && body[pos] == (uint8_t)',') {
+                ++pos;
+                status = append_byte(out, (uint8_t)',');
+                if (status != BL_OK) return status;
+                if (pos == length) {
+                    /* CPC stores and LISTs BORDER 1, even when RUN fails. */
+                    return statement == BL_ST_BORDER && first == 1 ?
+                           BL_OK : BL_BAD_SEQUENCE;
+                }
+                status = locate_border_operand(body, length, &pos, out,
+                                               statement, 1, &second);
+                if (status != BL_OK) return status;
+            } else if (statement == BL_ST_LOCATE &&
+                       !(first == 1 && pos == length)) {
                 return BL_BAD_SEQUENCE;
             }
         } else if (statement == BL_ST_PAPER) {

@@ -13,6 +13,12 @@ typedef char BEInkXtensaLayoutCheck[
      offsetof(BEVideoEvent, print_offset) == 8u &&
      offsetof(BEVideoEvent, ink) == 12u &&
      offsetof(BEVideoEvent, colour) == 13u) ? 1 : -1];
+/* Baseline main@9f19e500 BasicExecutor=600 bytes (32-bit size_t,
+ * pointer), B2 adds one 4-byte depth and eight 24-byte frames: 796.
+ * Enforce actual Xtensa ABI with a build-time proof, no runtime estimate. */
+typedef char BEWhileXtensaBudgetCheck[
+    (sizeof(BEWhileFrame) == 24u &&
+     sizeof(BasicExecutor) == 796u) ? 1 : -1];
 #endif
 
 typedef struct {
@@ -2705,4 +2711,74 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
         }
     }
     return status;
+}
+
+/* Pure provenance for typed WHILE/WEND errors. On a future malformed
+ * WEND 1 discovered by the structural scanner, report the actual WEND
+ * statement line, not the current WHILE cursor or an invented CPC ERR. */
+BEStatus be_while_diagnostic_line(const BasicExecutor *executor,
+                                  BEStatus cause, uint16_t *line_number)
+{
+    const BasicProgram *program;
+    BasicProgramLine line;
+    size_t cursor;
+    BPStatus bp_status;
+    if (executor == NULL || line_number == NULL ||
+        executor->program == NULL) return BE_INVALID_ARGUMENT;
+    if (cause != BE_WEND_WITHOUT_WHILE &&
+        cause != BE_WHILE_WITHOUT_WEND &&
+        cause != BE_WHILE_OPERAND_MISSING &&
+        cause != BE_WHILE_CONDITION_INVALID &&
+        cause != BE_WHILE_STACK_FULL &&
+        cause != BE_DIAG_CONTRADICTORY) return BE_INVALID_ARGUMENT;
+    program = executor->program;
+    if (bp_validate(program) != BP_OK) return BE_BAD_PROGRAM;
+    if (overlaps(line_number, sizeof(*line_number), executor,
+                 sizeof(*executor)) ||
+        overlaps(line_number, sizeof(*line_number), program,
+                 sizeof(*program)) ||
+        overlaps(line_number, sizeof(*line_number), program->data,
+                 program->capacity)) return BE_OVERLAP;
+    cursor = executor->cursor;
+    bp_status = bp_next(program, &cursor, &line);
+    if (bp_status != BP_OK) return BE_BAD_PROGRAM;
+    if (cause != BE_DIAG_CONTRADICTORY) {
+        *line_number = line.number;
+        return BE_OK;
+    }
+    /* For WEND 1 in a skipped WHILE 0, preflight returns the error while
+     * executor->cursor is still at WHILE. Locate the exact future token
+     * by scanning only real statements, skipping cache/quoted payloads. */
+    cursor = executor->cursor;
+    {
+        int first = 1;
+        while ((bp_status = bp_next(program, &cursor, &line)) == BP_OK) {
+            const uint8_t *b = program->data + line.body_offset;
+            size_t n = line.body_length;
+            size_t p = first ? executor->statement_offset : 0u;
+            first = 0;
+            while (p < n) {
+                size_t end;
+                BEStatus st;
+                skip_spaces(b,n,&p);
+                if (p == n || b[p] == 0xc5u ||
+                    (b[p] == 0x01u && p + 1u < n &&
+                     b[p+1u] == 0xc0u)) break;
+                if (b[p] == 0xd5u) {
+                    st = while_wend_suffix(b,n,p+1u,&end);
+                    if (st == BE_DIAG_CONTRADICTORY) {
+                        *line_number = line.number;
+                        return BE_OK;
+                    }
+                    if (st != BE_OK) return st;
+                } else {
+                    st = while_statement_end(b,n,p+1u,&end);
+                    if (st != BE_OK) return st;
+                }
+                if (end == n) break;
+                p = end + 1u;
+            }
+        }
+    }
+    return BE_BAD_PROGRAM;
 }

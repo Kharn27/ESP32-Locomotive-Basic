@@ -219,4 +219,11 @@ BEStatus be_preview_step_events(BasicExecutor *executor, uint8_t *output,
                                 BEVideoEvent *events, size_t event_capacity,
                                 size_t *event_written);
 
+/* B2: pure cause/location helper. Because a WHILE can prevalidate a future
+ * malformed WEND, the offending CPC line may differ from executor->cursor.
+ * No state or out-param mutation on error. Returns the actual numbered
+ * BASIC line for a typed WHILE/WEND diagnostic, not a CPC ERR code. */
+BEStatus be_while_diagnostic_line(const BasicExecutor *executor,
+                                  BEStatus cause, uint16_t *line_number);
+
 #endif

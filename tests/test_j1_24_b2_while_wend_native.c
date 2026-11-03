@@ -233,6 +233,11 @@ static int check_case(const char *root,const Case *item)
             if(succeeded==1) {
                 if(item->failure!=BE_OK) {
                     CHECK(failure_snapshot(&f,item->failure)==0);
+                    { uint16_t actual_line=0u;
+                      CHECK(be_while_diagnostic_line(&f.exec,item->failure,
+                                                     &actual_line)==BE_OK);
+                      CHECK(actual_line==item->cpc_fault_line);
+                    }
                     failed=1;break;
                 }
                 return 1;
@@ -372,12 +377,136 @@ static int low_capacity(void)
     CHECK(success(&f)==0);
     return 0;
 }
+
+static int fixture_failure(Fixture *f, BEStatus status)
+{
+    BasicExecutor before=f->ex;
+    BasicVariableStore var_before=f->vars;
+    uint8_t bytes[STORE],old_entries[sizeof(f->entries)],output[128],copy[128];
+    BEVideoEvent events[1],evcopy[1];
+    size_t n=999u,m=888u;
+    memcpy(bytes,f->data,sizeof(bytes));
+    memcpy(old_entries,f->entries,sizeof(old_entries));
+    memset(output,0x79,sizeof(output));memcpy(copy,output,sizeof(copy));
+    memset(events,0x64,sizeof(events));memcpy(evcopy,events,sizeof(events));
+    CHECK(be_preview_step_events(&f->ex,output,sizeof(output),&n,
+                                 events,1u,&m)==status);
+    CHECK(memcmp(&f->ex,&before,sizeof(before))==0);
+    CHECK(memcmp(&f->vars,&var_before,sizeof(var_before))==0);
+    CHECK(memcmp(f->data,bytes,sizeof(bytes))==0);
+    CHECK(memcmp(f->entries,old_entries,sizeof(old_entries))==0);
+    CHECK(n==999u&&m==888u&&memcmp(output,copy,sizeof(output))==0);
+    CHECK(memcmp(events,evcopy,sizeof(events))==0);
+    CHECK(be_step_events(&f->ex,output,sizeof(output),&n,
+                         events,1u,&m)==status);
+    CHECK(memcmp(&f->ex,&before,sizeof(before))==0);
+    CHECK(memcmp(f->data,bytes,sizeof(bytes))==0);
+    CHECK(memcmp(f->entries,old_entries,sizeof(old_entries))==0);
+    CHECK(n==999u&&m==888u&&memcmp(output,copy,sizeof(output))==0);
+    CHECK(memcmp(events,evcopy,sizeof(events))==0);
+    CHECK(be_step(&f->ex,output,sizeof(output),&n)==status);
+    CHECK(memcmp(&f->ex,&before,sizeof(before))==0);
+    CHECK(memcmp(f->data,bytes,sizeof(bytes))==0);
+    CHECK(memcmp(f->entries,old_entries,sizeof(old_entries))==0);
+    CHECK(n==999u&&memcmp(output,copy,sizeof(output))==0);
+    return 0;
+}
+static int unsupported_and_malformed(void)
+{
+    Fixture f;
+    static const uint8_t incomplete_ref[] = {0xd6u,' ',0x02u,0u};
+    static const uint8_t bad_wend[] = {0xd5u,' ',0x19u,2u};
+    size_t i,n=999u,aggregate=0u;
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"WHILE 1")==0);
+    CHECK(put(&f,20u,"WEND")==0);
+    CHECK(init(&f)==0);
+    CHECK(fixture_failure(&f,BE_WHILE_CONDITION_INVALID)==0);
+    CHECK(setup(&f)==0);
+    CHECK(bp_put(&f.program,10u,incomplete_ref,sizeof(incomplete_ref))==BP_OK);
+    CHECK(put(&f,20u,"WEND")==0);
+    CHECK(init(&f)==0);
+    CHECK(fixture_failure(&f,BE_TRUNCATED)==0);
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"WHILE 0")==0);
+    CHECK(bp_put(&f.program,20u,bad_wend,sizeof(bad_wend))==BP_OK);
+    CHECK(init(&f)==0);
+    CHECK(fixture_failure(&f,BE_BAD_SEQUENCE)==0);
+    /* The string "WEND:WHILE" must not end the false branch. */
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"WHILE 0")==0);
+    CHECK(put(&f,20u,"PRINT \"WEND:WHILE\"")==0);
+    CHECK(put(&f,30u,"WEND")==0);
+    CHECK(put(&f,40u,"PRINT \"OK\"")==0);
+    CHECK(put(&f,50u,"END")==0);
+    CHECK(init(&f)==0);
+    for(i=0u;i<3u;++i) {
+        CHECK(be_step(&f.ex,f.out,sizeof(f.out),&n)==BE_OK);
+        if(n!=0u) {CHECK(n==3u&&memcmp(f.out,"OK\n",3u)==0);++aggregate;}
+    }
+    CHECK(aggregate==1u);
+    CHECK(f.ex.while_depth==0u);
+    /* Already committed output persists after a later failed step. */
+    CHECK(setup(&f)==0);
+    CHECK(put(&f,10u,"PRINT \"BEFORE\"")==0);
+    CHECK(put(&f,20u,"WEND")==0);
+    CHECK(init(&f)==0);
+    n=999u;
+    CHECK(be_step(&f.ex,f.out,sizeof(f.out),&n)==BE_OK);
+    CHECK(n==7u&&memcmp(f.out,"BEFORE\n",7u)==0);
+    CHECK(fixture_failure(&f,BE_WEND_WITHOUT_WHILE)==0);
+    CHECK(memcmp(f.out,"BEFORE\n",7u)==0);
+    return 0;
+}
+static int session_resets(void)
+{
+    Fixture f;
+    BasicSessionRuntime runtime;
+    uint8_t temp[LINE],output[128];
+    size_t n=999u,i;
+    static const char *const code[]={
+      "A%=0","WHILE A%<1","A%=1","WEND","END"
+    };
+    CHECK(setup(&f)==0);
+    for(i=0u;i<5u;++i)CHECK(put(&f,(unsigned int)(10u+i*10u),code[i])==0);
+    CHECK(bsr_init_with_store(&runtime,&f.program,&f.vars).status==BSR_OK);
+    CHECK(bsr_submit(&runtime,(const uint8_t*)"RUN",3u,
+                     temp,sizeof(temp),output,sizeof(output),&n).status==BSR_OK);
+    CHECK(runtime.executor.while_depth==0u);
+    for(i=0u;i<2u;++i)
+        CHECK(bsr_step(&runtime,output,sizeof(output),&n).status==BSR_OK);
+    CHECK(runtime.executor.while_depth==1u);
+    CHECK(bsr_stop(&runtime).status==BSR_OK);
+    CHECK(runtime.executor.while_depth==0u);
+    { size_t j;
+      const uint8_t *p=(const uint8_t*)runtime.executor.while_stack;
+      for(j=0u;j<sizeof(runtime.executor.while_stack);++j)CHECK(p[j]==0u);
+    }
+    CHECK(bsr_submit(&runtime,(const uint8_t*)"RUN",3u,
+                     temp,sizeof(temp),output,sizeof(output),&n).status==BSR_OK);
+    for(i=0u;i<2u;++i)
+        CHECK(bsr_step(&runtime,output,sizeof(output),&n).status==BSR_OK);
+    CHECK(runtime.executor.while_depth==1u);
+    CHECK(bsr_submit(&runtime,(const uint8_t*)"NEW",3u,
+                     temp,sizeof(temp),output,sizeof(output),&n).status==BSR_OK);
+    CHECK(runtime.state==BSR_IDLE && runtime.executor.while_depth==0u);
+    for(i=0u;i<5u;++i)CHECK(put(&f,(unsigned int)(10u+i*10u),code[i])==0);
+    CHECK(bsr_submit(&runtime,(const uint8_t*)"RUN",3u,
+                     temp,sizeof(temp),output,sizeof(output),&n).status==BSR_OK);
+    for(i=0u;i<6u;++i)
+        CHECK(bsr_step(&runtime,output,sizeof(output),&n).status==BSR_OK);
+    CHECK(bsr_step(&runtime,output,sizeof(output),&n).status==BSR_END);
+    CHECK(runtime.state==BSR_IDLE && runtime.executor.while_depth==0u);
+    return 0;
+}
 int main(int argc,char **argv)
 {
     size_t i;
     CHECK(argc==2);
     CHECK(depth_tests()==0);
     CHECK(low_capacity()==0);
+    CHECK(unsupported_and_malformed()==0);
+    CHECK(session_resets()==0);
     for(i=0u;i<sizeof(cases)/sizeof(cases[0]);++i)
         CHECK(check_case(argv[1],&cases[i])==0);
     puts("J1.24-B2 20_CASES original+repeat; positive SEMANTIC only; "

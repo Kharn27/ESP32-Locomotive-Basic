@@ -47,14 +47,32 @@ Il exécute la **vraie** politique CMake avec `cmake -P` : CONSOLE défaut/20/40
 
 Jobs de qualification dédiés dans le workflow existant [CI-XTENSA : jobs spi40-host-policy et spi40-dual-console](../.github/workflows/ci-xtensa.yml) : **deux véritables compilations Xtensa CONSOLE**, 20 et 40 MHz sous **le même SHA** et mêmes version/CPU, avec CMakeCache, compile flag `LCD_CLOCK_HZ=...`, ELF, `size`, SHA-256 du binaire et manifeste. La CI trois profils indépendante utilise toujours **20 MHz par défaut** ; elle ne remplace pas les deux variantes explicites. Les artefacts de ces jobs et les résultats de la comparaison mémoire DRAM/BSS/IRAM/Flash sont à coller dans la PR sur HEAD final, sans inventer de métriques de carte.
 
-| Paramètre statique Xtensa | Base main | SPI20 HEAD | SPI40 HEAD | Conclusion |
-|---|---:|---:|---:|---|
-| IRAM | À relever CI | À relever CI | À relever CI | NON RENSEIGNÉ |
-| DRAM/BSS | À relever CI | À relever CI | À relever CI | NON RENSEIGNÉ |
-| Flash code / binaire | À relever CI | À relever CI | À relever CI | NON RENSEIGNÉ |
-| Heap libre/largest/min, pile **vrai CYD** | N/A | À mesurer PO | À mesurer PO | ON_DEVICE_UNVERIFIED |
+**Preuves binaires effectivement observées sur le HEAD code `f88ac5cd62cf6a8d6ce117419c9bc910744bf4cf` :** [CI-XTENSA #41627910770](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41627910770), CONSOLE/HW3/BASIC_PROBE 3/3 PASS et CONSOLE SPI20/SPI40 2/2 PASS ; [garde A0 #41627910691](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41627910691) 3/3 PASS. La base du tableau est **la référence historique A0 `5799c774...`**, pas `main@355b9bd...`. Le HEAD final (après documentation) doit confirmer ces mêmes sections et produire ses propres hashes/identités.
 
-Les valeurs du tableau seront mises à jour après CI, sans extrapoler les 5120 octets DMA depuis la taille ELF (allocation runtime inchangée).
+| Sections ESP-IDF ou BIN (octets) | A0 historique | SPI20 f88 | SPI40 f88 |
+|---|---:|---:|---:|
+| Flash code | 123166 | **157594** | **157590** |
+| Flash rodata | 50340 | **54260** | **54260** |
+| IRAM `size -A` | 67332 | **67332** | **67332** |
+| DRAM incl BSS | 53728 | **53984** | **53984** |
+| BSS | 42656 | **42912** | **42912** |
+| Binaire `.bin` | 252320 | **290656** | **290656** |
+| Delta DRAM vs A0 / budget | référence | **+256 / +256 : PASS, marge 0** | **+256 / +256 : PASS, marge 0** |
+| Heap libre/largest/min + pile (CYD) | N/A | **NON MESURÉ** | **NON MESURÉ** |
+
+Le faible écart de Flash code (4 octets) est une **observation de build**, pas une mesure de fréquence électrique. `idf.py size` affiche IRAM 67331 alors que la somme des sections `size -A` affiche 67332 : ne pas confondre les méthodes. Le binaire change de SHA-256 avec `HW4_SHOT_GIT_SHA` au nouveau commit ; consulter les manifestes **HEAD final** de la PR, ne pas flasher les anciens artefacts f88.
+
+**Contrôle de configuration des deux variantes après les builds :**
+
+```sh
+sha256sum sdkconfig.hw4-spi20 sdkconfig.hw4-spi40
+diff -u sdkconfig.hw4-spi20 sdkconfig.hw4-spi40
+grep -F 'CYD_LCD_SPI_HZ:STRING=' build-hw4-spi20/CMakeCache.txt build-hw4-spi40/CMakeCache.txt
+```
+
+Les deux sdkconfig devraient être identiques : la seule sélection de la fréquence LCD est le `-DCYD_LCD_SPI_HZ=...` CMake, non une configuration ESP-IDF. Toute autre différence doit être expliquée et soumise au Pilotage. Les `*.bin` produits depuis le même HEAD diffèrent normalement par le paramètre compilé, mais cela ne prouve pas une fréquence électrique effectivement atteinte.
+
+La HAL alloue toujours **un seul buffer DMA interne de 5120 o** ; la mémoire heap libre/plus grand bloc et la marge pile seront mesurées exclusivement sur le CYD.
 
 ## 4. Protocole reproductible PO : deux firmwares, même HEAD
 

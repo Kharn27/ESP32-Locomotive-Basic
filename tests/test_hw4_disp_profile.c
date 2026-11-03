@@ -27,20 +27,25 @@ int main(void)
     assert(p.completed==1U && p.classes[HW4_DP_FULL25].n==1U);
     assert(p.classes[HW4_DP_SCROLL_ASSOCIATED].n==1U);
     assert(p.classes[HW4_DP_FULL25].multi_scroll==1U);
-    assert(p.classes[HW4_DP_FULL25].bytes==128000U);
-    assert(p.classes[HW4_DP_FULL25].other_us==5000U);
+    assert(hw4_dp_bytes(&p.classes[HW4_DP_FULL25])==128000U);
+    assert(hw4_dp_other_us(&p.classes[HW4_DP_FULL25])==5000U);
     /* One flush after one scroll, then a partial repaint with no scroll. */
     f=frame(3U,1U,140000U);
     assert(hw4_dp_record(&p,&f));
     f=frame(1U,0U,146000U);
     assert(hw4_dp_record(&p,&f));
     assert(p.completed==3U && p.gaps==2U && p.gap_sum_us==46000U);
-    assert(p.trace_size==3U && p.trace[0].scrolls==3U &&
-           p.trace[1].gap_us==40000U && p.trace[2].scrolls==0U);
+    Hw4DpTrace t={0};
+    assert(p.trace_size==3U && hw4_dp_trace_at(&p,0U,&t) &&
+           t.seq==1U && t.scrolls==3U && t.bands==25U);
+    assert(hw4_dp_trace_at(&p,1U,&t) && t.gap_us==40000U && t.seq==2U);
+    assert(hw4_dp_trace_at(&p,2U,&t) && t.scrolls==0U && t.seq==3U);
+    assert(!hw4_dp_trace_at(&p,3U,&t) && !hw4_dp_trace_at(NULL,0U,&t) &&
+           !hw4_dp_trace_at(&p,0U,NULL));
     assert(p.classes[HW4_DP_PARTIAL].n==2U);
     assert(p.classes[HW4_DP_SCROLL_ASSOCIATED].n==2U);
     assert(p.classes[HW4_DP_PARTIAL].one_scroll==1U);
-    assert(p.classes[HW4_DP_PARTIAL].zero_scroll==1U);
+    assert(hw4_dp_zero_scroll(&p.classes[HW4_DP_PARTIAL])==1U);
     assert(p.classes[HW4_DP_FULL25].scrolls==3U);
     assert(hw4_dp_quantile_upper(&p.classes[HW4_DP_FULL25],50U)==32000U);
     assert(hw4_dp_quantile_upper(&p.classes[HW4_DP_FULL25],95U)==32000U);
@@ -85,8 +90,33 @@ int main(void)
         assert(hw4_dp_record(&p,&f));
     }
     assert(p.completed==20U && p.trace_size==HW4_DP_TRACE_CAP);
-    assert(p.trace_next==4U && p.trace[4].seq==5U);
-    assert(p.trace[3].seq==20U);
+    assert(p.trace_next==4U && hw4_dp_trace_at(&p,0U,&t));
+    assert(t.seq==5U && t.scrolls==2U && t.bands==1U);
+    assert(hw4_dp_trace_at(&p,15U,&t) && t.seq==20U && t.scrolls==2U);
+    assert(!hw4_dp_trace_at(&p,16U,&t));
+    /* Trace values remain exact through uint32 range; no 16-bit truncation. */
+    hw4_dp_reset(&p);
+    f=frame(25U,UINT32_MAX,100000U);
+    f.scroll_cpu_wall_us=UINT64_C(3000000000000);
+    assert(hw4_dp_record(&p,&f));
+    assert(hw4_dp_trace_at(&p,0U,&t) && t.scrolls==UINT32_MAX);
+    /* Underlying trace wall and gap retain the former UINT32_MAX sentinel. */
+    hw4_dp_reset(&p);
+    f=frame(1U,0U,UINT64_C(100000000000));
+    f.wall_us=UINT64_C(10000000000);
+    assert(hw4_dp_record(&p,&f));
+    assert(hw4_dp_trace_at(&p,0U,&t) && t.wall_us==UINT32_MAX);
+    /* Derived byte bound rejects before multiplication, including near limit. */
+    hw4_dp_reset(&p);
+    p.classes[HW4_DP_FULL25].bands=UINT64_MAX/HW4_DP_BAND_BYTES;
+    f=frame(25U,0U,100U);
+    assert(!hw4_dp_record(&p,&f) && p.completed==0U);
+    assert(hw4_dp_bytes(&p.classes[HW4_DP_PARTIAL])==0U);
+    assert(hw4_dp_other_us(&p.classes[HW4_DP_PARTIAL])==0U);
+    assert(hw4_dp_zero_scroll(&p.classes[HW4_DP_PARTIAL])==0U);
+    printf("HW4-DISP-PROFILE-A compact_profile_bytes=%u trace_storage=%u\n",
+           (unsigned)sizeof(Hw4DispProfile),
+           (unsigned)sizeof(p.trace));
     puts("HW4-DISP-PROFILE-A host accounting PASS");
     return 0;
 }

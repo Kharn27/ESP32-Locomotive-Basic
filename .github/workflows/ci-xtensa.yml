@@ -124,8 +124,8 @@ jobs:
                 # Keep all linked ELF ABI metrics observable and pinned.
                 cat "$out/xtensa-abi.txt"
                 grep -Fx "BasicVariableStore=24 bytes" "$out/xtensa-abi.txt"
-                grep -Fx "LocoProbeStorage=19084 bytes" "$out/xtensa-abi.txt"
-                grep -Fx "core_descriptor_bytes=648" "$out/xtensa-abi.txt"
+                grep -Fx "LocoProbeStorage=19280 bytes" "$out/xtensa-abi.txt"
+                grep -Fx "core_descriptor_bytes=844" "$out/xtensa-abi.txt"
                 grep -Fx "owned_buffers_and_entries_bytes=18432" "$out/xtensa-abi.txt"
                 if python3 /project/tools/ci/report_abi.py partitions.csv > "$out/abi-negative.log" 2>&1; then
                   echo "U1-B invalid ELF was accepted"; exit 1

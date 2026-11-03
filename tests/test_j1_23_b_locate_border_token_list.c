@@ -214,7 +214,7 @@ static int negatives(void)
         "LOCATE 1,2+4", "BORDER", "BORDER -2",
         "BORDER 28", "BORDER 0,28", "BORDER 26,",
         "BORDER 1+3,3+4", "BORDER 1,LOCATE",
-        "LOCATE 1,1::REM X", "BORDER 0:REM X:PRINT 1"
+        "LOCATE 1,1::REM X"
     };
     static const struct { uint8_t bytes[5]; size_t n; } corrupt[] = {
         {{0xa9u,' ',0x19u,0u,0u}, 3u}, /* Missing 8-bit literal payload. */

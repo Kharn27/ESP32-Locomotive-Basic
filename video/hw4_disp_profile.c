@@ -12,22 +12,65 @@ void hw4_dp_reset(Hw4DispProfile *p)
     if(p) memset(p,0,sizeof(*p));
 }
 static bool fits(uint64_t a,uint64_t b) { return b<=UINT64_MAX-a; }
-static bool class_fits(const Hw4DpClass *c,const Hw4DpFrame *f,
-                       uint64_t other)
+uint64_t hw4_dp_bytes(const Hw4DpClass *c)
 {
-    const uint64_t bytes=(uint64_t)f->bands*HW4_DP_BAND_BYTES;
+    return c ? c->bands*HW4_DP_BAND_BYTES : 0U;
+}
+uint64_t hw4_dp_other_us(const Hw4DpClass *c)
+{
+    return c ? c->wall_us-c->render_pack_us-c->submit_us-c->wait_us : 0U;
+}
+uint32_t hw4_dp_zero_scroll(const Hw4DpClass *c)
+{
+    return c ? c->n-c->one_scroll-c->multi_scroll : 0U;
+}
+/* Unaligned byte-level encoding, stable and C99-portable on host and Xtensa. */
+static void put32(uint8_t *dst,uint32_t value)
+{
+    for(unsigned k=0U;k<4U;++k)
+        dst[k]=(uint8_t)(value>>(k*8U));
+}
+static uint32_t get32(const uint8_t *src)
+{
+    uint32_t value=0U;
+    for(unsigned k=0U;k<4U;++k)
+        value|=(uint32_t)src[k]<<(k*8U);
+    return value;
+}
+bool hw4_dp_trace_at(const Hw4DispProfile *p,uint32_t index,Hw4DpTrace *out)
+{
+    if(p==NULL || out==NULL || index>=p->trace_size ||
+       p->trace_size>HW4_DP_TRACE_CAP ||
+       p->trace_next>=HW4_DP_TRACE_CAP) return false;
+    const uint32_t pos=(p->trace_next+HW4_DP_TRACE_CAP-p->trace_size+index)
+                       %HW4_DP_TRACE_CAP;
+    const uint8_t *const src=p->trace[pos];
+    Hw4DpTrace decoded={
+        .seq=p->completed-p->trace_size+index+1U,
+        .bands=src[0],
+        .scrolls=get32(src+1U),
+        .wall_us=get32(src+5U),
+        .gap_us=get32(src+9U)
+    };
+    *out=decoded;
+    return true;
+}
+static bool class_fits(const Hw4DpClass *c,const Hw4DpFrame *f)
+{
+    /* Guard derived bytes before multiplying; accepted samples remain exact. */
+    if(c->bands>UINT64_MAX/HW4_DP_BAND_BYTES-f->bands) return false;
+    if(c->one_scroll>c->n || c->multi_scroll>c->n-c->one_scroll) return false;
     return c->n<UINT32_MAX && c->bands<=UINT64_MAX-f->bands &&
-        fits(c->bytes,bytes) && fits(c->scrolls,f->scrolls) &&
+        fits(c->scrolls,f->scrolls) &&
         fits(c->wall_us,f->wall_us) &&
         fits(c->render_pack_us,f->render_pack_us) &&
         fits(c->submit_us,f->submit_us) && fits(c->wait_us,f->wait_us) &&
-        fits(c->other_us,other) &&
         fits(c->scroll_cpu_wall_us,f->scroll_cpu_wall_us) &&
-        (f->scrolls==0U ? c->zero_scroll<UINT32_MAX :
+        (f->scrolls==0U ? true :
          f->scrolls==1U ? c->one_scroll<UINT32_MAX :
                            c->multi_scroll<UINT32_MAX);
 }
-static void class_add(Hw4DpClass *c,const Hw4DpFrame *f,uint64_t other)
+static void class_add(Hw4DpClass *c,const Hw4DpFrame *f)
 {
     const uint32_t wall=(f->wall_us>UINT32_MAX)
             ? UINT32_MAX:(uint32_t)f->wall_us;
@@ -38,17 +81,14 @@ static void class_add(Hw4DpClass *c,const Hw4DpFrame *f,uint64_t other)
     ++c->hist[bin];
     ++c->n;
     c->bands+=f->bands;
-    c->bytes+=(uint64_t)f->bands*HW4_DP_BAND_BYTES;
     c->scrolls+=f->scrolls;
-    if(f->scrolls==0U) ++c->zero_scroll;
-    else if(f->scrolls==1U) ++c->one_scroll;
-    else ++c->multi_scroll;
+    if(f->scrolls==1U) ++c->one_scroll;
+    else if(f->scrolls>1U) ++c->multi_scroll;
     if(f->scrolls>c->max_scrolls) c->max_scrolls=f->scrolls;
     c->wall_us+=f->wall_us;
     c->render_pack_us+=f->render_pack_us;
     c->submit_us+=f->submit_us;
     c->wait_us+=f->wait_us;
-    c->other_us+=other;
     c->scroll_cpu_wall_us+=f->scroll_cpu_wall_us;
 }
 bool hw4_dp_record(Hw4DispProfile *p,const Hw4DpFrame *f)
@@ -65,10 +105,9 @@ bool hw4_dp_record(Hw4DispProfile *p,const Hw4DpFrame *f)
        !fits(p->gap_sum_us,p->completed
            ? f->completed_us-p->last_completed_us:0U) ||
        (p->completed && p->gaps==UINT32_MAX)) goto reject;
-    const uint64_t other=f->wall_us-phases;
     const unsigned category=f->bands==25U ? HW4_DP_FULL25:HW4_DP_PARTIAL;
-    if(!class_fits(&p->classes[category],f,other) ||
-       (f->scrolls && !class_fits(&p->classes[HW4_DP_SCROLL_ASSOCIATED],f,other)))
+    if(!class_fits(&p->classes[category],f) ||
+       (f->scrolls && !class_fits(&p->classes[HW4_DP_SCROLL_ASSOCIATED],f)))
         goto reject;
     if(p->completed) {
         const uint64_t gap=f->completed_us-p->last_completed_us;
@@ -80,16 +119,15 @@ bool hw4_dp_record(Hw4DispProfile *p,const Hw4DpFrame *f)
     }
     const uint64_t gap=p->completed
         ? f->completed_us-p->last_completed_us:0U;
-    Hw4DpTrace *trace=&p->trace[p->trace_next];
-    trace->seq=p->completed+1U;
-    trace->bands=f->bands;
-    trace->scrolls=f->scrolls;
-    trace->wall_us=f->wall_us>UINT32_MAX ? UINT32_MAX:(uint32_t)f->wall_us;
-    trace->gap_us=gap>UINT32_MAX ? UINT32_MAX:(uint32_t)gap;
+    uint8_t *trace=p->trace[p->trace_next];
+    trace[0]=(uint8_t)f->bands;
+    put32(trace+1U,f->scrolls);
+    put32(trace+5U,f->wall_us>UINT32_MAX ? UINT32_MAX:(uint32_t)f->wall_us);
+    put32(trace+9U,gap>UINT32_MAX ? UINT32_MAX:(uint32_t)gap);
     p->trace_next=(p->trace_next+1U)%HW4_DP_TRACE_CAP;
     if(p->trace_size<HW4_DP_TRACE_CAP) ++p->trace_size;
-    class_add(&p->classes[category],f,other);
-    if(f->scrolls) class_add(&p->classes[HW4_DP_SCROLL_ASSOCIATED],f,other);
+    class_add(&p->classes[category],f);
+    if(f->scrolls) class_add(&p->classes[HW4_DP_SCROLL_ASSOCIATED],f);
     ++p->completed;
     p->last_completed_us=f->completed_us;
     return true;

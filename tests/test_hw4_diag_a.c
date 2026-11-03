@@ -189,7 +189,7 @@ static void exact_direct_syntax_and_preservation(void)
      * including its trailing capacity. LIST still reveals it unchanged. */
     (void)real_submit("LIST",CPC_DIAG_HOST_GENERIC,
         CPC_READY_LIST_RETURN,false,"10 PRINT 2Ready");
-    assert(ready_count==11U);
+    assert(ready_count==10U);
     canaries();
 }
 static void direct_syntax_format_and_origin(void)

@@ -14,6 +14,13 @@ typedef struct {
 esp_err_t cyd_lcd_init(void);
 uint8_t *cyd_lcd_band(void);
 esp_err_t cyd_lcd_send(int x, int y, int width, int height);
+/* Optional wall-clock diagnostics: submit and semaphore wait do not assert SPI bus time. */
+typedef struct {
+    uint64_t submit_us;
+    uint64_t wait_us;
+} CydLcdSendTiming;
+esp_err_t cyd_lcd_send_profiled(int x, int y, int width, int height,
+                                CydLcdSendTiming *timing);
 esp_err_t cyd_lcd_orientation(unsigned index, uint16_t clear_rgb565);
 unsigned cyd_lcd_current_orientation(void);
 esp_err_t cyd_lcd_backlight(bool enabled);

@@ -105,6 +105,7 @@ static Hw4DpFrame *s_disp_active;
 static uint64_t s_disp_scroll_checkpoint_us;
 static uint64_t s_run_profile_started_us;
 static unsigned s_disp_run_seq;
+static bool s_disp_report_after_prompt;
 static uint64_t disp_clock(void *context)
 {
     (void)context;
@@ -122,8 +123,8 @@ static void disp_clock_overhead_report(void)
     const uint64_t baseline=b-a, instrumented=c-b;
     printf("HW4-DISP-PROFILE CLOCK_OVERHEAD_ESTIMATE calls=%u "
            "base_loop_us=%llu clock_loop_us=%llu "
-           "net_upper_us_per_call=%llu scope=task_wall_boot_calibration\\n",
-           N,(unsigned long long)baseline,(unsigned long long)instrumented,
+           "net_upper_us_per_call=%llu scope=task_wall_boot_calibration\n",
+           (unsigned)N,(unsigned long long)baseline,(unsigned long long)instrumented,
            (unsigned long long)(instrumented>baseline
               ? (instrumented-baseline+N-1U)/N:0U));
     (void)sink;
@@ -581,6 +582,10 @@ static bool prompt(void)
     if(!repaint_dirty()) return false;
     printf("HW4-C3-B2 INPUT_READY capacity=%u screen_row=%u "
            "policy=mode1_scroll\n",UART_LINE_CAPACITY,s_text.row);
+    if(s_disp_report_after_prompt) {
+        s_disp_report_after_prompt=false;
+        disp_report("run_terminal_after_prompt");
+    }
     return true;
 }
 static bool basic_submit(const uint8_t *source,size_t length,
@@ -727,9 +732,8 @@ static bool basic_run_slice(void)
            (unsigned)s_run_input.overflow_lines,
            HW4_SHOT_GIT_SHA);
     memory_report("run_terminal");
-    if(!apply_ready_policy(s_run_ready_transition) || !prompt()) return false;
-    disp_report("run_terminal_after_prompt");
-    return true;
+    s_disp_report_after_prompt=true;
+    return apply_ready_policy(s_run_ready_transition) && prompt();
 }
 static bool is_command(const uint8_t *source,size_t n,const char *word)
 {

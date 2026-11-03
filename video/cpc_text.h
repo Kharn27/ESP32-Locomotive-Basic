@@ -3,6 +3,8 @@
 #define CPC_TEXT_H
 #include "cpc_video.h"
 
+/* Optional profiling clock: absent for all ordinary CPC/host callers. */
+typedef uint64_t (*CpcTextMicros)(void *context);
 typedef struct {
     CpcVideo *video;           /* borrowed, exclusively owned by the rendering task */
     CpcGlyphRow glyph;
@@ -15,6 +17,9 @@ typedef struct {
     size_t scrolls;           /* completed one-cell vertical scroll operations */
     size_t controls_ignored;
     uint32_t input_fnv1a;      /* digest of unmodified incoming BASIC bytes */
+    CpcTextMicros scroll_clock; /* optional, never used for rendering decisions */
+    void *scroll_clock_context;
+    uint64_t scroll_wall_us;    /* accumulated scroll_up + E2 + dirty, wall not CPU */
 } CpcText;
 
 /* Video must already be in MODE 1. The cursor is a non-destructive overlay.
@@ -35,4 +40,5 @@ bool cpc_text_write(CpcText *sink, const uint8_t *bytes, size_t length);
 /* B2b CLS: same full-screen MODE1 domain, resets text cursor only.
  * Counters and input digest are retained; no bytes are printed. */
 bool cpc_text_clear(CpcText *sink);
+void cpc_text_profile_clock(CpcText *sink, CpcTextMicros clock, void *context);
 #endif

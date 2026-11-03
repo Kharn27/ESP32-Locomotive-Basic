@@ -32,7 +32,9 @@ typedef struct {
     uint32_t completed, rejected;
     uint64_t last_completed_us, gap_sum_us;
     uint32_t gaps, gap_min_us, gap_max_us;
-    /* Lossless 13-byte record: 1 byte bands + 3 little-endian uint32.\n     * Stored wall/gap already have the same UINT32_MAX cap as before.\n     * No packed struct, unaligned pointer or platform endianness dependency. */
+    /* Lossless 13-byte record: 1 byte bands + 3 little-endian uint32.
+     * Stored wall/gap already have the same UINT32_MAX cap as before.
+     * No packed struct, unaligned pointer or platform endianness dependency. */
     uint8_t trace[HW4_DP_TRACE_CAP][HW4_DP_TRACE_BYTES];
     uint32_t trace_next, trace_size;
 } Hw4DispProfile;

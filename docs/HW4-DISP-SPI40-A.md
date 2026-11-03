@@ -45,7 +45,7 @@ python3 tools/ci/hw4_spi40_policy.py
 
 Il exécute la **vraie** politique CMake avec `cmake -P` : CONSOLE défaut/20/40, HW3/BASIC_PROBE défaut/20, refus de 13 valeurs invalides (dont 55 MHz) et refus de 40 pour HW3/BASIC_PROBE. Les assertions statiques protègent les broches, 5120 o, SPI2, DMA, sémaphore/fail-stop, 8 px, aucun VSCR, etc. Cela ne reproduit **pas** une horloge physique.
 
-Workflow dédié [HW4-DISP-SPI40-A](../.github/workflows/hw4-disp-spi40-a.yml) : **deux véritables compilations Xtensa CONSOLE**, 20 et 40 MHz sous **le même SHA** et mêmes version/CPU, avec CMakeCache, compile flag `LCD_CLOCK_HZ=...`, ELF, `size`, SHA-256 du binaire et manifeste. La CI trois profils indépendante utilise toujours **20 MHz par défaut** ; elle ne remplace pas les deux variantes explicites. Les artefacts de ces jobs et les résultats de la comparaison mémoire DRAM/BSS/IRAM/Flash sont à coller dans la PR sur HEAD final, sans inventer de métriques de carte.
+Jobs de qualification dédiés dans le workflow existant [CI-XTENSA : jobs spi40-host-policy et spi40-dual-console](../.github/workflows/ci-xtensa.yml) : **deux véritables compilations Xtensa CONSOLE**, 20 et 40 MHz sous **le même SHA** et mêmes version/CPU, avec CMakeCache, compile flag `LCD_CLOCK_HZ=...`, ELF, `size`, SHA-256 du binaire et manifeste. La CI trois profils indépendante utilise toujours **20 MHz par défaut** ; elle ne remplace pas les deux variantes explicites. Les artefacts de ces jobs et les résultats de la comparaison mémoire DRAM/BSS/IRAM/Flash sont à coller dans la PR sur HEAD final, sans inventer de métriques de carte.
 
 | Paramètre statique Xtensa | Base main | SPI20 HEAD | SPI40 HEAD | Conclusion |
 |---|---:|---:|---:|---|

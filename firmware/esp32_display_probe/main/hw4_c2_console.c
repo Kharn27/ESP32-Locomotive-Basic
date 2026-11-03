@@ -751,6 +751,7 @@ void app_main(void)
            desc->version,esp_get_idf_version(),
            (unsigned)CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ);
     memory_report("before_lcd");
+    esp_err_t e=cyd_lcd_init();
     if(e!=ESP_OK) { (void)fail("LCD_INIT",(int)e); return; }
     printf("HW4-C2 LCD_INIT_PASS dma_bytes=%u\n",CYD_LCD_DMA_BYTES);
     e=cyd_lcd_orientation(10U,cpc_video_palette_rgb565(1U));

@@ -62,11 +62,13 @@ jobs:
               xtensa-esp-elf-nm -S --defined-only "$build/loco_esp32_display_probe.elf" > "$out/symbols.txt"
               grep -F " cyd_lcd_requested_spi_hz" "$out/symbols.txt"
               cp "$build/CMakeCache.txt" "$out/CMakeCache.txt"
+              test -s "$build/compile_commands.json"
+              cp "$build/compile_commands.json" "$out/compile_commands.json"
               sha256sum "$build/loco_esp32_display_probe.bin" > "$out/firmware-sha256.txt"
               python3 /project/tools/ci/verify_esp_app_version.py "$build/loco_esp32_display_probe.bin" "$EXPECTED_HEAD" loco_esp32_display_probe
               echo "C3_COMPILED=$tag REQUESTED_SPI_HZ=$hz SOURCE_SHA=$EXPECTED_HEAD"
             done
-            python3 /project/tools/ci/hw4_disp_spi_variants.py --spi40-sections reports/hw4-c3/spi40/elf-sections.txt --spi40-cache reports/hw4-c3/spi40/CMakeCache.txt --spi40-bin build-hw4-c3-spi40/loco_esp32_display_probe.bin --spi20-sections reports/hw4-c3/spi20/elf-sections.txt --spi20-cache reports/hw4-c3/spi20/CMakeCache.txt --spi20-bin build-hw4-c3-spi20/loco_esp32_display_probe.bin | tee reports/hw4-c3/variant-comparison.md
+            python3 /project/tools/ci/hw4_disp_spi_variants.py --spi40-sections reports/hw4-c3/spi40/elf-sections.txt --spi40-cache reports/hw4-c3/spi40/CMakeCache.txt --spi40-commands reports/hw4-c3/spi40/compile_commands.json --spi40-bin build-hw4-c3-spi40/loco_esp32_display_probe.bin --spi20-sections reports/hw4-c3/spi20/elf-sections.txt --spi20-cache reports/hw4-c3/spi20/CMakeCache.txt --spi20-commands reports/hw4-c3/spi20/compile_commands.json --spi20-bin build-hw4-c3-spi20/loco_esp32_display_probe.bin | tee reports/hw4-c3/variant-comparison.md
           '
           cat firmware/esp32_display_probe/reports/hw4-c3/variant-comparison.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4

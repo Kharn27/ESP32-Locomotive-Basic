@@ -78,6 +78,16 @@ bool hw4_dp_record(Hw4DispProfile *p,const Hw4DpFrame *f)
         p->gap_sum_us+=gap;
         ++p->gaps;
     }
+    const uint64_t gap=p->completed
+        ? f->completed_us-p->last_completed_us:0U;
+    Hw4DpTrace *trace=&p->trace[p->trace_next];
+    trace->seq=p->completed+1U;
+    trace->bands=f->bands;
+    trace->scrolls=f->scrolls;
+    trace->wall_us=f->wall_us>UINT32_MAX ? UINT32_MAX:(uint32_t)f->wall_us;
+    trace->gap_us=gap>UINT32_MAX ? UINT32_MAX:(uint32_t)gap;
+    p->trace_next=(p->trace_next+1U)%HW4_DP_TRACE_CAP;
+    if(p->trace_size<HW4_DP_TRACE_CAP) ++p->trace_size;
     class_add(&p->classes[category],f,other);
     if(f->scrolls) class_add(&p->classes[HW4_DP_SCROLL_ASSOCIATED],f,other);
     ++p->completed;

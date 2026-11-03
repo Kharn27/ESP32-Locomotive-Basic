@@ -178,6 +178,18 @@ if(BUILD_TESTING)
 endif()
 
 
+# J1.23-C1: native logical LOCATE/BORDER events, isolated CORE regression
+# reading J1.23-A immutable program and RUN/printer witnesses.
+if(BUILD_TESTING)
+    add_executable(test_j1_23_c1_locate_border_native
+                   tests/test_j1_23_c1_locate_border_native.c)
+    target_link_libraries(test_j1_23_c1_locate_border_native PRIVATE
+                          basic_session_runtime basic_variable_store)
+    add_test(NAME j1_23_c1_locate_border_native
+             COMMAND test_j1_23_c1_locate_border_native
+             "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
 # J1.23-B: only 82 BORDER and A9 LOCATE tokenization/LIST.
 # CPC J1.23-A original/repeat immutable RAM and LIST printer fixtures.
 # RUN is deliberately not enabled for either command.

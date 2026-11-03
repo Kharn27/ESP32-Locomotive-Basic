@@ -1,4 +1,4 @@
-/* HW4-DIAG-A: historical CPC wording only for missing numbered deletion. */
+/* HW4-DIAG-A / SYNTAX-A: exact CPC wording with strictly bounded origins. */
 #include "cpc_diag_policy.h"
 #include "basic_variable_ref.h"
 #include "basic_variable_binding.h"
@@ -21,6 +21,26 @@ static bool numbered_deletion(const uint8_t *source,size_t length)
     return i==length;
 }
 
+/* This is NOT a generic unknown-keyword parser. The mandate explicitly
+ * identifies LISTT as an invalid direct command. Without a CORE-level
+ * recognized-vs-unrecognized signal, do not widen this ROM-backed one-case
+ * classification to every BS_UNSUPPORTED_DIRECT (e.g. valid GOTO/MODE). */
+static bool exact_listt_typo(const uint8_t *source, size_t length)
+{
+    static const uint8_t word[]={'L','I','S','T','T'};
+    size_t start=0U, end=length;
+    if(source==NULL) return false;
+    while(start<end && source[start]==' ') ++start;
+    while(end>start && source[end-1U]==' ') --end;
+    if(end-start!=sizeof(word)) return false;
+    for(size_t i=0U;i<sizeof(word);++i) {
+        uint8_t c=source[start+i];
+        if(c>='a' && c<='z') c=(uint8_t)(c-'a'+'A');
+        if(c!=word[i]) return false;
+    }
+    return true;
+}
+
 CpcDiagCategory cpc_diag_policy_select(const uint8_t *source,size_t length,
                                        BSRResult result)
 {
@@ -31,6 +51,13 @@ CpcDiagCategory cpc_diag_policy_select(const uint8_t *source,size_t length,
        result.session.listing_status==BL_OK &&
        numbered_deletion(source,length))
         return CPC_DIAG_LINE_DOES_NOT_EXIST;
+    if(result.status==BSR_SESSION_ERROR &&
+       result.session.status==BS_UNSUPPORTED_DIRECT &&
+       result.session.tokenizer_status==BT_OK &&
+       result.session.program_status==BP_OK &&
+       result.session.listing_status==BL_OK &&
+       exact_listt_typo(source,length))
+        return CPC_DIAG_DIRECT_LISTT_SYNTAX;
     return CPC_DIAG_HOST_GENERIC;
 }
 
@@ -46,6 +73,7 @@ const char *cpc_diag_policy_category(CpcDiagCategory category)
         case CPC_DIAG_DIVISION_INTEGER_ZERO: return "INTEGER_F9_DIVISION_BY_ZERO_CPC";
         case CPC_DIAG_GOTO_MISSING_TARGET: return "GOTO_MISSING_TARGET_CPC";
         case CPC_DIAG_IF_MISSING_TARGET: return "IF_TAKEN_MISSING_TARGET_CPC";
+        case CPC_DIAG_DIRECT_LISTT_SYNTAX: return "DIRECT_LISTT_SYNTAX_ROM_CB49";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -63,21 +91,55 @@ const char *cpc_diag_policy_message(CpcDiagCategory category)
         case CPC_DIAG_DIVISION_INTEGER_ZERO: return "Division by zero";
         case CPC_DIAG_GOTO_MISSING_TARGET: return "Line does not exist";
         case CPC_DIAG_IF_MISSING_TARGET: return "Line does not exist";
+        case CPC_DIAG_DIRECT_LISTT_SYNTAX: return "Syntax error";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
 }
 
-bool cpc_diag_policy_write(CpcText *text,CpcDiagCategory category)
+CpcDiagOrigin cpc_diag_policy_direct_origin(CpcDiagCategory category)
+{
+    return category==CPC_DIAG_DIRECT_LISTT_SYNTAX
+           ? CPC_DIAG_ORIGIN_DIRECT_LISTT_ROM_CB49 : CPC_DIAG_ORIGIN_HOST;
+}
+
+/* Literal "Syntax error" is the CPC ROM error-table wording:
+ * basic.asm CB49: LD A,$02; CD98: "Syntax" + compressed " error".
+ * The LISTT input itself is from the Pilotage mandate, not a newly
+ * acquired independent CPC capture. Never synthesize ERR/ERL. */
+bool cpc_diag_policy_format_direct(CpcDiagCategory category,
+                                   uint8_t *output, size_t capacity,
+                                   size_t *written)
 {
     static const uint8_t generic[]="ERROR\n";
     static const uint8_t line_absent[]="Line does not exist\n";
-    if(text==NULL) return false;
-    if(category==CPC_DIAG_HOST_GENERIC)
-        return cpc_text_write(text,generic,sizeof(generic)-1U);
-    if(category==CPC_DIAG_LINE_DOES_NOT_EXIST)
-        return cpc_text_write(text,line_absent,sizeof(line_absent)-1U);
-    return false;
+    static const uint8_t syntax[]="Syntax error\n";
+    const uint8_t *bytes;
+    size_t n;
+    if(output==NULL || written==NULL) return false;
+    switch(category) {
+        case CPC_DIAG_HOST_GENERIC:
+            bytes=generic; n=sizeof(generic)-1U; break;
+        case CPC_DIAG_LINE_DOES_NOT_EXIST:
+            bytes=line_absent; n=sizeof(line_absent)-1U; break;
+        case CPC_DIAG_DIRECT_LISTT_SYNTAX:
+            bytes=syntax; n=sizeof(syntax)-1U; break;
+        default: return false;
+    }
+    if(capacity<n) return false;
+    memcpy(output,bytes,n);
+    *written=n;
+    return true;
+}
+
+bool cpc_diag_policy_write(CpcText *text,CpcDiagCategory category)
+{
+    uint8_t bytes[sizeof("Line does not exist\n")];
+    size_t n=0U;
+    if(text==NULL ||
+       !cpc_diag_policy_format_direct(category,bytes,sizeof(bytes),&n))
+        return false;
+    return cpc_text_write(text,bytes,n);
 }
 
 /* Identify the first potentially failing flow statement actually reached

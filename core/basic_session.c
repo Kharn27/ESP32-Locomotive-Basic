@@ -100,6 +100,80 @@ static int command_is(const uint8_t *s, size_t n, const char *literal)
     return i == n;
 }
 
+/* Source of positive recognition: Locomotive BASIC 1.1 ROM basic.asm,
+ * E418 (A..Z buckets), keyword spellings E44C..E720. Includes functions,
+ * operators, keywords absent from this project's limited C99 tokenizer,
+ * and the built-in AUTO/MODE/PAPER/GOTO direct commands. This is a lexer
+ * guard, NOT a second statement parser and NOT a CPC ERR classifier.
+ *
+ * The ROM also has multiword forms "ON SQ", "ON BREAK", "GO TO", "GO SUB",
+ * and a few symbol tokens. Their leading words ON/GOTO/GOSUB are in this
+ * positive list; multiword / punctuation forms remain unclassified below.
+ * TAGOFF is the canonical token (the E493 table comment says TAFOFF). */
+static const char cpc_rom_known_words[] =
+    "ABS AFTER AND ASC ATN AUTO "
+    "BIN$ BORDER "
+    "CALL CAT CHAIN CHR$ CINT CLEAR CLG CLOSEIN CLOSEOUT CLS "
+    "CONT COPYCHR$ COS CREAL CURSOR "
+    "DATA DEC$ DEF DEFINT DEFREAL DEFSTR DEG DELETE DERR DI "
+    "DIM DRAW DRAWR "
+    "EDIT EI ELSE END ENT ENV EOF ERASE ERL ERR ERROR EVERY EXP "
+    "FILL FIX FN FOR FRAME FRE "
+    "GOSUB GOTO GRAPHICS "
+    "HEX$ HIMEM "
+    "IF INK INKEY INKEY$ INP INPUT INSTR INT "
+    "JOY KEY "
+    "LEFT$ LEN LET LINE LIST LOAD LOCATE LOG LOG10 LOWER$ "
+    "MASK MAX MEMORY MERGE MID$ MIN MOD MODE MOVE MOVER "
+    "NEW NEXT NOT "
+    "ON OPENIN OPENOUT OR ORIGIN OUT "
+    "PAPER PEEK PEN PI PLOT PLOTR POKE POS PRINT "
+    "RAD RANDOMIZE READ RELEASE REM REMAIN RENUM RESTORE "
+    "RESUME RETURN RIGHT$ RND ROUND RUN "
+    "SAVE SGN SIN SOUND SPACE$ SPC SPEED SQ SQR STEP STOP "
+    "STR$ STRING$ SWAP SYMBOL "
+    "TAB TAG TAGOFF TAN TEST TESTR THEN TIME TO TROFF TRON "
+    "UNT UPPER$ USING "
+    "VAL VPOS "
+    "WAIT WEND WHILE WIDTH WINDOW WRITE "
+    "XOR XPOS YPOS ZONE";
+
+/* Exact positive look-up, not prefix matching: "RUNN" must not acquire
+ * the recognized RUN status. No temporary copies or mutable state. */
+static int cpc_rom_word_known(const uint8_t *source, size_t length)
+{
+    const char *p=cpc_rom_known_words;
+    while(*p!='\0') {
+        size_t i=0u;
+        int equal=1;
+        while(p[i]!='\0' && p[i]!=' ') {
+            if(i>=length || upper(source[i])!=(uint8_t)p[i]) equal=0;
+            ++i;
+        }
+        if(equal && i==length) return 1;
+        p+=i;
+        if(*p==' ') ++p;
+    }
+    return 0;
+}
+
+/* Fail closed: classify ONLY a complete, isolated ASCII alphabetic
+ * keyword-like direct word absent from the ROM lexicon. No arguments,
+ * punctuation, quotations, digits, tabs, separators, variable suffix,
+ * assignment or other grammar are inferred. A single letter can be a
+ * variable name and remains ambiguous. All ambiguous forms retain the
+ * historical BS_UNSUPPORTED_DIRECT. */
+static int direct_word_proven_unknown(const uint8_t *source, size_t length)
+{
+    if(length<2u) return 0;
+    for(size_t i=0u;i<length;++i) {
+        const uint8_t c=source[i];
+        if(!((c>='A' && c<='Z') || (c>='a' && c<='z')))
+            return 0;
+    }
+    return !cpc_rom_word_known(source,length);
+}
+
 static int has_direct_separator(const uint8_t *s, size_t n)
 {
     size_t i;
@@ -219,5 +293,7 @@ BSResult bs_process_line(BasicProgram *program,
         *written = 0u;
         return simple(BS_OK);
     }
+    if(direct_word_proven_unknown(source+cursor,i-cursor))
+        return simple(BS_UNKNOWN_DIRECT);
     return simple(BS_UNSUPPORTED_DIRECT);
 }

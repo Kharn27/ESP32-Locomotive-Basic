@@ -30,7 +30,8 @@ FAMILIES = {
         "j1-17-c-a-pen-cpc.yml"),
     "HW4": ("hw4-c3-b1-scroll.yml", "hw4-c3-b2-scroll.yml",
             "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
-            "hw4-scroll-opt-a0-memory.yml"),
+            "hw4-scroll-opt-a0-memory.yml",
+            "hw4-disp-profile-c3.yml"),
     "XTENSA": ("ci-xtensa.yml",),
 }
 EXPECTED_ROUTES = {
@@ -146,6 +147,16 @@ HW4_A0_PATHS = (
     "docs/HW4-SCROLL-OPT-A0-baseline.md",
     ".github/workflows/hw4-scroll-opt-a0-memory.yml",
 )
+# C3 enters the closed inventory; preserve exact triggering routes and reject
+# missing/overbroad edits. A0 historical filters remain immutable.
+HW4_C3 = "hw4-disp-profile-c3.yml"
+HW4_C3_PATHS = (
+    "firmware/components/cyd_ili9341/**",
+    "firmware/esp32_display_probe/**",
+    "video/hw4_disp_profile.*",
+    "tools/ci/hw4_disp_spi_*.py",
+    ".github/workflows/hw4-disp-profile-c3.yml",
+)
 
 
 class UnsafeRoute(ValueError):
@@ -210,7 +221,7 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(expected) == 33 and len(set(expected)) == 33,
+    demand(len(expected) == 34 and len(set(expected)) == 34,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(set(sources) == set(expected), "UNKNOWN_OR_MISSING_WORKFLOW")
     a0_paths = filters(sources[HW4_A0])
@@ -218,6 +229,11 @@ def audit(sources):
            len(a0_paths) == len(HW4_A0_PATHS) and
            set(a0_paths) == set(HW4_A0_PATHS),
            "HW4_A0_FILTER_CONTRACT_MISMATCH")
+    c3_paths = filters(sources[HW4_C3])
+    demand(c3_paths is not None and
+           len(c3_paths) == len(HW4_C3_PATHS) and
+           set(c3_paths) == set(HW4_C3_PATHS),
+           "HW4_C3_FILTER_CONTRACT_MISMATCH")
     for name, src in sources.items():
         demand(re.search(r"(?m)^  workflow_dispatch:", src),
                "MANUAL_DISPATCH_REMOVED_" + name)
@@ -903,7 +919,13 @@ def negative_tests(sources):
     missing_filter = sources[HW4_A0].replace(
         "      - 'tools/ci/hw4_a0_compare_memory.py'\n", "")
     demand(missing_filter != sources[HW4_A0], "A0_FILTER_NEGATIVE_INERT")
+    c3_missing_filter = sources[HW4_C3].replace(
+        "      - 'tools/ci/hw4_disp_spi_*.py'\n", "")
+    demand(c3_missing_filter != sources[HW4_C3],
+           "C3_FILTER_NEGATIVE_INERT")
     altered = {
+        "C3_FILTER_REMOVED": ({**sources, HW4_C3: c3_missing_filter},
+                              "HW4_C3_FILTER_CONTRACT_MISMATCH"),
         "UNKNOWN_WORKFLOW": ({**sources, "unknown-extra.yml": sources[HW4_A0]},
                              "UNKNOWN_OR_MISSING_WORKFLOW"),
         "REMOVED_A0": ({k: v for k, v in sources.items() if k != HW4_A0},
@@ -972,7 +994,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=33 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=34 FAMILIES=5")
 
 
 if __name__ == "__main__":

@@ -229,7 +229,7 @@ static int test_direct_rom_classification(void)
         "X", "A=1", "LISTT 1", "RUNN 99",
         "LISTT=1", "RUNA?", "GO TO 10", "PRINT?",
         "GOTO999", "A$", "LISTT  ", /* trimmed alphabetic: handled below */
-        "LISTT\\t"
+        "LISTT\t"
     };
     Fixture f;
     Snapshot snap;
@@ -263,13 +263,13 @@ static int test_direct_rom_classification(void)
     save(&f,&snap);
     CHECK(run(&f,"LISTT:RUN").status==BS_MULTIPLE_DIRECT);
     CHECK(same(&f,&snap)==0);
-    static const uint8_t controls[]={'L','I','S','T','T','\\r'};
+    static const uint8_t controls[]={'L','I','S','T','T','\r'};
     CHECK(run_bytes(&f,controls,sizeof(controls),sizeof(f.tmp),
                     sizeof(f.out)).status==BS_MALFORMED_INPUT);
     CHECK(same(&f,&snap)==0);
     CHECK(run(&f,"LIST").status==BS_OK);
-    CHECK(f.written==strlen("10 PRINT 2\\n"));
-    CHECK(memcmp(f.out,"10 PRINT 2\\n",f.written)==0);
+    CHECK(f.written==strlen("10 PRINT 2\n"));
+    CHECK(memcmp(f.out,"10 PRINT 2\n",f.written)==0);
     return 0;
 }
 

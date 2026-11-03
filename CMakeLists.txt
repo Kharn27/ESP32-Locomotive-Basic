@@ -190,6 +190,18 @@ if(BUILD_TESTING)
              "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
+# J1.24-B1: WHILE D6 / WEND D5 lexical-only CPC RAM + PRE-RUN LIST.
+# 20 original/repeat authentic ROM-backed cases; no loop execution.
+if(BUILD_TESTING)
+    add_executable(test_j1_24_b1_while_wend_token_list
+                   tests/test_j1_24_b1_while_wend_token_list.c)
+    target_link_libraries(test_j1_24_b1_while_wend_token_list PRIVATE
+                          basic_session_runtime basic_variable_store)
+    add_test(NAME j1_24_b1_while_wend_cpc_lexical
+             COMMAND test_j1_24_b1_while_wend_token_list
+             "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
 # J1.23-B: only 82 BORDER and A9 LOCATE tokenization/LIST.
 # CPC J1.23-A original/repeat immutable RAM and LIST printer fixtures.
 # RUN is deliberately not enabled for either command.

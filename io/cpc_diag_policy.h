@@ -17,6 +17,7 @@ typedef enum {
     CPC_DIAG_DIVISION_INTEGER_ZERO,
     CPC_DIAG_GOTO_MISSING_TARGET,
     CPC_DIAG_IF_MISSING_TARGET,
+    CPC_DIAG_DIRECT_LISTT_SYNTAX, /* only the explicitly attested typo */
     CPC_DIAG_COUNT
 } CpcDiagCategory;
 
@@ -29,7 +30,8 @@ typedef enum {
     CPC_DIAG_ORIGIN_NATIVE_NEXT_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE,
-    CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE
+    CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_DIRECT_LISTT_ROM_CB49 /* ROM code 2, not CPC live oracle */
 } CpcDiagOrigin;
 
 typedef struct {
@@ -57,13 +59,23 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
                                   size_t *written);
 bool cpc_diag_policy_write_step(CpcText *text, CpcStepDiagnostic diagnostic);
 
-/* Only a genuine numbered-line deletion BS_NOT_FOUND can select CPC text.
- * Other errors (including direct GOTO, LISTT, UART or executor failures) stay
- * generic. No BASIC semantics, status enums or Ready policy are altered. */
+/* Direct input classification is deliberately closed: absent numbered-line
+ * deletion and the exact LISTT typo (case-insensitive, outer spaces) are the
+ * only witnessed paths. BS_UNSUPPORTED_DIRECT on its own proves NOTHING:
+ * GOTO, MODE and other valid-but-unimplemented commands remain host generic.
+ * No BASIC semantics, core status enums or Ready policy are altered. */
 CpcDiagCategory cpc_diag_policy_select(const uint8_t *source, size_t length,
                                        BSRResult result);
 const char *cpc_diag_policy_category(CpcDiagCategory category);
 const char *cpc_diag_policy_message(CpcDiagCategory category);
+/* Provenance for the direct-input policy only. ROM_CB49 confirms the wording
+ * of CPC code 2, not a fresh CPC run of LISTT. Other direct classes are HOST. */
+CpcDiagOrigin cpc_diag_policy_direct_origin(CpcDiagCategory category);
+/* Byte-exact formatter; insufficient capacity and rejected categories preserve
+ * the ENTIRE buffer and count. No Ready; caller applies existing Ready policy. */
+bool cpc_diag_policy_format_direct(CpcDiagCategory category,
+                                   uint8_t *output, size_t capacity,
+                                   size_t *written);
 /* Exactly one diagnostic plus LF, no Ready and no hidden allocation. */
 bool cpc_diag_policy_write(CpcText *text, CpcDiagCategory category);
 #endif

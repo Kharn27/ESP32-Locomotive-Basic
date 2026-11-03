@@ -1,0 +1,8 @@
+exit code: 0
+Using configuration file: /__w/_temp/j124a/original/ZERO_LITERAL/run/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j124a/original/ZERO_LITERAL/run/screenshot_20261103_110438.png
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j124a/original/ZERO_LITERAL/run/screenshot_20261103_110446.png
+
+[stderr]

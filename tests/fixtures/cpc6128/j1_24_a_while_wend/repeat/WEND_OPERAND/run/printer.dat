@@ -1,0 +1,7 @@
+J124_DIAG_BEGIN
+ 0 
+ 20 
+10 WHILE 0
+20                                                                                                 WEND 1
+30 PRINT #8,"AFTER"
+40 END

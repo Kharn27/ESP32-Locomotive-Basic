@@ -1,4 +1,4 @@
-idf_component_register(SRCS "cyd_ili9341.c" INCLUDE_DIRS "include" REQUIRES esp_lcd esp_driver_spi esp_driver_gpio freertos heap)
+idf_component_register(SRCS "cyd_ili9341.c" INCLUDE_DIRS "include" REQUIRES esp_lcd esp_driver_spi esp_driver_gpio freertos heap esp_timer)
 if(NOT DEFINED HW3_LCD_BGR)
   set(HW3_LCD_BGR 0)
 endif()

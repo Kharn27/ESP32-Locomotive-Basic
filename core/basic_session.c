@@ -143,10 +143,10 @@ static const char cpc_rom_known_words[] =
 static int cpc_rom_word_known(const uint8_t *source, size_t length)
 {
     const char *p=cpc_rom_known_words;
-    while(*p!='\\0') {
+    while(*p!='\0') {
         size_t i=0u;
         int equal=1;
-        while(p[i]!='\\0' && p[i]!=' ') {
+        while(p[i]!='\0' && p[i]!=' ') {
             if(i>=length || upper(source[i])!=(uint8_t)p[i]) equal=0;
             ++i;
         }

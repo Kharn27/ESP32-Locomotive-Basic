@@ -41,7 +41,8 @@ bool hw4_dp_trace_at(const Hw4DispProfile *p,uint32_t index,Hw4DpTrace *out)
 {
     if(p==NULL || out==NULL || index>=p->trace_size ||
        p->trace_size>HW4_DP_TRACE_CAP ||
-       p->trace_next>=HW4_DP_TRACE_CAP) return false;
+       p->trace_next>=HW4_DP_TRACE_CAP ||
+       p->completed<p->trace_size) return false;
     const uint32_t pos=(p->trace_next+HW4_DP_TRACE_CAP-p->trace_size+index)
                        %HW4_DP_TRACE_CAP;
     const uint8_t *const src=p->trace[pos];

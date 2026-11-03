@@ -144,14 +144,13 @@ static void disp_report(const char *stage)
            s_disp_run_seq,stage,(unsigned)p->trace_size,
            (unsigned)p->completed,(unsigned)(p->completed>p->trace_size));
     for(unsigned i=0U;i<p->trace_size;++i) {
-        const unsigned idx=(p->trace_next+HW4_DP_TRACE_CAP-p->trace_size+i)
-            %HW4_DP_TRACE_CAP;
-        const Hw4DpTrace *t=&p->trace[idx];
+        Hw4DpTrace t={0};
+        if(!hw4_dp_trace_at(p,i,&t)) continue;
         printf("HW4-DISP-PROFILE TRACE run=%u seq=%u bands=%u "
                "scrolls=%u wall_us=%u completion_gap_us=%u\n",
-               s_disp_run_seq,(unsigned)t->seq,(unsigned)t->bands,
-               (unsigned)t->scrolls,(unsigned)t->wall_us,
-               (unsigned)t->gap_us);
+               s_disp_run_seq,(unsigned)t.seq,(unsigned)t.bands,
+               (unsigned)t.scrolls,(unsigned)t.wall_us,
+               (unsigned)t.gap_us);
     }
     for(unsigned i=0U;i<HW4_DP_CLASSES;++i) {
         const Hw4DpClass *c=&p->classes[i];
@@ -167,14 +166,16 @@ static void disp_report(const char *stage)
                (unsigned long long)(c->n ? c->wall_us/c->n:0U),
                (unsigned)hw4_dp_quantile_upper(c,50U),
                (unsigned)hw4_dp_quantile_upper(c,95U),(unsigned)c->max_us,
-               (unsigned long long)c->bands,(unsigned long long)c->bytes,
+               (unsigned long long)c->bands,
+               (unsigned long long)hw4_dp_bytes(c),
                (unsigned long long)c->wall_us,
                (unsigned long long)c->render_pack_us,
                (unsigned long long)c->submit_us,
                (unsigned long long)c->wait_us,
-               (unsigned long long)c->other_us,
+               (unsigned long long)hw4_dp_other_us(c),
                (unsigned long long)c->scroll_cpu_wall_us,
-               (unsigned long long)c->scrolls,(unsigned)c->zero_scroll,
+               (unsigned long long)c->scrolls,
+               (unsigned)hw4_dp_zero_scroll(c),
                (unsigned)c->one_scroll,(unsigned)c->multi_scroll,
                (unsigned)c->max_scrolls);
     }

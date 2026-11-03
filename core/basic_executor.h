@@ -36,7 +36,11 @@ typedef enum {
     BE_EVENT_RECEIVER_REQUIRED,
     BE_NO_EVENT_SPACE,
     BE_INVALID_INK, /* only four measured CPC boundaries, host diagnostic */
-    BE_INVALID_PAPER /* J1.19-A: host cause, NOT CPC numeric ERR=5 */
+    BE_INVALID_PAPER, /* J1.19-A: host cause, NOT CPC numeric ERR=5 */
+    BE_INVALID_LOCATE, /* J1.23-A observed rejected 0/-1 coordinate, CPC ERR=5 */
+    BE_INVALID_BORDER, /* J1.23-A rejected -1 ink, CPC ERR=5 */
+    BE_OPERAND_MISSING, /* J1.23-A BORDER 1, observed CPC ERR=22 */
+    BE_DIAG_CONTRADICTORY /* LOCATE 1: screen syntax, printer ERR=0 */
 } BEStatus;
 
 /* Typed, caller-owned video event, never encoded in PRINT.
@@ -53,12 +57,21 @@ typedef enum {
  * The three historical fields retain their offsets and initializer order.
  * Existing ABI remains unchanged: no new fields or shifted offsets.
  * The TEXT_PAPER type deliberately uses the existing logical-index payload;
- * HW4 consumers must reject unknown types during preflight. */
+ * HW4 consumers must reject unknown types during preflight.
+ * J1.23-C1 payload contracts without ABI/offset changes:
+ *   TEXT_CURSOR: pen=x (1-based), ink=y (1-based), colour=0.
+ *   SET_BORDER: pen=border1 (CPC 0..27 in witnessed cases),
+ *               ink=border2 if supplied, otherwise 0;
+ *               colour=1 iff the second argument was supplied, else 0.
+ * Only the tagged type determines these meanings; PEN/INK/PAPER/CLS
+ * payloads and positional initializers remain unchanged. No TFT projection. */
 typedef enum {
     BE_VIDEO_SET_TEXT_PEN = 1,
     BE_VIDEO_SET_INK = 2,
     BE_VIDEO_CLEAR_TEXT = 3, /* CLS 8A: text clear; no PRINT bytes */
-    BE_VIDEO_SET_TEXT_PAPER = 4 /* PAPER BA: logical CPC text background */
+    BE_VIDEO_SET_TEXT_PAPER = 4, /* PAPER BA: logical CPC text background */
+    BE_VIDEO_SET_TEXT_CURSOR = 5, /* LOCATE A9: logical CPC 1-based x,y */
+    BE_VIDEO_SET_BORDER = 6 /* BORDER 82: logical CPC ink(s), no RGB */
 } BEVideoEventType;
 typedef struct {
     BEVideoEventType type;
@@ -159,7 +172,7 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
 
 /* Exactly one stored BASIC line per call. Explicit ordered video side channel,
  * fixed caller-owned capacity; no allocation or hardware dependency.
- * events=NULL is allowed only for capacity=0; reached PEN/INK/CLS/PAPER returns
+ * events=NULL is allowed only for capacity=0; reached video commands return
  * BE_EVENT_RECEIVER_REQUIRED without consuming anything.
  * On BE_OK *written and *event_written report counts (including zeros).
  * On all errors and BE_END neither count, buffer, cursor nor store changes.

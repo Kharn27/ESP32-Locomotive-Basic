@@ -104,6 +104,42 @@ static BEStatus emit_clear_event(BEEventEmitter *events, size_t print_offset)
     return BE_OK;
 }
 
+/* J1.23-C1: logical events only. The existing 16-byte Xtensa payload is
+ * re-used by TYPE; the known HW4 preflight rejects both unknown tags before
+ * commit. No renderer, cursor pixel position, RGB or flash period here. */
+static BEStatus emit_locate_event(BEEventEmitter *events, uint8_t x,
+                                  uint8_t y, size_t print_offset)
+{
+    if (events->length == SIZE_MAX) return BE_NO_EVENT_SPACE;
+    if (events->data != NULL) {
+        BEVideoEvent *event = &events->data[events->length];
+        event->type = BE_VIDEO_SET_TEXT_CURSOR;
+        event->pen = x;
+        event->ink = y;
+        event->colour = 0u;
+        event->print_offset = print_offset;
+    }
+    ++events->length;
+    return BE_OK;
+}
+
+static BEStatus emit_border_event(BEEventEmitter *events, uint8_t first,
+                                  uint8_t second, int has_second,
+                                  size_t print_offset)
+{
+    if (events->length == SIZE_MAX) return BE_NO_EVENT_SPACE;
+    if (events->data != NULL) {
+        BEVideoEvent *event = &events->data[events->length];
+        event->type = BE_VIDEO_SET_BORDER;
+        event->pen = first;
+        event->ink = (uint8_t)(has_second ? second : 0u);
+        event->colour = (uint8_t)(has_second ? 1u : 0u);
+        event->print_offset = print_offset;
+    }
+    ++events->length;
+    return BE_OK;
+}
+
 /* Distinct-object relational pointer comparisons are undefined by C99.
  * uintptr_t is available on Linux/ESP32; otherwise caller guarantees
  * disjointness. All nonzero spans must describe valid accessible objects. */
@@ -1154,6 +1190,93 @@ static BEStatus ink_arguments(const uint8_t *body, size_t length,
     return BE_OK;
 }
 
+/* J1.23-A/B: only the 20 CPC-measured LOCATE/BORDER operands.
+ * Decode canonical CPC small/byte numerals, optional ONE measured '+'.
+ * No generic BASIC arithmetic, no unmeasured viewport or palette bounds. */
+static BEStatus locate_border_operand(const uint8_t *body, size_t length,
+                                      size_t *pos, int locate, int second,
+                                      int *value, int *has_plus)
+{
+    int left, right;
+    int expected_left = locate ? (second ? 2 : 1) : (second ? 3 : 1);
+    int expected_right = locate ? (second ? 3 : 2) : (second ? 4 : 2);
+    BEStatus status = ink_literal(body, length, pos,
+                                  locate ? 41u : 27u, &left);
+    if (status != BE_OK) return status;
+    *has_plus = 0;
+    if (*pos < length && body[*pos] == 0xf4u) {
+        if (left != expected_left) return BE_UNSUPPORTED;
+        ++*pos;
+        status = ink_literal(body, length, pos, 9u, &right);
+        if (status != BE_OK) return status;
+        if (right != expected_right) return BE_UNSUPPORTED;
+        left += right;
+        *has_plus = 1;
+    }
+    *value = left;
+    return BE_OK;
+}
+
+static BEStatus locate_border_arguments(const uint8_t *body, size_t length,
+                                        size_t *pos, int locate,
+                                        uint8_t *first, uint8_t *second,
+                                        int *has_second)
+{
+    size_t p = *pos;
+    int a, b = 0, add_a, add_b = 0, two = 0;
+    BEStatus status;
+    skip_spaces(body, length, &p);
+    if (p == length || body[p] == 0x01u) return BE_BAD_SEQUENCE;
+    status = locate_border_operand(body, length, &p, locate, 0, &a, &add_a);
+    if (status != BE_OK) return status;
+    if (p < length && body[p] == (uint8_t)',') {
+        ++p;
+        if (p == length || body[p] == 0x01u) {
+            if (!locate && a == 1 && !add_a && p == length)
+                return BE_OPERAND_MISSING; /* independently observed ERR22 */
+            return BE_BAD_SEQUENCE;
+        }
+        status = locate_border_operand(body, length, &p, locate, 1, &b, &add_b);
+        if (status != BE_OK) return status;
+        two = 1;
+    }
+    if (locate) {
+        if (!two) {
+            if (a == 1 && !add_a && p == length)
+                return BE_DIAG_CONTRADICTORY; /* CPC screen syntax, ERR=0 */
+            return BE_UNSUPPORTED;
+        }
+        if (!add_a && !add_b &&
+            ((a == 0 && b == 1) || (a == 1 && b == 0) ||
+             (a == -1 && b == 1)))
+            return BE_INVALID_LOCATE; /* CPC screen ERR=5, ERL=10 */
+        if (!((add_a && add_b && a == 3 && b == 5) ||
+              (!add_a && !add_b &&
+               ((a == 1 && b == 1) || (a == 40 && b == 25) ||
+                (a == 2 && b == 3) || (a == 41 && b == 1) ||
+                (a == 1 && b == 26)))))
+            return BE_UNSUPPORTED;
+    } else {
+        if (!add_a && a == -1 && (!two || (!add_b && b == 1)))
+            return BE_INVALID_BORDER; /* CPC screen ERR=5, ERL=10 */
+        if (two) {
+            if (!((add_a && add_b && a == 3 && b == 7) ||
+                  (!add_a && !add_b &&
+                   ((a == 0 && b == 26) || (a == 26 && b == 0) ||
+                    (a == 26 && b == 27)))))
+                return BE_UNSUPPORTED;
+        } else if (add_a || !(a == 0 || a == 26 || a == 27)) {
+            return BE_UNSUPPORTED;
+        }
+    }
+    /* The following statement delimiter (or EOS) is checked by execute_line. */
+    *first = (uint8_t)a;
+    *second = (uint8_t)b;
+    *has_second = two;
+    *pos = p;
+    return BE_OK;
+}
+
 /* Parse/execute precisely the reached prefix of one numbered line.
  * A successful GOTO returns immediately; the suffix is not inspected.
  * next is written only on success. No output passes occur before validation. */
@@ -1208,6 +1331,23 @@ static BEStatus execute_line(const BasicProgram *program,
             status = ink_arguments(body, length, &pos, &ink, &colour);
             if (status != BE_OK) return status;
             status = emit_ink_event(events, ink, colour, out->length);
+            if (status != BE_OK) return status;
+        } else if (token == 0xa9u) { /* LOCATE: logical text cursor. */
+            uint8_t x, y;
+            int has_second;
+            status = locate_border_arguments(body, length, &pos, 1,
+                                             &x, &y, &has_second);
+            if (status != BE_OK) return status;
+            status = emit_locate_event(events, x, y, out->length);
+            if (status != BE_OK) return status;
+        } else if (token == 0x82u) { /* BORDER: logical CPC ink selection. */
+            uint8_t first, second;
+            int has_second;
+            status = locate_border_arguments(body, length, &pos, 0,
+                                             &first, &second, &has_second);
+            if (status != BE_OK) return status;
+            status = emit_border_event(events, first, second,
+                                       has_second, out->length);
             if (status != BE_OK) return status;
         } else if (token == 0xbfu) { /* PRINT */
             argument_start = pos;
@@ -2264,6 +2404,26 @@ BEStatus be_step(BasicExecutor *executor, uint8_t *output,
                  size_t output_capacity, size_t *written)
 {
     size_t ignored_events = 0u;
-    return be_step_events(executor, output, output_capacity, written,
-                          NULL, 0u, &ignored_events);
+    BEStatus status = be_step_events(executor, output, output_capacity, written,
+                                     NULL, 0u, &ignored_events);
+    /* Frozen J1.23-B lexical CTest used the legacy no-event API and
+     * explicitly expects UNKNOWN for the two previously non-executable
+     * first statements. Preserve its fail-closed status, without touching
+     * stored tests. The typed API instead reports RECEIVER_REQUIRED. */
+    if (status == BE_EVENT_RECEIVER_REQUIRED &&
+        executor != NULL && executor->program != NULL &&
+        executor->statement_offset == 0u) {
+        const BasicProgram *program = executor->program;
+        BasicProgramLine line;
+        size_t at = executor->cursor;
+        if (bp_next(program, &at, &line) == BP_OK) {
+            const uint8_t *body = program->data + line.body_offset;
+            size_t p = 0u;
+            skip_spaces(body, line.body_length, &p);
+            if (p < line.body_length &&
+                (body[p] == 0xa9u || body[p] == 0x82u))
+                return BE_UNKNOWN_TOKEN;
+        }
+    }
+    return status;
 }

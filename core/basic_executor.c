@@ -983,16 +983,208 @@ static BEStatus for_match(const BasicProgram *program,
     return bp_status == BP_END ? BE_FOR_WITHOUT_NEXT : BE_BAD_PROGRAM;
 }
 
+
+/* J1.24-B2: bounded, read-only structural scanner for CPC statement
+ * boundaries. Opaque cache and numeric payload bytes never become a ':'
+ * or a WEND; quotes and CPC REM/apostrophe end scanning. This is NOT a
+ * parser/evaluator of skipped instructions, and never executes them. */
+static BEStatus while_statement_end(const uint8_t *b, size_t n,
+                                    size_t p, size_t *end)
+{
+    int quoted = 0;
+    while (p < n) {
+        uint8_t c = b[p];
+        if (c == (uint8_t)'"') {
+            quoted = !quoted;
+            ++p;
+        } else if (!quoted && c == 0x01u) {
+            *end = p;
+            return BE_OK;
+        } else if (!quoted && c == 0xc5u) {
+            *end = n;
+            return BE_OK;
+        } else if (!quoted && ((c >= 0x02u && c <= 0x04u) ||
+                               (c >= 0x0bu && c <= 0x0du))) {
+            BasicVariableRef ref;
+            BVRStatus st = bvr_decode(b, n, p, &ref);
+            if (st == BVR_TRUNCATED) return BE_TRUNCATED;
+            if (st != BVR_OK || ref.consumed == 0u) return BE_BAD_SEQUENCE;
+            p += ref.consumed;
+        } else if (!quoted && (c == 0x19u || c == 0x1au ||
+                               c == 0x1du || c == 0x1eu || c == 0x1fu)) {
+            size_t payload = c == 0x19u ? 1u : (c == 0x1fu ? 5u : 2u);
+            if (n - p <= payload) return BE_TRUNCATED;
+            p += payload + 1u;
+        } else {
+            ++p;
+        }
+    }
+    if (quoted) return BE_TRUNCATED;
+    *end = n;
+    return BE_OK;
+}
+
+static int while_line_contains_loop(const uint8_t *b, size_t n)
+{
+    size_t p = 0u;
+    while (p < n) {
+        size_t end;
+        skip_spaces(b, n, &p);
+        if (p == n || b[p] == 0xc5u ||
+            (b[p] == 0x01u && p + 1u < n && b[p + 1u] == 0xc0u))
+            return 0;
+        if (b[p] == 0xd6u || b[p] == 0xd5u) return 1;
+        if (while_statement_end(b, n, p, &end) != BE_OK) return 0;
+        if (end == n) return 0;
+        if (end + 1u == n || b[end + 1u] == 0xc0u) return 0;
+        p = end + 1u;
+    }
+    return 0;
+}
+
+/* The one B2 INTEGER condition grammar is: WHILE 0 or
+ * WHILE <explicit INTEGER ref> <one of six relations> <small INTEGER>.
+ * No general IF grammar, REAL5, STRING or arbitrary boolean expressions.
+ * The existing signed INTEGER evaluator performs the actual comparison. */
+static BEStatus while_condition(const uint8_t *b, size_t n, size_t start,
+                                 const BasicVariableStore *variables,
+                                 size_t *end, int *true_value)
+{
+    size_t p, rhs, at;
+    int16_t result;
+    BEStatus st = while_statement_end(b, n, start, end);
+    if (st != BE_OK) return st;
+    p = start;
+    skip_spaces(b, *end, &p);
+    if (p == *end) return BE_WHILE_OPERAND_MISSING;
+    if (b[p] == 0x0eu) {
+        ++p;
+        skip_spaces(b, *end, &p);
+        if (p != *end) return BE_WHILE_CONDITION_INVALID;
+    } else if (b[p] == 0x02u) {
+        BasicVariableRef ref;
+        BVRStatus br = bvr_decode(b, *end, p, &ref);
+        if (br != BVR_OK || ref.family != BVR_FAMILY_EXPLICIT ||
+            ref.explicit_type != BVR_TYPE_INTEGER || ref.consumed == 0u)
+            return BE_WHILE_CONDITION_INVALID;
+        p += ref.consumed;
+        skip_spaces(b, *end, &p);
+        if (p == *end) return BE_WHILE_OPERAND_MISSING;
+        if (b[p] != 0xeeu && b[p] != 0xefu && b[p] != 0xf0u &&
+            b[p] != 0xf1u && b[p] != 0xf2u && b[p] != 0xf3u)
+            return BE_WHILE_CONDITION_INVALID;
+        ++p;
+        skip_spaces(b, *end, &p);
+        if (p == *end) return BE_WHILE_OPERAND_MISSING;
+        rhs = p;
+        if (b[rhs] < 0x0eu || b[rhs] > 0x17u)
+            return BE_WHILE_CONDITION_INVALID;
+        p = rhs + 1u;
+        skip_spaces(b, *end, &p);
+        if (p != *end) return BE_WHILE_CONDITION_INVALID;
+    } else return BE_WHILE_CONDITION_INVALID;
+    at = start;
+    st = evaluate_logical_integer(b, *end, &at, variables, 0, &result);
+    if (st != BE_OK) return st;
+    if (at != *end) return BE_WHILE_CONDITION_INVALID;
+    *true_value = result != 0;
+    return BE_OK;
+}
+
+/* WEND 1 is stored by CPC but has contradictory RUN evidence: a screen
+ * Syntax error and an ERR=0 printer probe. The typed host cause is NOT an
+ * inferred CPC numeric error. This check works even on skipped WENDs. */
+static BEStatus while_wend_suffix(const uint8_t *b, size_t n, size_t p,
+                                  size_t *end)
+{
+    BEStatus st = while_statement_end(b, n, p, end);
+    if (st != BE_OK) return st;
+    skip_spaces(b, *end, &p);
+    if (p == *end) return BE_OK;
+    if (*end - p == 1u && b[p] == 0x0fu) return BE_DIAG_CONTRADICTORY;
+    return BE_BAD_SEQUENCE;
+}
+
+static void while_after(const BasicProgramLine *line, size_t end,
+                        size_t *cursor, size_t *statement)
+{
+    if (end == line->body_length) {
+        *cursor = line->next_offset;
+        *statement = 0u;
+    } else {
+        *cursor = line->offset;
+        *statement = end + 1u;
+    }
+}
+
+/* Bounded by the immutable program's total byte length. Nesting uses one
+ * counter, not a second stack, so a false outer WHILE may safely skip more
+ * than eight inner blocks without consuming any runtime frames. */
+static BEStatus while_match(const BasicProgram *program,
+                            const BasicProgramLine *first, size_t header_end,
+                            BEWhileFrame *frame)
+{
+    size_t cursor = first->offset, depth = 1u;
+    int first_line = 1;
+    BasicProgramLine line;
+    BPStatus bp_status;
+    while ((bp_status = bp_next(program, &cursor, &line)) == BP_OK) {
+        const uint8_t *b = program->data + line.body_offset;
+        size_t n = line.body_length;
+        size_t p = first_line ? header_end : 0u;
+        if (first_line) {
+            if (p < n && b[p] != 0x01u) return BE_BAD_SEQUENCE;
+            if (p < n) ++p;
+            first_line = 0;
+        }
+        while (p < n) {
+            size_t end, origin;
+            uint8_t token;
+            skip_spaces(b, n, &p);
+            if (p == n || b[p] == 0xc5u ||
+                (b[p] == 0x01u && p + 1u < n && b[p + 1u] == 0xc0u))
+                break;
+            origin = p;
+            token = b[p++];
+            if (token == 0xd5u) {
+                BEStatus st = while_wend_suffix(b, n, p, &end);
+                if (st != BE_OK) return st;
+                if (--depth == 0u) {
+                    frame->wend_cursor = line.offset;
+                    frame->wend_statement = origin;
+                    while_after(&line, end, &frame->after_cursor,
+                                &frame->after_statement);
+                    return BE_OK;
+                }
+            } else {
+                BEStatus st = while_statement_end(b, n, p, &end);
+                if (st != BE_OK) return st;
+                if (token == 0xd6u) {
+                    if (depth >= program->size) return BE_BAD_PROGRAM;
+                    ++depth;
+                }
+            }
+            if (end == n) break;
+            if (end + 1u == n) return BE_BAD_SEQUENCE;
+            p = end + 1u;
+        }
+    }
+    return bp_status == BP_END ? BE_WHILE_WITHOUT_WEND : BE_BAD_PROGRAM;
+}
+
 /* Pure action description prepared by both executor passes; never mutate
  * the call stack until validation, capacity, output and replay all succeed. */
 typedef enum { BE_FLOW_NONE, BE_FLOW_PUSH, BE_FLOW_POP, BE_FLOW_CLEAR } BEFlowAction;
 typedef enum { BE_FOR_NONE, BE_FOR_PUSH, BE_FOR_POP } BEForAction;
+typedef enum { BE_WHILE_NONE, BE_WHILE_PUSH, BE_WHILE_POP } BEWhileAction;
 typedef struct {
     BEFlowAction action;
     BECallFrame frame;
     size_t next_statement;
     BEForAction for_action;
     BEForFrame for_frame;
+    BEWhileAction while_action;
+    BEWhileFrame while_frame;
 } BEFlow;
 
 /* A branch or END may skip a suffix. In J0.19, no numbered line
@@ -1295,13 +1487,14 @@ static BEStatus execute_line(const BasicProgram *program,
     BEStatus status;
 
     for (;;) {
-        size_t argument_start;
+        size_t argument_start, statement_start;
         uint8_t token;
         skip_spaces(body, length, &pos);
         if (pos == length) {
             *next = line->next_offset;
             return BE_OK;
         }
+        statement_start = pos;
         token = body[pos++];
         if (token == 0xc5u) { /* REM */
             return comment_end(body, length, pos, line->next_offset, next);
@@ -1685,6 +1878,7 @@ static BEStatus execute_line(const BasicProgram *program,
         } else if (token == 0xa0u || token == 0x9fu) { /* GOTO / GOSUB */
             int is_gosub = token == 0x9fu;
             uint16_t destination;
+            if (executor->while_depth != 0u) return BE_UNSUPPORTED;
             BasicProgramLine target;
             BPStatus bp_status;
             argument_start = pos;
@@ -1753,6 +1947,7 @@ static BEStatus execute_line(const BasicProgram *program,
             if (pos < length && body[pos] != 0x01u) {
                 return unexpected(body[pos]);
             }
+            if (executor->while_depth != 0u) return BE_UNSUPPORTED;
             if (executor->call_depth == 0u) {
                 return BE_RETURN_WITHOUT_GOSUB;
             }
@@ -1974,9 +2169,8 @@ static BEStatus execute_line(const BasicProgram *program,
             skip_spaces(body, length, &pos);
             /* Multi-statement lines with an assignment are not in J0.19.
              * Do not commit a prefix, including if a comment follows it. */
-            if (pos < length && body[pos] == 0x01u) {
-                return BE_UNSUPPORTED;
-            }
+            if (pos < length && body[pos] == 0x01u &&
+                !while_line_contains_loop(body, length)) return BE_UNSUPPORTED;
             if (pos != length) {
                 return BE_BAD_SEQUENCE;
             }
@@ -1984,13 +2178,17 @@ static BEStatus execute_line(const BasicProgram *program,
             assignment->present = 1;
             assignment->key = key;
             assignment->value = value;
-            *next = line->next_offset;
+            if (pos < length && body[pos] == 0x01u) {
+                *next = line->offset;
+                flow->next_statement = pos + 1u;
+            } else *next = line->next_offset;
             return BE_OK;
         } else if (token == 0x9eu) { /* FOR INTEGER */
             BasicVariableKey key;
             int16_t initial, limit, step;
             size_t body_cursor, body_statement, exit_cursor, exit_statement;
             BasicVariableValue value = {0};
+            if (executor->while_depth != 0u) return BE_UNSUPPORTED;
             if (variables == NULL) return BE_UNSUPPORTED;
             if (executor->for_depth >= BE_FOR_STACK_CAPACITY)
                 return BE_FOR_STACK_FULL;
@@ -2038,6 +2236,7 @@ static BEStatus execute_line(const BasicProgram *program,
             int keep_loop;
             size_t consumed = 0u;
             if (variables == NULL) return BE_UNSUPPORTED;
+            if (executor->while_depth != 0u) return BE_UNSUPPORTED;
             if (executor->for_depth == 0u) return BE_NEXT_WITHOUT_FOR;
             frame = &executor->for_stack[executor->for_depth - 1u];
             skip_spaces(body, length, &pos);
@@ -2080,6 +2279,57 @@ static BEStatus execute_line(const BasicProgram *program,
                 }
             }
             return BE_OK;
+        } else if (token == 0xd6u) { /* WHILE : CPC D6 */
+            BEWhileFrame frame = {0};
+            const BEWhileFrame *existing = NULL;
+            size_t end, resume_cursor, resume_statement;
+            int condition;
+            if (executor->call_depth != 0u || executor->for_depth != 0u)
+                return BE_UNSUPPORTED; /* No cross-family unmeasured paths. */
+            status = while_condition(body, length, pos, variables,
+                                     &end, &condition);
+            if (status != BE_OK) return status;
+            if (executor->while_depth != 0u) {
+                const BEWhileFrame *top =
+                    &executor->while_stack[executor->while_depth - 1u];
+                if (top->header_cursor == line->offset &&
+                    top->header_statement == statement_start) existing = top;
+            }
+            if (existing == NULL) {
+                status = while_match(program, line, end, &frame);
+                if (status != BE_OK) return status;
+                frame.header_cursor = line->offset;
+                frame.header_statement = statement_start;
+                if (condition && executor->while_depth >= BE_WHILE_STACK_CAPACITY)
+                    return BE_WHILE_STACK_FULL;
+            } else frame = *existing;
+            while_after(line, end, &resume_cursor, &resume_statement);
+            if (condition) {
+                if (existing == NULL) {
+                    flow->while_action = BE_WHILE_PUSH;
+                    flow->while_frame = frame;
+                }
+                *next = resume_cursor;
+                flow->next_statement = resume_statement;
+            } else {
+                if (existing != NULL) flow->while_action = BE_WHILE_POP;
+                *next = frame.after_cursor;
+                flow->next_statement = frame.after_statement;
+            }
+            return BE_OK;
+        } else if (token == 0xd5u) { /* WEND : CPC D5 */
+            const BEWhileFrame *frame;
+            size_t end;
+            status = while_wend_suffix(body, length, pos, &end);
+            if (status != BE_OK) return status;
+            if (executor->while_depth == 0u) return BE_WEND_WITHOUT_WHILE;
+            frame = &executor->while_stack[executor->while_depth - 1u];
+            if (frame->wend_cursor != line->offset ||
+                frame->wend_statement != statement_start)
+                return BE_WEND_WITHOUT_WHILE;
+            *next = frame->header_cursor;
+            flow->next_statement = frame->header_statement;
+            return BE_OK;
         } else if (token == 0xa7u || token == 0xb1u || token == 0xcau) {
             return BE_UNSUPPORTED; /* LIST, NEW, RUN in stored programs. */
         } else {
@@ -2098,6 +2348,12 @@ static BEStatus execute_line(const BasicProgram *program,
                                line->next_offset, next);
         }
         ++pos;
+        if (executor->while_depth != 0u &&
+            while_line_contains_loop(body, length)) {
+            *next = line->offset;
+            flow->next_statement = pos;
+            return BE_OK;
+        }
         preceding_statement = 1;
         {
             size_t following = pos;
@@ -2151,6 +2407,8 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
     memset(executor->call_stack, 0, sizeof(executor->call_stack));
     executor->for_depth = 0u;
     memset(executor->for_stack, 0, sizeof(executor->for_stack));
+    executor->while_depth = 0u;
+    memset(executor->while_stack, 0, sizeof(executor->while_stack));
     executor->variables = variables;
     return BE_OK;
 }
@@ -2254,7 +2512,8 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
             return BE_OVERLAP;
         }
     }
-    if (executor->for_depth > BE_FOR_STACK_CAPACITY) {
+    if (executor->for_depth > BE_FOR_STACK_CAPACITY ||
+        executor->while_depth > BE_WHILE_STACK_CAPACITY) {
         return BE_BAD_PROGRAM;
     }
     if (executor->call_depth > BE_GOSUB_STACK_CAPACITY) {
@@ -2317,6 +2576,14 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
         transition.frame.cursor != second_transition.frame.cursor ||
         transition.frame.statement_offset != second_transition.frame.statement_offset ||
         transition.for_action != second_transition.for_action ||
+        transition.while_action != second_transition.while_action ||
+        (transition.while_action == BE_WHILE_PUSH &&
+         (transition.while_frame.header_cursor != second_transition.while_frame.header_cursor ||
+          transition.while_frame.header_statement != second_transition.while_frame.header_statement ||
+          transition.while_frame.wend_cursor != second_transition.while_frame.wend_cursor ||
+          transition.while_frame.wend_statement != second_transition.while_frame.wend_statement ||
+          transition.while_frame.after_cursor != second_transition.while_frame.after_cursor ||
+          transition.while_frame.after_statement != second_transition.while_frame.after_statement)) ||
         (transition.for_action == BE_FOR_PUSH &&
          (!for_same_key(&transition.for_frame.key, &second_transition.for_frame.key) ||
           transition.for_frame.limit != second_transition.for_frame.limit ||
@@ -2373,6 +2640,17 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
     if (transition.action == BE_FLOW_CLEAR) {
         executor->for_depth = 0u;
         memset(executor->for_stack, 0, sizeof(executor->for_stack));
+    }
+    if (transition.while_action == BE_WHILE_PUSH) {
+        executor->while_stack[executor->while_depth++] = transition.while_frame;
+    } else if (transition.while_action == BE_WHILE_POP) {
+        --executor->while_depth;
+        memset(&executor->while_stack[executor->while_depth], 0,
+               sizeof(executor->while_stack[0]));
+    }
+    if (transition.action == BE_FLOW_CLEAR) {
+        executor->while_depth = 0u;
+        memset(executor->while_stack, 0, sizeof(executor->while_stack));
     }
     executor->statement_offset = transition.next_statement;
     executor->cursor = next;

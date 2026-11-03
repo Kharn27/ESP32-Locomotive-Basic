@@ -40,7 +40,12 @@ typedef enum {
     BE_INVALID_LOCATE, /* J1.23-A observed rejected 0/-1 coordinate, CPC ERR=5 */
     BE_INVALID_BORDER, /* J1.23-A rejected -1 ink, CPC ERR=5 */
     BE_OPERAND_MISSING, /* J1.23-A BORDER 1, observed CPC ERR=22 */
-    BE_DIAG_CONTRADICTORY /* LOCATE 1: screen syntax, printer ERR=0 */
+    BE_DIAG_CONTRADICTORY, /* CPC screen vs ERR probe contradict, WEND 1 too */
+    BE_WEND_WITHOUT_WHILE, /* Host cause; CPC orphan WEND screen/ERR30 */
+    BE_WHILE_WITHOUT_WEND, /* Host cause; CPC WEND missing screen/ERR29 */
+    BE_WHILE_OPERAND_MISSING, /* Host cause; CPC operand missing screen/ERR22 */
+    BE_WHILE_CONDITION_INVALID, /* B2 non-oracled INTEGER expression */
+    BE_WHILE_STACK_FULL /* Host capacity 8, NOT a CPC ROM limit */
 } BEStatus;
 
 /* Typed, caller-owned video event, never encoded in PRINT.
@@ -109,6 +114,19 @@ typedef struct {
     size_t after_statement;
 } BEForFrame;
 
+/* B2: eight WHILE/WEND frames independent of GOSUB and FOR. The header
+ * and closing WEND are statement addresses inside immutable CPC records.
+ * Capacity 8 is an explicit caller-owned host bound, not a CPC ROM fact. */
+#define BE_WHILE_STACK_CAPACITY 8u
+typedef struct {
+    size_t header_cursor;
+    size_t header_statement;
+    size_t wend_cursor;
+    size_t wend_statement;
+    size_t after_cursor;
+    size_t after_statement;
+} BEWhileFrame;
+
 typedef struct {
     const BasicProgram *program; /* Borrowed; immutable through execution. */
     size_t cursor;               /* Offset of next record (or sentinel). */
@@ -117,6 +135,8 @@ typedef struct {
     BECallFrame call_stack[BE_GOSUB_STACK_CAPACITY];
     size_t for_depth;
     BEForFrame for_stack[BE_FOR_STACK_CAPACITY];
+    size_t while_depth;
+    BEWhileFrame while_stack[BE_WHILE_STACK_CAPACITY];
     BasicVariableStore *variables; /* Optional borrowed caller-owned store. */
 } BasicExecutor;
 

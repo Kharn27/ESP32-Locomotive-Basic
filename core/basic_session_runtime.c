@@ -271,6 +271,9 @@ BSRResult bsr_submit(BasicSessionRuntime *runtime,
         runtime->executor.call_depth = 0u;
         runtime->executor.statement_offset = 0u;
         memset(runtime->executor.call_stack, 0, sizeof(runtime->executor.call_stack));
+        runtime->executor.while_depth = 0u;
+        memset(runtime->executor.while_stack, 0,
+               sizeof(runtime->executor.while_stack));
     }
     return from_session(session_result);
 }
@@ -323,6 +326,9 @@ static BSRResult step_events_impl(BasicSessionRuntime *runtime,
             runtime->executor.statement_offset = 0u;
             memset(runtime->executor.call_stack, 0,
                    sizeof(runtime->executor.call_stack));
+            runtime->executor.while_depth = 0u;
+            memset(runtime->executor.while_stack, 0,
+                   sizeof(runtime->executor.while_stack));
         }
         ended.executor_status = BE_END;
         return ended;
@@ -368,6 +374,9 @@ BSRResult bsr_stop(BasicSessionRuntime *runtime)
     runtime->executor.call_depth = 0u;
     runtime->executor.statement_offset = 0u;
     memset(runtime->executor.call_stack, 0, sizeof(runtime->executor.call_stack));
+    runtime->executor.while_depth = 0u;
+    memset(runtime->executor.while_stack, 0,
+           sizeof(runtime->executor.while_stack));
     return simple(BSR_OK);
 }
 

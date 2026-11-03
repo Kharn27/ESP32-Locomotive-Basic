@@ -1,5 +1,8 @@
 # HW4-DISP-PROFILE-A-C2 — Intégration main / réception CYD SPI20
 
+**C3 RECTIFICATIF PILOTAGE 03/11/2026 : la campagne CYD SPI20 de C2 est ANNULÉE. Ne pas flasher de firmware SPI20 pour cette campagne. CONSOLE vise SPI40 ; repli SPI20 constructible seulement. Se reporter à `docs/HW4-DISP-PROFILE-A-C3.md` pour la seule fiche opératoire actuellement en vigueur. Aucune mesure SPI40 réelle n'a encore été obtenue.**
+
+
 **Mandat :** [arbitrage Pilotage C1 et ordre C2 du 03/11/2026](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/297#issuecomment-6608050032) ; PR [#297](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/297) **Draft, non fusionnée**. Parent [#295](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/295). **La recette du PO ne commence que sur instruction du Pilotage, après réception de la CI et du budget du HEAD final.**
 
 ## 1. Sources GitHub et intégration sans conflit

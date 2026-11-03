@@ -1,5 +1,8 @@
 # HW4-DISP-PROFILE-A — profilage MODE1 reproductible (#295)
 
+**C3 RECTIFICATIF PILOTAGE 03/11/2026 : la campagne CYD SPI20 de C2 est ANNULÉE. Ne pas flasher de firmware SPI20 pour cette campagne. CONSOLE vise SPI40 ; repli SPI20 constructible seulement. Se reporter à `docs/HW4-DISP-PROFILE-A-C3.md` pour la seule fiche opératoire actuellement en vigueur. Aucune mesure SPI40 réelle n'a encore été obtenue.**
+
+
 **Statut : mesure logicielle instrumentée, réception CYD NON VÉRIFIÉE.** Parent #285.
 Base GitHub de départ : `main@9f19e500a9a46f1e16121ebc5c678202d7e52d82` (03/11/2026).
 Référence exclusivement **main à SPI 20 MHz**. #286 / PR #289 fermée sans fusion, pas de reprise du 40 MHz. HEAD de livraison = HEAD de la PR (à vérifier au flash).

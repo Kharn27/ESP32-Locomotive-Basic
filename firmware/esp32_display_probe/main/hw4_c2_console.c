@@ -870,8 +870,13 @@ void app_main(void)
         (void)fail("VIDEO_INIT",-1); return;
     }
     cpc_text_profile_clock(&s_text,disp_clock,NULL);
-    printf("HW4-DISP-PROFILE BOOT spi_request_hz=20000000 "
-           "unit=wall_us physical_gram_visible=UNVERIFIED sha=%s\n",
+    /* Read from the actual HAL build constant, never assume electrical SCLK. */
+    printf("HW4-DISP-PROFILE BOOT spi_request_hz=%u "
+           "variant=%s effective_spi_hz=UNMEASURED "
+           "electrical_spi_hz=UNMEASURED unit=wall_us "
+           "physical_gram_visible=UNVERIFIED sha=%s\n",
+           cyd_lcd_requested_spi_hz(),
+           cyd_lcd_requested_spi_hz()==40000000U?"SPI40":"SPI20",
            HW4_SHOT_GIT_SHA);
     printf("HW4-C2 VIDEO_READY mode=1 logical=320x200 "
            "cols=40 rows=25 vram_bytes=%u ink_fg=24 ink_bg=1\n",

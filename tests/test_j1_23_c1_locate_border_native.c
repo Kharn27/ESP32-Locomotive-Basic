@@ -143,10 +143,11 @@ static int positive(const Case *item)
     BSRResult r;
     CHECK(item->host == BE_OK);
     snapshot();
-    /* Frozen J1.23-B legacy API stays intentionally fail-closed/unknown. */
+    /* BSR legacy delegates to its typed step without an event receiver;
+     * unlike direct be_step (frozen J1.23-B) it reports RECEIVER_REQUIRED. */
     r = bsr_step(&f.runtime, f.output, OUT, &f.written);
     CHECK(r.status == BSR_EXECUTOR_ERROR &&
-          r.executor_status == BE_UNKNOWN_TOKEN);
+          r.executor_status == BE_EVENT_RECEIVER_REQUIRED);
     CHECK(fully_unchanged() == 0);
     r = bsr_step_events(&f.runtime, f.output, OUT, &f.written,
                         NULL, 0u, &f.event_written);

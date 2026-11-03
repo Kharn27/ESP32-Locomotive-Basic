@@ -17,7 +17,7 @@ typedef enum {
     CPC_DIAG_DIVISION_INTEGER_ZERO,
     CPC_DIAG_GOTO_MISSING_TARGET,
     CPC_DIAG_IF_MISSING_TARGET,
-    CPC_DIAG_DIRECT_LISTT_SYNTAX, /* only the explicitly attested typo */
+    CPC_DIAG_DIRECT_UNKNOWN_SYNTAX, /* CORE-typed bare unknown command */
     CPC_DIAG_COUNT
 } CpcDiagCategory;
 
@@ -58,21 +58,21 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
                                   size_t *written);
 bool cpc_diag_policy_write_step(CpcText *text, CpcStepDiagnostic diagnostic);
 
-/* Direct input classification is deliberately closed: absent numbered-line
- * deletion and the exact LISTT typo (case-insensitive, outer spaces) are the
- * only witnessed paths. BS_UNSUPPORTED_DIRECT on its own proves NOTHING:
- * GOTO, MODE and other valid-but-unimplemented commands remain host generic.
- * No BASIC semantics, core status enums or Ready policy are altered. */
+/* Direct input classification is bounded to CORE's BS_UNKNOWN_DIRECT,
+ * plus the existing missing numbered-line deletion mapping. A generic
+ * BS_UNSUPPORTED_DIRECT is NOT a syntax signal (GOTO, MODE, etc.).
+ * The CORE lexical flag is host provenance, not a proven CPC ERR/ERL.
+ * No CORE semantics or Ready policy are altered here. */
 CpcDiagCategory cpc_diag_policy_select(const uint8_t *source, size_t length,
                                        BSRResult result);
 const char *cpc_diag_policy_category(CpcDiagCategory category);
 const char *cpc_diag_policy_message(CpcDiagCategory category);
-/* Separate provenance domain: RUN-origin enum is consumed by an exhaustive
- * integration switch and must keep its ABI unchanged. ROM CB49 proves CPC
- * code 2 wording, not a new independent CPC run of LISTT. */
+/* Separate provenance domain: keep CpcDiagOrigin (RUN consumers) untouched.
+ * This distinguishes a CORE lexical classification from a CPC ROM oracle.
+ * ROM CB49 supplies the message wording, not a direct-input CPC witness. */
 typedef enum {
     CPC_DIRECT_DIAG_ORIGIN_HOST = 0,
-    CPC_DIRECT_DIAG_ORIGIN_LISTT_ROM_CB49
+    CPC_DIRECT_DIAG_ORIGIN_CORE_UNKNOWN_LEXICAL
 } CpcDirectDiagOrigin;
 CpcDirectDiagOrigin cpc_diag_policy_direct_origin(CpcDiagCategory category);
 /* Byte-exact formatter; insufficient capacity and rejected categories preserve

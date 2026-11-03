@@ -97,10 +97,10 @@ const char *cpc_diag_policy_message(CpcDiagCategory category)
     return "INVALID_DIAGNOSTIC";
 }
 
-CpcDiagOrigin cpc_diag_policy_direct_origin(CpcDiagCategory category)
+CpcDirectDiagOrigin cpc_diag_policy_direct_origin(CpcDiagCategory category)
 {
     return category==CPC_DIAG_DIRECT_LISTT_SYNTAX
-           ? CPC_DIAG_ORIGIN_DIRECT_LISTT_ROM_CB49 : CPC_DIAG_ORIGIN_HOST;
+           ? CPC_DIRECT_DIAG_ORIGIN_LISTT_ROM_CB49 : CPC_DIRECT_DIAG_ORIGIN_HOST;
 }
 
 /* Literal "Syntax error" is the CPC ROM error-table wording:

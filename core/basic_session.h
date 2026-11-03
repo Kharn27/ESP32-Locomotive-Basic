@@ -21,7 +21,12 @@ typedef enum {
     BS_UNSUPPORTED_DIRECT,
     BS_TOKENIZER_ERROR,
     BS_PROGRAM_ERROR,
-    BS_LISTING_ERROR
+    BS_LISTING_ERROR,
+    /* HW4-DIAG-SYNTAX-CORE-A: single bare ASCII word absent from the
+     * positive ROM CPC keyword lexicon. Host lexical classification ONLY:
+     * no CPC ERR/ERL and no claim about the ROM's execution path.
+     * Appended; all existing numeric BSStatus values are unchanged. */
+    BS_UNKNOWN_DIRECT
 } BSStatus;
 
 typedef struct {
@@ -33,6 +38,10 @@ typedef struct {
 
 /* Dispatch exactly source_length bytes. On BS_OK, *written is 0 for edits,
  * NEW and blank input, or the LIST length; no trailing NUL is appended.
+ * An isolated alphabetic direct word absent from the ROM keyword lexicon
+ * returns BS_UNKNOWN_DIRECT; a known but not implemented direct command,
+ * or an ambiguous compound/syntax, returns BS_UNSUPPORTED_DIRECT. Neither
+ * attempts tokenization or execution. All other diagnostics stay stable.
  * On ANY other status, program, output (all output_capacity bytes) and
  * *written are unchanged. The temporary token buffer may be modified.
  *

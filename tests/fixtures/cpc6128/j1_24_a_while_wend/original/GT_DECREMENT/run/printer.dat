@@ -1,0 +1,14 @@
+ 3 
+ 2 
+ 1 
+END
+J124_DIAG_BEGIN
+ 0 
+ 0 
+10 A%=3
+20 WHILE A%>0
+30 PRINT #8,A%
+40 A%=A%-1
+50 WEND
+60 PRINT #8,"END"
+70 END

@@ -161,7 +161,8 @@ static int test_direct_commands_and_restart(void)
         r = submit(&f, rejected[i]);
         CHECK(r.status == BSR_SESSION_ERROR);
         CHECK(r.session.status == (i == 1u || i == 2u || i == 3u
-                                  ? BS_MULTIPLE_DIRECT : BS_UNSUPPORTED_DIRECT));
+                                  ? BS_MULTIPLE_DIRECT :
+                                  i == 5u ? BS_UNKNOWN_DIRECT : BS_UNSUPPORTED_DIRECT));
         CHECK(r.executor_status == BE_OK);
         CHECK(same(&f, &s) == 0);
     }
@@ -182,6 +183,74 @@ static int test_direct_commands_and_restart(void)
     CHECK(f.runtime.state == BSR_IDLE);
     CHECK(f.written == s.written &&
           memcmp(f.output, s.output, sizeof(f.output)) == 0);
+    return 0;
+}
+
+static int test_hw4_syntax_core_classifier_states(void)
+{
+    /* Both idle and running states use the actual BSR submission contract. */
+    static const char *unknown[]={
+        "LISTT", "RUNN", "PRONT", "writEE", "  CLSS  "
+    };
+    static const char *recognized[]={
+        "GOTO 999", "MODE 1", "PAPER 2", "AUTO", "READ",
+        "WHILE", "WEND", "GRAPHICS", "PRINT 1", "RUN 10"
+    };
+    static const char *uncharacterized[]={
+        "LISTT 1", "RUNN 99", "LISTT=1", "X", "A$",
+        "GOTO999", "LISTT?", "GO TO 10"
+    };
+    Fixture f;
+    Snapshot before;
+    BSRResult r;
+    CHECK(setup(&f)==0);
+    CHECK(BS_LISTING_ERROR==10 && BS_UNKNOWN_DIRECT==11);
+    CHECK(submit(&f,"10 PRINT 9").status==BSR_OK);
+    for(unsigned state=0u;state<2u;++state) {
+        if(state!=0u) {
+            CHECK(submit(&f,"RUN").status==BSR_OK);
+            CHECK(f.runtime.state==BSR_RUNNING);
+        }
+        for(size_t i=0u;i<sizeof(unknown)/sizeof(unknown[0]);++i) {
+            save(&f,&before);
+            r=submit(&f,unknown[i]);
+            CHECK(r.status==BSR_SESSION_ERROR &&
+                  r.session.status==BS_UNKNOWN_DIRECT &&
+                  r.session.tokenizer_status==BT_OK &&
+                  r.session.program_status==BP_OK &&
+                  r.session.listing_status==BL_OK &&
+                  r.executor_status==BE_OK);
+            CHECK(same(&f,&before)==0);
+        }
+        for(size_t i=0u;i<sizeof(recognized)/sizeof(recognized[0]);++i) {
+            save(&f,&before);
+            r=submit(&f,recognized[i]);
+            CHECK(r.status==BSR_SESSION_ERROR &&
+                  r.session.status==BS_UNSUPPORTED_DIRECT &&
+                  r.executor_status==BE_OK);
+            CHECK(same(&f,&before)==0);
+        }
+        for(size_t i=0u;i<sizeof(uncharacterized)/sizeof(uncharacterized[0]);++i) {
+            save(&f,&before);
+            r=submit(&f,uncharacterized[i]);
+            CHECK(r.status==BSR_SESSION_ERROR &&
+                  r.session.status==BS_UNSUPPORTED_DIRECT);
+            CHECK(same(&f,&before)==0);
+        }
+        save(&f,&before);
+        r=submit(&f,"LISTT:RUN");
+        CHECK(r.status==BSR_SESSION_ERROR &&
+              r.session.status==BS_MULTIPLE_DIRECT);
+        CHECK(same(&f,&before)==0);
+        static const uint8_t malformed[]={ 'L','I','S','T','T',0u };
+        r=submit_bytes(&f,malformed,sizeof(malformed),sizeof(f.temporary),
+                       sizeof(f.output));
+        CHECK(r.status==BSR_SESSION_ERROR &&
+              r.session.status==BS_MALFORMED_INPUT);
+        CHECK(same(&f,&before)==0);
+    }
+    CHECK(f.runtime.state==BSR_RUNNING);
+    CHECK(step_output(&f,"9\n")==0);
     return 0;
 }
 
@@ -404,6 +473,7 @@ int main(void)
 {
     CHECK(test_end_to_end() == 0);
     CHECK(test_direct_commands_and_restart() == 0);
+    CHECK(test_hw4_syntax_core_classifier_states() == 0);
     CHECK(test_list_and_new_while_running() == 0);
     CHECK(test_stop_and_infinite_loop() == 0);
     CHECK(test_executor_errors() == 0);

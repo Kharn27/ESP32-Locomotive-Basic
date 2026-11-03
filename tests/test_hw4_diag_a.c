@@ -27,6 +27,8 @@ static char painted[512];
 static size_t painted_count;
 static unsigned ready_count;
 static uint8_t before_program[8192];
+static uint8_t before_output[4096];
+static BasicSessionRuntime before_runtime;
 
 static uint8_t glyph(void *context,uint8_t ch,unsigned row)
 {
@@ -84,6 +86,8 @@ static BSRResult real_submit(const char *command,
     assert(cpc_uart_console_end_line(&text));
     painted_count=0U;
     memcpy(before_program,basic.program_bytes,sizeof before_program);
+    memcpy(before_output,basic.output,sizeof before_output);
+    memcpy(&before_runtime,&basic.runtime,sizeof before_runtime);
     const size_t old_size=basic.program.size;
     basic.written=0U;
     BSRResult r=bsr_submit(&basic.runtime,line.data,line.length,
@@ -95,6 +99,9 @@ static BSRResult real_submit(const char *command,
         assert(basic.program.size==old_size);
         assert(memcmp(before_program,basic.program_bytes,
                       sizeof before_program)==0);
+        assert(memcmp(before_output,basic.output,sizeof before_output)==0);
+        assert(memcmp(&before_runtime,&basic.runtime,sizeof before_runtime)==0);
+        assert(basic.written==0U);
         assert(cpc_diag_policy_write(&text,category));
     } else if(basic.written) {
         assert(cpc_text_write(&text,basic.output,basic.written));
@@ -154,42 +161,50 @@ static void real_historical_cases(void)
     assert(ready_count==5U);
     (void)real_submit("GOTO 999",CPC_DIAG_HOST_GENERIC,
         CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
-    (void)real_submit("listt",CPC_DIAG_DIRECT_LISTT_SYNTAX,
+    (void)real_submit("listt",CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
         CPC_READY_BASIC_DIAGNOSTIC,true,"Syntax errorReady");
     (void)real_submit("0",CPC_DIAG_HOST_GENERIC,
         CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
     assert(ready_count==8U);
 }
-/* A strictly proven direct typo maps to ROM CB49 / error 2; everything
- * merely BS_UNSUPPORTED_DIRECT continues to be a HOST diagnostic. */
-static void exact_direct_syntax_and_preservation(void)
+/* Real UART -> BSR -> policy -> Ready, not a forged status or
+ * a list of typo special cases. The positive category belongs to the
+ * CORE lexical decision only. No CPC ERR/ERL are inferred. */
+static void core_unknown_direct_syntax_and_preservation(void)
 {
     init_console();
     (void)real_submit("10 PRINT 2",CPC_DIAG_HOST_GENERIC,
         CPC_READY_NUMBERED_STORED,false,"");
-    (void)real_submit("LISTT",CPC_DIAG_DIRECT_LISTT_SYNTAX,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"Syntax errorReady");
-    (void)real_submit("  LiStT  ",CPC_DIAG_DIRECT_LISTT_SYNTAX,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"Syntax errorReady");
-    (void)real_submit("LISTTT",CPC_DIAG_HOST_GENERIC,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
-    (void)real_submit("LISTT:RUN",CPC_DIAG_HOST_GENERIC,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
-    (void)real_submit("LISTT 1",CPC_DIAG_HOST_GENERIC,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
-    (void)real_submit("GOTO 999",CPC_DIAG_HOST_GENERIC,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
-    (void)real_submit("MODE 1",CPC_DIAG_HOST_GENERIC,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
-    (void)real_submit("PAPER 2",CPC_DIAG_HOST_GENERIC,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
-    (void)real_submit("AUTO",CPC_DIAG_HOST_GENERIC,
-        CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
-    /* All ten diagnostics leave the original program byte-identical,
-     * including its trailing capacity. LIST still reveals it unchanged. */
+
+    /* Unrelated unknown words and case/ASCII-space variants. */
+    static const char *unknown[]={
+        "LISTT", "  LiStT  ", "RUNN", "  rUnN  ",
+        "PRONT", "CLSS", "WHILLE", "LISTTT"
+    };
+    for(size_t i=0U;i<sizeof(unknown)/sizeof(unknown[0]);++i)
+        (void)real_submit(unknown[i],CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
+            CPC_READY_BASIC_DIAGNOSTIC,true,"Syntax errorReady");
+
+    /* Valid but unsupported direct CPC keywords, and all ambiguous
+     * syntax/argument forms, must never be rebranded as Syntax. */
+    static const char *host[]={
+        "GOTO 999", "MODE 1", "PAPER 2", "AUTO", "CONT",
+        "GRAPHICS", "READ", "WHILE", "ON",
+        "LISTT:RUN", "LISTT 1", "RUNN 5", "LISTT=1",
+        "GOTO999", "A$", "A", "GO TO 10", "LISTT?",
+        "LISTT\t", "RUN 10"
+    };
+    for(size_t i=0U;i<sizeof(host)/sizeof(host[0]);++i)
+        (void)real_submit(host[i],CPC_DIAG_HOST_GENERIC,
+            CPC_READY_BASIC_DIAGNOSTIC,true,"ERRORReady");
+
+    /* Every rejected input leaves the complete program and output intact;
+     * the real LIST still exposes the original numbered statement. */
     (void)real_submit("LIST",CPC_DIAG_HOST_GENERIC,
         CPC_READY_LIST_RETURN,false,"10 PRINT 2Ready");
-    assert(ready_count==10U);
+    assert(ready_count==
+           sizeof(unknown)/sizeof(unknown[0])+
+           sizeof(host)/sizeof(host[0])+1U);
     canaries();
 }
 static void direct_syntax_format_and_origin(void)
@@ -197,22 +212,22 @@ static void direct_syntax_format_and_origin(void)
     uint8_t data[32],before[32];
     size_t n=999U;
     static const uint8_t wanted[]="Syntax error\n";
-    assert(cpc_diag_policy_direct_origin(CPC_DIAG_DIRECT_LISTT_SYNTAX)==
-           CPC_DIRECT_DIAG_ORIGIN_LISTT_ROM_CB49);
+    assert(cpc_diag_policy_direct_origin(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX)==
+           CPC_DIRECT_DIAG_ORIGIN_CORE_UNKNOWN_LEXICAL);
     assert(cpc_diag_policy_direct_origin(CPC_DIAG_HOST_GENERIC)==
            CPC_DIRECT_DIAG_ORIGIN_HOST);
     assert(cpc_diag_policy_direct_origin(CPC_DIAG_LINE_DOES_NOT_EXIST)==
            CPC_DIRECT_DIAG_ORIGIN_HOST);
-    assert(strcmp(cpc_diag_policy_message(CPC_DIAG_DIRECT_LISTT_SYNTAX),
+    assert(strcmp(cpc_diag_policy_message(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX),
                   "Syntax error")==0);
-    assert(strcmp(cpc_diag_policy_category(CPC_DIAG_DIRECT_LISTT_SYNTAX),
-                  "DIRECT_LISTT_SYNTAX_ROM_CB49")==0);
+    assert(strcmp(cpc_diag_policy_category(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX),
+                  "DIRECT_UNKNOWN_SYNTAX_CORE_LEXICAL")==0);
     memset(data,0x5a,sizeof data);
     memcpy(before,data,sizeof before);
-    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_LISTT_SYNTAX,
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
                                            data,sizeof(wanted)-2U,&n));
     assert(n==999U && memcmp(data,before,sizeof data)==0);
-    assert(cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_LISTT_SYNTAX,
+    assert(cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
                                           data,sizeof(wanted)-1U,&n));
     assert(n==sizeof(wanted)-1U);
     assert(memcmp(data,wanted,n)==0 && data[n]==0x5aU);
@@ -221,9 +236,9 @@ static void direct_syntax_format_and_origin(void)
     assert(!cpc_diag_policy_format_direct(CPC_DIAG_COUNT,
                                            data,sizeof data,&n));
     assert(n==999U && data[0]==0x5aU);
-    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_LISTT_SYNTAX,
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
                                            NULL,0U,&n));
-    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_LISTT_SYNTAX,
+    assert(!cpc_diag_policy_format_direct(CPC_DIAG_DIRECT_UNKNOWN_SYNTAX,
                                            data,sizeof data,NULL));
     assert(cpc_diag_policy_format_direct(CPC_DIAG_HOST_GENERIC,
                                           data,sizeof data,&n));
@@ -232,20 +247,29 @@ static void direct_syntax_format_and_origin(void)
 static void direct_syntax_false_status(void)
 {
     init_console();
-    const uint8_t src[]="LISTT";
+    static const uint8_t src[]="LISTT";
     basic.written=0U;
     BSRResult r=bsr_submit(&basic.runtime,src,sizeof(src)-1U,
                           basic.temporary,sizeof basic.temporary,
                           basic.output,sizeof basic.output,&basic.written);
     assert(r.status==BSR_SESSION_ERROR &&
-           r.session.status==BS_UNSUPPORTED_DIRECT);
+           r.session.status==BS_UNKNOWN_DIRECT &&
+           r.session.tokenizer_status==BT_OK &&
+           r.session.program_status==BP_OK &&
+           r.session.listing_status==BL_OK);
     assert(cpc_diag_policy_select(src,sizeof(src)-1U,r)==
-           CPC_DIAG_DIRECT_LISTT_SYNTAX);
+           CPC_DIAG_DIRECT_UNKNOWN_SYNTAX);
     BSRResult fake=r;
     fake.status=BSR_BUSY;
     assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
            CPC_DIAG_HOST_GENERIC);
     fake=r; fake.status=BSR_OVERLAP;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.status=BSR_EXECUTOR_ERROR;
+    assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
+           CPC_DIAG_HOST_GENERIC);
+    fake=r; fake.session.status=BS_UNSUPPORTED_DIRECT;
     assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
            CPC_DIAG_HOST_GENERIC);
     fake=r; fake.session.status=BS_TOKENIZER_ERROR;
@@ -261,8 +285,9 @@ static void direct_syntax_false_status(void)
     assert(cpc_diag_policy_select(src,sizeof(src)-1U,fake)==
            CPC_DIAG_HOST_GENERIC);
     assert(cpc_diag_policy_select(NULL,0U,r)==CPC_DIAG_HOST_GENERIC);
-    assert(cpc_diag_policy_select((const uint8_t *)"LISTT\n",6U,r)==
-           CPC_DIAG_HOST_GENERIC);
+    assert(cpc_diag_policy_select(src,0U,r)==CPC_DIAG_HOST_GENERIC);
+    /* The policy consumes CORE provenance, not a duplicate IO parser:
+     * a fabricated mismatched source/result is not a real BSR witness. */
 }
 static void wrong_status_and_host_guards(void)
 {
@@ -329,14 +354,14 @@ static void scroll_diagnostic(void)
 int main(void)
 {
     real_historical_cases();
-    exact_direct_syntax_and_preservation();
+    core_unknown_direct_syntax_and_preservation();
     direct_syntax_format_and_origin();
     direct_syntax_false_status();
     wrong_status_and_host_guards();
     string_bonjour_and_run();
     scroll_diagnostic();
-    puts("HW4-DIAG-SYNTAX-A PASS : exact LISTT CB49 syntax, "
-         "Ready, host fallbacks, preserved program, format canaries, "
+    puts("HW4-DIAG-SYNTAX-A-C1 PASS: CORE BS_UNKNOWN_DIRECT matrix, "
+         "Ready, known/ambiguous host fallbacks, atomic program/output, "
          "historical DIAG-A matrix");
     return 0;
 }

@@ -11,6 +11,7 @@
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_ili9341.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -53,8 +54,10 @@ static bool IRAM_ATTR on_color_done(esp_lcd_panel_io_handle_t io,
 }
 
 uint8_t *cyd_lcd_band(void) { return (s_panel && !s_fault) ? s_band : NULL; }
-esp_err_t cyd_lcd_send(int x, int y, int width, int height)
+static esp_err_t lcd_send_impl(int x, int y, int width, int height,
+                               CydLcdSendTiming *timing)
 {
+    if(timing!=NULL) { timing->submit_us=0U; timing->wait_us=0U; }
     if (!s_panel || !s_done || s_fault) return ESP_ERR_INVALID_STATE;
     if (x < 0 || y < 0 || width <= 0 || height <= 0 ||
         x > s_width || width > s_width - x ||
@@ -62,9 +65,16 @@ esp_err_t cyd_lcd_send(int x, int y, int width, int height)
         (size_t)width*(size_t)height > CYD_LCD_DMA_BYTES/2U)
         return ESP_ERR_INVALID_ARG;
     (void)xSemaphoreTake(s_done,0);
+    const int64_t t0=timing ? esp_timer_get_time():0;
     esp_err_t err = esp_lcd_panel_draw_bitmap(s_panel,x,y,x+width,y+height,s_band);
+    const int64_t t1=timing ? esp_timer_get_time():0;
     if (err == ESP_OK && xSemaphoreTake(s_done,pdMS_TO_TICKS(2000)) != pdTRUE) {
         err = ESP_ERR_TIMEOUT; ++s_timeouts;
+    }
+    if(timing!=NULL) {
+        const int64_t t2=esp_timer_get_time();
+        timing->submit_us=t1>=t0 ? (uint64_t)(t1-t0):0U;
+        timing->wait_us=t2>=t1 ? (uint64_t)(t2-t1):0U;
     }
     if (err != ESP_OK) {
         s_fault = true; /* DMA/ISR ownership ambiguous: keep resources pinned. */
@@ -72,6 +82,15 @@ esp_err_t cyd_lcd_send(int x, int y, int width, int height)
         ESP_LOGE(TAG,"HW4B DMA_FAIL err=%s buffer_retained=1",esp_err_to_name(err));
     } else ++s_transfers;
     s_last_error = err; return err;
+}
+esp_err_t cyd_lcd_send(int x, int y, int width, int height)
+{
+    return lcd_send_impl(x,y,width,height,NULL);
+}
+esp_err_t cyd_lcd_send_profiled(int x,int y,int width,int height,
+                                CydLcdSendTiming *timing)
+{
+    return lcd_send_impl(x,y,width,height,timing);
 }
 /*
  * Clear all 240x320 native GRAM in portrait BEFORE applying a new MADCTL.

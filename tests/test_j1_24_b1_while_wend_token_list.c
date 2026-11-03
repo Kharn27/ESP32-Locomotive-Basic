@@ -240,6 +240,24 @@ static int compare_witness(const char *root,const Witness *w)
         CHECK(load(root,session[s],w->id,"list/printer.dat",
                    printer,sizeof(printer),&l)==0);
         CHECK(cpc_list_matches(w->text,printer,l)); /* PRE-RUN only */
+        /* Gate #195: preserve the anomalous historical WEND 1 probe
+         * as a contradictory witness, not a native syntax diagnostic.
+         * This evidence is read-only and NEVER used as the LIST oracle. */
+        if(strcmp(w->id,"WEND_OPERAND")==0) {
+            uint8_t evidence[9000];
+            size_t bytes=0u;
+            CHECK(load(root,session[s],w->id,"capture.json",
+                       evidence,sizeof(evidence)-1u,&bytes)==0);
+            evidence[bytes]=0u;
+            CHECK(strstr((const char*)evidence,"\"err\": 0,")!=NULL);
+            CHECK(strstr((const char*)evidence,"\"erl\": 20,")!=NULL);
+            CHECK(strstr((const char*)evidence,"\"list_equal\": false,")!=NULL);
+            CHECK(strstr((const char*)evidence,
+                         "\"diagnostic_text\": \"PENDING_MANUAL_SCREEN_INSPECTION\"")
+                  !=NULL);
+            /* Visual screen 'Syntax error in 20' was confirmed in J1.24-A,
+             * not inferred from this host-side ERR=0 probe. */
+        }
         if(!s){memcpy(first_image,raw,n);first_n=n;
                memcpy(first_list,printer,l);first_l=l;}
         else{CHECK(n==first_n&&memcmp(first_image,raw,n)==0);
@@ -270,6 +288,40 @@ static int compare_witness(const char *root,const Witness *w)
            "%zu non-WHILE/WEND lines excluded\n",w->id,matched,ignored);
     return 0;
 }
+/* Lexical guards beyond the 20 immutable uppercase CPC inputs: these are
+ * HOST metamorphic tests, never described as extra historical captures. */
+static int lexical_neighbours(void)
+{
+    static const struct {const char *in,*listed;uint8_t token;} good[]={
+      {"while 0","WHILE 0",0xd6u},
+      {"wend","WEND",0xd5u},
+      {"WHILE   A% <= 2","WHILE   A% <= 2",0xd6u},
+      {"WHILE B%>=0","WHILE B%>=0",0xd6u},
+      {"WHILE A%<>2","WHILE A%<>2",0xd6u},
+      {"WHILE A%=1","WHILE A%=1",0xd6u},
+      {"WHILE 0:WEND","WHILE 0:WEND",0xd6u},
+      {"WHILE 0:PRINT \"WEND\"","WHILE 0:PRINT \"WEND\"",0xd6u},
+      {"WHILE 0:REM WEND:WHILE","WHILE 0:REM WEND:WHILE",0xd6u},
+      {"PRINT \"WHILE WEND\"","PRINT \"WHILE WEND\"",0xbfu},
+      {"REM WHILE:WEND","REM WHILE:WEND",0xc5u},
+      {"WEND 1","WEND 1",0xd5u}
+    };
+    size_t i;
+    for(i=0u;i<sizeof(good)/sizeof(good[0]);++i) {
+        uint8_t raw[256],listed[256],again[256];
+        size_t n=999u,m=888u,k=777u;
+        CHECK(bt_tokenize((const uint8_t*)good[i].in,strlen(good[i].in),
+                          raw,sizeof(raw),&n)==BT_OK);
+        CHECK(n>0u&&raw[0]==good[i].token);
+        CHECK(bl_detokenize(raw,n,listed,sizeof(listed),&m)==BL_OK);
+        CHECK(m==strlen(good[i].listed));
+        CHECK(memcmp(listed,good[i].listed,m)==0);
+        CHECK(bt_tokenize(listed,m,again,sizeof(again),&k)==BT_OK);
+        CHECK(k==n&&memcmp(raw,again,n)==0);
+    }
+    return 0;
+}
+
 static int negatives(void)
 {
     static const char *const bad[]={
@@ -385,6 +437,7 @@ int main(int argc,char **argv)
 {
     size_t i;
     CHECK(argc==2);
+    CHECK(lexical_neighbours()==0);
     CHECK(negatives()==0);
     CHECK(no_run()==0);
     for(i=0u;i<sizeof(witnesses)/sizeof(witnesses[0]);++i)

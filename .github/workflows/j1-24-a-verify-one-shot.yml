@@ -1,0 +1,54 @@
+name: J1.24-A one-shot independent CPC archive SHA audit
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/j1-24-a-verify-one-shot.yml"
+      - "tests/test_j1_24_a_while_wend_oracle.py"
+      - "tests/fixtures/cpc6128/j1_24_a_while_wend/**"
+permissions:
+  contents: read
+jobs:
+  evidence:
+    if: github.head_ref == 'oracle/j1-24-a-while-wend-cpc'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: External original-run manifest SHA, then 360 independent GNU sha256sum checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          E=tests/fixtures/cpc6128/j1_24_a_while_wend
+          echo "11b8450e0d8d772e9c4049aabb78ae2cf32595d7764199fa3904cbc0ba2ca441  $E/manifest.json" | sha256sum --check
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("tests/fixtures/cpc6128/j1_24_a_while_wend")
+          manifest=json.loads((root/"manifest.json").read_text(encoding="ascii"))
+          assert manifest["run_id"]=="41624453081"
+          assert manifest["acquisition_head"]=="a1659e814c8db7075a2bb08b54e30063de20d128"
+          assert len(manifest["files"])==360
+          with open("/tmp/j124-file-shas.txt","w",encoding="ascii") as out:
+              for rel,digest in sorted(manifest["files"].items()):
+                  print(f"{digest}  {root/rel}",file=out)
+          print("J1.24-A ORIGINAL_RUN_SHA_EXTERNAL_ANCHOR_PLUS_360_GNU_SHA_PROBES")
+          PY
+          sha256sum --check --status /tmp/j124-file-shas.txt
+          echo "J1.24-A INDEPENDENT_SHA256SUM_360_360_PASS"
+      - name: Independent Python unittest and ROM-backed source/byte/diagnostic comparisons
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_j1_24_a_while_wend_oracle.py' -v
+      - name: Prove fail-closed 4 mutations with exact causes and external manifest seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_24_a_while_wend_evidence.py \
+            --verify tests/fixtures/cpc6128/j1_24_a_while_wend \
+            --external-manifest-sha256 11b8450e0d8d772e9c4049aabb78ae2cf32595d7764199fa3904cbc0ba2ca441 \
+            --self-test
+          echo "J1.24-A EXTERNAL_SEAL_40_REAL_SESSIONS_AND_FOUR_TARGETED_NEGATIVES_PASS"

@@ -84,15 +84,75 @@ class J124Contract(unittest.TestCase):
             with self.assertRaisesRegex(oracle.OracleError,"ABSENT_OR_SYMLINK"):
                 oracle.verify(Path(path))
 
-    def test_archive_if_present_is_not_an_automatic_cpc_pass(self):
+    def test_independently_sealed_archive_sha_and_all_360_files(self):
         path=ROOT/"tests/fixtures/cpc6128/j1_24_a_while_wend"
-        if path.exists():
-            self.assertTrue((path/"manifest.json").is_file())
-            oracle.verify(path)
-            # External independent manifest seal must also be checked
-            # before declaring CPC_ORACLE_VERIFIED.
-        else:
-            self.assertFalse((path/"manifest.json").is_file())
+        seal="11b8450e0d8d772e9c4049aabb78ae2cf32595d7764199fa3904cbc0ba2ca441"
+        manifest=(path/"manifest.json").read_bytes()  # FAIL if absent
+        self.assertEqual(hashlib.sha256(manifest).hexdigest(),seal)
+        obj=json.loads(manifest)
+        self.assertEqual(obj["acquisition_head"],
+                         "a1659e814c8db7075a2bb08b54e30063de20d128")
+        self.assertEqual(obj["run_id"],"41624453081")
+        self.assertEqual(len(obj["files"]),360)
+        self.assertEqual(set(obj["files"]),oracle.inventory())
+        for relative,expected in obj["files"].items():
+            with self.subTest(file=relative):
+                self.assertEqual(hashlib.sha256(
+                    (path/relative).read_bytes()).hexdigest(),expected)
+
+    def test_observed_cpc_tokens_and_repeats_not_predictions(self):
+        evidence=ROOT/"tests/fixtures/cpc6128/j1_24_a_while_wend"
+        for case in oracle.CASES:
+            original=json.loads((evidence/"original"/case/"capture.json").read_bytes())
+            repeat=json.loads((evidence/"repeat"/case/"capture.json").read_bytes())
+            with self.subTest(case=case):
+                self.assertEqual(original["program_hex"],repeat["program_hex"])
+                self.assertEqual(original["list_sha256"],repeat["list_sha256"])
+                self.assertEqual(original["list_after_hex"],repeat["list_after_hex"])
+                self.assertEqual(original["run_output_hex"],repeat["run_output_hex"])
+                self.assertEqual((original["err"],original["erl"]),
+                                 (repeat["err"],repeat["erl"]))
+        def tokens(case):
+            capture=json.loads((evidence/"original"/case/"capture.json").read_bytes())
+            return [v["first_body_byte"] for v in
+                    capture["observed_keyword_lines"]]
+        self.assertEqual(tokens("ZERO_LITERAL"),[0xd6,0xd5])
+        self.assertEqual(tokens("WEND_ORPHAN"),[0xd5])
+        self.assertEqual(tokens("NEST_2X2"),[0xd6,0xd6,0xd5,0xd5])
+
+    def test_exact_cpc_output_and_diagnostic_counterexamples(self):
+        evidence=ROOT/"tests/fixtures/cpc6128/j1_24_a_while_wend"
+        outputs={
+            "ZERO_LITERAL":"ZERO\r\n",
+            "ONCE_LT":"T\r\nEND\r\n",
+            "THREE_LT":"T\r\nT\r\nT\r\nEND\r\n",
+            "NEST_2X2":"I\r\nI\r\nI\r\nI\r\nEND\r\n",
+            "COLON_SAME_LINE":"C\r\nC\r\nEND\r\n",
+            "COLON_CROSS_LINE":"C\r\nC\r\nEND\r\n",
+        }
+        errors={
+            "WEND_ORPHAN":(30,10),
+            "WHILE_UNCLOSED":(29,10),
+            "WHILE_MISSING":(22,10),
+            "WEND_OPERAND":(0,20),  # screen Syntax error in 20, NOT success
+            "WHILE_BAD_REL":(22,20),
+        }
+        for session in oracle.SESSIONS:
+            for case,output in outputs.items():
+                with self.subTest(session=session,case=case):
+                    cap=json.loads((evidence/session/case/"capture.json").read_bytes())
+                    self.assertEqual(bytes.fromhex(cap["run_output_hex"]),
+                                     output.encode("ascii"))
+                    self.assertEqual((cap["err"],cap["erl"]),(0,0))
+            for case,expected in errors.items():
+                with self.subTest(session=session,case=case):
+                    cap=json.loads((evidence/session/case/"capture.json").read_bytes())
+                    self.assertEqual((cap["err"],cap["erl"]),expected)
+                    self.assertEqual(cap["run_output_hex"],"")
+                    if case=="WEND_OPERAND":
+                        self.assertFalse(cap["list_equal"])
+                    else:
+                        self.assertTrue(cap["list_equal"])
 
 if __name__=="__main__":
     unittest.main()

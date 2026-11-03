@@ -16,8 +16,14 @@ def sizes(path):
     assert any(x.startswith(".iram0.") for x in found),path
     def total(prefix):
         return sum(v for k,v in found.items() if k.startswith(prefix))
+    # ESP-IDF's .iram0.text_end is a 1-byte linker endpoint marker, present
+    # in A0/C2/C3, not an extra vector or instruction. U1-B reports
+    # .iram0.vectors + .iram0.text (67331), excluding this sentinel.
+    assert found.get(".iram0.text_end")==1,(path,"unexpected IRAM end marker")
+    iram=sum(v for k,v in found.items()
+             if k.startswith(".iram0.") and k!=".iram0.text_end")
     return dict(dram=total(".dram0."),bss=found[".dram0.bss"],
-                iram=total(".iram0."),
+                iram=iram,
                 text=total(".flash.text"),rodata=total(".flash.rodata"))
 
 def main():
@@ -57,7 +63,7 @@ def main():
     print("|---|---:|---:|")
     for key in ("dram","bss","iram","text","rodata"):
         print(f"| {key} (bytes) | {m['spi40'][key]} | {m['spi20'][key]} |")
-    print(f"| firmware SHA256 | \`{digest['spi40']}\` | \`{digest['spi20']}\` |")
+    print(f"| firmware SHA256 | `{digest['spi40']}` | `{digest['spi20']}` |")
     print("C3_EXCEPTION_MEMORY=WITHIN_54664 IRAM=67331 HISTORIC_A0_UNCHANGED")
 
 if __name__=="__main__":

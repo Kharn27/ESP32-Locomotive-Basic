@@ -12,6 +12,7 @@ La sélection est dans `spi_clock_select.cmake`, inclus **après** `profile_sele
 
 ## Vérifications host et Xtensa attendues sur le HEAD final
 
+**Précision lecture ELF :** `xtensa-esp-elf-size -A` inclut le symbole de fin `.iram0.text_end` de **1 octet**, déjà identique en A0, C2 et C3. Le contrôle C3 compare les sections IRAM utiles `.iram0.vectors + .iram0.text` (= 67331 o) et vérifie séparément la présence du marqueur ; il ne doit pas compter une seconde fois ce marqueur comme une régression de code. Le garde A0 historique demeure intact et compare les sections de la même manière entre ses deux références.\n\n
 - `python3 tools/ci/hw4_disp_spi_policy.py` : **7 configurations acceptées, 15 refusées**, plus invariants de code SPI/DMA.
 - [workflow HW4-DISP-PROFILE-C3](../.github/workflows/hw4-disp-profile-c3.yml) : deux **builds Xtensa du même SHA** CONSOLE SPI40 + CONSOLE SPI20 en dossiers/configurations isolés, comparaison `xtensa-esp-elf-size -A`, sections DRAM/BSS/IRAM/Flash, hashes binaires distincts, SHA embarqué et identités `CMakeCache`, budget DRAM **≤54664 o** et IRAM **=67331 o** pour chacun. HW3/BASIC_PROBE à 20 MHz par [CI-XTENSA U1-B](../.github/workflows/ci-xtensa.yml).
 - CI-C99 4/4, ARCH, OPT3, CPC-PERMANENT, HW4-EDIT-P1, HW4-C3-B2, Xtensa 3/3 obligatoirement PASS. La CI A0 **reste volontairement inchangée et FAIL CONSOLE +936 o sous l'exception mémorielle Pilotage C1**, pas un nouveau seuil. Si la DRAM dépasse 54664, l'IRAM change ou les variantes binaires ne se distinguent pas, STOP et réarbitrage préalable.

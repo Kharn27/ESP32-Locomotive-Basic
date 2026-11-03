@@ -94,6 +94,12 @@ int main(void)
     assert(t.seq==5U && t.scrolls==2U && t.bands==1U);
     assert(hw4_dp_trace_at(&p,15U,&t) && t.seq==20U && t.scrolls==2U);
     assert(!hw4_dp_trace_at(&p,16U,&t));
+    Hw4DispProfile corrupt=p;
+    corrupt.completed=1U; /* less than 16 retained samples */
+    assert(!hw4_dp_trace_at(&corrupt,0U,&t));
+    corrupt=p;
+    corrupt.trace_size=HW4_DP_TRACE_CAP+1U;
+    assert(!hw4_dp_trace_at(&corrupt,0U,&t));
     /* Trace values remain exact through uint32 range; no 16-bit truncation. */
     hw4_dp_reset(&p);
     f=frame(25U,UINT32_MAX,100000U);

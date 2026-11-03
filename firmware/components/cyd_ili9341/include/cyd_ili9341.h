@@ -13,6 +13,8 @@ typedef struct {
 } CydLcdDiagnostics;
 esp_err_t cyd_lcd_init(void);
 uint8_t *cyd_lcd_band(void);
+/* Requested SPI pclk supplied to esp_lcd, not measured SCLK. */
+unsigned cyd_lcd_requested_spi_hz(void);
 esp_err_t cyd_lcd_send(int x, int y, int width, int height);
 esp_err_t cyd_lcd_orientation(unsigned index, uint16_t clear_rgb565);
 unsigned cyd_lcd_current_orientation(void);

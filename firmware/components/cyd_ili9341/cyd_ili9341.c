@@ -20,7 +20,13 @@
 #define LCD_CS GPIO_NUM_15
 #define LCD_DC GPIO_NUM_2
 #define LCD_BL GPIO_NUM_21
-#define LCD_CLOCK_HZ (20 * 1000 * 1000)
+/* Fixed at build time. No retuning of a live SPI/DMA bus. */
+#ifndef LCD_CLOCK_HZ
+#define LCD_CLOCK_HZ 20000000U
+#endif
+#if LCD_CLOCK_HZ != 20000000U && LCD_CLOCK_HZ != 40000000U
+#error "HW4-SPI40: only 20/40 MHz"
+#endif
 #define LCD_W 320
 #define LCD_NATIVE_W 240
 #define LCD_NATIVE_H 320
@@ -53,6 +59,8 @@ static bool IRAM_ATTR on_color_done(esp_lcd_panel_io_handle_t io,
 }
 
 uint8_t *cyd_lcd_band(void) { return (s_panel && !s_fault) ? s_band : NULL; }
+/* Driver pclk request; never an electrical SCLK measurement. */
+unsigned cyd_lcd_requested_spi_hz(void) { return LCD_CLOCK_HZ; }
 esp_err_t cyd_lcd_send(int x, int y, int width, int height)
 {
     if (!s_panel || !s_done || s_fault) return ESP_ERR_INVALID_STATE;

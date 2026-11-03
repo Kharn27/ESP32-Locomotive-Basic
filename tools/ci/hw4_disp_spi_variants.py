@@ -31,8 +31,15 @@ def main():
     for variant in ("spi40","spi20"):
         for item in ("sections","cache","bin","commands"):
             ap.add_argument(f"--{variant}-{item}",type=Path,required=True)
+    ap.add_argument("--base-sections",type=Path,required=True,
+                    help="actual Xtensa ELF size -A from pinned main J1.24-B2")
     args=ap.parse_args()
-    m={}; digest={}
+    m={"main_b2":sizes(args.base_sections)}
+    assert m["main_b2"]["dram"]==54168,(
+        "main B2 measured DRAM differs from authorized baseline",m["main_b2"])
+    assert m["main_b2"]["iram"]==67331,(
+        "main B2 measured IRAM differs from authorized baseline",m["main_b2"])
+    digest={}
     for variant,hz in (("spi40",40000000),("spi20",20000000)):
         section=getattr(args,variant+"_sections")
         cache=getattr(args,variant+"_cache").read_text()
@@ -51,7 +58,10 @@ def main():
         assert binary,(variant,"missing image")
         m[variant]=sizes(section)
         digest[variant]=hashlib.sha256(binary).hexdigest()
-        assert m[variant]["dram"]<=54664,(variant,"DRAM limit",m[variant])
+        assert m[variant]["dram"]<=54864,(variant,"C3-INT conditional DRAM cap",m[variant])
+        own_cost=m[variant]["dram"]-m["main_b2"]["dram"]
+        assert 0<=own_cost<=696,(
+            variant,"C3 instrumentation cost exceeds +696 vs main B2",own_cost)
         assert m[variant]["iram"]==67331,(variant,"IRAM changed",m[variant])
     assert m["spi40"]["dram"]==m["spi20"]["dram"],("DRAM mismatch",m)
     assert m["spi40"]["iram"]==m["spi20"]["iram"],("IRAM mismatch",m)
@@ -59,12 +69,17 @@ def main():
     print("HW4-DISP-C3 TARGET_BUILD_VERIFIED=SPI40_AND_SPI20 "
           "HAL_COMPILE_CLOCKS_VERIFIED=40000000_AND_20000000 "
           "clock_scope=requested_not_measured")
-    print("| Metric | CONSOLE SPI40 | CONSOLE SPI20 fallback |")
-    print("|---|---:|---:|")
+    print("| Metric | main B2 (measured) | CONSOLE SPI40 | CONSOLE SPI20 fallback |")
+    print("|---|---:|---:|---:|")
     for key in ("dram","bss","iram","text","rodata"):
-        print(f"| {key} (bytes) | {m['spi40'][key]} | {m['spi20'][key]} |")
-    print(f"| firmware SHA256 | `{digest['spi40']}` | `{digest['spi20']}` |")
-    print("C3_EXCEPTION_MEMORY=WITHIN_54664 IRAM=67331 HISTORIC_A0_UNCHANGED")
+        print(f"| {key} (bytes) | {m['main_b2'][key]} | {m['spi40'][key]} | {m['spi20'][key]} |")
+    print(f"| firmware SHA256 | baseline B2 | `{digest['spi40']}` | `{digest['spi20']}` |")
+    print("C3_INT_MAIN_B2_DRAM=54168 OWN_DELTA_SPI40=" +
+          str(m["spi40"]["dram"]-m["main_b2"]["dram"]) +
+          " OWN_DELTA_SPI20=" +
+          str(m["spi20"]["dram"]-m["main_b2"]["dram"]))
+    print("C3_INT_EXCEPTION_MEMORY=WITHIN_54864 OWN_COST_MAX_696 IRAM=67331 "
+          "HISTORIC_A0_UNCHANGED")
 
 if __name__=="__main__":
     main()

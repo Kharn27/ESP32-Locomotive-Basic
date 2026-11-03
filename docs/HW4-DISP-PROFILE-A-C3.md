@@ -2,6 +2,14 @@
 
 Mandat : [Pilotage C3](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/297#issuecomment-6609616678), [#295](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/295), parent [#285](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/285). PR #297 Draft ouverte, non fusionnée. **LE GO PHYSIQUE CYD SPI20 DE C2 EST ANNULÉ.**
 
+## C3-INT — synchronisation J1.24-B2 (mandat Pilotage 03/11/2026)
+
+Le complément [Pilotage C3-INT](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/297#issuecomment-6612833974) autorise l'intégration de `main@650ea00177fd3efeb8a3a5ec08e576171fea6091` (J1.24-B2, native WHILE/WEND), sans modification de BASIC par la présente PR. Le précédent plafond **54 664 o** est remplacé, **uniquement dans le contrôle local C3**, par **54 864 o de DRAM** ; le surcoût de la PR par rapport au `main` B2 reconstruit doit rester **≤ 696 o**, et l'IRAM utile doit rester exactement **67 331 o**. Ces valeurs sont des conditions à vérifier sur les ELF du nouveau HEAD, pas un PASS acquis.
+
+La CI C3 réalise désormais une **troisième compilation indépendante** du `main` B2 épinglé dans le même conteneur ESP-IDF 5.5.6. Elle compare ses sections réelles (`xtensa-esp-elf-size -A`) aux **deux** compilations CONSOLE SPI40/SPI20 du **même HEAD intégré**, contrôle le coût propre, les deux identités de compilation HAL et les hashes. Le workflow `ci-xtensa.yml` synchronisé depuis `main` contient les ABI BASIC_PROBE `LocoProbeStorage=19280` et `core_descriptor_bytes=844` ; sa vérification 3/3 reste obligatoire. La CI A0 globale et sa référence restent **strictement inchangées** et doivent conserver leur FAIL CONSOLE sous dérogation.
+
+**CYD : pas de flash maintenant.** La fiche opératoire C3 ci-dessous reste la préparation d'un **unique** essai physique SPI40, seulement après arbitrage Pilotage sur le HEAD complet final. Aucun A/B ni essai SPI20 imposé, aucune fusion autonome.
+
 ## Objet et traçabilité
 
 Base de développement : `feat/hw4-disp-profile-a@4a0f2aad688daad757e2b6ba3fcf3b82d21dd986`, par rapport à `main@2d0487338a50c8592a77d3b909bdb74618d3b778`. HEAD final = SHA GitHub de la PR remis au Pilotage et validé sur ce SHA, pas les commits intermédiaires. La PR #289 `6f799ee96f542f28c959d953c0b6df83f431b50f` a été étudiée **uniquement comme diff**, sans cherry-pick ni revendication d'un test SPI40 sur CYD.
@@ -14,7 +22,7 @@ La sélection est dans `spi_clock_select.cmake`, inclus **après** `profile_sele
 
 **Précision lecture ELF :** `xtensa-esp-elf-size -A` inclut le symbole de fin `.iram0.text_end` de **1 octet**, déjà identique en A0, C2 et C3. Le contrôle C3 compare les sections IRAM utiles `.iram0.vectors + .iram0.text` (= 67331 o) et vérifie séparément la présence du marqueur ; il ne doit pas compter une seconde fois ce marqueur comme une régression de code. Le garde A0 historique demeure intact et compare les sections de la même manière entre ses deux références.\n\n
 - `python3 tools/ci/hw4_disp_spi_policy.py` : **7 configurations acceptées, 15 refusées**, plus invariants de code SPI/DMA.
-- [workflow HW4-DISP-PROFILE-C3](../.github/workflows/hw4-disp-profile-c3.yml) : deux **builds Xtensa du même SHA** CONSOLE SPI40 + CONSOLE SPI20 en dossiers/configurations isolés, comparaison `xtensa-esp-elf-size -A`, sections DRAM/BSS/IRAM/Flash, hashes binaires distincts, SHA embarqué et identités `CMakeCache`, budget DRAM **≤54664 o** et IRAM **=67331 o** pour chacun. HW3/BASIC_PROBE à 20 MHz par [CI-XTENSA U1-B](../.github/workflows/ci-xtensa.yml).
+- [workflow HW4-DISP-PROFILE-C3](../.github/workflows/hw4-disp-profile-c3.yml) : deux **builds Xtensa du même SHA** CONSOLE SPI40 + CONSOLE SPI20 en dossiers/configurations isolés, comparaison `xtensa-esp-elf-size -A`, sections DRAM/BSS/IRAM/Flash, hashes binaires distincts, SHA embarqué et identités `CMakeCache`, budget DRAM **≤54864 o** et surcoût C3 **≤696 o** vs main B2 et IRAM **=67331 o** pour chacun. HW3/BASIC_PROBE à 20 MHz par [CI-XTENSA U1-B](../.github/workflows/ci-xtensa.yml).
 - CI-C99 4/4, ARCH, OPT3, CPC-PERMANENT, HW4-EDIT-P1, HW4-C3-B2, Xtensa 3/3 obligatoirement PASS. La CI A0 **reste volontairement inchangée et FAIL CONSOLE +936 o sous l'exception mémorielle Pilotage C1**, pas un nouveau seuil. Si la DRAM dépasse 54664, l'IRAM change ou les variantes binaires ne se distinguent pas, STOP et réarbitrage préalable.
 
 ## Fiche PO — à utiliser UNIQUEMENT après un GO explicite du Pilotage

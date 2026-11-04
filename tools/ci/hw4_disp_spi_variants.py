@@ -73,7 +73,7 @@ def main():
     print("|---|---:|---:|---:|")
     for key in ("dram","bss","iram","text","rodata"):
         print(f"| {key} (bytes) | {m['main_b3'][key]} | {m['spi40'][key]} | {m['spi20'][key]} |")
-    print(f"| firmware SHA256 | baseline B2 | `{digest['spi40']}` | `{digest['spi20']}` |")
+    print(f"| firmware SHA256 | baseline B3 | `{digest['spi40']}` | `{digest['spi20']}` |")
     print("C3_INT_MAIN_B3_DRAM=54168 OWN_DELTA_SPI40=" +
           str(m["spi40"]["dram"]-m["main_b3"]["dram"]) +
           " OWN_DELTA_SPI20=" +

@@ -1,0 +1,20 @@
+{
+  "case": "01_listt_direct",
+  "keyboard_inputs": [
+    "LISTT"
+  ],
+  "trailing_space": false,
+  "tail": "CAP32_DELAYCAP32_DELAYCAP32_SCRNSHOTCAP32_EXIT",
+  "argv": [
+    "xvfb-run",
+    "-a",
+    "/__w/ESP32-Locomotive-Basic/ESP32-Locomotive-Basic/tests/oracles/caprice32/cap32",
+    "-c",
+    "/tmp/hw4-diag-oracle-r1/original/01_listt_direct/cap32.cfg",
+    "-a",
+    "LISTT",
+    "-a",
+    "CAP32_DELAYCAP32_DELAYCAP32_SCRNSHOTCAP32_EXIT"
+  ],
+  "screen_not_printer": true
+}

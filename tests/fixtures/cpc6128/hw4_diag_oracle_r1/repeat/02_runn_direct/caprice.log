@@ -1,0 +1,7 @@
+returncode=0
+Using configuration file: /tmp/hw4-diag-oracle-r1/repeat/02_runn_direct/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /tmp/hw4-diag-oracle-r1/repeat/02_runn_direct/screenshot_20261104_211650.png
+
+[stderr]

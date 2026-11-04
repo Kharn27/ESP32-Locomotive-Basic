@@ -523,6 +523,25 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_BINARY_DIR}/hw4_preview_verified")
 endif()
 
+# HW4-DISP-RENDER-A: independent frozen generic reference and exact RGB565
+# comparison, including negative/multimode cases. Host benchmark is a separate
+# executable so ordinary C99/sanitizer CTest does not measure instrumentation.
+if(BUILD_TESTING)
+    add_executable(test_hw4_render_a
+        tests/test_hw4_render_a.c tests/hw4_render_a_reference.c)
+    target_link_libraries(test_hw4_render_a PRIVATE cpc_video)
+    target_include_directories(test_hw4_render_a PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_test(NAME hw4_disp_render_a_rgb565_exact
+             COMMAND test_hw4_render_a)
+
+    add_executable(bench_hw4_render_a
+        tests/bench_hw4_render_a.c tests/hw4_render_a_reference.c)
+    target_link_libraries(bench_hw4_render_a PRIVATE cpc_video)
+    target_include_directories(bench_hw4_render_a PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+endif()
+
 # J1.6-B: CPC FB MOD INTEGER, immutable J1.6-A original evidence only.
 # Two new portable suites, preserving all 42 previous regressions unchanged.
 if(BUILD_TESTING)

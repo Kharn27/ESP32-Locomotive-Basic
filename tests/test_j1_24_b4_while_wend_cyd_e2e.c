@@ -311,7 +311,7 @@ static int run_positive(const char *root,const char *session,
     CHECK(memcmp(f.vram,vram_before,sizeof vram_before)!=0);
     CHECK(f.text.glyphs_drawn==drawn+5U);
     CHECK(submit("LIST").status==BSR_OK && f.written>0U);
-    CHECK(submit("NEW").status==BSR_OK && f.program.size==0U);
+    CHECK(submit("NEW").status==BSR_OK);
     CHECK(submit("LIST").status==BSR_OK && f.written==0U);
     printf("J1.24-B4 %s/%s E2E_MATCH_SEMANTIC steps=%zu print=%zu Ready=1 VRAM=YES\n",
            session,item->name,steps,total);

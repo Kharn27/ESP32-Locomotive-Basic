@@ -205,6 +205,45 @@ static unsigned sampled_pen(const CpcVideo *v, unsigned x, unsigned y)
     }
     return p;
 }
+/* HW4-DISP-RENDER-A: MODE1 uses 80 contiguous VRAM bytes per raster row.
+ * Each byte contains four logical 2-bit pixels, MSB first. Convert its
+ * four pixels in one pass, with RGB565 inks resolved once per row. No LUT,
+ * heap, second framebuffer, VRAM mutation or change to MODE0/MODE2.
+ */
+static void render_mode1_row(const CpcVideo *v, unsigned ly, uint16_t *out)
+{
+    uint16_t colour[4];
+    for (unsigned p = 0U; p < 4U; ++p)
+        colour[p] = cpc_video_palette_rgb565(v->ink[p]);
+
+    const uint8_t *const src = v->pixels + (size_t)ly * 80U;
+    for (unsigned i = 0U; i < 80U; ++i) {
+        const unsigned packed = src[i];
+        const unsigned x = 4U * i;
+        out[x]      = colour[(packed >> 6U) & 3U];
+        out[x + 1U] = colour[(packed >> 4U) & 3U];
+        out[x + 2U] = colour[(packed >> 2U) & 3U];
+        out[x + 3U] = colour[packed & 3U];
+    }
+
+    /* The cursor overlays AFTER sampling without touching VRAM. Its 8-pixel
+     * exchange affects only the live PEN/PAPER indices; other graphics inks
+     * remain untouched. Fast path above stays branch-free for every byte.
+     */
+    if (v->cursor_visible && ly / 8U == v->cursor_row &&
+        v->pen != v->paper && v->cursor_column < 40U) {
+        const unsigned start = (unsigned)v->cursor_column * 8U;
+        for (unsigned dx = 0U; dx < 8U; ++dx) {
+            const unsigned x = start + dx;
+            const unsigned byte = src[x / 4U];
+            const unsigned raw = (byte >> (6U - 2U * (x % 4U))) & 3U;
+            const unsigned p = raw == v->pen ? v->paper :
+                               raw == v->paper ? v->pen : raw;
+            out[x] = p < 4U ? colour[p] :
+                     cpc_video_palette_rgb565(v->ink[p]);
+        }
+    }
+}
 bool cpc_video_render_row(const CpcVideo *v, unsigned y, uint16_t *out, size_t count)
 {
     if (!valid(v) || out == NULL || count < CPC_VIDEO_TFT_WIDTH || y >= CPC_VIDEO_TFT_HEIGHT) return false;
@@ -213,8 +252,11 @@ bool cpc_video_render_row(const CpcVideo *v, unsigned y, uint16_t *out, size_t c
         for (unsigned x = 0; x < CPC_VIDEO_TFT_WIDTH; ++x) out[x] = colour;
     } else {
         unsigned ly = y - CPC_VIDEO_VIEW_TOP;
-        for (unsigned x = 0; x < CPC_VIDEO_TFT_WIDTH; ++x)
-            out[x] = cpc_video_palette_rgb565(v->ink[sampled_pen(v,x,ly)]);
+        if (v->mode == CPC_MODE_1)
+            render_mode1_row(v, ly, out);
+        else
+            for (unsigned x = 0; x < CPC_VIDEO_TFT_WIDTH; ++x)
+                out[x] = cpc_video_palette_rgb565(v->ink[sampled_pen(v,x,ly)]);
     }
     return true;
 }

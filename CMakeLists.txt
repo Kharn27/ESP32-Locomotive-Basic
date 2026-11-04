@@ -538,6 +538,18 @@ if(BUILD_TESTING)
 endif()
 
 
+# HW4-DISP-PROFILE-A: independent C99 frame accounting, including negative cases.
+add_library(hw4_disp_profile STATIC video/hw4_disp_profile.c)
+target_include_directories(hw4_disp_profile PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/video)
+if(BUILD_TESTING)
+    add_executable(test_hw4_disp_profile tests/test_hw4_disp_profile.c)
+    target_link_libraries(test_hw4_disp_profile PRIVATE hw4_disp_profile)
+    add_test(NAME hw4_disp_profile_accounting COMMAND test_hw4_disp_profile)
+    add_executable(bench_hw4_disp_profile tests/bench_hw4_disp_profile.c)
+    target_link_libraries(bench_hw4_disp_profile PRIVATE hw4_disp_profile)
+    add_test(NAME hw4_disp_profile_host_overhead COMMAND bench_hw4_disp_profile)
+endif()
+
 # HW4-SCROLL-OPT-A0: portable bounded telemetry, no LCD or BASIC dependency.
 add_library(hw4_scroll_metrics STATIC video/hw4_scroll_metrics.c)
 target_include_directories(hw4_scroll_metrics PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/video)

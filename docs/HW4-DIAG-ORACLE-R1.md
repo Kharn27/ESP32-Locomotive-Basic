@@ -36,13 +36,52 @@ sha256sum /tmp/hw4-diag-oracle-r1-NEUF/manifest.json
 
 Utiliser un **nouveau répertoire** pour chaque essai. Hors Actions, `--expected-head <SHA>` peut remplacer la variable d'environnement. Le résultat de l'acquisition ne prouve aucun diagnostic sans lecture effective des images.
 
-## Témoins / résultat
+## Témoins acquis — vrais PNG Caprice32 / ROM CPC 6128 BASIC 1.1
 
-| Saisie directe | Originaux | Octets et SHA | Texte observé et Ready | Classification |
-|---|---|---|---|---|
-| `LISTT` | Deux démarrages CPC attendus | À acquérir | **Non observé** | `CPC_ORACLE_NOT_ACQUIRED` |
-| `RUNN` | Deux démarrages CPC attendus | À acquérir | **Non observé** | `CPC_ORACLE_NOT_ACQUIRED` |
+**Acquisition indépendante réelle :** [GitHub Actions #41914521177](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41914521177), job `acquire-independent-cpc` **SUCCESS**, le **4 novembre 2026 à 21:16:48–21:16:50 UTC**, exécuté sur **HEAD exact `38e3887379477aa885d48bb99736d7ae27c910a2`**. Archive poussée par l'Action **sur la branche dédiée uniquement**, commit `5162fb35b61857ca641da3f50ed47b7f8b41a463`.
 
-**Barrière :** `CPC_SCREEN_CANDIDATE_NOT_YET_VISUALLY_REVIEWED` est distinct de `CPC_ORACLE_VERIFIED`. Un succès de compilation, de workflow ou de contrôle SHA n'autorise **aucune transcription inventée**. Examiner visuellement les quatre PNG, vérifier le bandeau BASIC 1.1, les deux saisies et la totalité du texte d'erreur, de Ready et des lignes voisines ; noter les différences de répétitions. S'il manque une acquisition, indiquer le blocage et ne pas revendiquer de PASS.
+- [Archive brute (artefact Actions #13363502470)](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41914521177/artifacts/13363502470), sans ROM et sans snapshot.
+- [Manifeste original JSON archivé](../tests/fixtures/cpc6128/hw4_diag_oracle_r1/manifest.json), **SHA-256 externe dans les logs Actions : `e2dc7ec6b7e0ab9befbee2b0d6b522a9b3bb54b4d1e1baf7b95bd0deea8582af`**.
+- **Caprice32 `v4.6.0-8c778bf...`**, modèle `CPC6128`, ROM vérifiée SHA-256 `31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562`.
+- 4 processus/boots indépendants, **4/4 codes retour 0**, 4 PNG natifs **768×540**, leurs séquences `autocmd.json` et leurs journaux. Les 16 fichiers du manifeste sont identifiés par leur taille et SHA-256 ; contrôle de provenance/données **PASS**. Le même SHA pour original et répétition est une **égalité d'octets de l'écran**, non une duplication du processus (deux départs et deux captures distincts sont consignés).
 
-**Frontières :** ni PR #297 ni optimisation d'affichage touchées. Aucun test CYD demandé : `ON_DEVICE_UNVERIFIED`. La **revue, l'acceptation et la fusion** relèvent exclusivement du Pilotage.
+| Commande directe | PNG original et répétition | SHA-256 de chaque PNG | Message lu sur l'écran CPC | `Ready` après erreur | Statut borné |
+|---|---|---|---|---|---|
+| `LISTT` | [original](../tests/fixtures/cpc6128/hw4_diag_oracle_r1/original/01_listt_direct/screen.png) ; [repeat](../tests/fixtures/cpc6128/hw4_diag_oracle_r1/repeat/01_listt_direct/screen.png) | `40963349d0c8a6e63e4ae93e08e097983bb5c94f08abc3839ed3e3c5ff87e026` (les deux) | **`Syntax error`** | **Oui** | `CPC_ORACLE_VERIFIED` (cas LISTT) |
+| `RUNN` | [original](../tests/fixtures/cpc6128/hw4_diag_oracle_r1/original/02_runn_direct/screen.png) ; [repeat](../tests/fixtures/cpc6128/hw4_diag_oracle_r1/repeat/02_runn_direct/screen.png) | `9320f74f86d72ba8fb581ec20bd2e931c9533ff7e9c8f5d4b4fc0808dcb55844` (les deux) | **`Syntax error`** | **Oui** | `CPC_ORACLE_VERIFIED` (cas RUNN) |
+
+### Transcription visuelle indépendante — blocs pertinents complets
+
+**`LISTT`** : sous la bannière `Amstrad 128K Microcomputer (v3)`, copyrights Amstrad / Locomotive et `BASIC 1.1`, le PNG original montre les lignes :
+
+~~~text
+Ready
+LISTT
+Syntax error
+Ready
+~~~
+
+Puis un curseur sur la ligne vide suivante. **`RUNN`**, capture issue d'un autre processus CPC (même bannière) :
+
+~~~text
+Ready
+RUNN
+Syntax error
+Ready
+~~~
+
+Puis un curseur sur la ligne vide suivante. Les **deux répétitions sont identiques bit pour bit** à leurs originaux respectifs et donc portent cette même transcription. Le premier `Ready` est le prompt de démarrage ; le **second est bien émis après le message**. La surcharge `0FPS 0%` en haut à gauche appartient à l'émulateur, **pas au diagnostic BASIC**. Aucun numéro de ligne d'erreur n'est affiché.
+
+Les octets **du texte source de saisie** sont `LISTT = 4C 49 53 54 54` et `RUNN = 52 55 4E 4E` en ASCII (plus ENTER injecté par l'option Caprice32 `-a`). Leurs traces de touches exactes sont archivées dans [LISTT/autocmd.json](../tests/fixtures/cpc6128/hw4_diag_oracle_r1/original/01_listt_direct/autocmd.json) et [RUNN/autocmd.json](../tests/fixtures/cpc6128/hw4_diag_oracle_r1/original/02_runn_direct/autocmd.json), sans injection d'un pré-message écrit par le script.
+
+**Limite de canal :** `Syntax error` et `Ready` sont des **transcriptions de pixels lus visuellement sur les PNG originaux**, pas des octets de RAM écran ni un export texte CPC. Les SHA-256 concernent les **fichiers PNG intégraux** ; on ne prétend pas avoir acquis des codes `ERR`/`ERL`, un buffer de caractères ou des octets BASIC imprimante. La vérification des SHA et des octets d'entrée est automatique, la lecture du texte affiché a été réalisée **séparément** après la capture. Il ne s'agit pas d'un test CPC 6128 matériel, mais d'une exécution **de la véritable ROM CPC6128 dans l'émulateur indépendant épinglé**, sans passer par le C99 du projet.
+
+### Contre-exemple et comparaison demandée
+
+Pour **les seuls cas observés `LISTT` et `RUNN`**, l'écran CPC émet `Syntax error` puis `Ready`, cohérent avec la correspondance d'affichage hôte issue de #291. **Aucun contre-exemple trouvé sur ces deux cas** ; pas de correction CORE/IO justifiée par ces preuves. Cela **ne prouve pas** la classification de toutes les erreurs de saisie directe et ne transforme pas le désassemblage `cb49/cd98` en preuve d'une trajectoire machine observée ou d'un numéro `ERR` effectivement lu.
+
+Le contrôleur d'archives continue à indiquer `CPC_SCREEN_CANDIDATE_NOT_YET_VISUALLY_REVIEWED` dans le manifeste **original immuable** ; c'est sa classification **au moment de l'acquisition automatique**, volontairement conservée pour éviter une réécriture des preuves. **Le présent rapport porte la revue visuelle ultérieure**, avec ses SHA et son canal distinct. Les falsifications sur copie en mémoire du manifeste (hash PNG, entrée, ROM, verdict automatique) doivent être refusées par le test dédié ; ne jamais modifier les originaux.
+
+**STATUT D'ORACLE PROPOSÉ : `CPC_ORACLE_VERIFIED` — périmètre exactement `LISTT` et `RUNN` dans ces 4 sessions ROM-backed. `ON_DEVICE_UNVERIFIED` pour tout matériel CYD.**
+
+**Frontières maintenues :** ni PR #297 ni jalon d'optimisation d'affichage, CORE, IO, firmware, rendu ou workflows standards touchés. Aucune fixture scellée écrasée. **PR Draft non fusionnée ; la revue et la fusion restent au Pilotage.**

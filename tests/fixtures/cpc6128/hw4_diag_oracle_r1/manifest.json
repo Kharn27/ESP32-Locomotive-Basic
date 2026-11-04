@@ -1,0 +1,177 @@
+{
+  "schema": 1,
+  "mission": "HW4-DIAG-ORACLE-R1",
+  "issue": 298,
+  "repo_head": "38e3887379477aa885d48bb99736d7ae27c910a2",
+  "github_run_id": "41914521177",
+  "acquired_utc": "2026-11-04T21:16:48.254777+00:00",
+  "classification": "CPC_SCREEN_CANDIDATE_NOT_YET_VISUALLY_REVIEWED",
+  "oracle": {
+    "name": "Caprice32",
+    "commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+    "version": "Caprice32 v4.6.0-8c778bf072a06fb7c23b9cccd179041db7f79a52\nAPP_PATH: Not provided\nCompiled with:\nNumber of video plugins available: 11",
+    "system_rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+    "model": "CPC6128",
+    "basic_version": "BASIC 1.1 (to be checked on screenshots)",
+    "ram_kib": 128,
+    "keyboard": "English 0",
+    "rom_archived": false,
+    "container_image": "ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c",
+    "acquisition_driver_sha256": "f204c7d441f1b696596527d464ee54a08a52039edf8e255b980d3d65955cf8f0",
+    "mission_script_sha256": "7aa98e9cf4b2ebf35a5d95ff3aea087bf4c97b1be43d42287cb7d7a6578f25bc"
+  },
+  "c99_code_executed": false,
+  "screen_not_printer": true,
+  "diagnostic_interpretation": null,
+  "ready_interpretation": null,
+  "cases": [
+    {
+      "id": "01_listt_direct",
+      "direct_command": "LISTT",
+      "keyboard_inputs": [
+        "LISTT"
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-11-04T21:16:48.256600+00:00",
+          "finished_utc": "2026-11-04T21:16:48.850867+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/01_listt_direct/screen.png",
+          "screen_sha256": "40963349d0c8a6e63e4ae93e08e097983bb5c94f08abc3839ed3e3c5ff87e026",
+          "screen_size_bytes": 4770,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "c8c27d2596f8fd81d6c9be3298dd727dd7a6fcce2bd8be25afc0447c2f9ca308",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-11-04T21:16:48.853472+00:00",
+          "finished_utc": "2026-11-04T21:16:49.382486+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/01_listt_direct/screen.png",
+          "screen_sha256": "40963349d0c8a6e63e4ae93e08e097983bb5c94f08abc3839ed3e3c5ff87e026",
+          "screen_size_bytes": 4770,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "c8c27d2596f8fd81d6c9be3298dd727dd7a6fcce2bd8be25afc0447c2f9ca308",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    },
+    {
+      "id": "02_runn_direct",
+      "direct_command": "RUNN",
+      "keyboard_inputs": [
+        "RUNN"
+      ],
+      "runs": [
+        {
+          "repetition": "original",
+          "started_utc": "2026-11-04T21:16:49.384835+00:00",
+          "finished_utc": "2026-11-04T21:16:49.891466+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "original/02_runn_direct/screen.png",
+          "screen_sha256": "9320f74f86d72ba8fb581ec20bd2e931c9533ff7e9c8f5d4b4fc0808dcb55844",
+          "screen_size_bytes": 4771,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "6ab37c4704f50955ffa886bbb790e5f8b480db3a817d304fc23712698d5a88c2",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        },
+        {
+          "repetition": "repeat",
+          "started_utc": "2026-11-04T21:16:49.893520+00:00",
+          "finished_utc": "2026-11-04T21:16:50.396555+00:00",
+          "emulator_exit_code": 0,
+          "screen_png": "repeat/02_runn_direct/screen.png",
+          "screen_sha256": "9320f74f86d72ba8fb581ec20bd2e931c9533ff7e9c8f5d4b4fc0808dcb55844",
+          "screen_size_bytes": 4771,
+          "screen_width_px": 768,
+          "screen_height_px": 540,
+          "keyboard_sequence_sha256": "6ab37c4704f50955ffa886bbb790e5f8b480db3a817d304fc23712698d5a88c2",
+          "screen_reading_status": "TO_REVIEW",
+          "ready_count": null,
+          "cursor_position": null,
+          "independent_cpc_process": true
+        }
+      ]
+    }
+  ],
+  "artifact_hashes": {
+    "original/01_listt_direct/autocmd.json": {
+      "sha256": "cbc5f8b0da055088ab1bd558c97e2117f6381c9422739dc37d79a48f68d761e9",
+      "bytes": 482
+    },
+    "original/01_listt_direct/cap32.cfg": {
+      "sha256": "2238bedf0aef9762dcdd23d8283671c72fc6800b18d057c10aca9a98e57ecce8",
+      "bytes": 1105
+    },
+    "original/01_listt_direct/caprice.log": {
+      "sha256": "391ec981fb1bd7f09125418733c4e4890d5cb2a9690a0ea9afe59af9c40cb33a",
+      "bytes": 301
+    },
+    "original/01_listt_direct/screen.png": {
+      "sha256": "40963349d0c8a6e63e4ae93e08e097983bb5c94f08abc3839ed3e3c5ff87e026",
+      "bytes": 4770
+    },
+    "original/02_runn_direct/autocmd.json": {
+      "sha256": "43e04bd673e5f9923d384944460ad812960276e9d5e92fa58abd1f6f4aec17cc",
+      "bytes": 478
+    },
+    "original/02_runn_direct/cap32.cfg": {
+      "sha256": "35391748905c43811c1056d9d7287368ea37e98e6944808db830b15b1233a63b",
+      "bytes": 1104
+    },
+    "original/02_runn_direct/caprice.log": {
+      "sha256": "8c8949a16f525751f3c5f4a1cfdf8d3d2cd9f1789abcea4ee98c9b0e77eb27d8",
+      "bytes": 299
+    },
+    "original/02_runn_direct/screen.png": {
+      "sha256": "9320f74f86d72ba8fb581ec20bd2e931c9533ff7e9c8f5d4b4fc0808dcb55844",
+      "bytes": 4771
+    },
+    "repeat/01_listt_direct/autocmd.json": {
+      "sha256": "96c6525213385c9d44eab2bbeba6396ac2bd0bb46cde3740d777d9f157df3138",
+      "bytes": 480
+    },
+    "repeat/01_listt_direct/cap32.cfg": {
+      "sha256": "3f30276802946fec2aa683d0adc7e61a97c81714ef7ee4faca253e6a7b255fb8",
+      "bytes": 1103
+    },
+    "repeat/01_listt_direct/caprice.log": {
+      "sha256": "50a3ee97992c09c8d30b3ac9492ac871842cd34c1020eb35c00107846b1ad7db",
+      "bytes": 297
+    },
+    "repeat/01_listt_direct/screen.png": {
+      "sha256": "40963349d0c8a6e63e4ae93e08e097983bb5c94f08abc3839ed3e3c5ff87e026",
+      "bytes": 4770
+    },
+    "repeat/02_runn_direct/autocmd.json": {
+      "sha256": "f1ff6fc6fbfac11cb21e37488460c9e6bcfc18d241e6ebb16c2077b3e20effeb",
+      "bytes": 476
+    },
+    "repeat/02_runn_direct/cap32.cfg": {
+      "sha256": "3a45b09c8af6f1f498468e972ed81e8c493fe359775295cc5e0e95447aae7c8a",
+      "bytes": 1102
+    },
+    "repeat/02_runn_direct/caprice.log": {
+      "sha256": "edcf7f6e16dba00922c7a73e0895ef75a0d121559aaef1ecaedb4ee864e1e75f",
+      "bytes": 295
+    },
+    "repeat/02_runn_direct/screen.png": {
+      "sha256": "9320f74f86d72ba8fb581ec20bd2e931c9533ff7e9c8f5d4b4fc0808dcb55844",
+      "bytes": 4771
+    }
+  }
+}

@@ -43,6 +43,13 @@ def validate(root, j):
             not re.fullmatch(r"[0-9a-f]{64}", o.get("mission_script_sha256", "")) or
             not re.fullmatch(r"[0-9a-f]{64}", o.get("acquisition_driver_sha256", "")),
             "ROM_OR_EMULATOR_PROVENANCE")
+    # Pin the actual capture code used for acquisition, not merely a SHA
+    # written in JSON by the candidate workflow.
+    source_root = Path(__file__).resolve().parents[1]
+    fail_if(digest((source_root / "tools/hw4_diag_oracle_r1_cpc.py").read_bytes()) !=
+            o["mission_script_sha256"] or
+            digest((source_root / "tools/hw4_diag_a_cpc.py").read_bytes()) !=
+            o["acquisition_driver_sha256"], "ACQUISITION_SOURCE_HASH_CHANGED")
     fail_if(not re.fullmatch(r"[0-9a-f]{40}", j.get("repo_head", "")), "HEAD_UNVERIFIED")
     fail_if(len(j["cases"]) != 2 or
             {x.get("id") for x in j["cases"]} != set(CASES), "CASE_SET")
@@ -117,7 +124,27 @@ def main():
         self_test()
     if args.evidence:
         root = args.evidence.resolve()
-        validate(root, json.loads((root / "manifest.json").read_text()))
+        j = json.loads((root / "manifest.json").read_text())
+        validate(root, j)
+        if args.self_test:
+            # Falsify the in-memory representation without ever modifying
+            # the archived original files.
+            for kind in ("PNG_SHA", "DIRECT_INPUT", "ROM", "FAKE_VERDICT"):
+                forged = copy.deepcopy(j)
+                if kind == "PNG_SHA":
+                    forged["cases"][0]["runs"][0]["screen_sha256"] = "0" * 64
+                elif kind == "DIRECT_INPUT":
+                    forged["cases"][1]["keyboard_inputs"] = ["RUN"]
+                elif kind == "ROM":
+                    forged["oracle"]["system_rom_sha256"] = "0" * 64
+                else:
+                    forged["diagnostic_interpretation"] = "Syntax error"
+                try:
+                    validate(root, forged)
+                except ValueError:
+                    print("HW4_DIAG_ORACLE_R1_MUTATION_REJECTED=" + kind)
+                else:
+                    raise ValueError("MUTATION_ACCEPTED_" + kind)
     elif not args.self_test:
         raise ValueError("NEED_EVIDENCE_OR_SELFTEST")
 

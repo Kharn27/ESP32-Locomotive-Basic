@@ -667,6 +667,17 @@ if(BUILD_TESTING)
                           cpc_diag_policy cpc_ready_policy basic_session_runtime)
     add_test(NAME j1_diag_retro_a1a_gosub_return
              COMMAND test_j1_diag_retro_a1a)
+    # J1.24-B3: actual BSR failures through central CPC diagnostic/Ready
+    # policies, plus fake-origin and buffer-atomicity negative controls.
+    add_executable(test_j1_24_b3_while_wend_diagnostics
+                   tests/test_j1_24_b3_while_wend_diagnostics.c)
+    target_link_libraries(test_j1_24_b3_while_wend_diagnostics PRIVATE
+                          cpc_diag_policy cpc_ready_policy
+                          basic_session_runtime)
+    target_include_directories(test_j1_24_b3_while_wend_diagnostics
+                               PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/integration)
+    add_test(NAME j1_24_b3_while_wend_cpc_diagnostics
+             COMMAND test_j1_24_b3_while_wend_diagnostics)
 
     add_executable(test_hw4_diag_a tests/test_hw4_diag_a.c)
     target_link_libraries(test_hw4_diag_a PRIVATE

@@ -2,6 +2,16 @@
 
 Mandat : [Pilotage C3](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/297#issuecomment-6609616678), [#295](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/295), parent [#285](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/285). PR #297 Draft ouverte, non fusionnée. **LE GO PHYSIQUE CYD SPI20 DE C2 EST ANNULÉ.**
 
+## C3-INT-B3 — intégration J1.24-B3 (04/11/2026)
+
+Mandat complémentaire : [Pilotage #6631162512](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/297#issuecomment-6631162512). Cette branche est synchronisée avec `main@989ec54989537a31c3a9be8074f1ce7c47708f17` par commit de fusion à deux parents (C3-INT et B3). Les tests C99 C3 et B3 sont tous les deux enregistrés ; le diagnostic CPC B3 reste celui de main, sans réécriture de son code.
+
+**Baseline mesurée avant intégration :** CI-XTENSA de main B3 [#41832571009](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/41832571009), profil CONSOLE : **54168 octets DRAM, 67331 octets IRAM utile**. Le contrôle C3 reconstruit maintenant `main@989ec54989537a31c3a9be8074f1ce7c47708f17` dans le même ESP-IDF 5.5.6 que les variantes SPI40 et SPI20 et doit prouver un delta propre **≤696 octets**, DRAM finale **≤54864 octets** et IRAM inchangée. **Aucune extension de plafond accordée.** Le garde A0 global n'est ni modifié ni désactivé ; son FAIL historique sous dérogation reste explicitement signalé.
+
+**Réception matérielle déjà réalisée sur l'ancien SHA uniquement :** le PO a flashé `68488bb0f3a6ffe075fdf28303f64c13247ac420` en CONSOLE SPI40 et rapporté 3 RUN complets (2409604 / 2407691 / 2411329 µs), **0 défaut et 0 timeout DMA**, une marge pile de 4240 octets et un scrolling perçu plus fluide. Voir [verdict Pilotage](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/297#issuecomment-6631162512). Cette preuve **ne qualifie pas physiquement le nouveau SHA intégré** : `ON_DEVICE_UNVERIFIED` pour lui ; **aucune nouvelle campagne CYD demandée ni autorisée par ce changement**. Le SCLK LCD électrique reste non mesuré.
+
+La fiche opératoire historique plus bas sert de référence de traçabilité, **pas d'ordre de reflash**. Les anciennes phrases « pas de flash maintenant » et les mentions de GO futur ci-dessous documentent la phase pré-réception C3 et sont supplantées pour la synchronisation B3 par le présent chapitre.
+
 ## C3-INT — synchronisation J1.24-B2 (mandat Pilotage 03/11/2026)
 
 Le complément [Pilotage C3-INT](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/297#issuecomment-6612833974) autorise l'intégration de `main@650ea00177fd3efeb8a3a5ec08e576171fea6091` (J1.24-B2, native WHILE/WEND), sans modification de BASIC par la présente PR. Le précédent plafond **54 664 o** est remplacé, **uniquement dans le contrôle local C3**, par **54 864 o de DRAM** ; le surcoût de la PR par rapport au `main` B2 reconstruit doit rester **≤ 696 o**, et l'IRAM utile doit rester exactement **67 331 o**. Ces valeurs sont des conditions à vérifier sur les ELF du nouveau HEAD, pas un PASS acquis.
@@ -23,7 +33,7 @@ La sélection est dans `spi_clock_select.cmake`, inclus **après** `profile_sele
 **Précision lecture ELF :** `xtensa-esp-elf-size -A` inclut le symbole de fin `.iram0.text_end` de **1 octet**, déjà identique en A0, C2 et C3. Le contrôle C3 compare les sections IRAM utiles `.iram0.vectors + .iram0.text` (= 67331 o) et vérifie séparément la présence du marqueur ; il ne doit pas compter une seconde fois ce marqueur comme une régression de code. Le garde A0 historique demeure intact et compare les sections de la même manière entre ses deux références.\n\n
 - `python3 tools/ci/hw4_disp_spi_policy.py` : **7 configurations acceptées, 15 refusées**, plus invariants de code SPI/DMA.
 - [workflow HW4-DISP-PROFILE-C3](../.github/workflows/hw4-disp-profile-c3.yml) : deux **builds Xtensa du même SHA** CONSOLE SPI40 + CONSOLE SPI20 en dossiers/configurations isolés, comparaison `xtensa-esp-elf-size -A`, sections DRAM/BSS/IRAM/Flash, hashes binaires distincts, SHA embarqué et identités `CMakeCache`, budget DRAM **≤54864 o** et surcoût C3 **≤696 o** vs main B2 et IRAM **=67331 o** pour chacun. HW3/BASIC_PROBE à 20 MHz par [CI-XTENSA U1-B](../.github/workflows/ci-xtensa.yml).
-- CI-C99 4/4, ARCH, OPT3, CPC-PERMANENT, HW4-EDIT-P1, HW4-C3-B2, Xtensa 3/3 obligatoirement PASS. La CI A0 **reste volontairement inchangée et FAIL CONSOLE +936 o sous l'exception mémorielle Pilotage C1**, pas un nouveau seuil. Si la DRAM dépasse 54664, l'IRAM change ou les variantes binaires ne se distinguent pas, STOP et réarbitrage préalable.
+- CI-C99 4/4, ARCH, OPT3, CPC-PERMANENT, HW4-EDIT-P1, HW4-C3-B2, Xtensa 3/3 obligatoirement PASS. La CI A0 **reste volontairement inchangée et FAIL CONSOLE +1136 o (constaté sur B2, sous dérogation explicite Pilotage) sous l'exception mémorielle Pilotage C1**, pas un nouveau seuil. Si la DRAM dépasse 54864, l'IRAM change ou les variantes binaires ne se distinguent pas, STOP et réarbitrage préalable.
 
 ## Fiche PO — à utiliser UNIQUEMENT après un GO explicite du Pilotage
 

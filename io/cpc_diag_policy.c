@@ -57,6 +57,9 @@ const char *cpc_diag_policy_category(CpcDiagCategory category)
         case CPC_DIAG_GOTO_MISSING_TARGET: return "GOTO_MISSING_TARGET_CPC";
         case CPC_DIAG_IF_MISSING_TARGET: return "IF_TAKEN_MISSING_TARGET_CPC";
         case CPC_DIAG_DIRECT_UNKNOWN_SYNTAX: return "DIRECT_UNKNOWN_SYNTAX_CORE_LEXICAL";
+        case CPC_DIAG_WEND_UNEXPECTED: return "WEND_UNEXPECTED_CPC";
+        case CPC_DIAG_WHILE_WEND_MISSING: return "WHILE_WEND_MISSING_CPC";
+        case CPC_DIAG_WHILE_OPERAND_MISSING: return "WHILE_OPERAND_MISSING_CPC";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -75,6 +78,9 @@ const char *cpc_diag_policy_message(CpcDiagCategory category)
         case CPC_DIAG_GOTO_MISSING_TARGET: return "Line does not exist";
         case CPC_DIAG_IF_MISSING_TARGET: return "Line does not exist";
         case CPC_DIAG_DIRECT_UNKNOWN_SYNTAX: return "Syntax error";
+        case CPC_DIAG_WEND_UNEXPECTED: return "Unexpected WEND";
+        case CPC_DIAG_WHILE_WEND_MISSING: return "WEND missing";
+        case CPC_DIAG_WHILE_OPERAND_MISSING: return "Operand missing";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -556,6 +562,44 @@ static bool o2b_missing_target(const BasicSessionRuntime *runtime,
     return bp_find(program, destination, &target) == BP_NOT_FOUND;
 }
 
+/* J1.24-B3: corroborate an actual failed WHILE/WEND step without
+ * converting a caller-supplied BEStatus into alleged CPC evidence.
+ * The CORE preview API is read-only by contract, uses caller-owned tiny
+ * staging buffers and never commits a BASIC step. WHILE/WEND fail before
+ * emitting any output or video event. A future compound form requiring
+ * staging capacity will fail closed as a HOST diagnostic instead.
+ * The CORE helper supplies the real line, including prevalidated errors;
+ * neither a raw token search nor a cursor-derived line is sufficient. */
+static bool while_wend_locus(const BasicSessionRuntime *runtime,
+                             const BasicProgramLine *line, BEStatus cause,
+                             uint16_t *line_number)
+{
+    const BasicExecutor *executor = &runtime->executor;
+    const uint8_t *body = runtime->program->data + line->body_offset;
+    size_t at = executor->statement_offset;
+    uint8_t output[1] = {0U};
+    BEVideoEvent event[1];
+    size_t output_count = 0U, event_count = 0U;
+    uint8_t opcode;
+    if (runtime->variables != executor->variables ||
+        !o2b_statement_start(runtime->program, line, at))
+        return false;
+    next_skip_spaces(body, line->body_length, &at);
+    if (at >= line->body_length) return false;
+    opcode = cause == BE_WEND_WITHOUT_WHILE ? 0xd5u : 0xd6u;
+    if (body[at] != opcode) return false;
+    /* The historical signature is BasicExecutor* although the preview
+     * itself leaves the executor, store and program byte-identical. */
+    if (be_preview_step_events((BasicExecutor *)executor,
+             output, sizeof output, &output_count,
+             event, 1U, &event_count) != cause)
+        return false;
+    if (be_while_diagnostic_line(executor, cause, line_number) != BE_OK ||
+        *line_number == 0U)
+        return false;
+    return true;
+}
+
 /* bsr_step_events() preserves failed cursor, output and RUNNING state.
  * Resolve from the real stored record BEFORE bsr_stop(), with no side
  * effects. Status numbers are host enums, never historical CPC ERR codes. */
@@ -580,7 +624,10 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
        result.executor_status!=BE_RETURN_WITHOUT_GOSUB &&
        result.executor_status!=BE_NEXT_WITHOUT_FOR &&
        result.executor_status!=BE_NEXT_VARIABLE_MISMATCH &&
-       result.executor_status!=BE_DIVISION_BY_ZERO)
+       result.executor_status!=BE_DIVISION_BY_ZERO &&
+       result.executor_status!=BE_WEND_WITHOUT_WHILE &&
+       result.executor_status!=BE_WHILE_WITHOUT_WEND &&
+       result.executor_status!=BE_WHILE_OPERAND_MISSING)
         return diagnostic;
 
     cursor=runtime->executor.cursor;
@@ -588,6 +635,23 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
        line.offset!=runtime->executor.cursor || line.number==0U ||
        runtime->executor.statement_offset>=line.body_length)
         return diagnostic;
+    if (result.executor_status == BE_WEND_WITHOUT_WHILE ||
+        result.executor_status == BE_WHILE_WITHOUT_WEND ||
+        result.executor_status == BE_WHILE_OPERAND_MISSING) {
+        uint16_t real_line = 0U;
+        if (!while_wend_locus(runtime, &line,
+                             result.executor_status, &real_line))
+            return diagnostic;
+        diagnostic.category =
+            result.executor_status == BE_WEND_WITHOUT_WHILE ?
+                CPC_DIAG_WEND_UNEXPECTED :
+            result.executor_status == BE_WHILE_WITHOUT_WEND ?
+                CPC_DIAG_WHILE_WEND_MISSING :
+                CPC_DIAG_WHILE_OPERAND_MISSING;
+        diagnostic.origin = CPC_DIAG_ORIGIN_NATIVE_WHILE_WEND_CPC_ORACLE;
+        diagnostic.line_number = real_line;
+        return diagnostic;
+    }
     if(result.executor_status==BE_DIVISION_BY_ZERO) {
         if(!f9_zero_assignment(runtime,&line)) return diagnostic;
         diagnostic.category=CPC_DIAG_DIVISION_INTEGER_ZERO;
@@ -649,6 +713,9 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
     static const uint8_t return_prefix[]="Unexpected RETURN in ";
     static const uint8_t next_prefix[]="Unexpected NEXT in ";
     static const uint8_t f9_prefix[]="Division by zero in ";
+    static const uint8_t wend_prefix[]="Unexpected WEND in ";
+    static const uint8_t missing_wend_prefix[]="WEND missing in ";
+    static const uint8_t operand_prefix[]="Operand missing in ";
     const uint8_t *prefix=NULL;
     size_t prefix_length=0U;
     uint8_t digits[5];
@@ -688,6 +755,18 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE) {
         prefix=f9_prefix;
         prefix_length=sizeof(f9_prefix)-1U;
+    } else if(diagnostic.category==CPC_DIAG_WEND_UNEXPECTED &&
+              diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_WHILE_WEND_CPC_ORACLE) {
+        prefix=wend_prefix;
+        prefix_length=sizeof(wend_prefix)-1U;
+    } else if(diagnostic.category==CPC_DIAG_WHILE_WEND_MISSING &&
+              diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_WHILE_WEND_CPC_ORACLE) {
+        prefix=missing_wend_prefix;
+        prefix_length=sizeof(missing_wend_prefix)-1U;
+    } else if(diagnostic.category==CPC_DIAG_WHILE_OPERAND_MISSING &&
+              diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_WHILE_WEND_CPC_ORACLE) {
+        prefix=operand_prefix;
+        prefix_length=sizeof(operand_prefix)-1U;
     } else {
         return false;
     }

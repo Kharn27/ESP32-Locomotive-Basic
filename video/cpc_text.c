@@ -22,11 +22,29 @@ bool cpc_text_init(CpcText *sink, CpcVideo *video,
     return true;
 }
 
+void cpc_text_profile_clock(CpcText *sink, CpcTextMicros clock, void *context)
+{
+    if(sink==NULL) return;
+    sink->scroll_clock=clock;
+    sink->scroll_clock_context=context;
+}
+
 static bool advance(CpcText *sink)
 {
     if (sink->row == 24U) {
+        const uint64_t before=sink->scroll_clock ?
+            sink->scroll_clock(sink->scroll_clock_context):0U;
         if (!cpc_video_scroll_up(sink->video, 1U)) return false;
         ++sink->scrolls;
+        if(sink->scroll_clock) {
+            const uint64_t after=sink->scroll_clock(sink->scroll_clock_context);
+            if(after>=before) {
+                const uint64_t elapsed=after-before;
+                if(elapsed<=UINT64_MAX-sink->scroll_wall_us)
+                    sink->scroll_wall_us+=elapsed;
+                else sink->scroll_wall_us=UINT64_MAX;
+            }
+        }
     } else {
         ++sink->row;
     }

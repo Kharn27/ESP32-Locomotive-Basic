@@ -16,6 +16,7 @@ if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
             "hw4_c2_console.c" "hw4_touch_t1.c" "cpc_font.c"
             "../../../video/cpc_video.c" "../../../video/cpc_palette.c" "../../../video/cpc_boot.c"
             "../../../video/cpc_text.c" "../../../video/hw4_scroll_metrics.c"
+            "../../../video/hw4_disp_profile.c"
             "../../../integration/hw4_pen_bridge.c"
             "../../../integration/hw4_run_scheduler.c"
             "../../../integration/hw4_run_break_input.c"

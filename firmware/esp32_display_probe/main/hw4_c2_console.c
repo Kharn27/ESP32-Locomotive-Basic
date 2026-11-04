@@ -19,6 +19,7 @@
 #include "cpc_screen_nav.h"
 #include "cpc_video.h"
 #include "hw4_scroll_metrics.h"
+#include "hw4_disp_profile.h"
 #include "hw4_touch_t1.h"
 #include "cyd_ili9341.h"
 #include "uart_line.h"
@@ -98,6 +99,88 @@ static uint32_t s_shot_seq;
 /* A0: CONSOLE-only class counters; a scroll-associated dirty flush may
  * also contain cursor, text or !CLS writes. Never label it scroll-exclusive. */
 static Hw4ScrollMetrics s_scroll_metrics;
+/* HW4-DISP-PROFILE-A: bounded, single-owner, no per-band UART. */
+static Hw4DispProfile s_disp_profile;
+static Hw4DpFrame *s_disp_active;
+static uint64_t s_disp_scroll_checkpoint_us;
+static uint64_t s_run_profile_started_us;
+static unsigned s_disp_run_seq;
+static bool s_disp_report_after_prompt;
+static uint64_t disp_clock(void *context)
+{
+    (void)context;
+    return (uint64_t)esp_timer_get_time();
+}
+static void disp_clock_overhead_report(void)
+{
+    enum { N=512 };
+    volatile uint64_t sink=0U;
+    const uint64_t a=disp_clock(NULL);
+    for(unsigned i=0U;i<N;++i) sink+=(uint64_t)i;
+    const uint64_t b=disp_clock(NULL);
+    for(unsigned i=0U;i<N;++i) sink+=disp_clock(NULL);
+    const uint64_t c=disp_clock(NULL);
+    const uint64_t baseline=b-a, instrumented=c-b;
+    printf("HW4-DISP-PROFILE CLOCK_OVERHEAD_ESTIMATE calls=%u "
+           "base_loop_us=%llu clock_loop_us=%llu "
+           "net_upper_us_per_call=%llu scope=task_wall_boot_calibration\n",
+           (unsigned)N,(unsigned long long)baseline,(unsigned long long)instrumented,
+           (unsigned long long)(instrumented>baseline
+              ? (instrumented-baseline+N-1U)/N:0U));
+    (void)sink;
+}
+static void disp_report(const char *stage)
+{
+    const Hw4DispProfile *p=&s_disp_profile;
+    printf("HW4-DISP-PROFILE SUMMARY run=%u stage=%s completed=%u "
+           "rejected=%u gaps=%u gap_avg_us=%llu gap_min_us=%u "
+           "gap_max_us=%u semantics=repaint_completed_not_gram_visible\n",
+           s_disp_run_seq,stage,(unsigned)p->completed,(unsigned)p->rejected,
+           (unsigned)p->gaps,
+           (unsigned long long)(p->gaps ? p->gap_sum_us/p->gaps:0U),
+           (unsigned)p->gap_min_us,(unsigned)p->gap_max_us);
+    printf("HW4-DISP-PROFILE TRACE_INFO run=%u stage=%s retained=%u "
+           "total=%u truncated=%u order=completion gap_scope=between_completed\n",
+           s_disp_run_seq,stage,(unsigned)p->trace_size,
+           (unsigned)p->completed,(unsigned)(p->completed>p->trace_size));
+    for(unsigned i=0U;i<p->trace_size;++i) {
+        Hw4DpTrace t={0};
+        if(!hw4_dp_trace_at(p,i,&t)) continue;
+        printf("HW4-DISP-PROFILE TRACE run=%u seq=%u bands=%u "
+               "scrolls=%u wall_us=%u completion_gap_us=%u\n",
+               s_disp_run_seq,(unsigned)t.seq,(unsigned)t.bands,
+               (unsigned)t.scrolls,(unsigned)t.wall_us,
+               (unsigned)t.gap_us);
+    }
+    for(unsigned i=0U;i<HW4_DP_CLASSES;++i) {
+        const Hw4DpClass *c=&p->classes[i];
+        const char *name=i==HW4_DP_FULL25 ? "full25" :
+            i==HW4_DP_PARTIAL ? "partial" : "scroll_associated";
+        printf("HW4-DISP-PROFILE CLASS run=%u stage=%s name=%s n=%u "
+               "min_us=%u mean_us=%llu p50_upper_us=%u p95_upper_us=%u "
+               "max_us=%u bands=%llu bytes=%llu wall_us=%llu "
+               "render_pack_us=%llu submit_us=%llu sem_wait_us=%llu "
+               "other_us=%llu scroll_wall_outside_repaint_us=%llu "
+               "scrolls=%llu zero=%u one=%u multi=%u max_scrolls=%u\n",
+               s_disp_run_seq,stage,name,(unsigned)c->n,(unsigned)c->min_us,
+               (unsigned long long)(c->n ? c->wall_us/c->n:0U),
+               (unsigned)hw4_dp_quantile_upper(c,50U),
+               (unsigned)hw4_dp_quantile_upper(c,95U),(unsigned)c->max_us,
+               (unsigned long long)c->bands,
+               (unsigned long long)hw4_dp_bytes(c),
+               (unsigned long long)c->wall_us,
+               (unsigned long long)c->render_pack_us,
+               (unsigned long long)c->submit_us,
+               (unsigned long long)c->wait_us,
+               (unsigned long long)hw4_dp_other_us(c),
+               (unsigned long long)c->scroll_cpu_wall_us,
+               (unsigned long long)c->scrolls,
+               (unsigned)hw4_dp_zero_scroll(c),
+               (unsigned)c->one_scroll,(unsigned)c->multi_scroll,
+               (unsigned)c->max_scrolls);
+    }
+}
+
 static Hw4TouchT1 s_touch; /* CONSOLE only; 0 heap, 0 extra tasks */
 static Hw4RunScheduler s_run_scheduler;
 /* J1.21-B2b: tokenizer scratch is inactive for the whole RUN. Reuse it for
@@ -224,6 +307,7 @@ static bool render_band(unsigned top)
     uint16_t scan[LCD_WIDTH];           /* 640 B transient stack row */
     if(band==NULL || top+LCD_ROWS_PER_BAND>LCD_HEIGHT)
         return fail("LCD_BAND_ACCESS",-1);
+    const uint64_t render_start=s_disp_active ? disp_clock(NULL):0U;
     for(unsigned dy=0;dy<LCD_ROWS_PER_BAND;++dy) {
         if(!cpc_video_render_row(&s_video,top+dy,scan,LCD_WIDTH))
             return fail("VIDEO_RENDER",(int)(top+dy));
@@ -234,7 +318,15 @@ static bool render_band(unsigned top)
         }
     }
     /* DMA sender blocks for completion; a single app_main owns the band. */
-    esp_err_t e=cyd_lcd_send(0,(int)top,LCD_WIDTH,LCD_ROWS_PER_BAND);
+    esp_err_t e;
+    if(s_disp_active) {
+        const uint64_t render_end=disp_clock(NULL);
+        s_disp_active->render_pack_us+=render_end-render_start;
+        CydLcdSendTiming timing={0};
+        e=cyd_lcd_send_profiled(0,(int)top,LCD_WIDTH,LCD_ROWS_PER_BAND,&timing);
+        s_disp_active->submit_us+=timing.submit_us;
+        s_disp_active->wait_us+=timing.wait_us;
+    } else e=cyd_lcd_send(0,(int)top,LCD_WIDTH,LCD_ROWS_PER_BAND);
     if(e!=ESP_OK) return fail("LCD_DMA",(int)e);
     return true;
 }
@@ -365,10 +457,15 @@ static bool repaint_dirty(void)
     hw4_scroll_observe_text(&s_scroll_metrics,(uint32_t)s_text.scrolls);
     if(s_video.dirty_bands!=0U) {
         unsigned sent=0U;
+        Hw4DpFrame frame={0};
+        const uint64_t wall_start=disp_clock(NULL);
+        s_disp_active=&frame; /* only live within this synchronous flush */
         uint32_t start=esp_cpu_get_cycle_count();
         /* Exactly ONE attempt. Real LCD errors latch s_fault, so preserve
          * remaining dirty bands and fail-stop. Never retry the driver. */
         bool ok=cpc_video_flush_dirty(&s_video,send_dirty_band,&sent);
+        s_disp_active=NULL;
+        const uint64_t wall_end=disp_clock(NULL);
         /* CPU cycles modulo UINT32 wrap; CYD uses a fixed CPU clock.
          * Avoid extra timer component and preserve HW3 OFF dependencies. */
         uint32_t elapsed=esp_cpu_get_cycle_count()-start;
@@ -381,8 +478,20 @@ static bool repaint_dirty(void)
         unsigned bin=0U;
         while(bin<11U && us>s_latency_bounds_us[bin]) ++bin;
         ++s_lcd_metrics.histogram[bin];
-        if(ok) hw4_scroll_flush(&s_scroll_metrics,sent,us,
-                                (uint64_t)sent*CYD_LCD_DMA_BYTES);
+        if(ok) {
+            const uint32_t up=s_scroll_metrics.pending_up;
+            const uint32_t down=s_scroll_metrics.pending_down;
+            frame.scrolls=(UINT32_MAX-up<down) ? UINT32_MAX:up+down;
+            frame.bands=sent;
+            frame.completed_us=wall_end;
+            frame.wall_us=wall_end-wall_start;
+            frame.scroll_cpu_wall_us=(s_text.scroll_wall_us>=s_disp_scroll_checkpoint_us)
+                ? s_text.scroll_wall_us-s_disp_scroll_checkpoint_us:0U;
+            if(hw4_dp_record(&s_disp_profile,&frame))
+                s_disp_scroll_checkpoint_us=s_text.scroll_wall_us;
+            hw4_scroll_flush(&s_scroll_metrics,sent,us,
+                             (uint64_t)sent*CYD_LCD_DMA_BYTES);
+        }
         if(!ok) {
             CydLcdDiagnostics d;
             bool got=cyd_lcd_diagnostics(&d);
@@ -474,6 +583,10 @@ static bool prompt(void)
     if(!repaint_dirty()) return false;
     printf("HW4-C3-B2 INPUT_READY capacity=%u screen_row=%u "
            "policy=mode1_scroll\n",UART_LINE_CAPACITY,s_text.row);
+    if(s_disp_report_after_prompt) {
+        s_disp_report_after_prompt=false;
+        disp_report("run_terminal_after_prompt");
+    }
     return true;
 }
 static bool basic_submit(const uint8_t *source,size_t length,
@@ -528,9 +641,13 @@ static bool basic_run(void)
     s_run_break_source="none";
     s_run_video_failure=HW4_PEN_OK;
     s_run_ready_transition=CPC_READY_RUN_RETURN;
+    hw4_dp_reset(&s_disp_profile);
+    s_disp_scroll_checkpoint_us=s_text.scroll_wall_us;
+    ++s_disp_run_seq;
     printf("HW4-RUN-B RUN_START quantum=%u uart_poll_max=%u "
            "budget=none sha=%s\n",RUN_QUANTUM,RUN_UART_POLL_BYTES,
            HW4_SHOT_GIT_SHA);
+    s_run_profile_started_us=disp_clock(NULL);
     return true;
 }
 static bool basic_run_slice(void)
@@ -558,6 +675,7 @@ static bool basic_run_slice(void)
         return true;
     }
     s_run_active=false;
+    const uint64_t run_core_us=disp_clock(NULL)-s_run_profile_started_us;
     if(slice.state==HW4_RUN_EXECUTOR_ERROR) {
         const BSRResult r=s_run_scheduler.last_result;
         /* Resolve authentic PEN 16/L20 cursor BEFORE the only error stop. */
@@ -599,6 +717,9 @@ static bool basic_run_slice(void)
     } else if(slice.state!=HW4_RUN_ENDED && slice.state!=HW4_RUN_BROKEN) {
         return fail("RUN_STATE",(int)slice.state);
     }
+    printf("HW4-DISP-PROFILE RUN_DURATION run=%u core_us=%llu "
+           "scope=RUN_slices_including_repaint_excluding_final_prompt\n",
+           s_disp_run_seq,(unsigned long long)run_core_us);
     printf("HW4-RUN-B RUN_TERMINAL state=%u quanta=%u steps=%u "
            "break_source=%s stop_calls=%u latency_us=%llu "
            "ignored_input_lines=%u overflow_input_lines=%u "
@@ -612,6 +733,7 @@ static bool basic_run_slice(void)
            (unsigned)s_run_input.overflow_lines,
            HW4_SHOT_GIT_SHA);
     memory_report("run_terminal");
+    s_disp_report_after_prompt=true;
     return apply_ready_policy(s_run_ready_transition) && prompt();
 }
 static bool is_command(const uint8_t *source,size_t n,const char *word)
@@ -747,6 +869,15 @@ void app_main(void)
        !cpc_text_init(&s_text,&s_video,hw3_glyph_callback,NULL)) {
         (void)fail("VIDEO_INIT",-1); return;
     }
+    cpc_text_profile_clock(&s_text,disp_clock,NULL);
+    /* Read from the actual HAL build constant, never assume electrical SCLK. */
+    printf("HW4-DISP-PROFILE BOOT spi_request_hz=%u "
+           "variant=%s effective_spi_hz=UNMEASURED "
+           "electrical_spi_hz=UNMEASURED unit=wall_us "
+           "physical_gram_visible=UNVERIFIED sha=%s\n",
+           cyd_lcd_requested_spi_hz(),
+           cyd_lcd_requested_spi_hz()==40000000U?"SPI40":"SPI20",
+           HW4_SHOT_GIT_SHA);
     printf("HW4-C2 VIDEO_READY mode=1 logical=320x200 "
            "cols=40 rows=25 vram_bytes=%u ink_fg=24 ink_bg=1\n",
            CPC_VIDEO_BYTES);
@@ -775,6 +906,7 @@ void app_main(void)
     /* Non-secret boot discriminator with zero added RNG/IRAM linkage. */
     s_shot_boot_tag=esp_cpu_get_cycle_count() ^ (uint32_t)esp_timer_get_time();
     if(!uart_init()) return;
+    disp_clock_overhead_report(); /* one-time, outside RUN/repaint */
     e=cyd_lcd_backlight(true);
     if(e!=ESP_OK) { (void)fail("BACKLIGHT",(int)e); return; }
     memory_report("interactive_ready");
@@ -949,6 +1081,8 @@ void app_main(void)
             printf("HW4-C2 INPUT_OVERFLOW max_bytes=%u "
                    "policy=reject_entire_line\n",UART_LINE_CAPACITY);
         } else if(event==UART_LINE_READY) {
+            const bool profile_state=is_command(s_line.data,s_line.length,"LIST") ||
+                is_command(s_line.data,s_line.length,"!CLS");
             /* Input LF + program output + optional Ready + prompt are fully
              * composed BEFORE exactly one repaint_dirty(). */
             echo_batch_record(echo_pending,true);
@@ -958,6 +1092,7 @@ void app_main(void)
             memory_report("after_line");
             lcd_metrics_report("after_line");
             scroll_metrics_report("after_line");
+            if(profile_state) disp_report("list_or_cls_after_line");
         } else if(event==UART_LINE_REJECTED) {
             echo_batch_record(echo_pending,true);
             echo_pending=0U;

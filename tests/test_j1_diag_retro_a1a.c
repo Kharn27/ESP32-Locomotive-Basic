@@ -301,7 +301,8 @@ static void tests(void)
                    "Division by zero in 20\n", 1);
         CHECK_CASE(f9_zero, 1U, BE_DIVISION_BY_ZERO,
                    "Division by zero in 20\n", 1);
-        CHECK_CASE(fb_zero, 1U, BE_DIVISION_BY_ZERO, "ERROR\n", 0);
+        CHECK_CASE(fb_zero, 1U, BE_DIVISION_BY_ZERO,
+                   "Division by zero in 20\n", 1);
     }
     {
         static const char *f9_620[] = {
@@ -320,6 +321,86 @@ static void tests(void)
                    "Division by zero in 65535\n", 1);
         CHECK_CASE(f9_before, 2U, BE_DIVISION_BY_ZERO,
                    "Division by zero in 20\n", 1);
+    }
+    /* A3 RED: genuine BSR with original CPC forms and host-only extrapolations. */
+    {
+        static const char *sub[] = {
+            "10 A%=-32768",
+            "20 B%=A%-1",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *mul2[] = {
+            "10 A%=32767",
+            "20 B%=A%*2",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *mul255[] = {
+            "10 A%=255",
+            "20 B%=A%*255",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *fb0[] = {
+            "10 A%=0",
+            "20 B%=A% MOD 0",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *sub620[] = {
+            "600 A%=-32768",
+            "620 B%=A%-1",
+            "630 PRINT \"NEVER\""
+        };
+        static const char *mul65535[] = {
+            "65000 A%=32767",
+            "65535 B%=A%*2"
+        };
+        static const char *fb620[] = {
+            "600 A%=1",
+            "620 B%=A% MOD 0",
+            "630 PRINT \"NEVER\""
+        };
+        static const char *fb65535[] = {
+            "65000 A%=0",
+            "65535 B%=A% MOD 0"
+        };
+        static const char *before[] = {
+            "10 PRINT \"BEFORE\"",
+            "15 A%=255",
+            "20 B%=A%*255",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *sub_other[] = {
+            "10 A%=-32768",
+            "20 B%=A%-2",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *mul_other[] = {
+            "10 A%=32767",
+            "20 B%=A%*3",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *plus_other[] = {
+            "10 A%=32767",
+            "20 B%=A%+1",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *mod_other[] = {
+            "10 A%=2",
+            "20 B%=A% MOD 0",
+            "30 PRINT \"NEVER\""
+        };
+        CHECK_CASE(sub, 1U, BE_INTEGER_OVERFLOW, "Overflow in 20\n", 1);
+        CHECK_CASE(mul2, 1U, BE_INTEGER_OVERFLOW, "Overflow in 20\n", 1);
+        CHECK_CASE(mul255, 1U, BE_INTEGER_OVERFLOW, "Overflow in 20\n", 1);
+        CHECK_CASE(fb0, 1U, BE_DIVISION_BY_ZERO, "Division by zero in 20\n", 1);
+        CHECK_CASE(sub620, 1U, BE_INTEGER_OVERFLOW, "Overflow in 620\n", 1);
+        CHECK_CASE(mul65535, 1U, BE_INTEGER_OVERFLOW, "Overflow in 65535\n", 1);
+        CHECK_CASE(fb620, 1U, BE_DIVISION_BY_ZERO, "Division by zero in 620\n", 1);
+        CHECK_CASE(fb65535, 1U, BE_DIVISION_BY_ZERO, "Division by zero in 65535\n", 1);
+        CHECK_CASE(before, 2U, BE_INTEGER_OVERFLOW, "Overflow in 20\n", 1);
+        CHECK_CASE(sub_other, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
+        CHECK_CASE(mul_other, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
+        CHECK_CASE(plus_other, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
+        CHECK_CASE(mod_other, 1U, BE_DIVISION_BY_ZERO, "ERROR\n", 0);
     }
 #undef CHECK_CASE
 }

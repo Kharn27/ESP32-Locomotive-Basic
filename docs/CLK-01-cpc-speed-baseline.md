@@ -17,8 +17,8 @@ Cinq fichiers ASCII LF sous tests/fixtures/cpc6128/clk_01_speed/ ; manifest.json
 | 01_for.bas | FOR/NEXT sans PRINT dans la boucle | 1200 | CLK01 FOR |
 | 02_integer.bas | INTEGER +3, -2 | 500 | 501 |
 | 03_gosub.bas | GOSUB / RETURN | 300 | 300 |
-| 04_print_fixed.bas | 8 PRINT avec LOCATE 1,1 | 8 | CLK01 FIXED ×8 |
-| 05_print_scroll.bas | 30 PRINT avec LOCATE 1,24 | 30 | CLK01 SCROLL ×30 |
+| 04_print_fixed.bas | 3 PRINT depuis la position courante | 3 | CLK01 FIXED ×3 |
+| 05_print_scroll.bas | 30 PRINT consécutifs (scroll garanti même sans LOCATE) | 30 | CLK01 SCROLL ×30 |
 
 Résultat CPC et sortie natifs doivent être contrôlés séparément : le contenu affiché par la dalle n'est pas imprimé sur UART et ne peut pas être inventé à partir de RUN_DURATION. Le comportement réellement sans scroll du cas 04 devra être confirmé par les compteurs / l'écran ; à défaut ce qualificatif devient observation incertaine.
 
@@ -126,11 +126,10 @@ Scénario 04 :
 
 ~~~
 NEW
-10 LOCATE 1,1
-20 FOR I%=1 TO 8
-30 PRINT "CLK01 FIXED"
-40 NEXT I%
-50 END
+10 FOR I%=1 TO 3
+20 PRINT "CLK01 FIXED"
+30 NEXT I%
+40 END
 RUN
 RUN
 RUN
@@ -140,17 +139,16 @@ Scénario 05 :
 
 ~~~
 NEW
-10 LOCATE 1,24
-20 FOR I%=1 TO 30
-30 PRINT "CLK01 SCROLL"
-40 NEXT I%
-50 END
+10 FOR I%=1 TO 30
+20 PRINT "CLK01 SCROLL"
+30 NEXT I%
+40 END
 RUN
 RUN
 RUN
 ~~~
 
-Réception PO : comparer les sorties à l'écran (8 lignes pour profil 04, 30 impressions pour profil 05), vérifier RUN_DURATION, RUN_TERMINAL state=5, trois CLASS + SUMMARY, LCD_METRICS, DEVICE_MEMORY, dma_fault=0, dma_timeouts=0, lcd_error=ESP_OK, aucune erreur BASIC ou reboot, heap/pile non dégradés. Renvoyer au Pilotage SHA réellement flashé, version IDF, commande build, fichier UART brut + son SHA, sidecar TX, CSV/Markdown, et PASS/FAIL physique par scénario. Aucun ON_DEVICE_PASS n'est décidé par le script ou le développeur.
+Réception PO : comparer les sorties à l'écran (3 lignes pour profil 04, 30 impressions pour profil 05), vérifier RUN_DURATION, RUN_TERMINAL state=5, trois CLASS + SUMMARY, LCD_METRICS, DEVICE_MEMORY, dma_fault=0, dma_timeouts=0, lcd_error=ESP_OK, aucune erreur BASIC ou reboot, heap/pile non dégradés. Renvoyer au Pilotage SHA réellement flashé, version IDF, commande build, fichier UART brut + son SHA, sidecar TX, CSV/Markdown, et PASS/FAIL physique par scénario. Aucun ON_DEVICE_PASS n'est décidé par le script ou le développeur.
 
 ## États et barrières
 

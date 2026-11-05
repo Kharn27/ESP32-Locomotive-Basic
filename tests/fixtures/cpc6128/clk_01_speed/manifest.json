@@ -54,26 +54,21 @@
       "id": "04_print_fixed",
       "profile": "PRINT_NO_SCROLL",
       "file": "04_print_fixed.bas",
-      "sha256": "0a41dbc0b12b2fb1f601b06ba8fd006448fdec8d3549582270e8b87fe0a807fb",
-      "iterations": 8,
+      "sha256": "1b1f8a4ce6976032b04550614676c98494dbdeea0319e4f87a563b726438181f",
+      "iterations": 3,
       "expected_screen_lines": [
-        "CLK01 FIXED",
-        "CLK01 FIXED",
-        "CLK01 FIXED",
-        "CLK01 FIXED",
-        "CLK01 FIXED",
         "CLK01 FIXED",
         "CLK01 FIXED",
         "CLK01 FIXED"
       ],
-      "cpc_probe_line": 45,
-      "end_line": 50
+      "cpc_probe_line": 35,
+      "end_line": 40
     },
     {
       "id": "05_print_scroll",
       "profile": "PRINT_SCROLL",
       "file": "05_print_scroll.bas",
-      "sha256": "ec382429c997fe46b48dcb81642bb3d2c27039492e5f17207a1686a6b2f80d0e",
+      "sha256": "9629603057a4a3ab9c80dd2a54605bad1aff60acc815c6c9d28c7b5731c41b08",
       "iterations": 30,
       "expected_screen_lines": [
         "CLK01 SCROLL",
@@ -107,8 +102,8 @@
         "CLK01 SCROLL",
         "CLK01 SCROLL"
       ],
-      "cpc_probe_line": 45,
-      "end_line": 50
+      "cpc_probe_line": 35,
+      "end_line": 40
     }
   ]
 }

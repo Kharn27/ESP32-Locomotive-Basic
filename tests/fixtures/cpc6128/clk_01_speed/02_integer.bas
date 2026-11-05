@@ -1,0 +1,7 @@
+10 A%=1
+20 FOR I%=1 TO 500
+30 A%=A%+3
+40 A%=A%-2
+50 NEXT I%
+60 PRINT A%
+70 END

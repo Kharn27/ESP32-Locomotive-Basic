@@ -152,7 +152,7 @@ def line_numbers(case):
 
 def inventory():
     return {f"{session}/{case}/{part}"
-            for session in SESSIONS for case in CASES for part in FILES}
+            for session in SESSIONS for case in CASES for part in FILES} | {"index.json"}
 
 def check():
     need(len(CASES)==12 and len({tuple(v) for v in CASES.values()})==12,
@@ -164,10 +164,10 @@ def check():
              len(set(line_numbers(case)))==len(lines) and
              line_numbers(case)==sorted(line_numbers(case)) and
              all(re.fullmatch(r"[0-9]+ [ -~]{1,180}",s) for s in lines) and
-             any(re.match(r"[0-9]+ (DATA|READ|RESTORE)\\b",s) for s in lines) and
+             any(re.match(r"[0-9]+ (DATA|READ|RESTORE)\b",s) for s in lines) and
              lines[-1].endswith(" END"),"SOURCE_INVALID_"+case)
         program(case)
-    need(len(inventory())==12*2*len(FILES),"ARCHIVE_MATRIX")
+    need(len(inventory())==12*2*len(FILES)+1,"ARCHIVE_MATRIX")
     print("J1.25-A SOURCE_CONTRACT_PASS 12_CASES 24_SESSIONS",flush=True)
 
 def imports():
@@ -236,7 +236,7 @@ def observed_keyword_lines(case,ram,records):
     samples=[]
     for src,rec in zip(CASES[case],records):
         stmt=src.split(" ",1)[1]
-        m=re.match(r"(DATA|READ|RESTORE)\\b",stmt)
+        m=re.match(r"(DATA|READ|RESTORE)\b",stmt)
         if not m:
             continue
         token=m.group(1)
@@ -310,6 +310,13 @@ def acquire(cap,out,expected_head):
         for session in SESSIONS:
             for case in CASES:
                 capture(cap,out,session,case,Path(t),ink,png)
+    # Index source/session archive derived from the fresh CPC captures.
+    index={"schema":1,"mission":MISSION,
+           "sources":{c:sha(program(c)) for c in CASES},
+           "sessions":[{"case":c,"session":s,
+                        "capture_sha256":sha(read(out/s/c/"capture.json"))}
+                       for s in SESSIONS for c in CASES]}
+    (out/"index.json").write_bytes(canonical(index))
     manifest={
         "schema":1,"mission":MISSION,"base":BASE,
         "acquisition_head":expected_head,"rom_sha256":ROM,
@@ -324,7 +331,7 @@ def acquire(cap,out,expected_head):
     print("J1.25-A CAPTURE_24_MANIFEST_SHA256",
           sha(read(out/"manifest.json")),flush=True)
 
-def verify(out,seal=None):
+def verify(out,seal=None,expected_head=None):
     check()
     manifest=read(out/"manifest.json")
     m=json.loads(manifest)
@@ -343,9 +350,19 @@ def verify(out,seal=None):
     if seal is not None:
         need(bool(re.fullmatch("[0-9a-f]{64}",seal)) and sha(manifest)==seal,
              "EXTERNAL_MANIFEST_SEAL")
+        need(bool(re.fullmatch("[0-9a-f]{40}",expected_head or "")) and
+             m["acquisition_head"]==expected_head,"EXTERNAL_HEAD_SEAL")
     for file in sorted(wanted):
         need(sha(read(out/file))==m["files"][file],"HASH_"+file)
     ink,png=imports()
+    idx=json.loads(read(out/"index.json"))
+    need(idx.get("schema")==1 and idx.get("mission")==MISSION and
+         idx.get("sources")=={c:sha(program(c)) for c in CASES} and
+         idx.get("sessions")==[
+            {"case":c,"session":s,
+             "capture_sha256":sha(read(out/s/c/"capture.json"))}
+            for s in SESSIONS for c in CASES],
+         "INDEX_SOURCE_SESSION_CONTRACT")
     for case in CASES:
         observations=[]
         for session in SESSIONS:
@@ -402,38 +419,62 @@ def verify(out,seal=None):
     print("J1.25-A VERIFIED 12_CASES 24_SESSIONS "+
           ("EXTERNAL_SEAL" if seal else "UNSEALED"),flush=True)
 
-def falsifications(out,seal=None):
-    mutations=(
-      ("RAM","original/ONCE_LT/program.bin","HASH_original/ONCE_LT/program.bin"),
-      ("LIST","original/THREE_LT/list/printer.dat",
-       "HASH_original/THREE_LT/list/printer.dat"),
-      ("PROBE","repeat/WEND_ORPHAN/run/printer.dat",
-       "HASH_repeat/WEND_ORPHAN/run/printer.dat"),
-      ("MANIFEST","manifest.json","EXTERNAL_MANIFEST_SEAL")
-    )
-    for name,path,reason in mutations:
-        with tempfile.TemporaryDirectory() as t:
-            clone=Path(t)/"archive"
+def falsifications(out,seal=None,expected_head=None):
+    # Independent counterfeits. Seal-bound tests cannot pass unsealed.
+    jobs=[
+      ("RAM","original/ONE_INTEGER/program.bin","HASH_"),
+      ("LIST","original/TWO_INTEGERS/list/printer.dat","HASH_"),
+      ("PRINTER","repeat/QUOTED_COMMA/run/printer.dat","HASH_"),
+      ("SCREEN","original/TYPE_MISMATCH/run/screen_1.png","HASH_"),
+      ("CAPTURE","repeat/RESTORE_BEGIN/capture.json","HASH_"),
+      ("SESSION_REPLACEMENT","repeat/NEXT_DATA_LINE/capture.json","HASH_"),
+      ("FALSE_ROM","manifest.json","PROVENANCE"),
+      ("FALSE_HEAD","manifest.json","EXTERNAL_HEAD_SEAL"),
+      ("MANIFEST_REHASH","manifest.json","EXTERNAL_MANIFEST_SEAL"),
+      ("MANIFEST_RAW","manifest.json","EXTERNAL_MANIFEST_SEAL")
+    ]
+    tested=0
+    for name,path,reason in jobs:
+        if seal is None and name in ("FALSE_HEAD","MANIFEST_REHASH","MANIFEST_RAW"):
+            continue
+        with tempfile.TemporaryDirectory(prefix="j125-forgery-") as temp:
+            clone=Path(temp)/"archive"
             shutil.copytree(out,clone)
             victim=clone/path
-            buf=bytearray(read(victim))
-            need(bool(buf),"EMPTY_TARGET")
-            buf[len(buf)//2]^=1
-            victim.write_bytes(buf)
+            if name=="SESSION_REPLACEMENT":
+                victim.write_bytes(read(clone/"original/NEXT_DATA_LINE/capture.json"))
+            elif name=="FALSE_ROM":
+                m=json.loads(read(victim))
+                m["rom_sha256"]="0"*64
+                victim.write_bytes(canonical(m))
+            elif name=="FALSE_HEAD":
+                m=json.loads(read(victim))
+                m["acquisition_head"]=BASE
+                victim.write_bytes(canonical(m))
+                # Preserve external manifest SHA to force seal fail first.
+                reason="EXTERNAL_MANIFEST_SEAL"
+            elif name=="MANIFEST_REHASH":
+                target=clone/"original/ONE_INTEGER/program.bin"
+                raw=bytearray(read(target));raw[0]^=1;target.write_bytes(raw)
+                m=json.loads(read(victim))
+                m["files"]["original/ONE_INTEGER/program.bin"]=sha(read(target))
+                victim.write_bytes(canonical(m))
+            else:
+                raw=bytearray(read(victim))
+                need(bool(raw),"EMPTY_FALSIFICATION_TARGET_"+name)
+                raw[len(raw)//2]^=1
+                victim.write_bytes(raw)
             try:
-                verify(clone,seal if name=="MANIFEST" else None)
-            except OracleError as e:
-                need(str(e).startswith(reason) if name!="MANIFEST" else
-                     (str(e)==reason if seal else True),
-                     "WRONG_REJECTION_"+name+"_"+str(e))
-                print("J1.25-A FALSIFICATION_REJECTED",name,
-                      str(e),flush=True)
-            except (ValueError,KeyError,UnicodeError) as e:
-                need(name=="MANIFEST" and seal is None,
-                     "WRONG_REJECTION_"+name+"_"+str(e))
-                print("J1.25-A FALSIFICATION_REJECTED MANIFEST JSON",flush=True)
+                verify(clone,seal,expected_head)
+            except (OracleError,ValueError,KeyError,UnicodeError) as exc:
+                got=str(exc)
+                need(got.startswith(reason),"WRONG_REJECTION_"+name+"_"+got)
+                print("J1.25-A FALSIFICATION_REJECTED",name,got,flush=True)
+                tested+=1
             else:
                 raise OracleError("FALSIFICATION_ACCEPTED_"+name)
+    need(tested>=(10 if seal else 7),"INSUFFICIENT_FALSIFICATIONS")
+    print("J1.25-A FALSIFICATIONS_REJECTED",tested,flush=True)
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -444,19 +485,28 @@ def main():
     p.add_argument("--head")
     p.add_argument("--verify",type=Path)
     p.add_argument("--external-manifest-sha256")
+    p.add_argument("--external-acquisition-head")
+    p.add_argument("--permanent",action="store_true")
     args=p.parse_args()
-    need(args.check or args.self_test or args.acquire or args.verify,
-         "ACTION_REQUIRED")
+    need(args.check or args.self_test or args.acquire or args.verify or
+         args.permanent,"ACTION_REQUIRED")
     if args.check or args.self_test:
         check()
     if args.acquire:
         need(args.output is not None and args.verify is None,"ARGUMENTS")
         acquire(args.acquire.resolve(),args.output.resolve(),args.head or "")
+    if args.permanent:
+        need(EXTERNAL_MANIFEST_SHA256 is not None and
+             EXTERNAL_ACQUISITION_HEAD is not None,"EXTERNAL_SEAL_REQUIRED")
+        need(args.verify is not None,"ARCHIVE_REQUIRED")
     if args.verify:
-        verify(args.verify.resolve(),args.external_manifest_sha256)
+        seal=(EXTERNAL_MANIFEST_SHA256 if args.permanent else
+              args.external_manifest_sha256)
+        acq=(EXTERNAL_ACQUISITION_HEAD if args.permanent else
+             args.external_acquisition_head)
+        verify(args.verify.resolve(),seal,acq)
         if args.self_test:
-            falsifications(args.verify.resolve(),
-                           args.external_manifest_sha256)
+            falsifications(args.verify.resolve(),seal,acq)
     if args.self_test and not args.verify:
         with tempfile.TemporaryDirectory() as t:
             try:

@@ -75,7 +75,7 @@ if(BUILD_TESTING)
     # J1.25-B1: 12 original/repeat CPC RAM and LIST sources, lexical only.
     add_executable(test_j1_25_b1_token_list tests/test_j1_25_b1_token_list.c)
     target_link_libraries(test_j1_25_b1_token_list PRIVATE
-        basic_tokenizer basic_listing basic_program)
+        basic_tokenizer basic_listing basic_program basic_executor)
     add_test(NAME j1_25_b1_data_read_restore_token_list
              COMMAND test_j1_25_b1_token_list "${CMAKE_CURRENT_SOURCE_DIR}")
 

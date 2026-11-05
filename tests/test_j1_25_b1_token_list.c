@@ -4,6 +4,7 @@
 #include "basic_tokenizer.h"
 #include "basic_listing.h"
 #include "basic_session.h"
+#include "basic_executor.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -209,11 +210,46 @@ static int negative_atomicity(void)
     return 0;
 }
 
+
+/* B1 never silently introduces a DATA cursor or READ/RESTORE executor
+ * semantics. The unchanged BE step must reject all four new lexical forms
+ * without advancing or emitting even one byte. */
+static int runtime_still_unsupported(void)
+{
+    static const char *const statements[] = {
+        "DATA 1", "READ A%", "RESTORE", "RESTORE 100"
+    };
+    size_t i;
+    for (i=0u; i<sizeof(statements)/sizeof(statements[0]); ++i) {
+        BasicProgram bp;
+        BasicExecutor executor, before;
+        uint8_t program[128], body[80], output[32], frozen[32];
+        size_t body_len = 77u, output_len = 12345u;
+        BEStatus status;
+        CHECK(bp_init(&bp, program, sizeof(program)) == BP_OK);
+        CHECK(bt_tokenize((const uint8_t *)statements[i],
+                          strlen(statements[i]), body, sizeof(body),
+                          &body_len) == BT_OK);
+        CHECK(bp_put(&bp, 10u, body, body_len) == BP_OK);
+        CHECK(be_init(&executor, &bp) == BE_OK);
+        memcpy(&before, &executor, sizeof(before));
+        memset(output, 0x5au, sizeof(output));
+        memcpy(frozen, output, sizeof(frozen));
+        status=be_step(&executor, output, sizeof(output), &output_len);
+        CHECK(status != BE_OK && status != BE_END);
+        CHECK(output_len == 12345u &&
+              memcmp(output, frozen, sizeof(output)) == 0);
+        CHECK(memcmp(&executor, &before, sizeof(executor)) == 0);
+    }
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     size_t i, j;
     CHECK(argc == 2);
     CHECK(negative_atomicity() == 0);
+    CHECK(runtime_still_unsupported() == 0);
     for (i=0u; i<sizeof(cases)/sizeof(cases[0]); ++i) {
         for(j=0u; j<2u; ++j)
             CHECK(verify_case(argv[1],cases[i],sessions[j]) == 0);

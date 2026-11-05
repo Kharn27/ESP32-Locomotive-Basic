@@ -63,7 +63,8 @@ def analyze(raw, expected_head, programs, repetitions=3):
     rows = raw.splitlines()
     starts = [row for row in rows if "HW4-C2 START " in row]
     need(len(starts) == 1, "BOOT_COUNT_NOT_ONE")
-    boot = fields(starts[0], "HW4-C2 START ")
+    need(starts[0].endswith(" ON_DEVICE_UNVERIFIED"), "BOOT_MARKER_MISSING")
+    boot = fields(starts[0].removesuffix(" ON_DEVICE_UNVERIFIED"), "HW4-C2 START ")
     version = boot.get("version", "")
     need(re.fullmatch("[0-9a-f]{7,40}", version) is not None and
          expected_head.startswith(version), "WRONG_APP_VERSION")

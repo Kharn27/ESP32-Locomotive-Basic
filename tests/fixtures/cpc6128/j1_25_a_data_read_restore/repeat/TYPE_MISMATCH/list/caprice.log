@@ -1,0 +1,8 @@
+exit code: 0
+Using configuration file: /__w/_temp/j125-a/repeat/TYPE_MISMATCH/list/cap32.cfg
+No joystick found.
+joysticks_init() failed. Joysticks won't work.
+INFO    src/cap32.cpp:2194 - Dumping screen to /__w/_temp/j125-a/repeat/TYPE_MISMATCH/list/screenshot_20261105_112034.png
+INFO    src/cap32.cpp:2212 - Dumping machine snapshot to /tmp/j125-snap-llorjm_r/repeat-TYPE_MISMATCH/snapshot_20261105_112034.sna
+
+[stderr]

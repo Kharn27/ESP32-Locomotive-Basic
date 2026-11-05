@@ -211,6 +211,65 @@ static int negative_atomicity(void)
 }
 
 
+
+/* LIST full-program errors must preserve every output byte, count and
+ * stored record, including false record lengths and broken DATA tokens. */
+static int program_listing_atomicity(void)
+{
+    BasicProgram p;
+    BasicProgramLine line;
+    uint8_t store[128], token[32], output[128], old_out[128], old_store[128];
+    size_t token_n = 777u, output_n = 12345u;
+    CHECK(bp_init(&p, store, sizeof(store)) == BP_OK);
+    CHECK(bt_tokenize((const uint8_t *)"DATA 1", 6u, token,
+                      sizeof(token), &token_n) == BT_OK);
+    CHECK(bp_put(&p, 10u, token, token_n) == BP_OK);
+    memcpy(old_store, store, sizeof store);
+    memset(output, 0xa5, sizeof output);
+    memcpy(old_out, output, sizeof output);
+    CHECK(bl_list_program(&p, output, 0u, &output_n) == BL_NO_SPACE);
+    CHECK(bl_list_program(&p, output, 9u, &output_n) == BL_NO_SPACE);
+    CHECK(output_n == 12345u &&
+          memcmp(output, old_out, sizeof output) == 0 &&
+          memcmp(store, old_store, sizeof store) == 0);
+    CHECK(bl_list_program(&p, store, sizeof store, &output_n) == BL_OVERLAP);
+    CHECK(output_n == 12345u &&
+          memcmp(store, old_store, sizeof store) == 0);
+    CHECK(bl_list_program(&p, output, sizeof output,
+                          (size_t *)(void *)output) == BL_OVERLAP);
+    CHECK(output_n == 12345u &&
+          memcmp(output, old_out, sizeof output) == 0);
+    CHECK(bl_list_program(&p, output, sizeof output, &output_n) == BL_OK);
+    CHECK(output_n == strlen("10 DATA 1\n"));
+    CHECK(memcmp(output, "10 DATA 1\n", output_n) == 0);
+    CHECK(output[output_n] == 0xa5u);
+    memcpy(output, old_out, sizeof output);
+    output_n = 12345u;
+    store[0] = 0xffu; /* forged record length exceeds the image */
+    CHECK(bl_list_program(&p, output, sizeof output, &output_n) == BL_BAD_PROGRAM);
+    CHECK(output_n == 12345u &&
+          memcmp(output, old_out, sizeof output) == 0);
+    memcpy(store, old_store, sizeof store);
+    CHECK(bp_find(&p, 10u, &line) == BP_OK);
+    store[line.body_offset] = 0xffu; /* unknown statement token */
+    CHECK(bl_list_program(&p, output, sizeof output, &output_n) != BL_OK);
+    CHECK(output_n == 12345u &&
+          memcmp(output, old_out, sizeof output) == 0);
+    memcpy(store, old_store, sizeof store);
+
+    token_n = 777u;
+    CHECK(bt_tokenize((const uint8_t *)"DATA \"Z\"", 8u,
+                      token, sizeof token, &token_n) == BT_OK);
+    CHECK(bp_put(&p, 10u, token, token_n) == BP_OK);
+    CHECK(bp_find(&p, 10u, &line) == BP_OK);
+    CHECK(line.body_length >= 3u);
+    store[line.body_offset + line.body_length - 1u] = (uint8_t)'X';
+    CHECK(bl_list_program(&p, output, sizeof output, &output_n) != BL_OK);
+    CHECK(output_n == 12345u &&
+          memcmp(output, old_out, sizeof output) == 0);
+    return 0;
+}
+
 /* B1 never silently introduces a DATA cursor or READ/RESTORE executor
  * semantics. The unchanged BE step must reject all four new lexical forms
  * without advancing or emitting even one byte. */
@@ -249,6 +308,7 @@ int main(int argc, char **argv)
     size_t i, j;
     CHECK(argc == 2);
     CHECK(negative_atomicity() == 0);
+    CHECK(program_listing_atomicity() == 0);
     CHECK(runtime_still_unsupported() == 0);
     for (i=0u; i<sizeof(cases)/sizeof(cases[0]); ++i) {
         for(j=0u; j<2u; ++j)

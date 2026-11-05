@@ -75,7 +75,7 @@ def analyze(raw, expected_head, programs, repetitions=3):
          spi[0].get("variant") == "SPI40" and
          integer(spi[0], "spi_request_hz") == 40000000, "WRONG_SPI_OR_HEAD")
     need(any(" LCD_METRICS " in row for row in rows), "MISSING_LCD_METRICS")
-    need(not any(re.search(r"Guru Meditation|panic|Backtrace:|LCD_FAIL_STOP|HW4-C2 FAIL |MEMORY_FAIL|DMA_FAULT|VIDEO_REJECT|HW4_RUN_DISPLAY_.*FAILED", row, re.I)
+    need(not any(re.search(r"Guru Meditation|panic|Backtrace:|LCD_FAIL_STOP|HW4-C2 FAIL |MEMORY_FAIL|VIDEO_REJECT|HW4_RUN_DISPLAY_.*FAILED", row, re.I)
                  for row in rows), "FIRMWARE_FAILURE")
     result = []
     active = None

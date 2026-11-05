@@ -485,10 +485,8 @@ static bool a3_binary_witness(const BasicSessionRuntime *runtime,
         bp_validate(runtime->program) != BP_OK)
         return false;
     f9_skip_spaces(body, length, &pos);
-    if (pos < length && body[pos] == 0xa5u) { /* optional LET */
-        ++pos;
-        f9_skip_spaces(body, length, &pos);
-    }
+    /* LET is not among the independent A3 RUN screen witnesses. */
+    if (pos < length && body[pos] == 0xa5u) return false;
     if (pos >= length || body[pos] != 0x02u ||
         bvr_decode(body, length, pos, &ref) != BVR_OK ||
         ref.cache_low != 0U || ref.cache_high != 0U ||

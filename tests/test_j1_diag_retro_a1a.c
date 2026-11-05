@@ -368,6 +368,11 @@ static void tests(void)
             "20 B%=A%*255",
             "30 PRINT \"NEVER\""
         };
+        static const char *let_unwitnessed[] = {
+            "10 A%=-32768",
+            "20 LET B%=A%-1",
+            "30 PRINT \"NEVER\""
+        };
         static const char *sub_other[] = {
             "10 A%=-32768",
             "20 B%=A%-2",
@@ -397,6 +402,7 @@ static void tests(void)
         CHECK_CASE(fb620, 1U, BE_DIVISION_BY_ZERO, "Division by zero in 620\n", 1);
         CHECK_CASE(fb65535, 1U, BE_DIVISION_BY_ZERO, "Division by zero in 65535\n", 1);
         CHECK_CASE(before, 2U, BE_INTEGER_OVERFLOW, "Overflow in 20\n", 1);
+        CHECK_CASE(let_unwitnessed, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
         CHECK_CASE(sub_other, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
         CHECK_CASE(mul_other, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
         CHECK_CASE(plus_other, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);

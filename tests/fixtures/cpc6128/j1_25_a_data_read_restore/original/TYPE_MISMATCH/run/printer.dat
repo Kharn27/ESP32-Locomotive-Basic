@@ -1,0 +1,7 @@
+J125_DIAG_BEGIN
+ 0 
+ 10 
+10                                                                                                 DATA "HELLO"
+20 READ A%
+30 PRINT #8,"AFTER"
+40 END

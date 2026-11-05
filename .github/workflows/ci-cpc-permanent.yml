@@ -198,6 +198,19 @@ jobs:
           python3 tools/j1_22_a_integer_logical_oracle.py --verify "$RUNNER_TEMP/j122-permanent/archive" --self-test
 
 
+      - name: J1.25-A DATA READ RESTORE externally sealed CPC oracle (fail-closed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/j1_25_a_data_read_restore_evidence.py --check --self-test
+          DEST=tests/fixtures/cpc6128/j1_25_a_data_read_restore
+          if test -f "$DEST/manifest.json"; then
+            python3 tools/j1_25_a_data_read_restore_evidence.py --verify "$DEST" --permanent --self-test
+          else
+            test ! -e "$DEST"
+            echo "J1.25-A SOURCE_ONLY — CPC_ORACLE_UNVERIFIED"
+          fi
+
   pen-cpc-acquisition:
     if: (github.event_name == 'pull_request' && github.head_ref == 'oracle/j1-17-a-pen-cpc' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref_name == 'oracle/j1-17-a-pen-cpc')
     runs-on: ubuntu-24.04

@@ -1,0 +1,5 @@
+10 DATA 3,"Z"
+20 READ A%,B$
+30 PRINT #8,A%
+40 PRINT #8,B$
+50 END

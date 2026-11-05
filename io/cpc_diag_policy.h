@@ -21,6 +21,8 @@ typedef enum {
     CPC_DIAG_WEND_UNEXPECTED, /* J1.24-A WEND_ORPHAN */
     CPC_DIAG_WHILE_WEND_MISSING, /* J1.24-A WHILE_UNCLOSED */
     CPC_DIAG_WHILE_OPERAND_MISSING, /* J1.24-A two witnesses */
+    CPC_DIAG_INTEGER_OVERFLOW, /* A3 F5/F6 exact ROM witnesses */
+    CPC_DIAG_MOD_ZERO, /* A3 FB exact ROM witnesses */
     CPC_DIAG_COUNT
 } CpcDiagCategory;
 
@@ -34,7 +36,9 @@ typedef enum {
     CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_GOTO_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE,
-    CPC_DIAG_ORIGIN_NATIVE_WHILE_WEND_CPC_ORACLE
+    CPC_DIAG_ORIGIN_NATIVE_WHILE_WEND_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_NATIVE_F5_F6_OVERFLOW_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_NATIVE_FB_ZERO_CPC_ORACLE
 } CpcDiagOrigin;
 
 typedef struct {
@@ -53,7 +57,7 @@ bool cpc_diag_policy_next_locus(const BasicExecutor *executor, BEStatus reason,
                                  uint16_t *line_number);
 CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
                                         const BasicSessionRuntime *runtime);
-/* A2: tokenised F9 INTEGER literal-zero only; FB/MOD keeps host fallback. */
+/* A2 F9 and A3 bounded F5/F6/FB; all other arithmetic stays host-only. */
 /* One LF-terminated diagnostic. Host fallback is ERROR\n, with no fabricated
  * line number; invalid fabricated CPC contexts fail closed, writing nothing.
  * format_step is also a byte-exact regression seam, without heap or printf. */

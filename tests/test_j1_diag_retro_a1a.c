@@ -570,7 +570,7 @@ static void test_f9_provenance(void)
     assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
            CPC_DIAG_HOST_GENERIC);
     f.storage[f9_pos + 1U] = 0x0eu;
-    f.storage[f9_pos] = 0xfbu; /* same error enum, wrong operator */
+    f.storage[f9_pos] = 0xf4u; /* wrong operator; FB now has own A3 witness */
     assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
            CPC_DIAG_HOST_GENERIC);
     /* Fake F9 / zero in the destination cache, with real op F4,

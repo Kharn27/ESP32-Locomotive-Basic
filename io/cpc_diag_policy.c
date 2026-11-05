@@ -60,6 +60,8 @@ const char *cpc_diag_policy_category(CpcDiagCategory category)
         case CPC_DIAG_WEND_UNEXPECTED: return "WEND_UNEXPECTED_CPC";
         case CPC_DIAG_WHILE_WEND_MISSING: return "WHILE_WEND_MISSING_CPC";
         case CPC_DIAG_WHILE_OPERAND_MISSING: return "WHILE_OPERAND_MISSING_CPC";
+        case CPC_DIAG_INTEGER_OVERFLOW: return "INTEGER_BINARY_OVERFLOW_CPC";
+        case CPC_DIAG_MOD_ZERO: return "INTEGER_FB_DIVISION_BY_ZERO_CPC";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -81,6 +83,8 @@ const char *cpc_diag_policy_message(CpcDiagCategory category)
         case CPC_DIAG_WEND_UNEXPECTED: return "Unexpected WEND";
         case CPC_DIAG_WHILE_WEND_MISSING: return "WEND missing";
         case CPC_DIAG_WHILE_OPERAND_MISSING: return "Operand missing";
+        case CPC_DIAG_INTEGER_OVERFLOW: return "Overflow";
+        case CPC_DIAG_MOD_ZERO: return "Division by zero";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -450,6 +454,99 @@ static bool f9_zero_assignment(const BasicSessionRuntime *runtime,
     return pos == length; /* no second statement, comment, or payload */
 }
 
+
+/* A3: fail-closed, read-only corroboration of an actually failed native
+ * assignment, limited to exact original CPC screen witnesses. The two
+ * explicit references are decoded through BVR/BVB; caches are opaque to
+ * the lexical decoder, but A3 admits only untouched zero-cache native
+ * references (no speculative CPC cache semantics). Numeric operands are
+ * interpreted only in canonical tokens accepted by the CORE executor.
+ * No scan through comments, strings, colon continuations or payloads. */
+static bool a3_binary_witness(const BasicSessionRuntime *runtime,
+                               const BasicProgramLine *line, BEStatus cause)
+{
+    const BasicExecutor *executor = &runtime->executor;
+    const uint8_t *body = runtime->program->data + line->body_offset;
+    const size_t length = line->body_length;
+    size_t pos = 0U, used = 0U;
+    BasicVariableRef ref;
+    BasicVariableKey key;
+    BasicVariableValue value;
+    int16_t lhs;
+    int32_t rhs;
+    uint8_t operation, token;
+    uint8_t output[1] = {0U};
+    BEVideoEvent event[1];
+    size_t output_count = 0U, event_count = 0U;
+
+    if ((cause != BE_INTEGER_OVERFLOW && cause != BE_DIVISION_BY_ZERO) ||
+        executor->statement_offset != 0U || runtime->variables == NULL ||
+        executor->variables != runtime->variables ||
+        bp_validate(runtime->program) != BP_OK)
+        return false;
+    f9_skip_spaces(body, length, &pos);
+    if (pos < length && body[pos] == 0xa5u) { /* optional LET */
+        ++pos;
+        f9_skip_spaces(body, length, &pos);
+    }
+    if (pos >= length || body[pos] != 0x02u ||
+        bvr_decode(body, length, pos, &ref) != BVR_OK ||
+        ref.cache_low != 0U || ref.cache_high != 0U ||
+        bvb_resolve_explicit(body, length, pos, &key, &used) != BVB_OK ||
+        key.type != (uint8_t)BVT_INTEGER || key.name_length != 1U ||
+        key.name[0] != (uint8_t)'B' || used == 0U ||
+        used > length - pos)
+        return false;
+    pos += used;
+    f9_skip_spaces(body, length, &pos);
+    if (pos >= length || body[pos++] != 0xefu) return false; /* = */
+    f9_skip_spaces(body, length, &pos);
+    if (pos >= length || body[pos] != 0x02u ||
+        bvr_decode(body, length, pos, &ref) != BVR_OK ||
+        ref.cache_low != 0U || ref.cache_high != 0U ||
+        bvb_read_explicit(body, length, pos, runtime->variables,
+                          &key, &used, &value) != BVB_OK ||
+        key.type != (uint8_t)BVT_INTEGER ||
+        value.type != (uint8_t)BVT_INTEGER ||
+        key.name_length != 1U || key.name[0] != (uint8_t)'A' ||
+        used == 0U || used > length - pos)
+        return false;
+    lhs = value.data.integer;
+    pos += used;
+    f9_skip_spaces(body, length, &pos);
+    if (pos >= length) return false;
+    operation = body[pos++];
+    if ((cause == BE_INTEGER_OVERFLOW &&
+         operation != 0xf5u && operation != 0xf6u) ||
+        (cause == BE_DIVISION_BY_ZERO && operation != 0xfbu))
+        return false;
+    f9_skip_spaces(body, length, &pos);
+    if (pos >= length) return false;
+    token = body[pos++];
+    if (token >= 0x0eu && token <= 0x17u) {
+        rhs = (int32_t)(token - 0x0eu);
+    } else if (token == 0x19u && pos < length && body[pos] >= 10U) {
+        rhs = (int32_t)body[pos++];
+    } else {
+        return false;
+    }
+    f9_skip_spaces(body, length, &pos);
+    if (pos != length) return false;
+    if (cause == BE_INTEGER_OVERFLOW) {
+        if (!((operation == 0xf5u && lhs == INT16_MIN && rhs == 1) ||
+              (operation == 0xf6u && lhs == INT16_MAX && rhs == 2) ||
+              (operation == 0xf6u && lhs == 255 && rhs == 255)))
+            return false;
+    } else if (rhs != 0 || (lhs != 0 && lhs != 1)) {
+        return false;
+    }
+    /* A fabricated status or a mutable store no longer matching the real
+     * execution cannot promote a host failure to a ROM assertion. */
+    return be_preview_step_events((BasicExecutor *)executor,
+                output, sizeof output, &output_count,
+                event, 1U, &event_count) == cause;
+}
+
 /* Reject a forged continuation pointing into an opaque string/reference or
  * numeric payload. The executor itself only resumes at statement boundaries.
  * This lexical walk is read-only and bounded by the stored record. */
@@ -625,6 +722,7 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
        result.executor_status!=BE_NEXT_WITHOUT_FOR &&
        result.executor_status!=BE_NEXT_VARIABLE_MISMATCH &&
        result.executor_status!=BE_DIVISION_BY_ZERO &&
+       result.executor_status!=BE_INTEGER_OVERFLOW &&
        result.executor_status!=BE_WEND_WITHOUT_WHILE &&
        result.executor_status!=BE_WHILE_WITHOUT_WEND &&
        result.executor_status!=BE_WHILE_OPERAND_MISSING)
@@ -653,9 +751,23 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
         return diagnostic;
     }
     if(result.executor_status==BE_DIVISION_BY_ZERO) {
-        if(!f9_zero_assignment(runtime,&line)) return diagnostic;
-        diagnostic.category=CPC_DIAG_DIVISION_INTEGER_ZERO;
-        diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE;
+        if (f9_zero_assignment(runtime,&line)) {
+            diagnostic.category=CPC_DIAG_DIVISION_INTEGER_ZERO;
+            diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE;
+        } else if (a3_binary_witness(runtime,&line,BE_DIVISION_BY_ZERO)) {
+            diagnostic.category=CPC_DIAG_MOD_ZERO;
+            diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_FB_ZERO_CPC_ORACLE;
+        } else {
+            return diagnostic;
+        }
+        diagnostic.line_number=line.number;
+        return diagnostic;
+    }
+    if (result.executor_status==BE_INTEGER_OVERFLOW) {
+        if (!a3_binary_witness(runtime,&line,BE_INTEGER_OVERFLOW))
+            return diagnostic;
+        diagnostic.category=CPC_DIAG_INTEGER_OVERFLOW;
+        diagnostic.origin=CPC_DIAG_ORIGIN_NATIVE_F5_F6_OVERFLOW_CPC_ORACLE;
         diagnostic.line_number=line.number;
         return diagnostic;
     }
@@ -713,6 +825,7 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
     static const uint8_t return_prefix[]="Unexpected RETURN in ";
     static const uint8_t next_prefix[]="Unexpected NEXT in ";
     static const uint8_t f9_prefix[]="Division by zero in ";
+    static const uint8_t overflow_prefix[]="Overflow in ";
     static const uint8_t wend_prefix[]="Unexpected WEND in ";
     static const uint8_t missing_wend_prefix[]="WEND missing in ";
     static const uint8_t operand_prefix[]="Operand missing in ";
@@ -755,6 +868,14 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE) {
         prefix=f9_prefix;
         prefix_length=sizeof(f9_prefix)-1U;
+    } else if(diagnostic.category==CPC_DIAG_MOD_ZERO &&
+              diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_FB_ZERO_CPC_ORACLE) {
+        prefix=f9_prefix;
+        prefix_length=sizeof(f9_prefix)-1U;
+    } else if(diagnostic.category==CPC_DIAG_INTEGER_OVERFLOW &&
+              diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_F5_F6_OVERFLOW_CPC_ORACLE) {
+        prefix=overflow_prefix;
+        prefix_length=sizeof(overflow_prefix)-1U;
     } else if(diagnostic.category==CPC_DIAG_WEND_UNEXPECTED &&
               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_WHILE_WEND_CPC_ORACLE) {
         prefix=wend_prefix;

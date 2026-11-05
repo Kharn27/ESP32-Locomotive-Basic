@@ -321,8 +321,8 @@ static int diagnostic_provenance_matrix(void)
         "10 GOTO 999", "20 PRINT \"NEVER\""};
     static const char *const if_missing[]={
         "10 A%=1", "20 IF A% THEN 999", "30 PRINT \"NEVER\""};
-    /* J1-DIAG-RETRO-A2: F9 is the literal integer \\ 0, not FB MOD.
-     * The same BE_DIVISION_BY_ZERO must never authenticate MOD. */
+    /* A2 F9 and A3 FB have independently ROM-witnessed spellings.
+     * Neither BE_DIVISION_BY_ZERO nor BE_INTEGER_OVERFLOW suffice alone. */
     static const char *const f9_one[]={
         "10 A%=1", "20 B%=A%\\0", "30 PRINT \"NEVER\""};
     static const char *const f9_zero[]={
@@ -331,6 +331,14 @@ static int diagnostic_provenance_matrix(void)
         "600 A%=1", "620 B%=A%\\0", "630 PRINT \"NEVER\""};
     static const char *const mod_zero[]={
         "10 A%=1", "20 B%=A% MOD 0", "30 PRINT \"NEVER\""};
+    static const char *const mod_zero_lhs0[]={
+        "10 A%=0", "20 B%=A% MOD 0", "30 PRINT \"NEVER\""};
+    static const char *const sub_overflow[]={
+        "10 A%=-32768", "20 B%=A%-1", "30 PRINT \"NEVER\""};
+    static const char *const mul_overflow[]={
+        "10 A%=32767", "20 B%=A%*2", "30 PRINT \"NEVER\""};
+    static const char *const mul255_overflow[]={
+        "10 A%=255", "20 B%=A%*255", "30 PRINT \"NEVER\""};
     DIAG_CASE(pen,1u,BE_INVALID_PEN,CPC_DIAG_PEN_IMPROPER_ARGUMENT,
               CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE,20u,
               "Improper argument in 20\n","NATIVE_PEN_ORACLE");
@@ -361,12 +369,25 @@ static int diagnostic_provenance_matrix(void)
     DIAG_CASE(f9_620,1u,BE_DIVISION_BY_ZERO,CPC_DIAG_DIVISION_INTEGER_ZERO,
               CPC_DIAG_ORIGIN_NATIVE_F9_ZERO_CPC_ORACLE,620u,
               "Division by zero in 620\n","CPC_F9_ZERO_ORACLE");
-    DIAG_CASE(mod_zero,1u,BE_DIVISION_BY_ZERO,CPC_DIAG_HOST_GENERIC,
-              CPC_DIAG_ORIGIN_HOST,0u,"ERROR\n","HOST");
+    DIAG_CASE(mod_zero,1u,BE_DIVISION_BY_ZERO,CPC_DIAG_MOD_ZERO,
+              CPC_DIAG_ORIGIN_NATIVE_FB_ZERO_CPC_ORACLE,20u,
+              "Division by zero in 20\n","CPC_FB_ZERO_ORACLE");
+    DIAG_CASE(mod_zero_lhs0,1u,BE_DIVISION_BY_ZERO,CPC_DIAG_MOD_ZERO,
+              CPC_DIAG_ORIGIN_NATIVE_FB_ZERO_CPC_ORACLE,20u,
+              "Division by zero in 20\n","CPC_FB_ZERO_ORACLE");
+    DIAG_CASE(sub_overflow,1u,BE_INTEGER_OVERFLOW,CPC_DIAG_INTEGER_OVERFLOW,
+              CPC_DIAG_ORIGIN_NATIVE_F5_F6_OVERFLOW_CPC_ORACLE,20u,
+              "Overflow in 20\n","CPC_F5_F6_OVERFLOW_ORACLE");
+    DIAG_CASE(mul_overflow,1u,BE_INTEGER_OVERFLOW,CPC_DIAG_INTEGER_OVERFLOW,
+              CPC_DIAG_ORIGIN_NATIVE_F5_F6_OVERFLOW_CPC_ORACLE,20u,
+              "Overflow in 20\n","CPC_F5_F6_OVERFLOW_ORACLE");
+    DIAG_CASE(mul255_overflow,1u,BE_INTEGER_OVERFLOW,CPC_DIAG_INTEGER_OVERFLOW,
+              CPC_DIAG_ORIGIN_NATIVE_F5_F6_OVERFLOW_CPC_ORACLE,20u,
+              "Overflow in 20\n","CPC_F5_F6_OVERFLOW_ORACLE");
     /* A failed BSR status by itself can never make a CPC origin. */
     CHECK(strcmp(hw4_run_diag_source(CPC_DIAG_ORIGIN_HOST),"HOST")==0);
     CHECK(strcmp(hw4_run_diag_source((CpcDiagOrigin)999),"HOST")==0);
-    puts("HW4-RUN-BREAK-B-C2 DIAG 11/11 real BSR cases, UART provenance + TFT text");
+    puts("HW4-RUN-BREAK-B-C2 DIAG 15/15 real BSR cases, UART provenance + TFT text");
     return 0;
 }
 #undef DIAG_CASE

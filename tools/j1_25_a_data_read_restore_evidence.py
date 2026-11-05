@@ -342,7 +342,16 @@ def verify(out,seal=None,expected_head=None):
          m.get("status")=="UNSEALED" and
          m.get("snapshots_archived") is False and
          m.get("native_execution") is False,"PROVENANCE")
-    need(ancestor(m.get("acquisition_head")),"FAKE_HEAD")
+    # An acquisition branch is not necessarily an ancestor of main after a
+    # squash merge. In permanent mode, the independently pinned manifest
+    # SHA-256 and acquisition HEAD authenticate the archived evidence.
+    # Keep ancestry enforcement for unsealed/working-branch checks.
+    if seal is None:
+        need(ancestor(m.get("acquisition_head")),"FAKE_HEAD")
+    else:
+        need(bool(re.fullmatch("[0-9a-f]{40}",
+                               m.get("acquisition_head") or "")),
+             "FAKE_HEAD")
     wanted=inventory()
     need(set(m["files"])==wanted,"MANIFEST_FILES")
     actual={str(p.relative_to(out)) for p in out.rglob("*") if p.is_file()}

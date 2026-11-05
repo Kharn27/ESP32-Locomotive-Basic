@@ -301,7 +301,8 @@ static void tests(void)
                    "Division by zero in 20\n", 1);
         CHECK_CASE(f9_zero, 1U, BE_DIVISION_BY_ZERO,
                    "Division by zero in 20\n", 1);
-        CHECK_CASE(fb_zero, 1U, BE_DIVISION_BY_ZERO, "ERROR\n", 0);
+        CHECK_CASE(fb_zero, 1U, BE_DIVISION_BY_ZERO,
+                   "Division by zero in 20\n", 1);
     }
     {
         static const char *f9_620[] = {
@@ -320,6 +321,92 @@ static void tests(void)
                    "Division by zero in 65535\n", 1);
         CHECK_CASE(f9_before, 2U, BE_DIVISION_BY_ZERO,
                    "Division by zero in 20\n", 1);
+    }
+    /* A3 RED: genuine BSR with original CPC forms and host-only extrapolations. */
+    {
+        static const char *sub[] = {
+            "10 A%=-32768",
+            "20 B%=A%-1",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *mul2[] = {
+            "10 A%=32767",
+            "20 B%=A%*2",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *mul255[] = {
+            "10 A%=255",
+            "20 B%=A%*255",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *fb0[] = {
+            "10 A%=0",
+            "20 B%=A% MOD 0",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *sub620[] = {
+            "600 A%=-32768",
+            "620 B%=A%-1",
+            "630 PRINT \"NEVER\""
+        };
+        static const char *mul65535[] = {
+            "65000 A%=32767",
+            "65535 B%=A%*2"
+        };
+        static const char *fb620[] = {
+            "600 A%=1",
+            "620 B%=A% MOD 0",
+            "630 PRINT \"NEVER\""
+        };
+        static const char *fb65535[] = {
+            "65000 A%=0",
+            "65535 B%=A% MOD 0"
+        };
+        static const char *before[] = {
+            "10 PRINT \"BEFORE\"",
+            "15 A%=255",
+            "20 B%=A%*255",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *let_unwitnessed[] = {
+            "10 A%=-32768",
+            "20 LET B%=A%-1",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *sub_other[] = {
+            "10 A%=-32768",
+            "20 B%=A%-2",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *mul_other[] = {
+            "10 A%=32767",
+            "20 B%=A%*3",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *plus_other[] = {
+            "10 A%=32767",
+            "20 B%=A%+1",
+            "30 PRINT \"NEVER\""
+        };
+        static const char *mod_other[] = {
+            "10 A%=2",
+            "20 B%=A% MOD 0",
+            "30 PRINT \"NEVER\""
+        };
+        CHECK_CASE(sub, 1U, BE_INTEGER_OVERFLOW, "Overflow in 20\n", 1);
+        CHECK_CASE(mul2, 1U, BE_INTEGER_OVERFLOW, "Overflow in 20\n", 1);
+        CHECK_CASE(mul255, 1U, BE_INTEGER_OVERFLOW, "Overflow in 20\n", 1);
+        CHECK_CASE(fb0, 1U, BE_DIVISION_BY_ZERO, "Division by zero in 20\n", 1);
+        CHECK_CASE(sub620, 1U, BE_INTEGER_OVERFLOW, "Overflow in 620\n", 1);
+        CHECK_CASE(mul65535, 1U, BE_INTEGER_OVERFLOW, "Overflow in 65535\n", 1);
+        CHECK_CASE(fb620, 1U, BE_DIVISION_BY_ZERO, "Division by zero in 620\n", 1);
+        CHECK_CASE(fb65535, 1U, BE_DIVISION_BY_ZERO, "Division by zero in 65535\n", 1);
+        CHECK_CASE(before, 2U, BE_INTEGER_OVERFLOW, "Overflow in 20\n", 1);
+        CHECK_CASE(let_unwitnessed, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
+        CHECK_CASE(sub_other, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
+        CHECK_CASE(mul_other, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
+        CHECK_CASE(plus_other, 1U, BE_INTEGER_OVERFLOW, "ERROR\n", 0);
+        CHECK_CASE(mod_other, 1U, BE_DIVISION_BY_ZERO, "ERROR\n", 0);
     }
 #undef CHECK_CASE
 }
@@ -489,7 +576,7 @@ static void test_f9_provenance(void)
     assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
            CPC_DIAG_HOST_GENERIC);
     f.storage[f9_pos + 1U] = 0x0eu;
-    f.storage[f9_pos] = 0xfbu; /* same error enum, wrong operator */
+    f.storage[f9_pos] = 0xf4u; /* wrong operator; FB now has own A3 witness */
     assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
            CPC_DIAG_HOST_GENERIC);
     /* Fake F9 / zero in the destination cache, with real op F4,
@@ -776,6 +863,164 @@ static void test_o2b_if_store_origin(void)
     assert(diag.category == CPC_DIAG_HOST_GENERIC);
 }
 
+
+/* A3 anti-forgery: the stored tokenized assignment, zero cache, running
+ * locus, real source value and previewed cause must all agree. */
+static void test_a3_provenance(void)
+{
+    BSRResult genuine, forged;
+    CpcStepDiagnostic diag;
+    BasicProgramLine line;
+    uint8_t saved_program[PROGRAM_CAP], bytes[64];
+    BasicSessionRuntime saved_runtime;
+    size_t op, written = 291U, source = 0U;
+
+    setup();
+    submit("10 A%=32767"); submit("20 B%=A%*2"); submit("RUN");
+    assert(step().status == BSR_OK);
+    genuine = step();
+    assert(genuine.status == BSR_EXECUTOR_ERROR &&
+           genuine.executor_status == BE_INTEGER_OVERFLOW);
+    diag = cpc_diag_policy_step(genuine, &f.runtime);
+    assert(diag.category == CPC_DIAG_INTEGER_OVERFLOW &&
+           diag.origin == CPC_DIAG_ORIGIN_NATIVE_F5_F6_OVERFLOW_CPC_ORACLE &&
+           diag.line_number == 20U);
+    saved_runtime = f.runtime;
+    memcpy(saved_program, f.storage, sizeof saved_program);
+    assert(bp_find(&f.program, 20U, &line) == BP_OK);
+    op = line.body_offset + line.body_length - 2U;
+    assert(f.storage[op] == 0xf6u && f.storage[op + 1U] == 0x10u);
+
+    /* Host/renderer phase or host cause cannot be disguised as CPC. */
+    forged = genuine;
+    forged.status = BSR_SESSION_ERROR;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    forged = genuine;
+    forged.executor_status = BE_DIVISION_BY_ZERO;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    forged = genuine;
+    forged.status = BSR_OVERLAP;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+
+    /* Non-zero cache bytes are opaque to BVR but unsupported by this
+     * narrowly authenticated native provenance; never scan them as tokens. */
+    assert(f.storage[line.body_offset] == 0x02u);
+    f.storage[line.body_offset + 1U] = 0xf6u;
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved_program, sizeof saved_program);
+    f.storage[line.body_offset + 2U] = 0x01u;
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved_program, sizeof saved_program);
+    /* Verify the source is a real reference, not a token-like cache. */
+    for(source=line.body_offset; source < op; ++source)
+        if(f.storage[source] == 0xefu) break;
+    assert(source + 1U < op && f.storage[source + 1U] == 0x02u);
+    f.storage[source + 2U] = 0xf5u; /* source cache */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved_program, sizeof saved_program);
+
+    f.storage[op] = 0xf4u; /* unwitnessed +, regardless of forged status */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved_program, sizeof saved_program);
+    f.storage[op + 1U] = 0x11u; /* *3 not original *2 */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved_program, sizeof saved_program);
+    f.storage[op + 1U] = 0x19u; /* missing canonical operand payload */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved_program, sizeof saved_program);
+    f.storage[line.offset] = 2U; /* forged record length */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved_program, sizeof saved_program);
+
+    f.runtime.executor.statement_offset = 1U; /* inside ref, not reached */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.runtime = saved_runtime;
+    f.runtime.executor.cursor = f.program.size; /* absent current record */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.runtime = saved_runtime;
+    f.runtime.variables = NULL;
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.runtime = saved_runtime;
+    f.runtime.executor.variables = NULL;
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.runtime = saved_runtime;
+
+    /* Category/origin pairing and short capacities never partially write. */
+    diag.origin = CPC_DIAG_ORIGIN_NATIVE_FB_ZERO_CPC_ORACLE;
+    memset(bytes, 0xa4, sizeof bytes);
+    assert(!cpc_diag_policy_format_step(diag, bytes, sizeof bytes, &written));
+    assert(written == 291U);
+    for(size_t i = 0U; i < sizeof bytes; ++i) assert(bytes[i] == 0xa4U);
+    diag.origin = CPC_DIAG_ORIGIN_NATIVE_F5_F6_OVERFLOW_CPC_ORACLE;
+    assert(!cpc_diag_policy_format_step(diag, bytes, 4U, &written));
+    assert(written == 291U);
+    for(size_t i = 0U; i < sizeof bytes; ++i) assert(bytes[i] == 0xa4U);
+    diag.line_number = 0U;
+    assert(!cpc_diag_policy_format_step(diag, bytes, sizeof bytes, &written));
+    assert(written == 291U);
+
+    /* FB has its own witness; nonzero operand or unwitnessed lhs stays host. */
+    setup();
+    submit("10 A%=1"); submit("20 B%=A% MOD 0"); submit("RUN");
+    assert(step().status == BSR_OK);
+    genuine = step();
+    assert(genuine.status == BSR_EXECUTOR_ERROR &&
+           genuine.executor_status == BE_DIVISION_BY_ZERO);
+    diag = cpc_diag_policy_step(genuine, &f.runtime);
+    assert(diag.category == CPC_DIAG_MOD_ZERO &&
+           diag.origin == CPC_DIAG_ORIGIN_NATIVE_FB_ZERO_CPC_ORACLE);
+    assert(bp_find(&f.program, 20U, &line) == BP_OK);
+    /* MOD carries spaces around FB; unlike F6, it is not at n-2.
+     * This inspection is test-only on a known-good tokenised fixture. */
+    op = line.body_offset;
+    while(op < line.body_offset + line.body_length &&
+          f.storage[op] != 0xfbu) ++op;
+    assert(op < line.body_offset + line.body_length &&
+           f.storage[op] == 0xfbu);
+    f.storage[op] = 0xf6u;
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+
+    setup();
+    submit("10 A%=1"); submit("20 B%=A%*2"); submit("RUN");
+    assert(step().status == BSR_OK);
+    forged = genuine; /* synthetic overflow on a successful operation */
+    forged.executor_status = BE_INTEGER_OVERFLOW;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    assert(step().status == BSR_OK);
+
+    setup();
+    submit("10 A%=1"); submit("20 B%=A% MOD 1"); submit("RUN");
+    assert(step().status == BSR_OK);
+    forged.executor_status = BE_DIVISION_BY_ZERO;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    assert(step().status == BSR_OK);
+
+    setup();
+    submit("10 PRINT \"FB 0 F6\"");
+    submit("20 REM B%=A% MOD 0");
+    submit("RUN");
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    assert(step().status == BSR_OK);
+}
+
 int main(void)
 {
     test_o2b_if_store_origin();
@@ -787,6 +1032,7 @@ int main(void)
     test_next_provenance();
     test_next_success();
     test_f9_provenance();
+    test_a3_provenance();
     puts("J1-DIAG-RETRO-A1a: GOSUB/RETURN CPC, renumber, negative origins, atomicity, Ready OK");
     return 0;
 }

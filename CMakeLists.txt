@@ -698,6 +698,17 @@ if(BUILD_TESTING)
     add_test(NAME j1_24_b3_while_wend_cpc_diagnostics
              COMMAND test_j1_24_b3_while_wend_diagnostics)
 
+    # J1.24-B4: immutable CPC positive witnesses -> real BSR -> MODE1 text
+    # -> central Ready policy. Entirely host-only, no CORE/firmware change.
+    add_executable(test_j1_24_b4_while_wend_cyd_e2e
+                   tests/test_j1_24_b4_while_wend_cyd_e2e.c)
+    target_link_libraries(test_j1_24_b4_while_wend_cyd_e2e PRIVATE
+                          cpc_diag_policy cpc_ready_policy
+                          basic_session_runtime)
+    add_test(NAME j1_24_b4_while_wend_cyd_e2e
+             COMMAND test_j1_24_b4_while_wend_cyd_e2e
+                     "${CMAKE_CURRENT_SOURCE_DIR}")
+
     add_executable(test_hw4_diag_a tests/test_hw4_diag_a.c)
     target_link_libraries(test_hw4_diag_a PRIVATE
                           cpc_diag_policy cpc_ready_policy cpc_uart_console

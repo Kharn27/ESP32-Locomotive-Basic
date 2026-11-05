@@ -243,7 +243,7 @@ def observed_keyword_lines(case,ram,records):
         raw=ram[rec["offset"]:rec["offset"]+rec["length"]]
         body=raw[4:-1]
         need(bool(body) and body[0]==TOKENS[token],
-             "RAM_TOKEN_"+case+"_"+str(rec["line"]))
+             "RAM_TOKEN_"+case+"_"+str(int(src.split(" ",1)[0])))
         samples.append({"line":int(src.split(" ",1)[0]),
                         "keyword":token,"expected_rom_token":TOKENS[token],
                         "source_statement":stmt,"record_hex":raw.hex(" ").upper(),
@@ -435,7 +435,7 @@ def falsifications(out,seal=None,expected_head=None):
     ]
     tested=0
     for name,path,reason in jobs:
-        if seal is None and name in ("FALSE_HEAD","MANIFEST_REHASH","MANIFEST_RAW"):
+        if seal is None and name in ("MANIFEST_REHASH","MANIFEST_RAW"):
             continue
         with tempfile.TemporaryDirectory(prefix="j125-forgery-") as temp:
             clone=Path(temp)/"archive"
@@ -449,23 +449,25 @@ def falsifications(out,seal=None,expected_head=None):
                 victim.write_bytes(canonical(m))
             elif name=="FALSE_HEAD":
                 m=json.loads(read(victim))
-                m["acquisition_head"]=BASE
+                m["acquisition_head"]="0"*40
                 victim.write_bytes(canonical(m))
-                # Preserve external manifest SHA to force seal fail first.
-                reason="EXTERNAL_MANIFEST_SEAL"
+                reason="FAKE_HEAD"
             elif name=="MANIFEST_REHASH":
                 target=clone/"original/ONE_INTEGER/program.bin"
                 raw=bytearray(read(target));raw[0]^=1;target.write_bytes(raw)
                 m=json.loads(read(victim))
                 m["files"]["original/ONE_INTEGER/program.bin"]=sha(read(target))
                 victim.write_bytes(canonical(m))
+            elif name=="MANIFEST_RAW":
+                victim.write_bytes(read(victim)+b"\n")
             else:
                 raw=bytearray(read(victim))
                 need(bool(raw),"EMPTY_FALSIFICATION_TARGET_"+name)
                 raw[len(raw)//2]^=1
                 victim.write_bytes(raw)
             try:
-                verify(clone,seal,expected_head)
+                verify(clone,None if name in ("FALSE_ROM","FALSE_HEAD") else seal,
+                       expected_head)
             except (OracleError,ValueError,KeyError,UnicodeError) as exc:
                 got=str(exc)
                 need(got.startswith(reason),"WRONG_REJECTION_"+name+"_"+got)
@@ -473,7 +475,7 @@ def falsifications(out,seal=None,expected_head=None):
                 tested+=1
             else:
                 raise OracleError("FALSIFICATION_ACCEPTED_"+name)
-    need(tested>=(10 if seal else 7),"INSUFFICIENT_FALSIFICATIONS")
+    need(tested>=(10 if seal else 8),"INSUFFICIENT_FALSIFICATIONS")
     print("J1.25-A FALSIFICATIONS_REJECTED",tested,flush=True)
 
 def main():

@@ -31,7 +31,7 @@ FAMILIES = {
     "HW4": ("hw4-c3-b1-scroll.yml", "hw4-c3-b2-scroll.yml",
             "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
             "hw4-scroll-opt-a0-memory.yml",
-            "hw4-disp-profile-c3.yml"),
+            "hw4-disp-profile-c3.yml", "hw4-disp-render-a.yml"),
     "XTENSA": ("ci-xtensa.yml",),
 }
 EXPECTED_ROUTES = {
@@ -159,6 +159,16 @@ HW4_C3_PATHS = (
 )
 
 
+HW4_RENDER_A = "hw4-disp-render-a.yml"
+HW4_RENDER_A_PATHS = (
+    "video/cpc_video.c",
+    "CMakeLists.txt",
+    "tests/*hw4_render_a*",
+    "tools/ci/hw4_render_a_memory.py",
+    "docs/HW4-DISP-RENDER-A.md",
+    ".github/workflows/hw4-disp-render-a.yml",
+)
+
 class UnsafeRoute(ValueError):
     pass
 
@@ -221,7 +231,7 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(expected) == 34 and len(set(expected)) == 34,
+    demand(len(expected) == 35 and len(set(expected)) == 35,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(set(sources) == set(expected), "UNKNOWN_OR_MISSING_WORKFLOW")
     a0_paths = filters(sources[HW4_A0])
@@ -234,6 +244,11 @@ def audit(sources):
            len(c3_paths) == len(HW4_C3_PATHS) and
            set(c3_paths) == set(HW4_C3_PATHS),
            "HW4_C3_FILTER_CONTRACT_MISMATCH")
+    render_paths = filters(sources[HW4_RENDER_A])
+    demand(render_paths is not None and
+           len(render_paths) == len(HW4_RENDER_A_PATHS) and
+           set(render_paths) == set(HW4_RENDER_A_PATHS),
+           "HW4_RENDER_A_FILTER_CONTRACT_MISMATCH")
     for name, src in sources.items():
         demand(re.search(r"(?m)^  workflow_dispatch:", src),
                "MANUAL_DISPATCH_REMOVED_" + name)
@@ -994,7 +1009,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=34 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=35 FAMILIES=5")
 
 
 if __name__ == "__main__":

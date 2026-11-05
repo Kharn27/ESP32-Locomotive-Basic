@@ -1,0 +1,136 @@
+name: HW4-DISP-RENDER-A exact RGB565, CPU baseline and Xtensa budget
+on:
+  pull_request:
+    paths:
+      - 'video/cpc_video.c'
+      - 'CMakeLists.txt'
+      - 'tests/*hw4_render_a*'
+      - 'tools/ci/hw4_render_a_memory.py'
+      - 'docs/HW4-DISP-RENDER-A.md'
+      - '.github/workflows/hw4-disp-render-a.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-differential-and-benchmark:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Compile GCC and Clang -O3, compare frozen baseline and measure
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          mkdir -p reports/hw4-render-a
+          for cc in gcc clang; do
+            cmake -S . -B "build-hw4-render-$cc" \
+              -DCMAKE_C_COMPILER="$cc" -DCMAKE_C_FLAGS="-O3 -fno-lto" \
+              -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON \
+              > "reports/hw4-render-a/configure-$cc.log" 2>&1
+            cmake --build "build-hw4-render-$cc" --parallel 2 \
+              --target test_hw4_render_a bench_hw4_render_a \
+              > "reports/hw4-render-a/build-$cc.log" 2>&1 || {
+                tail -100 "reports/hw4-render-a/build-$cc.log"; exit 1;
+              }
+            ctest --test-dir "build-hw4-render-$cc" --output-on-failure \
+              -R '^hw4_disp_render_a_rgb565_exact$' \
+              | tee "reports/hw4-render-a/differential-$cc.log"
+            "./build-hw4-render-$cc/bench_hw4_render_a" \
+              | tee "reports/hw4-render-a/benchmark-$cc.log"
+            {
+              echo "### HW4-DISP-RENDER-A $cc -O3 HOST"
+              echo '~~~text'
+              cat "reports/hw4-render-a/benchmark-$cc.log"
+              echo '~~~'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hw4-render-a-host-benchmarks
+          retention-days: 30
+          if-no-files-found: warn
+          path: reports/hw4-render-a/
+
+  xtensa-memory-baseline:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 21e95a7197413923bb5976067a0419bc729c20c1
+          path: baseline-render-a
+          persist-credentials: false
+      - name: Compare independent CONSOLE SPI40 ESP-IDF 5.5.6 ELF images
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git -C baseline-render-a rev-parse HEAD)" = 21e95a7197413923bb5976067a0419bc729c20c1
+          python3 tools/ci/hw4_render_a_memory.py --self-test
+          docker run --rm -v "$PWD:/project" -w /project \
+            -e IDF_GIT_SAFE_DIR=/project -e EXPECTED_HEAD="$EXPECTED_HEAD" \
+            espressif/idf:v5.5.6 bash -lc '
+              set -euo pipefail
+              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
+              mkdir -p /project/reports/hw4-render-a-xtensa
+              for version in base optimized; do
+                if test "$version" = base; then
+                  cd /project/baseline-render-a/firmware/esp32_display_probe
+                else
+                  cd /project/firmware/esp32_display_probe
+                fi
+                out="/project/reports/hw4-render-a-xtensa/$version"
+                build="build-hw4-render-a"
+                config="$PWD/sdkconfig.hw4-render-a"
+                mkdir -p "$out"
+                idf.py -B "$build" -DSDKCONFIG="$config" \
+                  -DLOCO_CYD_PROFILE=CONSOLE -DCYD_LCD_SPI_HZ=40000000 \
+                  set-target esp32 > "$out/configure.log" 2>&1 || {
+                    tail -100 "$out/configure.log"; exit 1;
+                  }
+                idf.py -B "$build" -DSDKCONFIG="$config" \
+                  -DLOCO_CYD_PROFILE=CONSOLE -DCYD_LCD_SPI_HZ=40000000 \
+                  build > "$out/build.log" 2>&1 || {
+                    tail -100 "$out/build.log"; exit 1;
+                  }
+                grep -Fx "LOCO_CYD_PROFILE:STRING=CONSOLE" "$build/CMakeCache.txt"
+                grep -Fx "CYD_LCD_SPI_HZ:STRING=40000000" "$build/CMakeCache.txt"
+                grep -F -- "-DLCD_CLOCK_HZ=40000000U" "$build/compile_commands.json" > /dev/null
+                xtensa-esp-elf-size -A "$build/loco_esp32_display_probe.elf" > "$out/sections.txt"
+                xtensa-esp-elf-nm -S --defined-only "$build/loco_esp32_display_probe.elf" > "$out/symbols.txt"
+                sha256sum "$build/loco_esp32_display_probe.bin" > "$out/firmware-sha256.txt"
+                cp "$build/CMakeCache.txt" "$out/CMakeCache.txt"
+                if test "$version" = optimized; then
+                  python3 /project/tools/ci/verify_esp_app_version.py \
+                    "$build/loco_esp32_display_probe.bin" "$EXPECTED_HEAD" loco_esp32_display_probe
+                fi
+              done
+              cd /project
+              python3 tools/ci/hw4_render_a_memory.py \
+                --baseline reports/hw4-render-a-xtensa/base/sections.txt \
+                --optimized reports/hw4-render-a-xtensa/optimized/sections.txt \
+                | tee reports/hw4-render-a-xtensa/compare.md
+            '
+          cat reports/hw4-render-a-xtensa/compare.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hw4-render-a-xtensa-baseline
+          retention-days: 30
+          if-no-files-found: warn
+          path: reports/hw4-render-a-xtensa/

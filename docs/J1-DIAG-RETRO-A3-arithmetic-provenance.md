@@ -28,3 +28,35 @@ Sources de provenance : [soustraction](J1.3-A-integer-subtraction-oracle.md), [m
 ## Preuves restantes pour remise
 
 CTest host OFF/ON GCC/Clang + ASan/UBSan ; négatifs de provenance ; CI-ARCH/OPT3/CPC-PERMANENT ; 3 profils Xtensa 5.5.6 au **même HEAD final** ; comparatif Flash/IRAM/DRAM à la base ; réception CYD exclusivement par PO (`ON_DEVICE_UNVERIFIED` auparavant).
+
+## Protocole PO CYD — réception physique non réalisée
+
+**Statut initial `ON_DEVICE_UNVERIFIED`** ; l'approbation et la fusion reviennent au Pilotage. Exécuter **uniquement après désignation du HEAD complet final par Pilotage**. Ne pas confondre CI Xtensa et flash réel.
+
+Cible : ESP32-2432S028R, CONSOLE, UART 115200, ESP-IDF **5.5.6**.
+
+```sh
+git fetch origin
+git checkout --detach <SHA_COMPLET_FINAL_DE_LA_PR_319>
+cd firmware/esp32_display_probe
+idf.py -DLOCO_CYD_PROFILE=CONSOLE build
+idf.py -p /dev/ttyUSB0 flash monitor
+```
+
+Entrer **une ligne BASIC par envoi UART**. Repartir d'un `NEW` pour chacun des scénarios ; les `LIST` de contrôle doivent rester identiques après erreur :
+
+| Scénario à saisir, puis `RUN`, `LIST` | Diagnostic attendu sur l'écran / UART | Origine UART attendue |
+|---|---|---|
+| `10 A%=-32768` ; `20 B%=A%-1` ; `30 PRINT "NEVER"` | `Overflow in 20` | `CPC_F5_F6_OVERFLOW_ORACLE` |
+| `10 A%=32767` ; `20 B%=A%*2` ; `30 PRINT "NEVER"` | `Overflow in 20` | `CPC_F5_F6_OVERFLOW_ORACLE` |
+| `10 A%=255` ; `20 B%=A%*255` ; `30 PRINT "NEVER"` | `Overflow in 20` | `CPC_F5_F6_OVERFLOW_ORACLE` |
+| `10 A%=1` ; `20 B%=A% MOD 0` ; `30 PRINT "NEVER"` | `Division by zero in 20` | `CPC_FB_ZERO_ORACLE` |
+| `10 A%=0` ; `20 B%=A% MOD 0` ; `30 PRINT "NEVER"` | `Division by zero in 20` | `CPC_FB_ZERO_ORACLE` |
+| `600 A%=-32768` ; `620 B%=A%-1` ; `630 PRINT "NEVER"` | `Overflow in 620` (**extrapolation native**) | `CPC_F5_F6_OVERFLOW_ORACLE` |
+| `10 A%=2` ; `20 B%=A% MOD 0` ; `30 PRINT "NEVER"` | `ERROR` (**forme non oraclée**) | `HOST` |
+| `10 A%=1` ; `20 B%=A%\\0` ; `30 PRINT "NEVER"` | `Division by zero in 20` (**F9 non-régression**) | `CPC_F9_ZERO_ORACLE` |
+| `10 NEXT I%` ; `20 PRINT "NEVER"` | `Unexpected NEXT in 10` | `CPC_NEXT_ORACLE` |
+
+Critères **PASS matériels** : une seule occurrence de `Ready` après chaque `RUN`, pas de `NEVER` exécuté, `LIST` intact, pas de reboot, LCD opérationnel, pas d'erreur DMA ni de timeout. `Ready` initial au démarrage non compté comme celui du RUN. Toute divergence est **FAIL**, noter les octets affichés et le numéro de ligne.
+
+Preuves à transmettre **au Pilotage** : SHA complet vraiment flashé, logs build/flash/monitor, photo lisible des diagnostics sur CYD, version de l'ESP-IDF, `heap_free`, `max_free_block`, marge pile, `dma_fault`, `dma_timeouts` et état LCD (`ESP_OK`). Ne pas inventer une métrique absente. L'absence d'essai CYD ne change jamais le statut `ON_DEVICE_UNVERIFIED`.

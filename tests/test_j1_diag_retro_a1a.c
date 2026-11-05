@@ -978,8 +978,13 @@ static void test_a3_provenance(void)
     assert(diag.category == CPC_DIAG_MOD_ZERO &&
            diag.origin == CPC_DIAG_ORIGIN_NATIVE_FB_ZERO_CPC_ORACLE);
     assert(bp_find(&f.program, 20U, &line) == BP_OK);
-    op = line.body_offset + line.body_length - 2U;
-    assert(f.storage[op] == 0xfbu && f.storage[op + 1U] == 0x0eu);
+    /* MOD carries spaces around FB; unlike F6, it is not at n-2.
+     * This inspection is test-only on a known-good tokenised fixture. */
+    op = line.body_offset;
+    while(op < line.body_offset + line.body_length &&
+          f.storage[op] != 0xfbu) ++op;
+    assert(op < line.body_offset + line.body_length &&
+           f.storage[op] == 0xfbu);
     f.storage[op] = 0xf6u;
     assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
            CPC_DIAG_HOST_GENERIC);

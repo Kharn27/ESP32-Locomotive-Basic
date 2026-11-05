@@ -1,0 +1,77 @@
+name: CLK-01 isolated speed baseline evidence
+on:
+  pull_request:
+    paths:
+      - 'tools/clk_01_*'
+      - 'tests/test_clk_01_uart.py'
+      - 'tests/fixtures/cpc6128/clk_01_speed/**'
+      - 'docs/CLK-01*'
+      - '.github/workflows/clk-01-acquisition.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  host-corpus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Negative UART parser and source sealing
+        run: |
+          python3 -m unittest discover -s tests -p 'test_clk_01_uart.py' -v
+          python3 tools/clk_01_cpc.py --self-test
+      - name: Real native host CLI execution
+        run: |
+          cmake -S . -B "$RUNNER_TEMP/clk-01-host" -DCMAKE_BUILD_TYPE=Debug
+          cmake --build "$RUNNER_TEMP/clk-01-host" --target loco_basic_cli -j2
+          python3 tools/clk_01_native.py --cli "$RUNNER_TEMP/clk-01-host/loco_basic_cli" --output "$RUNNER_TEMP/clk-01-native.json"
+      - name: Upload native run witness
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-01-native
+          path: ${{ runner.temp }}/clk-01-native.json
+          if-no-files-found: ignore
+
+  cpc-timing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: recursive
+      - name: Authentic ROM and Caprice32 speed-gated acquisition
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | awk '{print $1}')" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          python3 tools/clk_01_cpc.py --self-test
+          python3 tools/clk_01_cpc.py --caprice tests/oracles/caprice32 --output "$RUNNER_TEMP/clk01-cpc-evidence"
+      - name: Persist raw independent CPC evidence (no ROM files)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-01-cpc-raw
+          path: ${{ runner.temp }}/clk01-cpc-evidence/
+          if-no-files-found: warn
+          retention-days: 90

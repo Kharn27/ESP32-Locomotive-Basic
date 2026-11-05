@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "mission": "CLK-01",
+  "base_sha": "c8cec8b1b4d0cab553cdc8b97b751aef3dd1370d",
+  "environment": "CPC6128 BASIC 1.1 / native CYD CONSOLE SPI40",
+  "repetitions": {
+    "cpc": 5,
+    "cyd": 3
+  },
+  "cpc_speed_policy": "limit_speed=1, speed=4, mandatory 300 ticks/s vs wall gate",
+  "results": {
+    "cpc": "UNVERIFIED",
+    "cyd": "ON_DEVICE_UNVERIFIED",
+    "comparison": "NOT_COMPARABLE"
+  },
+  "programs": [
+    {
+      "id": "01_for",
+      "profile": "FOR_NEXT_NO_OUTPUT",
+      "file": "01_for.bas",
+      "sha256": "3205f45db42593ee5142f22e82d961d156992d35897168fe1022f7ae4b6b7cf5",
+      "iterations": 1200,
+      "expected_screen_lines": [
+        "CLK01 FOR"
+      ],
+      "cpc_probe_line": 45,
+      "end_line": 50
+    },
+    {
+      "id": "02_integer",
+      "profile": "INTEGER_ADD_SUB",
+      "file": "02_integer.bas",
+      "sha256": "48d5abb2ca270dacf7df5eed58ea163dce41e3a190b5e20b6d7664ded9ce1156",
+      "iterations": 500,
+      "expected_screen_lines": [
+        "501"
+      ],
+      "cpc_probe_line": 65,
+      "end_line": 70
+    },
+    {
+      "id": "03_gosub",
+      "profile": "GOSUB_RETURN",
+      "file": "03_gosub.bas",
+      "sha256": "121b9a7ff606bf1e44f82e8695851d375332a2bd3b034e00d546c4ad7787e07c",
+      "iterations": 300,
+      "expected_screen_lines": [
+        "300"
+      ],
+      "cpc_probe_line": 55,
+      "end_line": 60
+    },
+    {
+      "id": "04_print_fixed",
+      "profile": "PRINT_NO_SCROLL",
+      "file": "04_print_fixed.bas",
+      "sha256": "1b1f8a4ce6976032b04550614676c98494dbdeea0319e4f87a563b726438181f",
+      "iterations": 3,
+      "expected_screen_lines": [
+        "CLK01 FIXED",
+        "CLK01 FIXED",
+        "CLK01 FIXED"
+      ],
+      "cpc_probe_line": 35,
+      "end_line": 40
+    },
+    {
+      "id": "05_print_scroll",
+      "profile": "PRINT_SCROLL",
+      "file": "05_print_scroll.bas",
+      "sha256": "9629603057a4a3ab9c80dd2a54605bad1aff60acc815c6c9d28c7b5731c41b08",
+      "iterations": 30,
+      "expected_screen_lines": [
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL",
+        "CLK01 SCROLL"
+      ],
+      "cpc_probe_line": 35,
+      "end_line": 40
+    }
+  ]
+}

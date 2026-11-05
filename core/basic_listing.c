@@ -1048,7 +1048,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 pos = pos - 1u + sizeof(prefix);
                 status = for_reference(body, length, &pos, out);
                 if (status != BL_OK) return status;
-            } else if (stream8 && !(t == 0x02u || t == 0x19u))
+            } else if (stream8 && !(t == 0x02u || t == 0x03u || t == 0x19u))
                 return BL_BAD_SEQUENCE;
             else if (t == (uint8_t)'"') {
                 status = append_byte(out, t);

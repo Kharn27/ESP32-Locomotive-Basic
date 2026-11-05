@@ -24,6 +24,8 @@ SOURCES = ROOT / "tests/oracles/inputs/j1_25_a"
 TOKENS = {"DATA":0x8c,"READ":0xc3,"RESTORE":0xc7}
 EXTERNAL_MANIFEST_SHA256 = "1f3368dab902087a78232d16c6a4ae7ae7ee62efadc3f0e67bd54a72f7131cf8"
 EXTERNAL_ACQUISITION_HEAD = "1cd8412fdd26fc9bccc57c3b53f43bd6e60733c2"
+# Exact GitHub squash integration of PR #318; NOT an arbitrary repository HEAD.
+SQUASH_INTEGRATION_SHA = "156a19a6c943b6ea4ce1cb96b74996640efe55b5"
 
 # Each list is the EXACT experimental BASIC source, not a predicted CPC result.
 # Inputs are distinct, finite by construction if normal INTEGER updates work;
@@ -188,6 +190,28 @@ def ancestor(commit):
                         commit,"HEAD"],stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL).returncode==0)
 
+def provenance_is_authorized(acquisition_head, permanent=False,
+                             seal=None, expected_head=None):
+    """Strict ancestry, or *only* the externally sealed PR #318 squash lineage.
+
+    The original CPC acquisition commit is absent from squash descendants.
+    The fallback therefore requires the exact historic acquisition HEAD, the
+    exact external SHA-256 seal AND the exact known integration commit in the
+    running checkout ancestry. Unsealed evidence has no squash exception.
+    """
+    if not isinstance(acquisition_head, str) or not re.fullmatch(
+            r"[0-9a-f]{40}", acquisition_head):
+        return False
+    if permanent and not (
+            acquisition_head == EXTERNAL_ACQUISITION_HEAD and
+            expected_head == EXTERNAL_ACQUISITION_HEAD and
+            seal == EXTERNAL_MANIFEST_SHA256):
+        return False
+    if ancestor(acquisition_head):
+        return True
+    return permanent and ancestor(SQUASH_INTEGRATION_SHA)
+
+
 def setup():
     return ["MODE 1","NEW"]
 
@@ -342,25 +366,21 @@ def verify(out,seal=None,expected_head=None):
          m.get("status")=="UNSEALED" and
          m.get("snapshots_archived") is False and
          m.get("native_execution") is False,"PROVENANCE")
-    # An acquisition branch is not necessarily an ancestor of main after a
-    # squash merge. In permanent mode, the independently pinned manifest
-    # SHA-256 and acquisition HEAD authenticate the archived evidence.
-    # Keep ancestry enforcement for unsealed/working-branch checks.
-    if seal is None:
-        need(ancestor(m.get("acquisition_head")),"FAKE_HEAD")
-    else:
-        need(bool(re.fullmatch("[0-9a-f]{40}",
-                               m.get("acquisition_head") or "")),
-             "FAKE_HEAD")
-    wanted=inventory()
-    need(set(m["files"])==wanted,"MANIFEST_FILES")
-    actual={str(p.relative_to(out)) for p in out.rglob("*") if p.is_file()}
-    need(actual==wanted|{"manifest.json"},"ARCHIVE_INVENTORY")
+    # Check the external seal BEFORE considering the squash exception.
+    # A coordinated manifest re-hash must never manufacture provenance.
     if seal is not None:
         need(bool(re.fullmatch("[0-9a-f]{64}",seal)) and sha(manifest)==seal,
              "EXTERNAL_MANIFEST_SEAL")
         need(bool(re.fullmatch("[0-9a-f]{40}",expected_head or "")) and
              m["acquisition_head"]==expected_head,"EXTERNAL_HEAD_SEAL")
+    need(provenance_is_authorized(m.get("acquisition_head"),
+                                 permanent=seal is not None,
+                                 seal=seal,expected_head=expected_head),
+         "FAKE_HEAD")
+    wanted=inventory()
+    need(set(m["files"])==wanted,"MANIFEST_FILES")
+    actual={str(p.relative_to(out)) for p in out.rglob("*") if p.is_file()}
+    need(actual==wanted|{"manifest.json"},"ARCHIVE_INVENTORY")
     for file in sorted(wanted):
         need(sha(read(out/file))==m["files"][file],"HASH_"+file)
     ink,png=imports()
@@ -440,16 +460,22 @@ def falsifications(out,seal=None,expected_head=None):
       ("FALSE_ROM","manifest.json","PROVENANCE"),
       ("FALSE_HEAD","manifest.json","EXTERNAL_HEAD_SEAL"),
       ("MANIFEST_REHASH","manifest.json","EXTERNAL_MANIFEST_SEAL"),
-      ("MANIFEST_RAW","manifest.json","EXTERNAL_MANIFEST_SEAL")
+      ("MANIFEST_RAW","manifest.json","EXTERNAL_MANIFEST_SEAL"),
+      ("COORDINATED_HEAD_REHASH","manifest.json","FAKE_HEAD"),
+      ("COORDINATED_ARCHIVE_REHASH","manifest.json","FAKE_HEAD")
     ]
     tested=0
     for name,path,reason in jobs:
-        if seal is None and name in ("MANIFEST_REHASH","MANIFEST_RAW"):
+        if seal is None and name in (
+                "MANIFEST_REHASH","MANIFEST_RAW",
+                "COORDINATED_HEAD_REHASH","COORDINATED_ARCHIVE_REHASH"):
             continue
         with tempfile.TemporaryDirectory(prefix="j125-forgery-") as temp:
             clone=Path(temp)/"archive"
             shutil.copytree(out,clone)
             victim=clone/path
+            forged_seal=seal
+            forged_head=expected_head
             if name=="SESSION_REPLACEMENT":
                 victim.write_bytes(read(clone/"original/NEXT_DATA_LINE/capture.json"))
             elif name=="FALSE_ROM":
@@ -469,14 +495,28 @@ def falsifications(out,seal=None,expected_head=None):
                 victim.write_bytes(canonical(m))
             elif name=="MANIFEST_RAW":
                 victim.write_bytes(read(victim)+b"\n")
+            elif name=="COORDINATED_HEAD_REHASH":
+                m=json.loads(read(victim))
+                m["acquisition_head"]=BASE  # valid *ancestor*, invalid *seal origin*
+                victim.write_bytes(canonical(m))
+                forged_seal=sha(read(victim))
+                forged_head=BASE
+            elif name=="COORDINATED_ARCHIVE_REHASH":
+                rel="repeat/NEXT_DATA_LINE/capture.json"
+                target=clone/rel
+                target.write_bytes(read(clone/"original/NEXT_DATA_LINE/capture.json"))
+                m=json.loads(read(victim))
+                m["files"][rel]=sha(read(target))
+                victim.write_bytes(canonical(m))
+                forged_seal=sha(read(victim))
             else:
                 raw=bytearray(read(victim))
                 need(bool(raw),"EMPTY_FALSIFICATION_TARGET_"+name)
                 raw[len(raw)//2]^=1
                 victim.write_bytes(raw)
             try:
-                verify(clone,None if name in ("FALSE_ROM","FALSE_HEAD") else seal,
-                       expected_head)
+                verify(clone,None if name in ("FALSE_ROM","FALSE_HEAD") else forged_seal,
+                       forged_head)
             except (OracleError,ValueError,KeyError,UnicodeError) as exc:
                 got=str(exc)
                 need(got.startswith(reason),"WRONG_REJECTION_"+name+"_"+got)
@@ -484,7 +524,7 @@ def falsifications(out,seal=None,expected_head=None):
                 tested+=1
             else:
                 raise OracleError("FALSIFICATION_ACCEPTED_"+name)
-    need(tested>=(10 if seal else 8),"INSUFFICIENT_FALSIFICATIONS")
+    need(tested>=(12 if seal else 8),"INSUFFICIENT_FALSIFICATIONS")
     print("J1.25-A FALSIFICATIONS_REJECTED",tested,flush=True)
 
 def main():
@@ -503,6 +543,11 @@ def main():
          args.permanent,"ACTION_REQUIRED")
     if args.check or args.self_test:
         check()
+    if args.self_test:
+        # This is part of the existing mandatory CPC-PERMANENT command path.
+        subprocess.run([sys.executable,
+                        str(ROOT/"tests/test_j1_25_a_p1_squash_provenance.py")],
+                       check=True,cwd=ROOT)
     if args.acquire:
         need(args.output is not None and args.verify is None,"ARGUMENTS")
         acquire(args.acquire.resolve(),args.output.resolve(),args.head or "")

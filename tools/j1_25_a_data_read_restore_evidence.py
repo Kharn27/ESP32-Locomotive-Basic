@@ -22,8 +22,8 @@ MISSION = "J1.25-A"
 DIAG_MARKER = b"J125_DIAG_BEGIN"
 SOURCES = ROOT / "tests/oracles/inputs/j1_25_a"
 TOKENS = {"DATA":0x8c,"READ":0xc3,"RESTORE":0xc7}
-EXTERNAL_MANIFEST_SHA256 = None
-EXTERNAL_ACQUISITION_HEAD = None
+EXTERNAL_MANIFEST_SHA256 = "1f3368dab902087a78232d16c6a4ae7ae7ee62efadc3f0e67bd54a72f7131cf8"
+EXTERNAL_ACQUISITION_HEAD = "1cd8412fdd26fc9bccc57c3b53f43bd6e60733c2"
 
 # Each list is the EXACT experimental BASIC source, not a predicted CPC result.
 # Inputs are distinct, finite by construction if normal INTEGER updates work;

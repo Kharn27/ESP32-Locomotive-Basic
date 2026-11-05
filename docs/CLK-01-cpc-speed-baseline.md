@@ -6,6 +6,8 @@ Mandat Pilotage : issue #308, parent #307. Branche : test/clk-01-cpc-speed-basel
 
 La ligne UART HW4-DISP-PROFILE RUN_DURATION run=N core_us=D scope=RUN_slices_including_repaint_excluding_final_prompt mesure le temps mur des tranches RUN, y compris repaint et yields FreeRTOS. Elle ne mesure PAS le CPU BASIC seul et exclut le prompt final. HW4-RUN-B RUN_START identifie le SHA et quantum=8 ; RUN_TERMINAL state=5 identifie une fin normale (4 est BREAK). Le groupe HW4-DISP-PROFILE SUMMARY/CLASS/TRACE est émis après prompt final. Les classes full25 et partial sont disjointes, scroll_associated les recouvre : NE PAS sommer les trois classes ; les métriques de repaint incluent potentiellement le prompt final, contrairement à RUN_DURATION. LCD_METRICS fournit les cumuls LCD ; DEVICE_MEMORY fournit heap/stack, DMA et lcd_error. Aucune instrumentation nouvelle ne remplace ces éléments.
 
+Chaque RUN démarre avec un écran vide : CYD `!CLS` (diagnostic UART) et CPC `CLS` directe sont émis **avant RUN**, hors des deux fenêtres chronométrées. Le reset est indépendant des programmes BASIC et évite les scrolls parasites dus aux scénarios précédents. Le parseur certifie la séquence UART exacte, les lignes BASIC, et ces quinze resets. Aucun effacement n\x27interrompt un RUN.
+
 La sonde CPC utilise TIME (300 ticks/seconde). Le programme CPC original est copié dans la RAM de l'outil d'acquisition avec une ligne 5 T=TIME et une ligne PRINT #8,TIME-T juste avant END ; aucun TIME sur CYD. La mesure CPC part après le déclenchement RUN et finit avant END, alors que RUN_DURATION CYD englobe les tranches de RUN et excludes le prompt. Les sondes ont un surcoût inconnu. Les temps mur du processus Caprice32 incluent l'initialisation de l'émulateur. Aucun ratio direct CPC ↔ CYD n'est donc publié sans alignement démontré des fenêtres : NOT_COMPARABLE. Ne pas étendre le constat visuel ROUGE/JAUNE ~3,4 à tous les profils.
 
 ## Corpus exact et contrôle
@@ -71,7 +73,7 @@ python3 tools/clk_01_uart.py clk01-uart-raw.log --sha "$(git rev-parse HEAD)" \
     --csv clk01-resultats.csv --markdown clk01-resultats.md
 ~~~
 
-Vérifier que le SHA complet correspond à celui du Pilotage et le working tree est propre avant build. Au lancement du script, appuyer une fois sur RESET du CYD pour que le boot soit conservé dans la capture brute. Le script envoie automatiquement NEW + chaque ligne numérotée de chaque fichier, puis RUN trois fois avant de changer de programme : 15 RUN, une session, un seul fichier UART reçu sans annotation. Il sauve séparément un fichier TX horodaté. Ne pas lancer de vidéo, de monitor simultané ou de deuxième flash de profil. Sur échec, garder le RAW partiel, annoter FAIL et stopper.
+Vérifier que le SHA complet correspond à celui du Pilotage et le working tree est propre avant build. Au lancement du script, appuyer une fois sur RESET du CYD pour que le boot soit conservé dans la capture brute. Le script envoie automatiquement NEW + chaque ligne numérotée de chaque fichier, puis !CLS et RUN trois fois avant de changer de programme : 15 RUN, une session, un seul fichier UART reçu sans annotation. Il sauve séparément un fichier TX horodaté. Ne pas lancer de vidéo, de monitor simultané ou de deuxième flash de profil. Sur échec, garder le RAW partiel, annoter FAIL et stopper.
 
 Alternative manuelle uniquement si pyserial impossible : idf.py -p /dev/ttyUSB0 -B build-clk01 monitor ; saisir chaque bloc exact ci-dessous. Attendre le RUN_TERMINAL à chaque fois avant d'envoyer le RUN suivant. Ne pas saisir TIME sur CYD.
 
@@ -84,8 +86,11 @@ NEW
 30 NEXT I%
 40 PRINT "CLK01 FOR"
 50 END
+!CLS
 RUN
+!CLS
 RUN
+!CLS
 RUN
 ~~~
 
@@ -100,8 +105,11 @@ NEW
 50 NEXT I%
 60 PRINT A%
 70 END
+!CLS
 RUN
+!CLS
 RUN
+!CLS
 RUN
 ~~~
 
@@ -117,8 +125,11 @@ NEW
 60 END
 100 A%=A%+1
 110 RETURN
+!CLS
 RUN
+!CLS
 RUN
+!CLS
 RUN
 ~~~
 
@@ -130,8 +141,11 @@ NEW
 20 PRINT "CLK01 FIXED"
 30 NEXT I%
 40 END
+!CLS
 RUN
+!CLS
 RUN
+!CLS
 RUN
 ~~~
 
@@ -143,8 +157,11 @@ NEW
 20 PRINT "CLK01 SCROLL"
 30 NEXT I%
 40 END
+!CLS
 RUN
+!CLS
 RUN
+!CLS
 RUN
 ~~~
 

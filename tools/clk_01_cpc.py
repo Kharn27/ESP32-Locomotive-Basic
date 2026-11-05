@@ -194,7 +194,8 @@ def main(argv=None):
                   "caprice_sha_expected": CAP32_SHA, "container_pin": IMAGE,
                   "rom_sha_expected": ROM_SHA, "speed": "EMULATOR_SPEED_UNVERIFIED",
                   "cpc": "UNVERIFIED", "comparison": "NOT_COMPARABLE",
-                  "corpus": doc["programs"], "captures": []}
+                  "corpus": doc["programs"], "captures": [],
+                  "screen_reset": "CPC CLS direct before RUN, outside TIME window"}
     try:
         git = subprocess.check_output(["git", "-C", str(cap), "rev-parse", "HEAD"],
                                       text=True).strip()
@@ -210,8 +211,9 @@ def main(argv=None):
             for repeat in range(1, 6):
                 name = p["id"] + "/r%02d" % repeat
                 folder = out / name
+                # Direct screen reset before RUN: outside CPC TIME-T.
                 cmds = ["NEW", "MODE 1"] + instrumented(p) + [
-                    "RUN", "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"]
+                    "CLS", "RUN", "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"]
                 host_wall = execute(cap, folder, cmds)
                 png = list(folder.glob("screenshot_*.png"))
                 need(len(png) == 1 and read(png[0]).startswith(b"\x89PNG\r\n\x1a\n"),

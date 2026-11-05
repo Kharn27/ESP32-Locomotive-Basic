@@ -16,21 +16,32 @@ def example():
         "HW4-DISP-PROFILE BOOT spi_request_hz=40000000 variant=SPI40 sha=" + SHA,
         "HW4-C3-B2-C1 LCD_METRICS stage=after_line flushes=1 bands=1",
     ]
-    for seq in range(1, 16):
-        out += [
-            "HW4-RUN-B RUN_START quantum=8 uart_poll_max=16 budget=none sha=" + SHA,
-            "HW4-DISP-PROFILE RUN_DURATION run=%d core_us=%d scope=%s" %
-            (seq, seq + 1000, SCOPE),
-            "HW4-RUN-B RUN_TERMINAL state=5 quanta=3 steps=12 break_source=none "
-            "stop_calls=0 latency_us=0 ignored_input_lines=0 overflow_input_lines=0 "
-            "sha=" + SHA + " program_preserved=1",
-            "HW4-C2 DEVICE_MEMORY stage=run_terminal heap8_free=200000 "
-            "heap8_largest=110000 stack_margin_bytes=4000 dma_fault=0 "
-            "dma_timeouts=0 lcd_error=ESP_OK",
-            "HW4-DISP-PROFILE SUMMARY run=%d stage=run_terminal_after_prompt completed=2" % seq,
-        ]
-        for name in ("full25", "partial", "scroll_associated"):
-            out.append("HW4-DISP-PROFILE CLASS run=%d stage=run_terminal_after_prompt "
+    seq = 0
+    for spec in corpus()["programs"]:
+        source = Path(__file__).resolve().parent / "fixtures/cpc6128/clk_01_speed" / spec["file"]
+        commands = ["NEW"] + source.read_text().splitlines()
+        for _ in range(3):
+            commands.extend(("!CLS", "RUN"))
+        for cmd in commands:
+            out.append("HW4-C2 UART_LINE length=%d hex=%s" %
+                       (len(cmd), cmd.encode("ascii").hex()))
+            if cmd != "RUN":
+                continue
+            seq += 1
+            out += [
+                "HW4-RUN-B RUN_START quantum=8 uart_poll_max=16 budget=none sha=" + SHA,
+                "HW4-DISP-PROFILE RUN_DURATION run=%d core_us=%d scope=%s" %
+                (seq, seq + 1000, SCOPE),
+                "HW4-RUN-B RUN_TERMINAL state=5 quanta=3 steps=12 break_source=none "
+                "stop_calls=0 latency_us=0 ignored_input_lines=0 overflow_input_lines=0 "
+                "sha=" + SHA + " program_preserved=1",
+                "HW4-C2 DEVICE_MEMORY stage=run_terminal heap8_free=200000 "
+                "heap8_largest=110000 stack_margin_bytes=4000 dma_fault=0 "
+                "dma_timeouts=0 lcd_error=ESP_OK",
+                "HW4-DISP-PROFILE SUMMARY run=%d stage=run_terminal_after_prompt completed=2" % seq,
+            ]
+            for name in ("full25", "partial", "scroll_associated"):
+                out.append("HW4-DISP-PROFILE CLASS run=%d stage=run_terminal_after_prompt "
                        "name=%s n=1 wall_us=100 render_pack_us=40 sem_wait_us=20" %
                        (seq, name))
     return "\n".join(out) + "\n"
@@ -81,6 +92,9 @@ class TestUart(unittest.TestCase):
             "uart_overflow": x.replace("overflow_input_lines=0", "overflow_input_lines=1", 1),
             "error": x + "Guru Meditation Error: Core 1 panic\n",
             "truncated": "\n".join(x.splitlines()[:-1]),
+            "wrong_cls": x.replace("UART_LINE length=4 hex=21434c53", "UART_LINE length=4 hex=21434c54", 1),
+            "tampered_source": x.replace("UART_LINE length=7 hex=31302041253d30", "UART_LINE length=7 hex=31302041253d31", 1),
+            "extra_command": x + "HW4-C2 UART_LINE length=3 hex=52554e\n",
         }
         for name, bad in mutants.items():
             with self.subTest(name=name), self.assertRaises(Reject):

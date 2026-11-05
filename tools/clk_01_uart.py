@@ -77,6 +77,30 @@ def analyze(raw, expected_head, programs, repetitions=3):
     need(any(" LCD_METRICS " in row for row in rows), "MISSING_LCD_METRICS")
     need(not any(re.search(r"Guru Meditation|panic|Backtrace:|LCD_FAIL_STOP|HW4-C2 FAIL |MEMORY_FAIL|VIDEO_REJECT|HW4_RUN_DISPLAY_.*FAILED", row, re.I)
                  for row in rows), "FIRMWARE_FAILURE")
+    # Audit the actual typed source and screen reset, not just RUN order.
+    submitted = []
+    for row in rows:
+        if "HW4-C2 UART_LINE " in row:
+            d = fields(row, "HW4-C2 UART_LINE ")
+            n = integer(d, "length")
+            hx = d.get("hex", "")
+            need(n > 0 and n <= 32 and re.fullmatch("[0-9a-f]+", hx) is not None
+                 and len(hx) == 2 * n, "BAD_UART_LINE_HEX")
+            try:
+                submitted.append(bytes.fromhex(hx).decode("ascii"))
+            except UnicodeError as exc:
+                raise Reject("NON_ASCII_UART_LINE") from exc
+    expected = []
+    for spec in programs["programs"]:
+        source = CORPUS.parent / spec["file"]
+        raw_source = source.read_bytes()
+        need(hashlib.sha256(raw_source).hexdigest() == spec["sha256"],
+             "PROGRAM_SHA_AT_ANALYSIS")
+        expected.append("NEW")
+        expected.extend(raw_source.decode("ascii").splitlines())
+        for _ in range(repetitions):
+            expected.extend(("!CLS", "RUN"))
+    need(submitted == expected, "UART_SOURCE_OR_COMMAND_SEQUENCE_MISMATCH")
     result = []
     active = None
     for row in rows:

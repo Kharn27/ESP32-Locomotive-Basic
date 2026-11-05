@@ -95,6 +95,8 @@ def main(argv=None):
                     sequence = (program_manifest["programs"].index(spec) * 3 + attempt)
                     print("PO RUN", spec["id"], attempt, "sequence", sequence,
                           flush=True)
+                    # Screen-only reset OUTSIDE timed RUN, equivalent to CPC direct CLS.
+                    submit("!CLS", "LCD_METRICS stage=after_line")
                     submit("RUN",
                            "SUMMARY run=%d stage=run_terminal_after_prompt" % sequence,
                            seconds=args.timeout)

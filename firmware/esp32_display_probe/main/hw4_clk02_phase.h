@@ -8,6 +8,7 @@
 #define HW4_CLK02_PHASE_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 typedef enum {

@@ -194,8 +194,12 @@ def capture_case(cap, out, session, case, snaps, oracle):
             if "TIME" in source and '"' not in source:
                 body = program[rec["offset"]+4:rec["offset"]+rec["length"]-1]
                 need(b"\xff\x46" in body, "TIME_RAM_TOKEN_MISSING_" + ident)
+        # 9000 interpreted iterations run longer than two automation delays;
+        # the first genuine CPC screenshot showed RUN still in progress.
+        # Only enlarge the collection window, without changing BASIC source.
+        delays = 16 if ident == "P04_LONG" else 2
         run_cmds = ["MODE 1", "NEW", *lines, "RUN",
-                    "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_EXIT"]
+                    " ".join(["CAP32_DELAY"] * delays) + " CAP32_SCRNSHOT CAP32_EXIT"]
         execution = run(cap, folder / "run", run_cmds, snaps)
         nums = parse_numbers(read(folder / "run/printer.dat"), case["printer_numeric_count"])
         need(len(read(folder / "list/printer.dat")) > 0, "LIST_PRINTER_EMPTY")

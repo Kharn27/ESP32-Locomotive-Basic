@@ -29,10 +29,13 @@ git -C "$ROOT" fetch --no-tags origin \
   > "$OUT/pr330-fetch.log" 2>&1
 test "$(git -C "$ROOT" rev-parse refs/remotes/origin/c3-pr330)" = "$C1"
 test "$(git -C "$ROOT" merge-base "$MAIN" "$C1")" = "$B1"
-git -C "$ROOT" show "$BASE:tools/ci/hw4_render_a_memory.py" | sha256sum > "$OUT/frozen-gate-sha256.txt"
+# Gate introduced after the frozen ELF commit: pin script against current
+# main, NOT against the older baseline commit (where this file did not exist).
 git -C "$ROOT" show "$MAIN:tools/ci/hw4_render_a_memory.py" | sha256sum > "$OUT/main-gate-sha256.txt"
-cmp -s "$OUT/frozen-gate-sha256.txt" "$OUT/main-gate-sha256.txt" || {
- echo "Historical gate source drifted" >&2; exit 8;
+sha256sum "$ROOT/tools/ci/hw4_render_a_memory.py" | sed "s@  .*@  -@" > "$OUT/lab-gate-sha256.txt"
+sed -i 's@  .*@  -@' "$OUT/main-gate-sha256.txt"
+cmp -s "$OUT/main-gate-sha256.txt" "$OUT/lab-gate-sha256.txt" || {
+ echo "Historical gate comparator modified in laboratory" >&2; exit 8;
 }
 SRC="$ROOT/.c3-worktrees/$CASE"
 git -C "$ROOT" worktree add --detach "$SRC" "$REV" > "$OUT/worktree.log" 2>&1

@@ -139,10 +139,11 @@ typedef struct {
     size_t while_depth;
     BEWhileFrame while_stack[BE_WHILE_STACK_CAPACITY];
     BasicVariableStore *variables; /* Optional borrowed caller-owned store. */
-    /* B2: record offset and next item in an immutable DATA record.
-     * Offsets, never pointers; RUN/NEW reset them. No global scanner. */
-    size_t data_cursor;
-    size_t data_item_offset;
+    /* J1.25-B2 retains this ABI layout. On the closed INTEGER DATA corpus,
+     * the final WHILE frame's after_cursor/after_statement are the DATA
+     * record/item offsets. DATA and WHILE are rejected in the same program;
+     * WHILE-only programs retain all 8 frame slots and prior semantics.
+     * No pointer into editable program storage is retained. */
 } BasicExecutor;
 
 /* Validate a program and reset execution to its first line.

@@ -187,8 +187,17 @@ static int verify_case(const char *root, const char *name,
         native_n += written;
     }
     CHECK(steps < 40u && error_seen == exhausted);
-    CHECK(native_n == cpc_out_n);
-    CHECK(memcmp(native, cpc_out, native_n) == 0);
+    if (native_n != cpc_out_n ||
+        memcmp(native, cpc_out, native_n < cpc_out_n ? native_n : cpc_out_n) != 0) {
+        size_t k;
+        fprintf(stderr, "B2 mismatch %s/%s native_n=%zu CPC_n=%zu native=",
+                name, session, native_n, cpc_out_n);
+        for (k = 0u; k < native_n; ++k) fprintf(stderr, "%02x ", native[k]);
+        fprintf(stderr, " CPC=");
+        for (k = 0u; k < cpc_out_n; ++k) fprintf(stderr, "%02x ", cpc_out[k]);
+        fprintf(stderr, "\n");
+        return 1;
+    }
     if (exhausted) {
         CHECK(store.count == 1u && entries[0].value.data.integer == 1);
         CHECK(bsr_stop(&runtime).status == BSR_OK);

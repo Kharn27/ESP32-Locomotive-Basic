@@ -10,7 +10,7 @@
 #include <string.h>
 
 #define CHECK(x) do { if (!(x)) { \
-    fprintf(stderr, "%s:%d: %s\\n", __FILE__, __LINE__, #x); \
+    fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #x); \
     return 1; } } while (0)
 enum { CAP = 2048 };
 static const char *const positives[] = {
@@ -19,8 +19,8 @@ static const char *const positives[] = {
 };
 static const char *const sessions[] = {"original", "repeat"};
 static const char *const numeric_expected[] = {
-    " 1 \\n", " 1 \\n 2 \\n", " 4 \\n 5 \\n",
-    " 7 \\n", " 6 \\n 6 \\n", " 9 \\n", "BEFORE\\n 1 \\n"
+    " 1 \n", " 1 \n 2 \n", " 4 \n 5 \n",
+    " 7 \n", " 6 \n 6 \n", " 9 \n", "BEFORE\n 1 \n"
 };
 
 static int file_bytes(const char *path, uint8_t *bytes, size_t cap,
@@ -45,7 +45,7 @@ static int fill_program(const uint8_t *source, size_t n, BasicProgram *program)
         unsigned int line = 0u;
         uint8_t body[CAP];
         size_t body_n = 0u;
-        while (p < n && source[p] != (uint8_t)'\\n') ++p;
+        while (p < n && source[p] != (uint8_t)'\n') ++p;
         if (p == n) return 1;
         i = start;
         if (i == p) return 1;
@@ -70,7 +70,7 @@ static int cpc_run_prefix(const uint8_t *src, size_t n,
                           uint8_t *out, size_t cap, size_t *len,
                           int exhausted)
 {
-    static const char marker[] = "J125_DIAG_BEGIN\\r\\n";
+    static const char marker[] = "J125_DIAG_BEGIN\r\n";
     size_t i, stop = n, k = 0u, diag;
     for (i = 0u; i + sizeof(marker)-1u <= n; ++i) {
         if (memcmp(src + i, marker, sizeof(marker)-1u) == 0) {
@@ -81,19 +81,19 @@ static int cpc_run_prefix(const uint8_t *src, size_t n,
     if (stop == n) return 1;
     diag = stop + sizeof(marker)-1u;
     if (exhausted) {
-        static const char numbers[] = " 4 \\r\\n 40 \\r\\n";
+        static const char numbers[] = " 4 \r\n 40 \r\n";
         if (n - diag < sizeof(numbers)-1u ||
             memcmp(src + diag, numbers, sizeof(numbers)-1u) != 0)
             return 1;
     } else {
-        static const char zeros[] = " 0 \\r\\n 0 \\r\\n";
+        static const char zeros[] = " 0 \r\n 0 \r\n";
         if (n - diag < sizeof(zeros)-1u ||
             memcmp(src + diag, zeros, sizeof(zeros)-1u) != 0)
             return 1;
     }
     for (i = 0u; i < stop; ++i) {
-        if (src[i] == (uint8_t)'\\r') {
-            if (i+1u == stop || src[i+1u] != (uint8_t)'\\n') return 1;
+        if (src[i] == (uint8_t)'\r') {
+            if (i+1u == stop || src[i+1u] != (uint8_t)'\n') return 1;
             continue;
         }
         if (k >= cap) return 1;
@@ -197,7 +197,7 @@ static int verify_case(const char *root, const char *name,
     } else {
         CHECK(store.count >= 1u);
     }
-    printf("B2 %-16s %-8s CPC_RUN_MATCH=%zu ERROR=%d\\n",
+    printf("B2 %-16s %-8s CPC_RUN_MATCH=%zu ERROR=%d\n",
            name, session, native_n, error_seen);
     return 0;
 }
@@ -282,7 +282,7 @@ int main(int argc, char **argv)
     }
     for (j = 0u; j < sizeof(sessions)/sizeof(sessions[0]); ++j) {
         CHECK(verify_case(argv[1], "DATA_EXHAUSTED", sessions[j],
-                          " 1 \\n", 1) == 0);
+                          " 1 \n", 1) == 0);
     }
     puts("J1.25-B2 7/7 positive x2 and DATA_EXHAUSTED x2 CPC RUN MATCH");
     return 0;

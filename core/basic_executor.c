@@ -304,11 +304,9 @@ static BEStatus print8_piece(const uint8_t *body, size_t length, size_t *at,
             (key.name[0] != (uint8_t)'A' &&
              key.name[0] != (uint8_t)'B')) return BE_UNSUPPORTED;
         p += consumed;
-        st = emit(out, (uint8_t)' ');
-        if (st != BE_OK) return st;
+        /* emit_integer already supplies CPC sign alignment and trailing
+         * space: do not add a second layer of blanks for PRINT #8. */
         st = emit_integer(out, value.data.integer);
-        if (st != BE_OK) return st;
-        st = emit(out, (uint8_t)' ');
         if (st != BE_OK) return st;
         *at = p;
         return BE_OK;

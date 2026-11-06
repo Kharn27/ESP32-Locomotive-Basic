@@ -1,11 +1,13 @@
-name: HW4-SCROLL-A0 C2 integration-main Xtensa memory delta
+name: HW4-SCROLL-A0 C1 A0 debt and PR-incremental memory
 on:
   pull_request:
     paths:
       - 'video/hw4_scroll_metrics.*'
       - 'firmware/esp32_display_probe/main/hw4_c2_console.c'
       - 'firmware/esp32_display_probe/main/CMakeLists.txt'
-      - 'tools/ci/hw4_a0_compare_memory.py'
+      - 'tools/ci/hw4_a0_*.py'
+      - 'tests/test_hw4_a0_incremental_memory.py'
+      - 'docs/CI-HW4-A0-incremental-memory.md'
       - 'tools/hw4_scroll_a0_uart.py'
       - 'tests/test_hw4_scroll_metrics_parser.py'
       - 'docs/HW4-SCROLL-OPT-A0-baseline.md'
@@ -16,7 +18,24 @@ permissions:
   contents: read
 
 jobs:
-  base-vs-head:
+  comparator-self-tests:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Reject workflow_dispatch without authoritative PR context
+        if: github.event_name != 'pull_request'
+        run: |
+          echo 'FAIL_CLOSED: dispatch is not an authoritative PR event' >&2
+          exit 2
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Enforce positive and negative comparator tests
+        run: python3 -m unittest discover -s tests -p test_hw4_a0_incremental_memory.py -v
+
+  a0-base-head:
+    needs: comparator-self-tests
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     strategy:
@@ -24,61 +43,101 @@ jobs:
       matrix:
         profile: [CONSOLE, HW3, BASIC_PROBE]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           path: head
+          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with:
-          ref: 5799c774a3a5b3d453c17012a2328b379bd587bd
+          ref: ${{ github.event.pull_request.base.sha }}
           path: base
           persist-credentials: false
-      - name: Compare actual Xtensa sections and binaries at exact base/HEAD
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: 5799c774a3a5b3d453c17012a2328b379bd587bd
+          path: a0
+          persist-credentials: false
+      - name: Verify live GitHub PR refs and Git graph (fail-closed)
         shell: bash
         env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PROFILE: ${{ matrix.profile }}
         run: |
           set -euo pipefail
-          test "$(git -C base rev-parse HEAD)" = 5799c774a3a5b3d453c17012a2328b379bd587bd
-          test "$(git -C head rev-parse HEAD)" = "$EXPECTED_HEAD"
+          mkdir -p "head/hw4-a0-evidence/$PROFILE"
+          echo 'MEASUREMENT_FAILED: provenance or build incomplete' > "head/hw4-a0-evidence/$PROFILE/status.txt"
+          curl -fsS --max-time 30 --retry 2 \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+            > "head/hw4-a0-evidence/$PROFILE/pr-live.json"
+          python3 head/tools/ci/hw4_a0_provenance.py \
+            --api-response "head/hw4-a0-evidence/$PROFILE/pr-live.json" \
+            --repo "$GITHUB_REPOSITORY" --pr-number "$PR_NUMBER" \
+            --base-sha "$BASE_SHA" --head-sha "$HEAD_SHA" \
+            --a0-path a0 --base-path base --head-path head \
+            --output "head/hw4-a0-evidence/$PROFILE/provenance.json"
+      - name: Measure A0, base and HEAD with ESP-IDF 5.5.6
+        shell: bash
+        env:
+          PROFILE: ${{ matrix.profile }}
+          A0_SHA: 5799c774a3a5b3d453c17012a2328b379bd587bd
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C a0 rev-parse HEAD)" = "$A0_SHA"
+          test "$(git -C base rev-parse HEAD)" = "$BASE_SHA"
+          test "$(git -C head rev-parse HEAD)" = "$HEAD_SHA"
           docker run --rm -v "$PWD:/workspace" -w /workspace \
             -e IDF_GIT_SAFE_DIR=/workspace -e PROFILE="$PROFILE" \
             espressif/idf:v5.5.6 bash -lc '
               set -euo pipefail
-              idf.py --version | grep -Fx "ESP-IDF v5.5.6"
-              for label in base head; do
+              for label in a0 base head; do
                 cd "/workspace/$label/firmware/esp32_display_probe"
                 cfg="sdkconfig.hw4-a0-$PROFILE"
                 build="build-hw4-a0-$PROFILE"
+                idf.py --version > "/workspace/$label/a0-$PROFILE-idf-version.txt"
+                grep -Fx "ESP-IDF v5.5.6" "/workspace/$label/a0-$PROFILE-idf-version.txt"
                 idf.py -B "$build" -DSDKCONFIG="$PWD/$cfg" \
-                  -DLOCO_CYD_PROFILE="$PROFILE" set-target esp32 >/dev/null
+                  -DLOCO_CYD_PROFILE="$PROFILE" set-target esp32 \
+                    > "/workspace/$label/a0-$PROFILE-set-target.log" 2>&1
                 idf.py -B "$build" -DSDKCONFIG="$PWD/$cfg" \
-                  -DLOCO_CYD_PROFILE="$PROFILE" build >/dev/null
+                  -DLOCO_CYD_PROFILE="$PROFILE" build \
+                    > "/workspace/$label/a0-$PROFILE-build.log" 2>&1
                 xtensa-esp-elf-size -A "$build/loco_esp32_display_probe.elf" \
                   > "/workspace/$label/a0-$PROFILE-sections.txt"
                 idf.py -B "$build" size > "/workspace/$label/a0-$PROFILE-size.txt"
                 cp "$build/loco_esp32_display_probe.bin" \
                   "/workspace/$label/a0-$PROFILE.bin"
+                test -s "/workspace/$label/a0-$PROFILE-sections.txt"
+                test -s "/workspace/$label/a0-$PROFILE.bin"
+                sha256sum "/workspace/$label/a0-$PROFILE.bin" \
+                  > "/workspace/$label/a0-$PROFILE-bin-sha256.txt"
               done
             '
+          out="head/hw4-a0-evidence/$PROFILE"
           python3 head/tools/ci/hw4_a0_compare_memory.py \
-            --base-sha 5799c774a3a5b3d453c17012a2328b379bd587bd \
+            --a0-sha "$A0_SHA" --base-sha "$BASE_SHA" --head-sha "$HEAD_SHA" \
             --profile "$PROFILE" \
-            --base-size "base/a0-$PROFILE-sections.txt" \
-            --head-size "head/a0-$PROFILE-sections.txt" \
-            --base-bin "base/a0-$PROFILE.bin" \
-            --head-bin "head/a0-$PROFILE.bin" | tee "head/hw4-a0-$PROFILE-delta.md"
-          cat "head/hw4-a0-$PROFILE-delta.md" >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+            --a0-size "a0/a0-$PROFILE-sections.txt" --base-size "base/a0-$PROFILE-sections.txt" --head-size "head/a0-$PROFILE-sections.txt" \
+            --a0-bin "a0/a0-$PROFILE.bin" --base-bin "base/a0-$PROFILE.bin" --head-bin "head/a0-$PROFILE.bin" \
+            --output-md "$out/report.md" --output-json "$out/report.json"
+          cat "$out/report.md" >> "$GITHUB_STEP_SUMMARY"
+          echo 'INCREMENTAL_PASS (historical debt reported separately)' > "$out/status.txt"
+      - uses: actions/upload-artifact@v4.6.2
         if: always()
         with:
           name: hw4-a0-memory-${{ matrix.profile }}
           retention-days: 30
+          if-no-files-found: error
           path: |
-            base/a0-${{ matrix.profile }}-sections.txt
-            base/a0-${{ matrix.profile }}-size.txt
-            head/a0-${{ matrix.profile }}-sections.txt
-            head/a0-${{ matrix.profile }}-size.txt
-            head/hw4-a0-${{ matrix.profile }}-delta.md
+            head/hw4-a0-evidence/${{ matrix.profile }}/
+            a0/a0-${{ matrix.profile }}-*
+            base/a0-${{ matrix.profile }}-*
+            head/a0-${{ matrix.profile }}-*

@@ -1,0 +1,105 @@
+# LAB_ONLY_NEVER_MERGE — J1.25-B2-C3 Issue #336
+# The historical RENDER-A workflow and comparator are NOT modified.
+name: LAB J1.25-B2-C3 six-by-two Xtensa SPI40 evidence
+on:
+  push:
+    branches:
+      - lab/j1-25-b2-c3-spi40-matrix
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lab-j1-25-b2-c3-spi40
+  cancel-in-progress: false
+
+jobs:
+  source-pin-and-compile-check:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check C3 lab script syntax and source SHA pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tools/lab/j1_25_b2_c3_build.sh
+          python3 -m py_compile tools/lab/j1_25_b2_c3_aggregate.py
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git cat-file -e ae07e039a08f6fff66f752228dc2ebed3fcf4220^{commit}
+          git cat-file -e 4d261f2a76374ab99a4dd7415cae7a097330c46b^{commit}
+          git cat-file -e e0085a9e2d3b601359fc44fcfa3ea83430fc7056^{commit}
+          git cat-file -e 21e95a7197413923bb5976067a0419bc729c20c1^{commit}
+          git fetch --no-tags origin \
+            +refs/pull/330/head:refs/remotes/origin/c3-pin-330
+          test "$(git rev-parse refs/remotes/origin/c3-pin-330)" = \
+            64b0087d5087903fee175c4f149c65a65bb43fe6
+          test "$(git merge-base ae07e039a08f6fff66f752228dc2ebed3fcf4220 64b0087d5087903fee175c4f149c65a65bb43fe6)" = \
+            4d261f2a76374ab99a4dd7415cae7a097330c46b
+          echo "C3_PINNED_SOURCES=PASS"
+
+  six-states:
+    needs: source-pin-and-compile-check
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        case: [ref, b1, main_e008, c1, main_ae07, combo]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Two cold ESP-IDF v5.5.6 CONSOLE SPI40 builds and ELF proofs
+        shell: bash
+        env:
+          C3_CASE: ${{ matrix.case }}
+        run: |
+          set -euo pipefail
+          bash tools/lab/j1_25_b2_c3_build.sh "$C3_CASE"
+      - uses: actions/upload-artifact@v4.6.2
+        if: always()
+        with:
+          name: c3-spi40-${{ matrix.case }}
+          retention-days: 30
+          if-no-files-found: warn
+          compression-level: 6
+          path: reports/c3/
+
+  aggregate-and-historical-gate:
+    needs: six-states
+    if: always()
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          pattern: c3-spi40-*
+          path: reports/c3
+          merge-multiple: true
+      - name: Check 12 measurement sets and execute unmodified RENDER-A comparator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/lab/j1_25_b2_c3_aggregate.py
+          cat reports/c3-summary/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4.6.2
+        if: always()
+        with:
+          name: c3-spi40-synthesis-gate-verdict
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            reports/c3-summary/
+            reports/c3/*/run*/historical-gate.*.txt

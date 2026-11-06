@@ -1670,7 +1670,80 @@ static BEStatus execute_line(const BasicProgram *program,
             return comment_end(body, length, pos + 1u,
                                line->next_offset, next);
         }
-        if (token == 0x8au) { /* CPC CLS: no direct firmware side effect. */
+        if (token == 0x8cu) { /* DATA: source-order items, no cursor advance */
+            int more;
+            int16_t ignored;
+            if (variables == NULL) return BE_UNSUPPORTED; /* B1 legacy API. */
+            do {
+                status = data_integer_item(body, length, &pos, &ignored, &more);
+                if (status != BE_OK) return status;
+            } while (more);
+            /* A colon after DATA is executable, witnessed by DATA_COLON. */
+        } else if (token == 0xc3u) { /* READ A%[,B%] */
+            size_t record = executor->data_cursor;
+            size_t item = executor->data_item_offset;
+            if (variables == NULL || preceding_statement) return BE_UNSUPPORTED;
+            for (;;) {
+                BasicVariableKey key;
+                size_t consumed = 0u;
+                int16_t value;
+                BVBStatus resolved;
+                skip_spaces(body, length, &pos);
+                if (pos == length || body[pos] != 0x02u) return BE_UNSUPPORTED;
+                if (flow->data_count >= 2u) return BE_UNSUPPORTED;
+                resolved = bvb_resolve_explicit(body, length, pos,
+                                                 &key, &consumed);
+                if (resolved != BVB_OK) return binding_error(resolved);
+                if (key.type != (uint8_t)BVT_INTEGER ||
+                    key.name_length != 1u ||
+                    (key.name[0] != (uint8_t)'A' &&
+                     key.name[0] != (uint8_t)'B')) return BE_UNSUPPORTED;
+                if ((flow->data_count != 0u &&
+                     for_same_key(&key, &flow->data_keys[0])) ||
+                    body[pos + 1u] != 0u || body[pos + 2u] != 0u)
+                    return BE_UNSUPPORTED;
+                status = data_next_integer(program, &record, &item, &value);
+                if (status != BE_OK) return status;
+                flow->data_keys[flow->data_count] = key;
+                flow->data_values[flow->data_count] = value;
+                ++flow->data_count;
+                pos += consumed;
+                skip_spaces(body, length, &pos);
+                if (pos == length) break;
+                if (body[pos++] != (uint8_t)',') return BE_UNSUPPORTED;
+            }
+            flow->data_action = 1u;
+            flow->data_cursor = record;
+            flow->data_item_offset = item;
+            *next = line->next_offset;
+            return BE_OK;
+        } else if (token == 0xc7u) { /* RESTORE or RESTORE 100 only */
+            size_t p = pos;
+            BasicProgramLine target;
+            BPStatus bp;
+            if (variables == NULL || preceding_statement) return BE_UNSUPPORTED;
+            skip_spaces(body, length, &p);
+            if (p == length) {
+                flow->data_action = 2u;
+                flow->data_cursor = 0u;
+                flow->data_item_offset = 0u;
+            } else {
+                if (length - p != 3u || body[p] != 0x1eu ||
+                    body[p + 1u] != 100u || body[p + 2u] != 0u)
+                    return BE_UNSUPPORTED; /* No arbitrary RESTORE yet. */
+                bp = bp_find(program, 100u, &target);
+                if (bp == BP_NOT_FOUND) return BE_MISSING_TARGET;
+                if (bp != BP_OK) return BE_BAD_PROGRAM;
+                if (target.body_length == 0u ||
+                    program->data[target.body_offset] != 0x8cu)
+                    return BE_UNSUPPORTED;
+                flow->data_action = 2u;
+                flow->data_cursor = target.offset;
+                flow->data_item_offset = 0u;
+            }
+            *next = line->next_offset;
+            return BE_OK;
+        } else if (token == 0x8au) { /* CPC CLS: no direct firmware side effect. */
             status = emit_clear_event(events, out->length);
             if (status != BE_OK) return status;
         } else if (token == 0xbbu) { /* PEN immediate, not a byte-stream escape. */
@@ -2576,6 +2649,8 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
     executor->while_depth = 0u;
     memset(executor->while_stack, 0, sizeof(executor->while_stack));
     executor->variables = variables;
+    executor->data_cursor = 0u;
+    executor->data_item_offset = 0u;
     return BE_OK;
 }
 

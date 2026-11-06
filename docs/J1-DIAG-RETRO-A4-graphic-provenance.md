@@ -78,3 +78,26 @@ idf.py -p /dev/ttyUSB0 flash monitor
 Après chaque `NEW`, saisir les lignes puis `RUN` : `10 INK 16,26`, `10 INK -1,26`, `10 INK 1,32`, `10 INK 1,-1`, `20 PAPER 16` (avec `10 REM J119-P16`), `20 PAPER -1` (avec `10 REM J119-PN1`), `10 LOCATE 0,1`, `10 LOCATE 1,0`, `10 LOCATE -1,1`, `10 BORDER -1`, `10 BORDER -1,1`, `10 BORDER 1,` ; ajouter une ligne ultérieure `PRINT "NEVER"` comme canari. Attendre `Improper argument in N` sur les onze premières formes, `Operand missing in 10` sur la dernière, puis **une seule** occurrence de `Ready`. Les origines UART attendues sont `CPC_INK_ORACLE`, `CPC_PAPER_ORACLE`, `CPC_LOCATE_ORACLE`, `CPC_BORDER_ORACLE`. Vérifier que le `LIST` reste intact, que `NEVER` n'est pas exécuté, que l'écran/LCD fonctionne et qu'il n'y a ni redémarrage ni panne DMA.
 
 **Retour à Pilotage si essai prescrit** : SHA réellement flashé, logs build/flash/monitor, photo des messages, `heap_free`, `max_free_block`, marge pile, `dma_fault` / `dma_timeouts` et état TFT si disponibles. Ne jamais fabriquer les métriques absentes. Aucun auto-merge ou mandat A5/B2/CLK-03.
+
+## Mesures effectives — CI du HEAD de code 772c7990aa05bf7cd761ca2f9bc70dcff567a3cd
+
+Les cinq workflows obligatoires ont été observés **completed/SUCCESS sur le même HEAD de code** :
+
+| CI | Preuve |
+|---|---|
+| C99 | [#42207995081](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42207995081) — 4/4 cellules GCC/Clang × sanitizers OFF/ON, **131/131 CTests/cellule** |
+| ARCH | [#42207995392](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42207995392) — SUCCESS |
+| OPT3 | [#42207995103](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42207995103) — SUCCESS |
+| CPC-PERMANENT | [#42207995872](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42207995872) — SUCCESS |
+| XTENSA | [#42207995390](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42207995390) — SUCCESS, ESP-IDF 5.5.6, **BASIC_PROBE/CONSOLE/HW3 3/3 PASS** |
+
+**Base exacte pour comparatif :** `main@4d261f2a76374ab99a4dd7415cae7a097330c46b` — [CI-XTENSA #42186520959](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42186520959). Les valeurs ci-dessous sont celles des logs des jobs BASIC_PROBE, CONSOLE et HW3, **pas** les `BASE` historiques U1-B d'une autre campagne.
+
+| Profil | Flash_Code base → A4 | Δ Flash | IRAM base → A4 | Δ IRAM | DRAM base → A4 | Δ DRAM |
+|---|---:|---:|---:|---:|---:|---:|
+| BASIC_PROBE | 98358 → 98358 o | **0 o** | 51807 → 51807 o | 0 o | 31228 → 31228 o | 0 o |
+| CONSOLE | 168426 → 169230 o | **+804 o** | 67331 → 67331 o | 0 o | 54864 → 54864 o | 0 o |
+| HW3 | 83306 → 83306 o | **0 o** | 67279 → 67279 o | 0 o | 31520 → 31520 o | 0 o |
+
+**Garde CONSOLE** : `CONSOLE_STORAGE_ELF_BSS_BYTES=22864 ARENA_BYTES=4096 EXTRA_BUDGET_BYTES=4096 PASS`. Le job `po-standard-build` est **SKIPPED**, pas compté comme PASS. Stack libre, heap et DMA **sur CYD physique** demeurent non mesurés. La mise à jour documentaire elle-même constitue un nouveau HEAD ; consulter la **PR #332** et sa remise pour les CI effectivement relancées sur ce HEAD final.
+

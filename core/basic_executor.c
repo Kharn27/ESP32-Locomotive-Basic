@@ -18,7 +18,7 @@ typedef char BEInkXtensaLayoutCheck[
  * Enforce actual Xtensa ABI with a build-time proof, no runtime estimate. */
 typedef char BEWhileXtensaBudgetCheck[
     (sizeof(BEWhileFrame) == 24u &&
-     sizeof(BasicExecutor) == 796u) ? 1 : -1];
+     sizeof(BasicExecutor) == 804u) ? 1 : -1];
 #endif
 
 typedef struct {
@@ -289,6 +289,30 @@ static BEStatus print8_piece(const uint8_t *body, size_t length, size_t *at,
         body[p++] != 0x16u || body[p++] != (uint8_t)',')
         return BE_BAD_SEQUENCE;
     skip_spaces(body, length, &p);
+    if (allow_reference && p < length && body[p] == 0x02u) {
+        BasicVariableKey key;
+        BasicVariableValue value;
+        size_t consumed = 0u;
+        BVBStatus resolved;
+        if (variables == NULL) return BE_UNSUPPORTED;
+        resolved = bvb_read_explicit(body, length, p, variables,
+                                     &key, &consumed, &value);
+        if (resolved != BVB_OK) return binding_error(resolved);
+        if (key.type != (uint8_t)BVT_INTEGER ||
+            value.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+        if (key.name_length != 1u ||
+            (key.name[0] != (uint8_t)'A' &&
+             key.name[0] != (uint8_t)'B')) return BE_UNSUPPORTED;
+        p += consumed;
+        st = emit(out, (uint8_t)' ');
+        if (st != BE_OK) return st;
+        st = emit_integer(out, value.data.integer);
+        if (st != BE_OK) return st;
+        st = emit(out, (uint8_t)' ');
+        if (st != BE_OK) return st;
+        *at = p;
+        return BE_OK;
+    }
     if (p == length || body[p++] != (uint8_t)'"') return BE_BAD_SEQUENCE;
     while (p < length) {
         uint8_t c = body[p++];
@@ -1241,7 +1265,86 @@ typedef struct {
     BEForFrame for_frame;
     BEWhileAction while_action;
     BEWhileFrame while_frame;
+    /* J1.25-B2: bounded, pure READ/RESTORE transaction (no heap). */
+    unsigned int data_action; /* 0 none, 1 READ, 2 RESTORE */
+    size_t data_cursor;
+    size_t data_item_offset;
+    size_t data_count;
+    BasicVariableKey data_keys[2];
+    int16_t data_values[2];
 } BEFlow;
+
+
+/* J1.25-B2: parse only sealed unsigned ASCII INTEGER DATA items.
+ * CPC 01 (colon) ends DATA; no STRING/REAL5 or speculative expressions. */
+static BEStatus data_integer_item(const uint8_t *body, size_t length,
+                                  size_t *at, int16_t *value, int *more)
+{
+    size_t p = *at;
+    int32_t number = 0;
+    skip_spaces(body, length, &p);
+    if (p == length || body[p] < (uint8_t)'0' ||
+        body[p] > (uint8_t)'9') return BE_UNSUPPORTED;
+    do {
+        number = number * 10 + (int32_t)(body[p++] - (uint8_t)'0');
+        if (number > INT16_MAX) return BE_INTEGER_OVERFLOW;
+    } while (p < length && body[p] >= (uint8_t)'0' &&
+             body[p] <= (uint8_t)'9');
+    skip_spaces(body, length, &p);
+    if (p < length && body[p] == (uint8_t)',') {
+        ++p;
+        /* Reject dangling commas before any READ commits a value. */
+        {
+            size_t ahead = p;
+            skip_spaces(body, length, &ahead);
+            if (ahead == length || body[ahead] < (uint8_t)'0' ||
+                body[ahead] > (uint8_t)'9') return BE_BAD_SEQUENCE;
+        }
+        *more = 1;
+    } else if (p == length || body[p] == 0x01u) {
+        *more = 0;
+    } else return BE_BAD_SEQUENCE;
+    *value = (int16_t)number;
+    *at = p;
+    return BE_OK;
+}
+
+/* Scan the immutable program in source order, independent of GOTO.
+ * DATA is supported only at a line start (the closed B1 INTEGER shapes).
+ * Cursors are offsets; no pointers to externally editable program storage. */
+static BEStatus data_next_integer(const BasicProgram *program,
+                                  size_t *record, size_t *item,
+                                  int16_t *value)
+{
+    size_t at = *record;
+    size_t next_item = *item;
+    for (;;) {
+        BasicProgramLine line;
+        BPStatus bp = bp_next(program, &at, &line);
+        const uint8_t *body;
+        int more;
+        BEStatus status;
+        if (bp == BP_END) return BE_DATA_EXHAUSTED;
+        if (bp != BP_OK) return BE_BAD_PROGRAM;
+        body = program->data + line.body_offset;
+        if (next_item == 0u) {
+            if (line.body_length == 0u || body[0] != 0x8cu) {
+                at = line.next_offset;
+                continue;
+            }
+            next_item = 1u;
+        } else if (line.body_length == 0u || body[0] != 0x8cu ||
+                   next_item >= line.body_length) {
+            return BE_BAD_PROGRAM;
+        }
+        status = data_integer_item(body, line.body_length, &next_item,
+                                   value, &more);
+        if (status != BE_OK) return status;
+        *record = more ? line.offset : line.next_offset;
+        *item = more ? next_item : 0u;
+        return BE_OK;
+    }
+}
 
 /* A branch or END may skip a suffix. In J0.19, no numbered line
  * containing an actual subsequent assignment is executable. Locate only

@@ -24,6 +24,9 @@ typedef enum {
     BL_ST_BORDER,
     BL_ST_WHILE,
     BL_ST_WEND,
+    BL_ST_DATA,
+    BL_ST_READ,
+    BL_ST_RESTORE,
     BL_ST_EMPTY
 } BLStatement;
 
@@ -508,6 +511,84 @@ static BLStatus bl_inline_print8(const uint8_t *b, size_t len,
     return BL_OK;
 }
 
+
+/* Exact inverse for the J1.25-A raw DATA island; reject opcodes and
+ * malformed delimiters, never infer DATA runtime values. */
+static BLStatus j125_data_text(const uint8_t *body, size_t length,
+                                size_t *pos, BLEmitter *out)
+{
+    int need = 1;
+    BLStatus status;
+    while (*pos < length && body[*pos] != 0x01u) {
+        uint8_t c = body[*pos];
+        if (c == (uint8_t)' ') {
+            status = append_byte(out, c);
+            if (status != BL_OK) return status;
+            ++*pos;
+        } else if (need && c == (uint8_t)'"') {
+            status = append_byte(out, c);
+            if (status != BL_OK) return status;
+            ++*pos;
+            while (*pos < length && body[*pos] != (uint8_t)'"') {
+                c = body[(*pos)++];
+                if (c < 0x20u || c > 0x7eu) return BL_BAD_SEQUENCE;
+                status = append_byte(out, c);
+                if (status != BL_OK) return status;
+            }
+            if (*pos == length) return BL_TRUNCATED;
+            status = append_byte(out, (uint8_t)'"');
+            if (status != BL_OK) return status;
+            ++*pos;
+            need = 0;
+        } else if (need && c >= (uint8_t)'0' && c <= (uint8_t)'9') {
+            do {
+                status = append_byte(out, body[*pos]);
+                if (status != BL_OK) return status;
+                ++*pos;
+            } while (*pos < length && body[*pos] >= (uint8_t)'0' &&
+                     body[*pos] <= (uint8_t)'9');
+            need = 0;
+        } else if (!need && c == (uint8_t)',') {
+            status = append_byte(out, c);
+            if (status != BL_OK) return status;
+            ++*pos;
+            need = 1;
+        } else {
+            return BL_BAD_SEQUENCE;
+        }
+    }
+    return need ? BL_BAD_SEQUENCE : BL_OK;
+}
+
+/* READ operands are BVR 02/03 with two opaque (but here zero) cache
+ * bytes, and the CPC high-bit-terminated A/B name. */
+static BLStatus j125_read_ref(const uint8_t *body, size_t length,
+                              size_t *pos, BLEmitter *out)
+{
+    BasicVariableRef ref;
+    BVRStatus decoded;
+    uint8_t name, suffix;
+    BLStatus status;
+    if (*pos == length) return BL_TRUNCATED;
+    decoded = bvr_decode(body, length, *pos, &ref);
+    if (decoded == BVR_TRUNCATED) return BL_TRUNCATED;
+    if (decoded != BVR_OK || ref.family != BVR_FAMILY_EXPLICIT ||
+        ref.name_length != 1u || ref.cache_low != 0u ||
+        ref.cache_high != 0u ||
+        (ref.explicit_type != BVR_TYPE_INTEGER &&
+         ref.explicit_type != BVR_TYPE_STRING))
+        return BL_BAD_SEQUENCE;
+    name = (uint8_t)(body[ref.name_offset] & 0x7fu);
+    if (name != (uint8_t)'A' && name != (uint8_t)'B')
+        return BL_BAD_SEQUENCE;
+    suffix = ref.explicit_type == BVR_TYPE_INTEGER ?
+             (uint8_t)'%' : (uint8_t)'$';
+    status = append_byte(out, name);
+    if (status == BL_OK) status = append_byte(out, suffix);
+    *pos = ref.reference_offset + ref.consumed;
+    return status;
+}
+
 static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
 {
     size_t pos = 0;
@@ -572,6 +653,9 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
         case 0x02u: case 0x03u: statement = BL_ST_ASSIGN; status = BL_OK; break;
         case 0xa5u: statement = BL_ST_ASSIGN; status = append_word(out, "LET"); break;
         case 0xbfu: statement = BL_ST_PRINT; status = append_word(out, "PRINT"); break;
+        case 0x8cu: statement = BL_ST_DATA; status = append_word(out, "DATA"); break;
+        case 0xc3u: statement = BL_ST_READ; status = append_word(out, "READ"); break;
+        case 0xc7u: statement = BL_ST_RESTORE; status = append_word(out, "RESTORE"); break;
         case 0xd6u: statement = BL_ST_WHILE; status = append_word(out, "WHILE"); break;
         case 0xd5u: statement = BL_ST_WEND; status = append_word(out, "WEND"); break;
         case 0xa9u: statement = BL_ST_LOCATE; status = append_word(out, "LOCATE"); break;
@@ -878,6 +962,32 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
             if (status != BL_OK) {
                 return status;
             }
+        } else if (statement == BL_ST_DATA) {
+            status = j125_data_text(body, length, &pos, out);
+            if (status != BL_OK) return status;
+        } else if (statement == BL_ST_READ) {
+            if (pos == length || body[pos] == 0x01u) return BL_BAD_SEQUENCE;
+            status = j125_read_ref(body, length, &pos, out);
+            while (status == BL_OK && pos < length && body[pos] == (uint8_t)',') {
+                status = append_byte(out, (uint8_t)',');
+                if (status != BL_OK) return status;
+                ++pos;
+                status = append_spaces(body, length, &pos, out);
+                if (status == BL_OK)
+                    status = j125_read_ref(body, length, &pos, out);
+            }
+            if (status != BL_OK) return status;
+        } else if (statement == BL_ST_RESTORE) {
+            if (pos < length && body[pos] == 0x1eu) {
+                if (length - pos < 3u) return BL_TRUNCATED;
+                if (body[pos + 1u] != 0x64u || body[pos + 2u] != 0u)
+                    return BL_BAD_SEQUENCE;
+                pos += 3u;
+                status = append_word(out, "100");
+                if (status != BL_OK) return status;
+            } else if (pos < length && body[pos] != 0x01u) {
+                return BL_BAD_SEQUENCE;
+            }
         } else if (statement == BL_ST_PRINT && pos < length && body[pos] != 0x01u) {
             uint8_t t;
             int stream8 = 0;
@@ -914,6 +1024,15 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                         body[pos + 2u] == 0x01u)) {
                 status = append_word(out, "\"C\"");
                 pos += 2u;
+            } else if (stream8 && t == (uint8_t)'"' &&
+                       ((length - (pos - 1u) == 8u &&
+                         memcmp(body + pos - 1u, "\"BEFORE\"", 8u) == 0) ||
+                        (length - (pos - 1u) == 7u &&
+                         memcmp(body + pos - 1u, "\"AFTER\"", 7u) == 0))) {
+                const char *literal = length - (pos - 1u) == 8u ?
+                                      "\"BEFORE\"" : "\"AFTER\"";
+                status = append_word(out, literal);
+                pos = length;
             } else if (stream8 && t == (uint8_t)'"') {
                 static const uint8_t prefix[] = {
                     '"','V','A','L','U','E','=','"',';'
@@ -929,7 +1048,7 @@ static BLStatus decode(const uint8_t *body, size_t length, BLEmitter *out)
                 pos = pos - 1u + sizeof(prefix);
                 status = for_reference(body, length, &pos, out);
                 if (status != BL_OK) return status;
-            } else if (stream8 && !(t == 0x02u || t == 0x19u))
+            } else if (stream8 && !(t == 0x02u || t == 0x03u || t == 0x19u))
                 return BL_BAD_SEQUENCE;
             else if (t == (uint8_t)'"') {
                 status = append_byte(out, t);

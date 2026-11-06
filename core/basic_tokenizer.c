@@ -12,7 +12,8 @@ typedef struct {
 typedef enum {
     ST_PRINT, ST_LIST, ST_RUN, ST_NEW, ST_GOTO, ST_END, ST_REM, ST_APOSTROPHE,
     ST_ASSIGN, ST_IF, ST_GOSUB, ST_RETURN, ST_FOR, ST_NEXT, ST_PEN, ST_INK,
-    ST_PAPER, ST_CLS, ST_LOCATE, ST_BORDER, ST_WHILE, ST_WEND
+    ST_PAPER, ST_CLS, ST_LOCATE, ST_BORDER, ST_WHILE, ST_WEND,
+    ST_DATA, ST_READ, ST_RESTORE
 } BTStatement;
 
 typedef struct {
@@ -24,6 +25,9 @@ typedef struct {
 /* CPC keyword codes checked against basic.asm: E54A, E5DB, E4FF, E5A6, E63A, E663. */
 static const BTKeyword keywords[] = {
     {"PRINT", 0xbfu, ST_PRINT},
+    {"RESTORE",0xc7u, ST_RESTORE},
+    {"READ",0xc3u, ST_READ},
+    {"DATA",0x8cu, ST_DATA},
     {"WHILE", 0xd6u, ST_WHILE}, /* J1.24-A ROM-backed RAM, original/repeat */
     {"WEND",  0xd5u, ST_WEND}, /* J1.24-A ROM-backed RAM, original/repeat */
     {"LOCATE",0xa9u, ST_LOCATE}, /* J1.23-A original/repeat CPC RAM */
@@ -659,6 +663,81 @@ static BTStatus tokenize_logic_integer(const uint8_t *src, size_t length,
     return BT_OK;
 }
 
+
+/* J1.25-B1 DATA: content is ASCII CPC raw text, not numeric tokens. */
+static BTStatus j125_data_text(const uint8_t *src, size_t n,
+                                size_t *at, BTEmitter *out)
+{
+    int need = 1;
+    BTStatus status;
+    while (*at < n && src[*at] != (uint8_t)':') {
+        uint8_t c = src[*at];
+        if (c == (uint8_t)' ') {
+            status = emit(out, c);
+            if (status != BT_OK) return status;
+            ++*at;
+        } else if (need && c == (uint8_t)'"') {
+            status = emit(out, c);
+            if (status != BT_OK) return status;
+            ++*at;
+            while (*at < n && src[*at] != (uint8_t)'"') {
+                c = src[(*at)++];
+                if (c < 0x20u || c > 0x7eu) return BT_UNSUPPORTED_CONSTRUCT;
+                status = emit(out, c);
+                if (status != BT_OK) return status;
+            }
+            if (*at == n) return BT_MALFORMED_INPUT;
+            status = emit(out, (uint8_t)'"');
+            if (status != BT_OK) return status;
+            ++*at;
+            need = 0;
+        } else if (need && ascii_digit(c)) {
+            do {
+                status = emit(out, src[*at]);
+                if (status != BT_OK) return status;
+                ++*at;
+            } while (*at < n && ascii_digit(src[*at]));
+            need = 0;
+        } else if (!need && c == (uint8_t)',') {
+            status = emit(out, c);
+            if (status != BT_OK) return status;
+            ++*at;
+            need = 1;
+        } else {
+            return BT_UNSUPPORTED_CONSTRUCT;
+        }
+    }
+    return need ? BT_MALFORMED_INPUT : BT_OK;
+}
+
+/* Only A/B typed INTEGER or STRING refs occur in the twelve CPC sources. */
+static BTStatus j125_read_ref(const uint8_t *src, size_t n,
+                              size_t *at, BTEmitter *out)
+{
+    uint8_t name;
+    if (*at + 1u >= n) return BT_MALFORMED_INPUT;
+    name = ascii_upper(src[*at]);
+    if ((name != (uint8_t)'A' && name != (uint8_t)'B') ||
+        (src[*at + 1u] != (uint8_t)'%' &&
+         src[*at + 1u] != 0x24u) ||
+        (*at + 2u < n && identifier_continuation(src[*at + 2u])))
+        return BT_UNSUPPORTED_CONSTRUCT;
+    return explicit_variable(src, n, at, out, BVR_TYPE_UNDETERMINED);
+}
+
+static int j125_print_operand(const uint8_t *src, size_t n)
+{
+    static const char *const forms[] = {
+        "A%", "B%", "A$", "B$", "\"BEFORE\"", "\"AFTER\""
+    };
+    size_t i;
+    for (i = 0u; i < sizeof(forms) / sizeof(forms[0]); ++i) {
+        size_t len = strlen(forms[i]);
+        if (n == len && memcmp(src, forms[i], len) == 0) return 1;
+    }
+    return 0;
+}
+
 static BTStatus one_pass(const uint8_t *source, size_t length,
                          BTEmitter *out)
 {
@@ -770,8 +849,7 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
             if (stream8 && !while_colon_c && !(length - index >= 9u &&
                 memcmp(source + index, "\"VALUE=\";", 9u) == 0) &&
                 !keyword_matches(source, length, index, "ABS", &count) &&
-                !(length - index == 2u && source[index] == (uint8_t)'B' &&
-                  source[index + 1u] == (uint8_t)'%') &&
+                !j125_print_operand(source + index, length - index) &&
                 !(length - index == 2u && source[index] == (uint8_t)'8' &&
                   source[index + 1u] == (uint8_t)'8'))
                 return BT_UNSUPPORTED_CONSTRUCT;
@@ -812,6 +890,31 @@ static BTStatus one_pass(const uint8_t *source, size_t length,
                 }
             } else {
                 return BT_UNSUPPORTED_CONSTRUCT;
+            }
+        } else if (statement == ST_DATA) {
+            status = j125_data_text(source, length, &index, out);
+        } else if (statement == ST_READ) {
+            if (index == length || source[index] == (uint8_t)':')
+                return BT_MALFORMED_INPUT;
+            status = j125_read_ref(source, length, &index, out);
+            while (status == BT_OK && index < length &&
+                   source[index] == (uint8_t)',') {
+                status = emit(out, (uint8_t)',');
+                if (status != BT_OK) return status;
+                ++index;
+                status = spaces(source, length, &index, out);
+                if (status == BT_OK)
+                    status = j125_read_ref(source, length, &index, out);
+            }
+        } else if (statement == ST_RESTORE) {
+            if (index < length && source[index] != (uint8_t)':') {
+                unsigned int target;
+                status = decimal(source, length, &index, 65535u, &target);
+                if (status != BT_OK) return status;
+                if (target != 100u) return BT_UNSUPPORTED_CONSTRUCT;
+                status = emit(out, 0x1eu);
+                if (status == BT_OK) status = emit(out, 0x64u);
+                if (status == BT_OK) status = emit(out, 0u);
             }
         } else if (statement == ST_WHILE) {
             /* Lexical B1 only: stop before CPC 01 (':'). Reuse the

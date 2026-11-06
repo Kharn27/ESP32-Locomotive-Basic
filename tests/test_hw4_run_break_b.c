@@ -339,6 +339,74 @@ static int diagnostic_provenance_matrix(void)
         "10 A%=32767", "20 B%=A%*2", "30 PRINT \"NEVER\""};
     static const char *const mul255_overflow[]={
         "10 A%=255", "20 B%=A%*255", "30 PRINT \"NEVER\""};
+
+    /* A4 12 genuine failed graphics statements + dynamic L620.
+     * The scheduler, UART provenance and TFT text share the real BSR. */
+    static const char *const g_ink16[]={
+        "10 INK 16,26", "20 PRINT \"NEVER\""};
+    static const char *const g_inkneg[]={
+        "10 INK -1,26", "20 PRINT \"NEVER\""};
+    static const char *const g_ink32[]={
+        "10 INK 1,32", "20 PRINT \"NEVER\""};
+    static const char *const g_inkminus[]={
+        "10 INK 1,-1", "20 PRINT \"NEVER\""};
+    static const char *const g_p16[]={
+        "10 REM J119-P16", "20 PAPER 16", "30 PRINT \"NEVER\""};
+    static const char *const g_pneg[]={
+        "10 REM J119-PN1", "20 PAPER -1", "30 PRINT \"NEVER\""};
+    static const char *const g_p620[]={
+        "600 PRINT \"BEFORE\"", "620 PAPER 16", "630 PRINT \"NEVER\""};
+    static const char *const g_l001[]={
+        "10 LOCATE 0,1", "20 PRINT \"NEVER\""};
+    static const char *const g_l010[]={
+        "10 LOCATE 1,0", "20 PRINT \"NEVER\""};
+    static const char *const g_ln11[]={
+        "10 LOCATE -1,1", "20 PRINT \"NEVER\""};
+    static const char *const g_bneg[]={
+        "10 BORDER -1", "20 PRINT \"NEVER\""};
+    static const char *const g_bneg1[]={
+        "10 BORDER -1,1", "20 PRINT \"NEVER\""};
+    static const char *const g_bmissing[]={
+        "10 BORDER 1,", "20 PRINT \"NEVER\""};
+    DIAG_CASE(g_ink16,0u,BE_INVALID_INK,CPC_DIAG_INK_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_INK_CPC_ORACLE,10u,
+              "Improper argument in 10\n","CPC_INK_ORACLE");
+    DIAG_CASE(g_inkneg,0u,BE_INVALID_INK,CPC_DIAG_INK_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_INK_CPC_ORACLE,10u,
+              "Improper argument in 10\n","CPC_INK_ORACLE");
+    DIAG_CASE(g_ink32,0u,BE_INVALID_INK,CPC_DIAG_INK_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_INK_CPC_ORACLE,10u,
+              "Improper argument in 10\n","CPC_INK_ORACLE");
+    DIAG_CASE(g_inkminus,0u,BE_INVALID_INK,CPC_DIAG_INK_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_INK_CPC_ORACLE,10u,
+              "Improper argument in 10\n","CPC_INK_ORACLE");
+    DIAG_CASE(g_p16,1u,BE_INVALID_PAPER,CPC_DIAG_PAPER_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_PAPER_CPC_ORACLE,20u,
+              "Improper argument in 20\n","CPC_PAPER_ORACLE");
+    DIAG_CASE(g_pneg,1u,BE_INVALID_PAPER,CPC_DIAG_PAPER_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_PAPER_CPC_ORACLE,20u,
+              "Improper argument in 20\n","CPC_PAPER_ORACLE");
+    DIAG_CASE(g_p620,1u,BE_INVALID_PAPER,CPC_DIAG_PAPER_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_PAPER_CPC_ORACLE,620u,
+              "Improper argument in 620\n","CPC_PAPER_ORACLE");
+    DIAG_CASE(g_l001,0u,BE_INVALID_LOCATE,CPC_DIAG_LOCATE_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_LOCATE_CPC_ORACLE,10u,
+              "Improper argument in 10\n","CPC_LOCATE_ORACLE");
+    DIAG_CASE(g_l010,0u,BE_INVALID_LOCATE,CPC_DIAG_LOCATE_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_LOCATE_CPC_ORACLE,10u,
+              "Improper argument in 10\n","CPC_LOCATE_ORACLE");
+    DIAG_CASE(g_ln11,0u,BE_INVALID_LOCATE,CPC_DIAG_LOCATE_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_LOCATE_CPC_ORACLE,10u,
+              "Improper argument in 10\n","CPC_LOCATE_ORACLE");
+    DIAG_CASE(g_bneg,0u,BE_INVALID_BORDER,CPC_DIAG_BORDER_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_BORDER_CPC_ORACLE,10u,
+              "Improper argument in 10\n","CPC_BORDER_ORACLE");
+    DIAG_CASE(g_bneg1,0u,BE_INVALID_BORDER,CPC_DIAG_BORDER_IMPROPER_ARGUMENT,
+              CPC_DIAG_ORIGIN_NATIVE_BORDER_CPC_ORACLE,10u,
+              "Improper argument in 10\n","CPC_BORDER_ORACLE");
+    DIAG_CASE(g_bmissing,0u,BE_OPERAND_MISSING,CPC_DIAG_BORDER_OPERAND_MISSING,
+              CPC_DIAG_ORIGIN_NATIVE_BORDER_CPC_ORACLE,10u,
+              "Operand missing in 10\n","CPC_BORDER_ORACLE");
     DIAG_CASE(pen,1u,BE_INVALID_PEN,CPC_DIAG_PEN_IMPROPER_ARGUMENT,
               CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE,20u,
               "Improper argument in 20\n","NATIVE_PEN_ORACLE");
@@ -387,7 +455,7 @@ static int diagnostic_provenance_matrix(void)
     /* A failed BSR status by itself can never make a CPC origin. */
     CHECK(strcmp(hw4_run_diag_source(CPC_DIAG_ORIGIN_HOST),"HOST")==0);
     CHECK(strcmp(hw4_run_diag_source((CpcDiagOrigin)999),"HOST")==0);
-    puts("HW4-RUN-BREAK-B-C2 DIAG 15/15 real BSR cases, UART provenance + TFT text");
+    puts("HW4-RUN-BREAK-B-C2 DIAG 28/28 real BSR cases, UART provenance + TFT text");
     return 0;
 }
 #undef DIAG_CASE

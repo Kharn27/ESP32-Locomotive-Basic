@@ -132,7 +132,13 @@ class MemoryTest(unittest.TestCase):
             with self.subTest(opt=opt, value=value):
                 proc, report, _ = self.run_cli({opt: value})
                 self.assertEqual(proc.returncode, 2)
-                self.assertEqual(report["status"], "FAIL_CLOSED")
+                self.assertEqual(report["status"], "BASELINE_INVALID" if opt == "--a0-sha" else "FAIL_CLOSED")
+
+    def test_invalid_a0_sections_are_baseline_invalid(self):
+        self.files["a0"][0].write_text("")
+        proc, report, _ = self.run_cli()
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(report["status"], "BASELINE_INVALID")
 
     def test_empty_truncated_report_or_failed_image(self):
         self.files["head"][0].write_text("")

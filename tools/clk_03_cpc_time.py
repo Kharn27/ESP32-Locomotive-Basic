@@ -116,7 +116,10 @@ def run(cap, folder, commands, snaps, timeout=200):
     argv = ["xvfb-run", "-a", str(cap / "cap32"), "-c", str(folder / "cap32.cfg")]
     for cmd in commands:
         need("\r" not in cmd and "\n" not in cmd, "NEWLINE_IN_AUTOCMD")
-        argv.extend(("-a", cmd))
+        # Caprice32 automation accepts F12 + Return as the snapshot hotkey,
+        # not the literal word CAP32_SNAPSHOT. The original text remains
+        # visible in autocmd.json; argv stores the real control sequence.
+        argv.extend(("-a", cmd.replace("CAP32_SNAPSHOT", "\x0c\x0d")))
     (folder / "autocmd.json").write_bytes(canonical({"commands": commands, "argv": argv}))
     env = dict(os.environ, SDL_VIDEODRIVER="x11", SDL_AUDIODRIVER="dummy")
     start_utc = datetime.now(timezone.utc).isoformat()

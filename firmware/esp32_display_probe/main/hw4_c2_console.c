@@ -7,6 +7,7 @@
 #include "hw4_pen_bridge.h"
 #include "hw4_run_scheduler.h"
 #include "hw4_run_break_input.h"
+#include "hw4_clk02_phase.h"
 #include "hw4_run_diag_source.h"
 #include "basic_variable_store.h"
 #include "j1_15_c_string_arena.h"
@@ -183,6 +184,8 @@ static void disp_report(const char *stage)
 
 static Hw4TouchT1 s_touch; /* CONSOLE only; 0 heap, 0 extra tasks */
 static Hw4RunScheduler s_run_scheduler;
+/* CLK-02: only one bounded aggregate in the existing CONSOLE task. */
+static Hw4Clk02Phase s_clk02;
 /* J1.21-B2b: tokenizer scratch is inactive for the whole RUN. Reuse it for
  * private preview without increasing static DRAM by another 4096 bytes.
  * The public events must NOT alias that union during RUN. */
@@ -426,7 +429,12 @@ static bool touch_poll(void)
         esp_err_t e=cyd_lcd_orientation(target,
                                           cpc_video_palette_rgb565(1U));
         if(e!=ESP_OK) return fail("TOUCH_ORIENTATION",(int)e);
+        const bool during_run=s_run_active;
+        const uint64_t full_started_us=during_run ? disp_clock(NULL):0U;
         if(!repaint_full()) return false; /* single DMA attempt per band */
+        if(during_run)
+            hw4_clk02_record(&s_clk02,HW4_CLK02_FULL,full_started_us,
+                             disp_clock(NULL),0U,LCD_HEIGHT/LCD_ROWS_PER_BAND);
         printf("HW4-TOUCH-T1 SHORT_ROTATE orientation=%u elapsed_ms=%llu "
                "program_preserved=1 repaint=full\n",
                target,(unsigned long long)elapsed);
@@ -635,6 +643,7 @@ static bool basic_run(void)
     s_run_preview.event_capacity=PEN_EVENT_CAPACITY;
     if(!hw4_run_scheduler_bind_preview(&s_run_scheduler,&s_run_preview))
         return fail("RUN_SCHEDULER_SCRATCH",-1);
+    hw4_clk02_reset(&s_clk02); /* strictly before RUN_DURATION begins */
     s_run_active=true;
     s_run_quanta=0U;
     s_run_break_requested_us=0U;
@@ -657,13 +666,26 @@ static bool basic_run_slice(void)
     Hw4RunSlice slice;
     /* B2b: do NOT touch public written here; preview writes only its
      * private scheduler staging. Public bytes/counts commit after preflight. */
+    const uint64_t step_started_us=disp_clock(NULL);
     slice=hw4_run_scheduler_slice(&s_run_scheduler,RUN_QUANTUM,&receiver,
                        s_basic.output,sizeof(s_basic.output),&s_basic.written,
                        s_run_public_events,PEN_EVENT_CAPACITY,&event_count);
+    hw4_clk02_record(&s_clk02,HW4_CLK02_STEP,step_started_us,
+                     disp_clock(NULL),0U,0U);
     if(s_run_quanta!=SIZE_MAX) ++s_run_quanta;
     if(slice.state==HW4_RUN_YIELDED) {
         /* NO Ready, prompt, stop or restart at a quantum boundary. */
+        const uint32_t flushes_before=s_lcd_metrics.flushes;
+        const uint32_t bands_before=s_lcd_metrics.bands;
+        const uint64_t repaint_started_us=disp_clock(NULL);
         if(!repaint_dirty()) return false;
+        const uint64_t repaint_ended_us=disp_clock(NULL);
+        if(s_lcd_metrics.flushes<flushes_before ||
+           s_lcd_metrics.bands<bands_before) s_clk02.invalid=true;
+        else hw4_clk02_record(&s_clk02,HW4_CLK02_DIRTY,
+                              repaint_started_us,repaint_ended_us,
+                              s_lcd_metrics.flushes-flushes_before,
+                              s_lcd_metrics.bands-bands_before);
         if(s_run_quanta%RUN_LOG_QUANTA==0U) {
             printf("HW4-RUN-B YIELD quanta=%u steps=%u state=RUNNING "
                    "program_preserved=1 sha=%s\n",
@@ -731,6 +753,37 @@ static bool basic_run_slice(void)
                (uint64_t)esp_timer_get_time()-s_run_break_requested_us : 0U),
            (unsigned)s_run_input.ignored_lines,
            (unsigned)s_run_input.overflow_lines,
+           HW4_SHOT_GIT_SHA);
+    /* CLK-02: append-only post-RUN report; no UART from the hot loop.
+     * Call windows are disjoint. Residual includes UART/touch/log/probes,
+     * and is NOT measured FreeRTOS wait time. */
+    uint64_t other_wall_us=0U;
+    const bool accounting_ok=hw4_clk02_finish(&s_clk02,run_core_us,
+                                              &other_wall_us);
+    const uint64_t probe_clock_reads=2U*
+        ((uint64_t)s_clk02.step_calls+(uint64_t)s_clk02.repaint_calls+
+         (uint64_t)s_clk02.yield_calls);
+    printf("HW4-CLK02 RUN_PHASE_SUMMARY version=1 run=%u "
+           "duration_us=%llu step_call_wall_us=%llu "
+           "repaint_call_wall_us=%llu yield_call_wall_us=%llu "
+           "other_wall_us=%llu step_calls=%u repaint_calls=%u "
+           "repaint_flushes=%u repaint_bands=%u full_repaints=%u "
+           "yield_calls=%u probe_clock_reads=%llu valid=%u "
+           "unit=us clock=esp_timer_task_wall "
+           "scope=RUN_slices_including_repaint_excluding_final_prompt "
+           "step_scope=scheduler_slice_call "
+           "repaint_scope=dirty_plus_touch_full_calls "
+           "yield_scope=cooperative_vTaskDelay_call "
+           "attribution=task_wall_not_cpu_or_gram sha=%s\n",
+           s_disp_run_seq,(unsigned long long)run_core_us,
+           (unsigned long long)s_clk02.step_wall_us,
+           (unsigned long long)s_clk02.repaint_wall_us,
+           (unsigned long long)s_clk02.yield_wall_us,
+           (unsigned long long)other_wall_us,
+           (unsigned)s_clk02.step_calls,(unsigned)s_clk02.repaint_calls,
+           (unsigned)s_clk02.repaint_flushes,(unsigned)s_clk02.repaint_bands,
+           (unsigned)s_clk02.full_repaints,(unsigned)s_clk02.yield_calls,
+           (unsigned long long)probe_clock_reads,(unsigned)accounting_ok,
            HW4_SHOT_GIT_SHA);
     memory_report("run_terminal");
     s_disp_report_after_prompt=true;
@@ -955,7 +1008,13 @@ void app_main(void)
                 }
             }
             if(!basic_run_slice()) return;
+            /* Observe the existing yield call; never alter its cadence. */
+            const bool count_yield=s_run_active;
+            const uint64_t yield_started_us=count_yield ? disp_clock(NULL):0U;
             vTaskDelay(1); /* mandatory cooperative yield between quanta */
+            if(count_yield)
+                hw4_clk02_record(&s_clk02,HW4_CLK02_YIELD,
+                                 yield_started_us,disp_clock(NULL),0U,0U);
             continue;
         }
         uint8_t ch=0U;

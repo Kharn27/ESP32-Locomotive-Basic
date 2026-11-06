@@ -75,10 +75,10 @@ static int skipped_family(const char *unreached)
     CHECK(add(&t,20u,unreached)==0);
     CHECK(add(&t,30u,"A%=1")==0);
     CHECK(add(&t,40u,"WHILE A%=1")==0);
-    CHECK(add(&t,50u,"PRINT #8,\"T\"")==0);
+    CHECK(add(&t,50u,"PRINT \"T\"")==0);
     CHECK(add(&t,60u,"A%=2")==0);
     CHECK(add(&t,70u,"WEND")==0);
-    CHECK(add(&t,80u,"PRINT #8,\"END\"")==0);
+    CHECK(add(&t,80u,"PRINT \"END\"")==0);
     CHECK(add(&t,90u,"END")==0);
     return run(&t,"T\nEND\n",1u);
 }
@@ -99,7 +99,7 @@ static int eight_frames(void)
     CHECK(add(&t,120u,"A%=2")==0);
     for(number=130u;number<=200u;number=(uint16_t)(number+10u))
         CHECK(add(&t,number,"WEND")==0);
-    CHECK(add(&t,210u,"PRINT #8,\"END\"")==0);
+    CHECK(add(&t,210u,"PRINT \"END\"")==0);
     CHECK(add(&t,220u,"END")==0);
     return run(&t,"END\n",8u);
 }

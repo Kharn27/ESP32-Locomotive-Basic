@@ -18,7 +18,7 @@ typedef char BEInkXtensaLayoutCheck[
  * Enforce actual Xtensa ABI with a build-time proof, no runtime estimate. */
 typedef char BEWhileXtensaBudgetCheck[
     (sizeof(BEWhileFrame) == 24u &&
-     sizeof(BasicExecutor) == 804u) ? 1 : -1];
+     sizeof(BasicExecutor) == 796u) ? 1 : -1];
 #endif
 
 typedef struct {
@@ -1273,6 +1273,30 @@ typedef struct {
 } BEFlow;
 
 
+/* DATA and WHILE cannot share the one bounded per-executor storage slot.
+ * Keep the established 796-byte Xtensa ABI; reject any mixed program at
+ * WHILE evaluation, even when the DATA is skipped by GOTO. */
+#define BE_DATA_RECORD(executor) \
+    ((executor)->while_stack[BE_WHILE_STACK_CAPACITY-1u].after_cursor)
+#define BE_DATA_ITEM(executor) \
+    ((executor)->while_stack[BE_WHILE_STACK_CAPACITY-1u].after_statement)
+
+static int program_has_data_family(const BasicProgram *program)
+{
+    size_t cursor = 0u;
+    BasicProgramLine line;
+    while (bp_next(program, &cursor, &line) == BP_OK) {
+        const uint8_t *body = program->data + line.body_offset;
+        size_t pos = 0u;
+        skip_spaces(body, line.body_length, &pos);
+        if (pos < line.body_length &&
+            (body[pos] == 0x8cu || body[pos] == 0xc3u ||
+             body[pos] == 0xc7u))
+            return 1;
+    }
+    return 0;
+}
+
 /* J1.25-B2: parse only sealed unsigned ASCII INTEGER DATA items.
  * CPC 01 (colon) ends DATA; no STRING/REAL5 or speculative expressions. */
 static BEStatus data_integer_item(const uint8_t *body, size_t length,
@@ -1678,8 +1702,8 @@ static BEStatus execute_line(const BasicProgram *program,
             } while (more);
             /* A colon after DATA is executable, witnessed by DATA_COLON. */
         } else if (token == 0xc3u) { /* READ A%[,B%] */
-            size_t record = executor->data_cursor;
-            size_t item = executor->data_item_offset;
+            size_t record = BE_DATA_RECORD(executor);
+            size_t item = BE_DATA_ITEM(executor);
             if (variables == NULL || preceding_statement) return BE_UNSUPPORTED;
             for (;;) {
                 BasicVariableKey key;
@@ -2519,6 +2543,7 @@ static BEStatus execute_line(const BasicProgram *program,
             return BE_OK;
         } else if (token == 0xd6u) { /* WHILE : CPC D6 */
             BEWhileFrame frame = {0};
+            if (program_has_data_family(program)) return BE_UNSUPPORTED;
             const BEWhileFrame *existing = NULL;
             size_t end, resume_cursor, resume_statement;
             int condition;
@@ -2647,8 +2672,8 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
     executor->while_depth = 0u;
     memset(executor->while_stack, 0, sizeof(executor->while_stack));
     executor->variables = variables;
-    executor->data_cursor = 0u;
-    executor->data_item_offset = 0u;
+    BE_DATA_RECORD(executor) = 0u;
+    BE_DATA_ITEM(executor) = 0u;
     return BE_OK;
 }
 
@@ -2927,8 +2952,8 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
         memset(executor->while_stack, 0, sizeof(executor->while_stack));
     }
     if (transition.data_action != 0u) {
-        executor->data_cursor = transition.data_cursor;
-        executor->data_item_offset = transition.data_item_offset;
+        BE_DATA_RECORD(executor) = transition.data_cursor;
+        BE_DATA_ITEM(executor) = transition.data_item_offset;
     }
     executor->statement_offset = transition.next_statement;
     executor->cursor = next;

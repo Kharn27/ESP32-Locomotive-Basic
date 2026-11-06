@@ -2796,6 +2796,18 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
                 return store_error(lookup);
         }
     }
+    if (transition.data_action == 1u) {
+        size_t i, missing = 0u;
+        for (i = 0u; i < transition.data_count; ++i) {
+            size_t index;
+            BVSStatus find = bvs_find(variables, &transition.data_keys[i],
+                                      &index);
+            if (find == BVS_NOT_FOUND) ++missing;
+            else if (find != BVS_OK) return store_error(find);
+        }
+        if (missing > variables->capacity - variables->count)
+            return BE_STORE_FULL; /* No partial multi-READ assignment. */
+    }
     if (probe.length > output_capacity) {
         return BE_NO_SPACE;
     }
@@ -2833,6 +2845,18 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
           transition.for_frame.loop_statement != second_transition.for_frame.loop_statement ||
           transition.for_frame.after_cursor != second_transition.for_frame.after_cursor ||
           transition.for_frame.after_statement != second_transition.for_frame.after_statement)) ||
+        transition.data_action != second_transition.data_action ||
+        transition.data_cursor != second_transition.data_cursor ||
+        transition.data_item_offset != second_transition.data_item_offset ||
+        transition.data_count != second_transition.data_count ||
+        (transition.data_count > 0u &&
+         (!for_same_key(&transition.data_keys[0],
+                        &second_transition.data_keys[0]) ||
+          transition.data_values[0] != second_transition.data_values[0])) ||
+        (transition.data_count > 1u &&
+         (!for_same_key(&transition.data_keys[1],
+                        &second_transition.data_keys[1]) ||
+          transition.data_values[1] != second_transition.data_values[1])) ||
         assignment.present != second.present ||
         (assignment.present &&
          (assignment.key.type != second.key.type ||
@@ -2847,6 +2871,17 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
              assignment.value.data.integer != second.value.data.integer)))))) {
         /* Unreachable while the documented immutable-input contract holds. */
         return BE_BAD_PROGRAM;
+    }
+    if (commit && transition.data_action == 1u) {
+        size_t i;
+        for (i = 0u; i < transition.data_count; ++i) {
+            BasicVariableValue value = {0};
+            value.type = (uint8_t)BVT_INTEGER;
+            value.data.integer = transition.data_values[i];
+            status = store_error(bvs_assign(variables,
+                                           &transition.data_keys[i], &value));
+            if (status != BE_OK) return status; /* preflighted, unreachable */
+        }
     }
     if (commit && assignment.present) {
         status = store_error(assignment.value.type == (uint8_t)BVT_STRING ?
@@ -2892,6 +2927,10 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
     if (transition.action == BE_FLOW_CLEAR) {
         executor->while_depth = 0u;
         memset(executor->while_stack, 0, sizeof(executor->while_stack));
+    }
+    if (transition.data_action != 0u) {
+        executor->data_cursor = transition.data_cursor;
+        executor->data_item_offset = transition.data_item_offset;
     }
     executor->statement_offset = transition.next_statement;
     executor->cursor = next;

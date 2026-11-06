@@ -62,6 +62,11 @@ const char *cpc_diag_policy_category(CpcDiagCategory category)
         case CPC_DIAG_WHILE_OPERAND_MISSING: return "WHILE_OPERAND_MISSING_CPC";
         case CPC_DIAG_INTEGER_OVERFLOW: return "INTEGER_BINARY_OVERFLOW_CPC";
         case CPC_DIAG_MOD_ZERO: return "INTEGER_FB_DIVISION_BY_ZERO_CPC";
+        case CPC_DIAG_INK_IMPROPER_ARGUMENT: return "INK_IMPROPER_ARGUMENT_CPC";
+        case CPC_DIAG_PAPER_IMPROPER_ARGUMENT: return "PAPER_IMPROPER_ARGUMENT_CPC";
+        case CPC_DIAG_LOCATE_IMPROPER_ARGUMENT: return "LOCATE_IMPROPER_ARGUMENT_CPC";
+        case CPC_DIAG_BORDER_IMPROPER_ARGUMENT: return "BORDER_IMPROPER_ARGUMENT_CPC";
+        case CPC_DIAG_BORDER_OPERAND_MISSING: return "BORDER_OPERAND_MISSING_CPC";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -85,6 +90,11 @@ const char *cpc_diag_policy_message(CpcDiagCategory category)
         case CPC_DIAG_WHILE_OPERAND_MISSING: return "Operand missing";
         case CPC_DIAG_INTEGER_OVERFLOW: return "Overflow";
         case CPC_DIAG_MOD_ZERO: return "Division by zero";
+        case CPC_DIAG_INK_IMPROPER_ARGUMENT: return "Improper argument";
+        case CPC_DIAG_PAPER_IMPROPER_ARGUMENT: return "Improper argument";
+        case CPC_DIAG_LOCATE_IMPROPER_ARGUMENT: return "Improper argument";
+        case CPC_DIAG_BORDER_IMPROPER_ARGUMENT: return "Improper argument";
+        case CPC_DIAG_BORDER_OPERAND_MISSING: return "Operand missing";
         case CPC_DIAG_COUNT: break;
     }
     return "INVALID_DIAGNOSTIC";
@@ -695,6 +705,97 @@ static bool while_wend_locus(const BasicSessionRuntime *runtime,
     return true;
 }
 
+
+/* A4: the entire reached CPC statement must be exactly a sealed original
+ * AND repeat screen witness. This is not an opcode/ERR lookup: it disallows
+ * forged cache words, a colon continuation, REM/quoted tokens, extra
+ * operands, different values, and direct input. A noncommitting native
+ * preview additionally checks that the reported BE cause is genuine. */
+typedef struct {
+    const uint8_t *record;
+    size_t length;
+    BEStatus cause;
+    CpcDiagCategory category;
+    CpcDiagOrigin origin;
+} A4GraphicWitness;
+
+static bool a4_graphic_witness(const BasicSessionRuntime *runtime,
+                               const BasicProgramLine *line, BEStatus cause,
+                               CpcStepDiagnostic *diagnostic)
+{
+    static const uint8_t i1626[] = {0xa2u,0x20u,0x19u,0x10u,0x2cu,0x19u,0x1au};
+    static const uint8_t in126[] = {0xa2u,0x20u,0xf5u,0x0fu,0x2cu,0x19u,0x1au};
+    static const uint8_t i132[] = {0xa2u,0x20u,0x0fu,0x2cu,0x19u,0x20u};
+    static const uint8_t i1n1[] = {0xa2u,0x20u,0x0fu,0x2cu,0xf5u,0x0fu};
+    static const uint8_t p16[] = {0xbau,0x20u,0x19u,0x10u};
+    static const uint8_t pn1[] = {0xbau,0x20u,0xf5u,0x0fu};
+    static const uint8_t l001[] = {0xa9u,0x20u,0x0eu,0x2cu,0x0fu};
+    static const uint8_t l010[] = {0xa9u,0x20u,0x0fu,0x2cu,0x0eu};
+    static const uint8_t ln11[] = {0xa9u,0x20u,0xf5u,0x0fu,0x2cu,0x0fu};
+    static const uint8_t bn[] = {0x82u,0x20u,0xf5u,0x0fu};
+    static const uint8_t bn1[] = {0x82u,0x20u,0xf5u,0x0fu,0x2cu,0x0fu};
+    static const uint8_t bm[] = {0x82u,0x20u,0x0fu,0x2cu};
+#define A4W(bytes, reason, kind, source) \
+    {bytes, sizeof(bytes), reason, kind, source}
+    static const A4GraphicWitness verified[] = {
+        A4W(i1626, BE_INVALID_INK, CPC_DIAG_INK_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_INK_CPC_ORACLE),
+        A4W(in126, BE_INVALID_INK, CPC_DIAG_INK_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_INK_CPC_ORACLE),
+        A4W(i132, BE_INVALID_INK, CPC_DIAG_INK_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_INK_CPC_ORACLE),
+        A4W(i1n1, BE_INVALID_INK, CPC_DIAG_INK_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_INK_CPC_ORACLE),
+        A4W(p16, BE_INVALID_PAPER, CPC_DIAG_PAPER_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_PAPER_CPC_ORACLE),
+        A4W(pn1, BE_INVALID_PAPER, CPC_DIAG_PAPER_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_PAPER_CPC_ORACLE),
+        A4W(l001, BE_INVALID_LOCATE, CPC_DIAG_LOCATE_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_LOCATE_CPC_ORACLE),
+        A4W(l010, BE_INVALID_LOCATE, CPC_DIAG_LOCATE_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_LOCATE_CPC_ORACLE),
+        A4W(ln11, BE_INVALID_LOCATE, CPC_DIAG_LOCATE_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_LOCATE_CPC_ORACLE),
+        A4W(bn, BE_INVALID_BORDER, CPC_DIAG_BORDER_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_BORDER_CPC_ORACLE),
+        A4W(bn1, BE_INVALID_BORDER, CPC_DIAG_BORDER_IMPROPER_ARGUMENT,
+            CPC_DIAG_ORIGIN_NATIVE_BORDER_CPC_ORACLE),
+        A4W(bm, BE_OPERAND_MISSING, CPC_DIAG_BORDER_OPERAND_MISSING,
+            CPC_DIAG_ORIGIN_NATIVE_BORDER_CPC_ORACLE)
+    };
+#undef A4W
+    const uint8_t *body;
+    const BasicExecutor *executor;
+    uint8_t output[1] = {0u};
+    BEVideoEvent event[1];
+    size_t output_count = 0u, event_count = 0u;
+    size_t i;
+
+    if (runtime == NULL || line == NULL || diagnostic == NULL ||
+        runtime->program == NULL || runtime->executor.program != runtime->program ||
+        runtime->executor.statement_offset != 0u ||
+        runtime->executor.variables != runtime->variables ||
+        bp_validate(runtime->program) != BP_OK)
+        return false;
+    executor = &runtime->executor;
+    body = runtime->program->data + line->body_offset;
+    for (i = 0u; i < sizeof(verified) / sizeof(verified[0]); ++i) {
+        const A4GraphicWitness *w = &verified[i];
+        if (cause == w->cause && line->body_length == w->length &&
+            memcmp(body, w->record, w->length) == 0) {
+            if (be_preview_step_events((BasicExecutor *)executor,
+                        output, sizeof output, &output_count,
+                        event, 1u, &event_count) != cause)
+                return false;
+            diagnostic->category = w->category;
+            diagnostic->origin = w->origin;
+            diagnostic->line_number = line->number;
+            return true;
+        }
+    }
+    return false;
+}
+
 /* bsr_step_events() preserves failed cursor, output and RUNNING state.
  * Resolve from the real stored record BEFORE bsr_stop(), with no side
  * effects. Status numbers are host enums, never historical CPC ERR codes. */
@@ -723,7 +824,12 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
        result.executor_status!=BE_INTEGER_OVERFLOW &&
        result.executor_status!=BE_WEND_WITHOUT_WHILE &&
        result.executor_status!=BE_WHILE_WITHOUT_WEND &&
-       result.executor_status!=BE_WHILE_OPERAND_MISSING)
+       result.executor_status!=BE_WHILE_OPERAND_MISSING &&
+       result.executor_status!=BE_INVALID_INK &&
+       result.executor_status!=BE_INVALID_PAPER &&
+       result.executor_status!=BE_INVALID_LOCATE &&
+       result.executor_status!=BE_INVALID_BORDER &&
+       result.executor_status!=BE_OPERAND_MISSING)
         return diagnostic;
 
     cursor=runtime->executor.cursor;
@@ -731,6 +837,18 @@ CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
        line.offset!=runtime->executor.cursor || line.number==0U ||
        runtime->executor.statement_offset>=line.body_length)
         return diagnostic;
+    if (result.executor_status == BE_INVALID_INK ||
+        result.executor_status == BE_INVALID_PAPER ||
+        result.executor_status == BE_INVALID_LOCATE ||
+        result.executor_status == BE_INVALID_BORDER ||
+        result.executor_status == BE_OPERAND_MISSING) {
+        /* Host origin unless the identical native failed step, token
+         * stream, actual numbered line and original/repeat CPC witness
+         * all agree. No direct-source or renderer status is accepted. */
+        (void)a4_graphic_witness(runtime, &line,
+                                 result.executor_status, &diagnostic);
+        return diagnostic;
+    }
     if (result.executor_status == BE_WEND_WITHOUT_WHILE ||
         result.executor_status == BE_WHILE_WITHOUT_WEND ||
         result.executor_status == BE_WHILE_OPERAND_MISSING) {
@@ -874,6 +992,20 @@ bool cpc_diag_policy_format_step(CpcStepDiagnostic diagnostic,
               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_F5_F6_OVERFLOW_CPC_ORACLE) {
         prefix=overflow_prefix;
         prefix_length=sizeof(overflow_prefix)-1U;
+    } else if(((diagnostic.category==CPC_DIAG_INK_IMPROPER_ARGUMENT &&
+                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_INK_CPC_ORACLE) ||
+               (diagnostic.category==CPC_DIAG_PAPER_IMPROPER_ARGUMENT &&
+                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_PAPER_CPC_ORACLE) ||
+               (diagnostic.category==CPC_DIAG_LOCATE_IMPROPER_ARGUMENT &&
+                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_LOCATE_CPC_ORACLE) ||
+               (diagnostic.category==CPC_DIAG_BORDER_IMPROPER_ARGUMENT &&
+                diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_BORDER_CPC_ORACLE))) {
+        prefix=pen_prefix;
+        prefix_length=sizeof(pen_prefix)-1U;
+    } else if(diagnostic.category==CPC_DIAG_BORDER_OPERAND_MISSING &&
+              diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_BORDER_CPC_ORACLE) {
+        prefix=operand_prefix;
+        prefix_length=sizeof(operand_prefix)-1U;
     } else if(diagnostic.category==CPC_DIAG_WEND_UNEXPECTED &&
               diagnostic.origin==CPC_DIAG_ORIGIN_NATIVE_WHILE_WEND_CPC_ORACLE) {
         prefix=wend_prefix;

@@ -201,8 +201,8 @@ static int verify_case(const char *root, const char *name,
     if (exhausted) {
         CHECK(store.count == 1u && entries[0].value.data.integer == 1);
         CHECK(bsr_stop(&runtime).status == BSR_OK);
-        CHECK(runtime.executor.data_cursor == 0u &&
-              runtime.executor.data_item_offset == 0u);
+        CHECK(runtime.executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_cursor == 0u &&
+              runtime.executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_statement == 0u);
     } else {
         CHECK(store.count >= 1u);
     }
@@ -329,8 +329,8 @@ static int lifecycle(void)
     CHECK(bsr_step(&runtime, output, sizeof(output), &written).status == BSR_OK);
     CHECK(store.count == 2u && entries[1].value.data.integer == 2);
     CHECK(bsr_stop(&runtime).status == BSR_OK);
-    CHECK(runtime.executor.data_cursor == 0u &&
-          runtime.executor.data_item_offset == 0u);
+    CHECK(runtime.executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_cursor == 0u &&
+          runtime.executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_statement == 0u);
     state = bsr_submit(&runtime, (const uint8_t *)"RUN", 3u,
                        temporary, sizeof(temporary), output, sizeof(output),
                        &written);
@@ -355,8 +355,8 @@ static int lifecycle(void)
                        temporary, sizeof(temporary), output, sizeof(output),
                        &written);
     CHECK(state.status == BSR_OK && store.count == 0u &&
-          runtime.executor.data_cursor == 0u &&
-          runtime.executor.data_item_offset == 0u &&
+          runtime.executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_cursor == 0u &&
+          runtime.executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_statement == 0u &&
           program.size == 2u);
     /* After NEW, DATA:PRINT needs a sufficient print buffer: no partial
      * output even when DATA itself is syntactically valid. */

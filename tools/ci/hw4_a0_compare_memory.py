@@ -77,7 +77,7 @@ def evaluate(a0, base, head, a0_sha, base_sha, head_sha, profile):
     if profile not in PROFILES:
         raise ValueError("FAIL_CLOSED: unsupported Xtensa profile")
     if a0_sha != A0_SHA:
-        raise ValueError("FAIL_CLOSED: immutable A0 SHA mismatch")
+        raise ValueError("BASELINE_INVALID: immutable A0 SHA mismatch")
     checked_sha(base_sha)
     checked_sha(head_sha)
     if base_sha == head_sha:
@@ -148,15 +148,21 @@ def main(argv=None):
     try:
         metrics = {}
         for label in ("a0", "base", "head"):
-            metrics[label.upper()] = {**read_size(getattr(args, label + "_size")),
-                                      **read_image(getattr(args, label + "_bin"))}
+            try:
+                metrics[label.upper()] = {**read_size(getattr(args, label + "_size")),
+                                          **read_image(getattr(args, label + "_bin"))}
+            except (ValueError, OSError, UnicodeError) as exc:
+                if label == "a0":
+                    raise ValueError(f"BASELINE_INVALID: {exc}") from exc
+                raise
         result = evaluate(metrics["A0"], metrics["BASE"], metrics["HEAD"],
                           args.a0_sha, args.base_sha, args.head_sha, args.profile)
         md = markdown(result)
         exit_code = 0 if result["incremental"]["status"] == "INCREMENTAL_PASS" else 1
     except (ValueError, OSError, UnicodeError) as exc:
-        result = {"status": "FAIL_CLOSED", "error": str(exc), "profile": args.profile}
-        md = f"### HW4-A0 {args.profile}: **FAIL_CLOSED**\n\n{exc}\n"
+        status = "BASELINE_INVALID" if "BASELINE_INVALID" in str(exc) else "FAIL_CLOSED"
+        result = {"status": status, "error": str(exc), "profile": args.profile}
+        md = f"### HW4-A0 {args.profile}: **{status}**\n\n{exc}\n"
         exit_code = 2
     output_md.parent.mkdir(parents=True, exist_ok=True)
     output_json.parent.mkdir(parents=True, exist_ok=True)

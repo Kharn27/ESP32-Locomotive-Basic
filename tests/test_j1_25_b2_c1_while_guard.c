@@ -104,12 +104,104 @@ static int eight_frames(void)
     return run(&t,"END\n",8u);
 }
 
+
+/* Fail-closed, byte-atomic cross-family attempts in the last live frame:
+ * the B2 DATA offsets share two members of frame #8, so a READ/RESTORE
+ * inside WHILE must never overwrite their WHILE continuation addresses. */
+static int denied_in_eight_frames(const char *statement)
+{
+    TestContext t;
+    BasicExecutor before;
+    BasicVariableEntry entries_before[8];
+    uint8_t before_output[sizeof(t.output)];
+    size_t count, n;
+    BEStatus status;
+    uint16_t number;
+    memset(&t,0,sizeof(t));
+    CHECK(bp_init(&t.program,t.storage,sizeof(t.storage))==BP_OK);
+    CHECK(add(&t,10u,"GOTO 30")==0);
+    CHECK(add(&t,20u,"DATA 1")==0);
+    CHECK(add(&t,30u,"A%=1")==0);
+    for(number=40u;number<=110u;number=(uint16_t)(number+10u))
+        CHECK(add(&t,number,"WHILE A%=1")==0);
+    CHECK(add(&t,120u,statement)==0);
+    for(number=130u;number<=200u;number=(uint16_t)(number+10u))
+        CHECK(add(&t,number,"WEND")==0);
+    CHECK(add(&t,210u,"END")==0);
+    CHECK(bvs_init(&t.store,t.entries,8u)==BVS_OK);
+    CHECK(be_init_with_store(&t.executor,&t.program,&t.store)==BE_OK);
+    for(n=0u;n<10u;++n) {
+        size_t written=901u;
+        status=be_step(&t.executor,t.output,sizeof(t.output),&written);
+        CHECK(status==BE_OK && written==0u);
+    }
+    CHECK(t.executor.while_depth==8u);
+    CHECK(t.executor.while_stack[7].header_cursor!=0u);
+    before=t.executor;
+    memcpy(entries_before,t.entries,sizeof(entries_before));
+    memset(t.output,0x69,sizeof(t.output));
+    memcpy(before_output,t.output,sizeof(t.output));
+    count=994u;
+    status=be_step(&t.executor,t.output,sizeof(t.output),&count);
+    CHECK(status==BE_UNSUPPORTED);
+    CHECK(count==994u);
+    CHECK(memcmp(&t.executor,&before,sizeof(before))==0);
+    CHECK(memcmp(t.entries,entries_before,sizeof(entries_before))==0);
+    CHECK(memcmp(t.output,before_output,sizeof(t.output))==0);
+    CHECK(t.executor.while_depth==8u);
+    return 0;
+}
+
+/* The opposite order is also outside the sealed B2 corpus: a consumed
+ * READ cursor cannot be converted into an active WHILE frame. */
+static int denied_while_after_read(void)
+{
+    TestContext t;
+    BasicExecutor before;
+    BasicVariableEntry entries_before[8];
+    uint8_t before_output[sizeof(t.output)];
+    size_t n, count=994u;
+    BEStatus status;
+    memset(&t,0,sizeof(t));
+    CHECK(bp_init(&t.program,t.storage,sizeof(t.storage))==BP_OK);
+    CHECK(add(&t,10u,"DATA 1")==0);
+    CHECK(add(&t,20u,"READ A%")==0);
+    CHECK(add(&t,30u,"WHILE A%=1")==0);
+    CHECK(add(&t,40u,"WEND")==0);
+    CHECK(add(&t,50u,"END")==0);
+    CHECK(bvs_init(&t.store,t.entries,8u)==BVS_OK);
+    CHECK(be_init_with_store(&t.executor,&t.program,&t.store)==BE_OK);
+    for(n=0u;n<2u;++n) {
+        size_t written=994u;
+        CHECK(be_step(&t.executor,t.output,sizeof(t.output),&written)==BE_OK);
+        CHECK(written==0u);
+    }
+    CHECK(t.store.count==1u && t.entries[0].value.data.integer==1);
+    CHECK(t.executor.while_depth==0u);
+    CHECK(t.executor.while_stack[7].after_cursor!=0u);
+    before=t.executor;
+    memcpy(entries_before,t.entries,sizeof(entries_before));
+    memset(t.output,0x69,sizeof(t.output));
+    memcpy(before_output,t.output,sizeof(t.output));
+    status=be_step(&t.executor,t.output,sizeof(t.output),&count);
+    CHECK(status==BE_UNSUPPORTED);
+    CHECK(count==994u);
+    CHECK(memcmp(&t.executor,&before,sizeof(before))==0);
+    CHECK(memcmp(t.entries,entries_before,sizeof(entries_before))==0);
+    CHECK(memcmp(t.output,before_output,sizeof(t.output))==0);
+    return 0;
+}
+
 int main(void)
 {
     CHECK(skipped_family("DATA 1")==0);
     CHECK(skipped_family("READ A%")==0);
     CHECK(skipped_family("RESTORE")==0);
     CHECK(eight_frames()==0);
+    CHECK(denied_in_eight_frames("DATA 1")==0);
+    CHECK(denied_in_eight_frames("READ B%")==0);
+    CHECK(denied_in_eight_frames("RESTORE")==0);
+    CHECK(denied_while_after_read()==0);
     puts("J1.25-B2-C1 WHILE skipped DATA/READ/RESTORE and 8 frames PASS");
     return 0;
 }

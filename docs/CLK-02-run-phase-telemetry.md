@@ -31,7 +31,7 @@ Les quatre **segments de temps mur** sont exclusifs par construction au niveau d
 ## Diff minimal et coût de l'instrumentation
 
 - **Seul code matériel modifié :** `firmware/esp32_display_probe/main/hw4_c2_console.c` et un header C99 local `hw4_clk02_phase.h`. Aucune dépendance ou tâche créée, pas de DMA, framebuffer, heap ou buffer UART supplémentaire.
-- Un struct statique par RUN (phase de durée, appels, flushs/bands et garde de dépassement). Reset à `basic_run`; horodatages aux **frontières des appels existants**, pas dans la boucle d'interprétation BASIC ni par bande DMA.
+- Un struct **automatique** sur la pile existante de `app_main` CONSOLE (durées, appels, flushs/bands, garde de dépassement), transmis aux fonctions concernées par pointeur ; **0 octet BSS/DRAM supplémentaire** imputable au stockage, aucune allocation dynamique. Reset à `basic_run`; horodatages aux **frontières des appels existants**, pas dans la boucle d'interprétation BASIC ni par bande DMA. Vérifier la marge de pile réelle dans `DEVICE_MEMORY` lors du test PO.
 - `probe_clock_reads=2*(step_calls+repaint_calls+yield_calls)` estime le **nombre de sondes supplémentaires**; leur coût mur réel et l'overhead de bookkeeping restent à mesurer sur CYD. Aucun `printf` dans la boucle chaude CLK-02. Le `vTaskDelay(1)`, le quantum 8, le toucher, UART, la configuration TFT SPI40, le nombre de flushs et les appels scheduler sont inchangés.
 - `CMakeLists.txt` racine reçoit **uniquement deux ctests**, sans changement du target de production : test C99 du même accumulateur et parseur UART à falsifications.
 

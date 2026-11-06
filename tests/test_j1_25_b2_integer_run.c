@@ -259,6 +259,10 @@ static int negatives(void)
     CHECK(bt_tokenize((const uint8_t *)"READ A%,B%", 10u,
                       read, sizeof(read), &r) == BT_OK);
     CHECK(negative_case(body, n, read, r, BE_STORE_FULL, 1u, 0) == 0);
+    CHECK(bt_tokenize((const uint8_t *)"DATA 1", 6u,
+                      body, sizeof(body), &n) == BT_OK);
+    CHECK(negative_case(body, n, read, r, BE_DATA_EXHAUSTED,
+                        2u, 0) == 0); /* B% must not be partially created. */
     CHECK(negative_case(malformed, sizeof(malformed), NULL, 0u,
                         BE_BAD_SEQUENCE, 2u, 1) == 0);
     /* READ without a preceding DATA: explicit host exhaustion. */
@@ -278,11 +282,106 @@ static int negatives(void)
     return 0;
 }
 
+
+/* Same runtime across RUN, preview, STOP, numbered edit and NEW: no stale
+ * pointer into mutable program storage, and no preview-only consumption. */
+static int lifecycle(void)
+{
+    uint8_t storage[256], body[96], temporary[128], output[128];
+    BasicProgram program;
+    BasicVariableStore store;
+    BasicVariableEntry entries[2], before_entries[2];
+    BasicSessionRuntime runtime, before;
+    size_t n, written = 333u, event_written = 444u;
+    BSRResult state;
+    BEStatus status;
+    CHECK(bp_init(&program, storage, sizeof(storage)) == BP_OK);
+    CHECK(bt_tokenize((const uint8_t *)"DATA 1,2", 8u,
+                      body, sizeof(body), &n) == BT_OK);
+    CHECK(bp_put(&program, 10u, body, n) == BP_OK);
+    CHECK(bt_tokenize((const uint8_t *)"READ A%", 7u,
+                      body, sizeof(body), &n) == BT_OK);
+    CHECK(bp_put(&program, 20u, body, n) == BP_OK);
+    CHECK(bt_tokenize((const uint8_t *)"READ B%", 7u,
+                      body, sizeof(body), &n) == BT_OK);
+    CHECK(bp_put(&program, 30u, body, n) == BP_OK);
+    CHECK(bt_tokenize((const uint8_t *)"END", 3u,
+                      body, sizeof(body), &n) == BT_OK);
+    CHECK(bp_put(&program, 40u, body, n) == BP_OK);
+    CHECK(bvs_init(&store, entries, 2u) == BVS_OK);
+    CHECK(bsr_init_with_store(&runtime, &program, &store).status == BSR_OK);
+    state = bsr_submit(&runtime, (const uint8_t *)"RUN", 3u,
+                       temporary, sizeof(temporary), output, sizeof(output),
+                       &written);
+    CHECK(state.status == BSR_OK && written == 0u);
+    CHECK(bsr_step(&runtime, output, sizeof(output), &written).status == BSR_OK);
+    before = runtime;
+    memcpy(before_entries, entries, sizeof(entries));
+    written = 333u;
+    event_written = 444u;
+    state = bsr_preview_step_events(&runtime, output, sizeof(output),
+                                    &written, NULL, 0u, &event_written);
+    CHECK(state.status == BSR_OK && written == 0u && event_written == 0u);
+    CHECK(memcmp(&runtime, &before, sizeof(runtime)) == 0);
+    CHECK(memcmp(entries, before_entries, sizeof(entries)) == 0);
+    CHECK(bsr_step(&runtime, output, sizeof(output), &written).status == BSR_OK);
+    CHECK(store.count == 1u && entries[0].value.data.integer == 1);
+    CHECK(bsr_step(&runtime, output, sizeof(output), &written).status == BSR_OK);
+    CHECK(store.count == 2u && entries[1].value.data.integer == 2);
+    CHECK(bsr_stop(&runtime).status == BSR_OK);
+    CHECK(runtime.executor.data_cursor == 0u &&
+          runtime.executor.data_item_offset == 0u);
+    state = bsr_submit(&runtime, (const uint8_t *)"RUN", 3u,
+                       temporary, sizeof(temporary), output, sizeof(output),
+                       &written);
+    CHECK(state.status == BSR_OK && store.count == 0u);
+    CHECK(bsr_step(&runtime, output, sizeof(output), &written).status == BSR_OK);
+    CHECK(bsr_step(&runtime, output, sizeof(output), &written).status == BSR_OK);
+    CHECK(store.count == 1u && entries[0].value.data.integer == 1);
+    CHECK(bsr_stop(&runtime).status == BSR_OK);
+    state = bsr_submit(&runtime, (const uint8_t *)"10 DATA 9", 9u,
+                       temporary, sizeof(temporary), output, sizeof(output),
+                       &written);
+    CHECK(state.status == BSR_OK);
+    state = bsr_submit(&runtime, (const uint8_t *)"RUN", 3u,
+                       temporary, sizeof(temporary), output, sizeof(output),
+                       &written);
+    CHECK(state.status == BSR_OK && store.count == 0u);
+    CHECK(bsr_step(&runtime, output, sizeof(output), &written).status == BSR_OK);
+    CHECK(bsr_step(&runtime, output, sizeof(output), &written).status == BSR_OK);
+    CHECK(store.count == 1u && entries[0].value.data.integer == 9);
+    CHECK(bsr_stop(&runtime).status == BSR_OK);
+    state = bsr_submit(&runtime, (const uint8_t *)"NEW", 3u,
+                       temporary, sizeof(temporary), output, sizeof(output),
+                       &written);
+    CHECK(state.status == BSR_OK && store.count == 0u &&
+          runtime.executor.data_cursor == 0u &&
+          runtime.executor.data_item_offset == 0u &&
+          program.size == 2u);
+    /* After NEW, DATA:PRINT needs a sufficient print buffer: no partial
+     * output even when DATA itself is syntactically valid. */
+    CHECK(bt_tokenize((const uint8_t *)"DATA 1:PRINT #8,\"BEFORE\"",
+                      strlen("DATA 1:PRINT #8,\"BEFORE\""),
+                      body, sizeof(body), &n) == BT_OK);
+    CHECK(bp_put(&program, 10u, body, n) == BP_OK);
+    CHECK(be_init_with_store(&runtime.executor, &program, &store) == BE_OK);
+    before = runtime;
+    memset(output, 0xa5, sizeof(output));
+    written = 333u;
+    status = be_step(&runtime.executor, output, 1u, &written);
+    CHECK(status == BE_NO_SPACE && written == 333u &&
+          output[0] == 0xa5u &&
+          memcmp(&runtime, &before, sizeof(runtime)) == 0 &&
+          store.count == 0u);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     size_t i, j;
     CHECK(argc == 2);
     CHECK(negatives() == 0);
+    CHECK(lifecycle() == 0);
     for (i = 0u; i < sizeof(positives)/sizeof(positives[0]); ++i) {
         for (j = 0u; j < sizeof(sessions)/sizeof(sessions[0]); ++j) {
             CHECK(verify_case(argv[1], positives[i], sessions[j],

@@ -23,6 +23,11 @@ typedef enum {
     CPC_DIAG_WHILE_OPERAND_MISSING, /* J1.24-A two witnesses */
     CPC_DIAG_INTEGER_OVERFLOW, /* A3 F5/F6 exact ROM witnesses */
     CPC_DIAG_MOD_ZERO, /* A3 FB exact ROM witnesses */
+    CPC_DIAG_INK_IMPROPER_ARGUMENT, /* A4 4 original/repeat screen witnesses */
+    CPC_DIAG_PAPER_IMPROPER_ARGUMENT, /* A4 P16/PN1 */
+    CPC_DIAG_LOCATE_IMPROPER_ARGUMENT, /* A4 three L10 witnesses */
+    CPC_DIAG_BORDER_IMPROPER_ARGUMENT, /* A4 B_NEG/B_NEG_01 */
+    CPC_DIAG_BORDER_OPERAND_MISSING, /* A4 B_MISSING only */
     CPC_DIAG_COUNT
 } CpcDiagCategory;
 
@@ -38,7 +43,11 @@ typedef enum {
     CPC_DIAG_ORIGIN_NATIVE_IF_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_WHILE_WEND_CPC_ORACLE,
     CPC_DIAG_ORIGIN_NATIVE_F5_F6_OVERFLOW_CPC_ORACLE,
-    CPC_DIAG_ORIGIN_NATIVE_FB_ZERO_CPC_ORACLE
+    CPC_DIAG_ORIGIN_NATIVE_FB_ZERO_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_NATIVE_INK_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_NATIVE_PAPER_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_NATIVE_LOCATE_CPC_ORACLE,
+    CPC_DIAG_ORIGIN_NATIVE_BORDER_CPC_ORACLE
 } CpcDiagOrigin;
 
 typedef struct {
@@ -57,7 +66,9 @@ bool cpc_diag_policy_next_locus(const BasicExecutor *executor, BEStatus reason,
                                  uint16_t *line_number);
 CpcStepDiagnostic cpc_diag_policy_step(BSRResult result,
                                         const BasicSessionRuntime *runtime);
-/* A2 F9 and A3 bounded F5/F6/FB; all other arithmetic stays host-only. */
+/* A2 F9, A3 bounded F5/F6/FB and A4 sealed graphic arguments only.
+ * A4 requires an exact reached CPC tokenized record AND native preview
+ * with the same cause: a BEStatus alone is never ROM provenance. */
 /* One LF-terminated diagnostic. Host fallback is ERROR\n, with no fabricated
  * line number; invalid fabricated CPC contexts fail closed, writing nothing.
  * format_step is also a byte-exact regression seam, without heap or printf. */

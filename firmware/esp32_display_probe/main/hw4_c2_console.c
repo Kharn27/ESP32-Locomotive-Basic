@@ -184,8 +184,6 @@ static void disp_report(const char *stage)
 
 static Hw4TouchT1 s_touch; /* CONSOLE only; 0 heap, 0 extra tasks */
 static Hw4RunScheduler s_run_scheduler;
-/* CLK-02: only one bounded aggregate in the existing CONSOLE task. */
-static Hw4Clk02Phase s_clk02;
 /* J1.21-B2b: tokenizer scratch is inactive for the whole RUN. Reuse it for
  * private preview without increasing static DRAM by another 4096 bytes.
  * The public events must NOT alias that union during RUN. */
@@ -410,7 +408,7 @@ static bool touch_init(void)
            cyd_lcd_current_orientation());
     return true;
 }
-static bool touch_poll(void)
+static bool touch_poll(Hw4Clk02Phase *phase)
 {
     uint64_t elapsed=0U;
     const uint64_t now=touch_now_ms();
@@ -433,7 +431,7 @@ static bool touch_poll(void)
         const uint64_t full_started_us=during_run ? disp_clock(NULL):0U;
         if(!repaint_full()) return false; /* single DMA attempt per band */
         if(during_run)
-            hw4_clk02_record(&s_clk02,HW4_CLK02_FULL,full_started_us,
+            hw4_clk02_record(phase,HW4_CLK02_FULL,full_started_us,
                              disp_clock(NULL),0U,LCD_HEIGHT/LCD_ROWS_PER_BAND);
         printf("HW4-TOUCH-T1 SHORT_ROTATE orientation=%u elapsed_ms=%llu "
                "program_preserved=1 repaint=full\n",
@@ -632,7 +630,7 @@ static bool basic_submit(const uint8_t *source,size_t length,
     return true;
 }
 /* RUN submitted by the real BSR; this starts, but does not execute, it. */
-static bool basic_run(void)
+static bool basic_run(Hw4Clk02Phase *phase)
 {
     hw4_run_break_input_init(&s_run_input);
     if(!hw4_run_scheduler_init(&s_run_scheduler,&s_basic.runtime))
@@ -643,7 +641,7 @@ static bool basic_run(void)
     s_run_preview.event_capacity=PEN_EVENT_CAPACITY;
     if(!hw4_run_scheduler_bind_preview(&s_run_scheduler,&s_run_preview))
         return fail("RUN_SCHEDULER_SCRATCH",-1);
-    hw4_clk02_reset(&s_clk02); /* strictly before RUN_DURATION begins */
+    hw4_clk02_reset(phase); /* strictly before RUN_DURATION begins */
     s_run_active=true;
     s_run_quanta=0U;
     s_run_break_requested_us=0U;
@@ -659,7 +657,7 @@ static bool basic_run(void)
     s_run_profile_started_us=disp_clock(NULL);
     return true;
 }
-static bool basic_run_slice(void)
+static bool basic_run_slice(Hw4Clk02Phase *phase)
 {
     Hw4RunReceiver receiver={run_preflight,run_replay,NULL,NULL};
     size_t event_count=0U;
@@ -670,7 +668,7 @@ static bool basic_run_slice(void)
     slice=hw4_run_scheduler_slice(&s_run_scheduler,RUN_QUANTUM,&receiver,
                        s_basic.output,sizeof(s_basic.output),&s_basic.written,
                        s_run_public_events,PEN_EVENT_CAPACITY,&event_count);
-    hw4_clk02_record(&s_clk02,HW4_CLK02_STEP,step_started_us,
+    hw4_clk02_record(phase,HW4_CLK02_STEP,step_started_us,
                      disp_clock(NULL),0U,0U);
     if(s_run_quanta!=SIZE_MAX) ++s_run_quanta;
     if(slice.state==HW4_RUN_YIELDED) {
@@ -681,8 +679,8 @@ static bool basic_run_slice(void)
         if(!repaint_dirty()) return false;
         const uint64_t repaint_ended_us=disp_clock(NULL);
         if(s_lcd_metrics.flushes<flushes_before ||
-           s_lcd_metrics.bands<bands_before) s_clk02.invalid=true;
-        else hw4_clk02_record(&s_clk02,HW4_CLK02_DIRTY,
+           s_lcd_metrics.bands<bands_before) phase->invalid=true;
+        else hw4_clk02_record(phase,HW4_CLK02_DIRTY,
                               repaint_started_us,repaint_ended_us,
                               s_lcd_metrics.flushes-flushes_before,
                               s_lcd_metrics.bands-bands_before);
@@ -758,11 +756,11 @@ static bool basic_run_slice(void)
      * Call windows are disjoint. Residual includes UART/touch/log/probes,
      * and is NOT measured FreeRTOS wait time. */
     uint64_t other_wall_us=0U;
-    const bool accounting_ok=hw4_clk02_finish(&s_clk02,run_core_us,
+    const bool accounting_ok=hw4_clk02_finish(phase,run_core_us,
                                               &other_wall_us);
     const uint64_t probe_clock_reads=2U*
-        ((uint64_t)s_clk02.step_calls+(uint64_t)s_clk02.repaint_calls+
-         (uint64_t)s_clk02.yield_calls);
+        ((uint64_t)phase->step_calls+(uint64_t)phase->repaint_calls+
+         (uint64_t)phase->yield_calls);
     printf("HW4-CLK02 RUN_PHASE_SUMMARY version=1 run=%u "
            "duration_us=%llu step_call_wall_us=%llu "
            "repaint_call_wall_us=%llu yield_call_wall_us=%llu "
@@ -776,13 +774,13 @@ static bool basic_run_slice(void)
            "yield_scope=cooperative_vTaskDelay_call "
            "attribution=task_wall_not_cpu_or_gram sha=%s\n",
            s_disp_run_seq,(unsigned long long)run_core_us,
-           (unsigned long long)s_clk02.step_wall_us,
-           (unsigned long long)s_clk02.repaint_wall_us,
-           (unsigned long long)s_clk02.yield_wall_us,
+           (unsigned long long)phase->step_wall_us,
+           (unsigned long long)phase->repaint_wall_us,
+           (unsigned long long)phase->yield_wall_us,
            (unsigned long long)other_wall_us,
-           (unsigned)s_clk02.step_calls,(unsigned)s_clk02.repaint_calls,
-           (unsigned)s_clk02.repaint_flushes,(unsigned)s_clk02.repaint_bands,
-           (unsigned)s_clk02.full_repaints,(unsigned)s_clk02.yield_calls,
+           (unsigned)phase->step_calls,(unsigned)phase->repaint_calls,
+           (unsigned)phase->repaint_flushes,(unsigned)phase->repaint_bands,
+           (unsigned)phase->full_repaints,(unsigned)phase->yield_calls,
            (unsigned long long)probe_clock_reads,(unsigned)accounting_ok,
            HW4_SHOT_GIT_SHA);
     memory_report("run_terminal");
@@ -799,7 +797,7 @@ static bool is_command(const uint8_t *source,size_t n,const char *word)
     }
     return i==n && word[i]=='\0';
 }
-static bool diagnostic_demo(void)
+static bool diagnostic_demo(Hw4Clk02Phase *phase)
 {
     static const char *const source[]={
         "NEW", "10 A%=2", "20 B%=A%+3", "30 PRINT B%", "40 END", "RUN"
@@ -809,9 +807,9 @@ static bool diagnostic_demo(void)
         if(!basic_submit((const uint8_t *)source[i],strlen(source[i]),NULL))
             return false;
     }
-    return basic_run();
+    return basic_run(phase);
 }
-static bool execute_line(void)
+static bool execute_line(Hw4Clk02Phase *phase)
 {
     const uint8_t *source=s_line.data;
     size_t length=s_line.length;
@@ -835,7 +833,7 @@ static bool execute_line(void)
         s_scroll_reported=0U;
         transition=CPC_READY_HOST_CLS; /* screen-only, no CPC equivalent */
     } else if(is_command(source,length,"!DEMO")) {
-        if(!diagnostic_demo()) return false;
+        if(!diagnostic_demo(phase)) return false;
         if(s_run_active) {
             s_run_ready_transition=CPC_READY_HOST_DEMO;
             return true;
@@ -858,7 +856,7 @@ static bool execute_line(void)
             transition=CPC_READY_BASIC_DIAGNOSTIC;
         } else {
             if(run && s_basic.runtime.state==BSR_RUNNING) {
-                if(!basic_run()) return false;
+                if(!basic_run(phase)) return false;
                 return true; /* RUN yields, no Ready/prompt until terminal */
             }
             transition=run ? CPC_READY_RUN_RETURN :
@@ -898,6 +896,9 @@ static bool uart_init(void)
 void app_main(void)
 {
     const esp_app_desc_t *desc=esp_app_get_description();
+    /* CLK-02: one bounded automatic aggregate in existing 6144-byte CONSOLE
+     * app_main stack; zero additional static DRAM / heap / task allocation. */
+    Hw4Clk02Phase phase={0};
     printf("HW4-C2 START project=%s version=%s idf=%s "
            "target=esp32 ON_DEVICE_UNVERIFIED\n",
            desc->project_name,desc->version,esp_get_idf_version());
@@ -971,7 +972,7 @@ void app_main(void)
     printf("HW4-C3-B2-C1 ECHO_POLICY idle_ms=%u batch_max=%u "
            "command_flush=1 dma_fail_stop=1\n",ECHO_IDLE_MS,ECHO_MAX_BYTES);
     for(;;) {
-        if(!touch_poll()) return;
+        if(!touch_poll(&phase)) return;
         if(s_run_active) {
             /* UART is polled before every quantum; no editor/SHOT in RUN. */
             for(unsigned i=0U;i<RUN_UART_POLL_BYTES;++i) {
@@ -1007,13 +1008,13 @@ void app_main(void)
                     break;
                 }
             }
-            if(!basic_run_slice()) return;
+            if(!basic_run_slice(&phase)) return;
             /* Observe the existing yield call; never alter its cadence. */
             const bool count_yield=s_run_active;
             const uint64_t yield_started_us=count_yield ? disp_clock(NULL):0U;
             vTaskDelay(1); /* mandatory cooperative yield between quanta */
             if(count_yield)
-                hw4_clk02_record(&s_clk02,HW4_CLK02_YIELD,
+                hw4_clk02_record(&phase,HW4_CLK02_YIELD,
                                  yield_started_us,disp_clock(NULL),0U,0U);
             continue;
         }
@@ -1146,7 +1147,7 @@ void app_main(void)
              * composed BEFORE exactly one repaint_dirty(). */
             echo_batch_record(echo_pending,true);
             echo_pending=0U;
-            if(!execute_line()) return;
+            if(!execute_line(&phase)) return;
             uart_line_ack(&s_line);
             memory_report("after_line");
             lcd_metrics_report("after_line");

@@ -36,8 +36,8 @@ def sample(full=0):
     # CLK-01 fixture remains untouched. Substitute the boot + RUN attestation
     # expected for the new HEAD; add one post-terminal line per RUN.
     old = example()
-    old = old.replace("c8cec8b", SHA[:7]).replace(
-        "c8cec8b1b4d0cab553cdc8b97b751aef3dd1370d", SHA)
+    old = old.replace("c8cec8b1b4d0cab553cdc8b97b751aef3dd1370d", SHA)
+    old = old.replace("version=c8cec8b", "version=" + SHA[:7])
     out = []
     i = 0
     for row in old.splitlines():

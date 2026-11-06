@@ -1111,3 +1111,18 @@ if(BUILD_TESTING)
     add_test(NAME hw4_esc_break_a_transport_contract
              COMMAND test_hw4_cpc_escape_contract)
 endif()
+
+# CLK-02: identical HW4 phase accounting C99 unit and strict UART falsifications.
+# Testing-only additions: no product target or scheduler/render linkage changes.
+if(BUILD_TESTING)
+    add_executable(test_clk_02_phase tests/test_clk_02_phase.c)
+    target_include_directories(test_clk_02_phase PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main)
+    target_compile_options(test_clk_02_phase PRIVATE
+        -std=c99 -Wall -Wextra -Wpedantic -Wconversion -Werror)
+    add_test(NAME clk_02_run_phase_accounting COMMAND test_clk_02_phase)
+    add_test(NAME clk_02_uart_adversarial COMMAND
+        ${Python3_EXECUTABLE} -m unittest discover
+        -s "${CMAKE_CURRENT_SOURCE_DIR}/tests"
+        -p "test_clk_02_uart.py" -v)
+endif()

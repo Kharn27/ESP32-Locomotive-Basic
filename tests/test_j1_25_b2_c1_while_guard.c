@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define CHECK(x) do { if (!(x)) { \
-  fprintf(stderr,"%s:%d: %s\\n",__FILE__,__LINE__,#x); return 1; \
+  fprintf(stderr,"%s:%d: %s\n",__FILE__,__LINE__,#x); return 1; \
 } } while (0)
 
 typedef struct {
@@ -44,7 +44,7 @@ static int run(TestContext *t, const char *expected,
             break;
         }
         if(st!=BE_OK) {
-            fprintf(stderr,"WHILE C1 status=%d step=%zu cursor=%zu depth=%zu\\n",
+            fprintf(stderr,"WHILE C1 status=%d step=%zu cursor=%zu depth=%zu\n",
                     (int)st,step,t->executor.cursor,t->executor.while_depth);
             return 1;
         }
@@ -80,7 +80,7 @@ static int skipped_family(const char *unreached)
     CHECK(add(&t,70u,"WEND")==0);
     CHECK(add(&t,80u,"PRINT #8,\"END\"")==0);
     CHECK(add(&t,90u,"END")==0);
-    return run(&t,"T\\nEND\\n",1u);
+    return run(&t,"T\nEND\n",1u);
 }
 
 /* Eight nested live WHILE frames; line 20 remains unreachable and must
@@ -101,7 +101,7 @@ static int eight_frames(void)
         CHECK(add(&t,number,"WEND")==0);
     CHECK(add(&t,210u,"PRINT #8,\"END\"")==0);
     CHECK(add(&t,220u,"END")==0);
-    return run(&t,"END\\n",8u);
+    return run(&t,"END\n",8u);
 }
 
 int main(void)

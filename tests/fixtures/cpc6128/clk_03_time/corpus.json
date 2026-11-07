@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "mission": "CLK-03",
+  "status": "SEALED_INPUTS_NOT_OBSERVATIONS",
+  "cases": [
+    {"id":"D01_DIRECT", "kind":"direct", "question":"Direct print, rapid readings and delayed direct reading; display is separate from printer", "commands":["MODE 1","PRINT #8,TIME","PRINT #8,TIME","PRINT TIME","CAP32_DELAY CAP32_DELAY","PRINT #8,TIME"], "printer_numeric_count":3},
+    {"id":"D02_NEW_RUN", "kind":"direct", "question":"NEW and RUN in a single CPC process; observe continuous/reset clock without predicting it", "commands":["MODE 1","PRINT #8,TIME","NEW","PRINT #8,TIME","10 PRINT #8,TIME","20 END","RUN","RUN","PRINT #8,TIME"], "printer_numeric_count":5},
+    {"id":"P01_NUMBERED", "kind":"program", "question":"Numbered PRINT and LIST; RAM FF46 prefix", "lines":["10 PRINT #8,TIME","20 END"], "printer_numeric_count":1},
+    {"id":"P02_RAPID", "kind":"program", "question":"Three adjacent reads, repeatability and tick granularity", "lines":["10 PRINT #8,TIME","20 PRINT #8,TIME","30 PRINT #8,TIME","40 END"], "printer_numeric_count":3},
+    {"id":"P03_SHORT", "kind":"program", "question":"SHORT finite loop and start/end TIME readings", "lines":["10 PRINT #8,TIME","20 FOR I=1 TO 300","30 NEXT I","40 PRINT #8,TIME","50 END"], "printer_numeric_count":2},
+    {"id":"P04_LONG", "kind":"program", "question":"LONG finite loop and start/end TIME readings", "lines":["10 PRINT #8,TIME","20 FOR I=1 TO 9000","30 NEXT I","40 PRINT #8,TIME","50 END"], "printer_numeric_count":2},
+    {"id":"P05_EXPRESSION", "kind":"program", "question":"TIME as value in arithmetic expression and conditional", "lines":["10 PRINT #8,TIME*2","20 IF TIME>=0 THEN PRINT #8,1","30 END"], "printer_numeric_count":2},
+    {"id":"P06_BOUNDARY", "kind":"program", "question":"Observe TIME as large value against 32767 threshold; not a forced overflow test", "lines":["10 PRINT #8,TIME","20 PRINT #8,TIME>32767","30 END"], "printer_numeric_count":2},
+    {"id":"N01_PARENS", "kind":"direct_diagnostic", "question":"TIME(1): record screen and ERR/ERL if probe remains runnable", "commands":["MODE 1","PRINT TIME(1)"], "printer_numeric_count":0},
+    {"id":"N02_ASSIGN", "kind":"direct_diagnostic", "question":"TIME=0: record screen and ERR/ERL if probe remains runnable", "commands":["MODE 1","TIME=0"], "printer_numeric_count":0}
+  ]
+}

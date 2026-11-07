@@ -30,9 +30,43 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "ae07e039a08f6fff66f752228dc2ebed3fcf4220" || {
-            echo "STOP: main drift not authorised"; exit 6;
+          # C4-R1 #338: accept *only* the known CLK-03 tip; no descendant.
+          EXPECTED_MAIN=03f83c39e6f9ed4daeddb1ed93a989a35d726e30
+          PREVIOUS_MAIN=ae07e039a08f6fff66f752228dc2ebed3fcf4220
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | cut -f1)"
+          echo "C4_R1_REMOTE_MAIN=$REMOTE_MAIN"
+          echo "C4_R1_APPROVED_MAIN=$EXPECTED_MAIN PREVIOUS_MAIN=$PREVIOUS_MAIN"
+          test "$REMOTE_MAIN" = "$EXPECTED_MAIN" || {
+            echo "STOP: main differs from the exact C4-R1 authorized CLK-03 tip"; exit 6;
           }
+          git cat-file -e "$EXPECTED_MAIN^{commit}"
+          test "$(git rev-parse "$EXPECTED_MAIN^")" = "$PREVIOUS_MAIN" || {
+            echo "STOP: CLK-03 must have the exact previously approved parent"; exit 7;
+          }
+          test "$(git merge-base "$PREVIOUS_MAIN" "$EXPECTED_MAIN")" = "$PREVIOUS_MAIN"
+          test "$(git rev-list --count "$PREVIOUS_MAIN..$EXPECTED_MAIN")" = 1
+          git show --no-patch --format='C4_R1_APPROVED_COMMIT=%H%nC4_R1_PARENTS=%P%nC4_R1_SUBJECT=%s' "$EXPECTED_MAIN"
+          # Assert exact filename/status allowlist; no broad subdirectory wildcard.
+          EXPECTED_DIFF="$(cat <<'CLK03_ALLOWED_DIFF'
+          A	.github/workflows/clk-03-acquisition.yml
+          A	docs/CLK-03-cpc-time-oracle.md
+          A	tests/fixtures/cpc6128/clk_03_time/corpus.json
+          A	tests/test_clk_03_time.py
+          M	tools/ci/opt3_routing.py
+          A	tools/clk_03_cpc_time.py
+          CLK03_ALLOWED_DIFF
+          )"
+          ACTUAL_DIFF="$(git diff --name-status "$PREVIOUS_MAIN" "$EXPECTED_MAIN")"
+          printf 'C4_R1_CLK03_DIFF_START\n%s\nC4_R1_CLK03_DIFF_END\n' "$ACTUAL_DIFF"
+          test "$ACTUAL_DIFF" = "$EXPECTED_DIFF" || {
+            echo "STOP: unexpected path or status in CLK-03"; exit 8;
+          }
+          git diff --stat "$PREVIOUS_MAIN" "$EXPECTED_MAIN"
+          git diff --check "$PREVIOUS_MAIN" "$EXPECTED_MAIN"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$EXPECTED_MAIN" || {
+            echo "STOP: main advanced during C4-R1 provenance verification"; exit 6;
+          }
+          echo "C4_R1_EXACT_CLK03_MAIN_AND_SIX_FILE_DIFF=PASS"
           git cat-file -e e500864b3be612a325559259250f41cc35b5252b^{commit}
           git cat-file -e e0085a9e2d3b601359fc44fcfa3ea83430fc7056^{commit}
           bash -n tools/lab/j1_25_b2_c4_build.sh

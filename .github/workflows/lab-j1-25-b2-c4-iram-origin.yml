@@ -1,0 +1,115 @@
+# LAB_ONLY_NEVER_MERGE — J1.25-B2-C4 #338
+# Does not change or bypass historical RENDER-A.
+name: LAB J1.25-B2-C4 origin-of-220B strict SPI40
+on:
+  push:
+    branches:
+      - lab/j1-25-b2-c4-iram-origin
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: lab-j1-25-b2-c4-origin
+  cancel-in-progress: false
+
+jobs:
+  two-clean-e500-builds:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify pinned main, source refs, scripts and historical gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "ae07e039a08f6fff66f752228dc2ebed3fcf4220" || {
+            echo "STOP: main drift not authorised"; exit 6;
+          }
+          git cat-file -e e500864b3be612a325559259250f41cc35b5252b^{commit}
+          git cat-file -e e0085a9e2d3b601359fc44fcfa3ea83430fc7056^{commit}
+          bash -n tools/lab/j1_25_b2_c4_build.sh
+          python3 -m py_compile tools/lab/j1_25_b2_c4_analyze.py
+          test "$(git show ae07e039a08f6fff66f752228dc2ebed3fcf4220:tools/ci/hw4_render_a_memory.py | sha256sum | cut -d' ' -f1)" = "$(sha256sum tools/ci/hw4_render_a_memory.py | cut -d' ' -f1)"
+          echo "C4_PINS_AND_GATE_UNCHANGED=PASS"
+      - name: e500 at 40 MHz, two cold ESP-IDF builds (C3 Docker digest)
+        run: bash tools/lab/j1_25_b2_c4_build.sh e500
+      - uses: actions/upload-artifact@v4.6.2
+        if: always()
+        with:
+          name: c4-spi40-e500
+          retention-days: 30
+          if-no-files-found: warn
+          path: reports/c4/
+
+  analysis-and-gate:
+    needs: two-clean-e500-builds
+    if: always()
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Retrieve C4 new e500 repetitions
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: c4-spi40-e500
+          path: reports/c4
+      - name: Reuse C3 main e008 repetitions
+        continue-on-error: true
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: c3-spi40-main_e008
+          run-id: 42239047408
+          github-token: ${{ github.token }}
+          path: reports/c3
+      - name: Reuse C3 immutable RENDER-A reference
+        continue-on-error: true
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: c3-spi40-ref
+          run-id: 42239047408
+          github-token: ${{ github.token }}
+          path: reports/c3
+      - name: Qualify C3 e008 build for comparison
+        id: qualify
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p reports/c4-summary
+          python3 tools/lab/j1_25_b2_c4_analyze.py --qualify-only 2>&1 | tee reports/c4-summary/qualification.log
+          rc=${PIPESTATUS[0]}
+          case "$rc" in
+            0) echo "fallback=false" >> "$GITHUB_OUTPUT";;
+            3) echo "fallback=true" >> "$GITHUB_OUTPUT";;
+            *) echo "MEASUREMENT_INVALID qualification rc=$rc"; exit "$rc";;
+          esac
+      - name: ONLY IF C3 impossible, two clean e008 builds
+        if: steps.qualify.outputs.fallback == 'true'
+        shell: bash
+        run: bash tools/lab/j1_25_b2_c4_build.sh main_e008
+      - name: Comparative Xtensa diagnostics and historical gate (unaltered)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/lab/j1_25_b2_c4_analyze.py | tee reports/c4-summary/analysis.log
+          cat reports/c4-summary/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4.6.2
+        if: always()
+        with:
+          name: c4-spi40-diagnostic
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            reports/c4-summary/
+            reports/c4/main_e008/

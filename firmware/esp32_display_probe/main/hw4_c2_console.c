@@ -818,11 +818,48 @@ static bool execute_line(Hw4Clk02Phase *phase)
         printf("%02x",(unsigned)source[i]);
     if(length>32U) printf("...");
     printf("\n");
+    /* J1.21-C2: C1 alone classifies direct CLS. Prepare outside submit/RUN:
+     * source (UART E3), output, counters and the reused TEMP/events union
+     * are disjoint at their FULL capacities. No additional static buffer.
+     * Check the complete video step BEFORE end_line mutates the cursor. */
+    bool direct_cls=false;
+    size_t direct_events=0U;
+    if(s_basic.runtime.state==BSR_IDLE) {
+        const BSRResult prepared=bsr_prepare_direct_events(
+            &s_basic.runtime,source,length,
+            s_basic.output,sizeof(s_basic.output),&s_basic.written,
+            s_basic.scratch.events,PEN_EVENT_CAPACITY,&direct_events);
+        if(prepared.status==BSR_OK) {
+            if(s_basic.written!=0U || direct_events!=1U ||
+               s_basic.scratch.events[0].type!=BE_VIDEO_CLEAR_TEXT ||
+               s_basic.scratch.events[0].print_offset!=0U)
+                return fail("DIRECT_CLS_CONTRACT",-1);
+            const Hw4PenStatus preflight=hw4_pen_preflight(
+                &s_text,s_basic.output,s_basic.written,
+                s_basic.scratch.events,direct_events);
+            if(preflight!=HW4_PEN_OK)
+                return fail("DIRECT_CLS_PREFLIGHT",(int)preflight);
+            direct_cls=true;
+        }
+        /* Unsupported/host/numbered commands retain their legacy path,
+         * including its existing diagnostic and RUN/LIST/NEW policy. */
+    }
     if(!cpc_uart_console_end_line(&s_text))
         return fail("INPUT_EOL",-1);
     CpcReadyTransition transition=CPC_READY_UNCHARACTERIZED_DIRECT;
     const bool shot=is_command(source,length,"!SHOT");
-    if(shot) {
+    if(direct_cls) {
+        const Hw4PenStatus replay=hw4_pen_replay(
+            &s_text,s_basic.output,s_basic.written,
+            s_basic.scratch.events,direct_events);
+        if(replay!=HW4_PEN_OK)
+            return fail("DIRECT_CLS_REPLAY",(int)replay); /* FAIL_STOP */
+        printf("J1.21-C2 DIRECT_CLS event=BE_VIDEO_CLEAR_TEXT count=1 "
+               "print_bytes=0 program_preserved=1 palette_preserved=1 "
+               "ready_policy=DIRECT_UNKNOWN\n");
+        /* No extra Ready: D_FULL cannot isolate Ready/echo/cursor. The
+         * existing E3 prompt is reconstructed by prompt() below. */
+    } else if(shot) {
         printf("HW4-SHOT-A HOST_COMMAND command=!SHOT basic_preserved=1\n");
     } else if(is_command(source,length,"!CLS")) {
         printf("HW4-C2 DIAGNOSTIC_SCREEN_CLEAR source=!CLS "

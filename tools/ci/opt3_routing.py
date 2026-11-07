@@ -288,8 +288,8 @@ def audit(sources):
            "CLK03_FILTER_CONTRACT_MISMATCH")
     # Restrict the isolated workflow to its two approved event sources.
     # The exact five paths above bind pull_request; workflow_dispatch is manual.
-    events = re.findall(r"(?m)^  ([a-z][\\w-]*):",
-                        clk03_src.split("\\npermissions:", 1)[0])
+    events = re.findall(r"(?m)^  ([a-z][\w-]*):",
+                        clk03_src.split("\npermissions:", 1)[0])
     demand(events == ["pull_request", "workflow_dispatch"],
            "CLK03_EVENT_CONTRACT_MISMATCH")
     demand(CLK03_WORKFLOW in triggered_names(
@@ -1009,7 +1009,7 @@ def clk03_negative_tests(sources):
     """In-memory falsifications: keep CLK-03 in its own closed CPC family."""
     original = sources[CLK03_WORKFLOW]
     for required in CLK03_PATHS:
-        needle = "      - '" + required + "'\\n"
+        needle = "      - '" + required + "'\n"
         demand(original.count(needle) == 1,
                "CLK03_NEGATIVE_INERT_" + required)
         mutated = {**sources, CLK03_WORKFLOW: original.replace(needle, "", 1)}
@@ -1048,9 +1048,9 @@ def clk03_negative_tests(sources):
             "CLK03_FILTER_CONTRACT_MISMATCH"),
         "DUPLICATE_PATH": (
             {**sources, CLK03_WORKFLOW: original.replace(
-                "      - 'tools/clk_03_*'\\n",
-                "      - 'tools/clk_03_*'\\n"
-                "      - 'tools/clk_03_*'\\n", 1)},
+                "      - 'tools/clk_03_*'\n",
+                "      - 'tools/clk_03_*'\n"
+                "      - 'tools/clk_03_*'\n", 1)},
             "CLK03_FILTER_CONTRACT_MISMATCH"),
         "SELF_CHANGE_UNROUTED": (
             {**sources, CLK03_WORKFLOW: original.replace(
@@ -1059,16 +1059,16 @@ def clk03_negative_tests(sources):
             "CLK03_FILTER_CONTRACT_MISMATCH"),
         "PR_TRIGGER_REMOVED": (
             {**sources, CLK03_WORKFLOW: original.replace(
-                "  pull_request:\\n", "", 1)},
+                "  pull_request:\n", "", 1)},
             "PULL_REQUEST_MISSING"),
         "DISPATCH_TRIGGER_REMOVED": (
             {**sources, CLK03_WORKFLOW: original.replace(
-                "  workflow_dispatch:\\n", "", 1)},
+                "  workflow_dispatch:\n", "", 1)},
             "CLK03_EVENT_CONTRACT_MISMATCH"),
         "PUSH_TRIGGER_ADDED": (
             {**sources, CLK03_WORKFLOW: original.replace(
-                "  workflow_dispatch:\\n",
-                "  workflow_dispatch:\\n  push:\\n", 1)},
+                "  workflow_dispatch:\n",
+                "  workflow_dispatch:\n  push:\n", 1)},
             "CLK03_EVENT_CONTRACT_MISMATCH"),
     }
     for label, (mutated, code) in cases.items():

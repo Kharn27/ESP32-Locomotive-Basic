@@ -86,11 +86,15 @@ workflow dédié.
 ## Exécution et lecture contradictoire
 
 Workflow additionnel `.github/workflows/hw4-mem-c5-v2.yml`.
-Pour le `push` de la branche C5, le témoin est la **PR réelle #339**
-à HEAD `1b16c32ee4968100fcc46d876e7cdf095ea43798`, base
-`main@03f83...` au mandat ; sur événement `pull_request`, ce sont
-les références réelles de la PR ouverte ; en `workflow_dispatch`,
-l'utilisateur fournit son numéro de PR. Une mutation de `main`,
+La **PR Draft C5 elle-même** est le témoin de bout en bout via
+`pull_request` : les deux SHA comparés proviennent de son API GitHub
+réelle ; en `workflow_dispatch`, l'opérateur fournit un numéro de PR
+ouvert dont `base.sha` doit être exactement le `main@03f83...` mandaté.
+La PR #339 n'est pas utilisée comme paire probante C5 : GitHub expose
+actuellement `base.sha=ae07e039...` pour #339, différent du SHA
+`main@03f83...` imposé ; substituer arbitrairement `main@03f83...`
+à cette base violerait la provenance. Son run C3 existant n'est utilisé
+que comme source du **référentiel historique B3**, sans toucher #339. Une mutation de `main`,
 de base ou de HEAD au cours d'un run entraîne **STOP/INVALID**.
 GitHub Actions conserve `provenance.json`, `source.json` pour quatre
 constructions, `verdict.json/md` et codes retour ; le run est une

@@ -65,7 +65,7 @@ for label in base head; do
       -e IDF_GIT_SAFE_DIR="$SRC" \
       -e C5_OUT="$R" -e C5_BUILD="$BUILD" -e C5_CFG="$CFG" \
       -e C5_HZ="$HZ" -e C5_VARIANT="$variant" -e C5_LABEL="$label" \
-      -e C5_SOURCE="$SHA" -e C5_TREE="$TREE" -e C5_IMAGE_ID="$IMAGE_ID" \
+      -e C5_SOURCE="$SHA" -e C5_TREE="$TREE" -e C5_IMAGE_ID="$IMAGE_ID" -e C5_ROOT="$ROOT" \
       "$IMAGE" bash -lc '
         set -euo pipefail
         idf.py --version > "$C5_OUT/idf-version.txt"
@@ -87,11 +87,11 @@ for label in base head; do
         cp "$C5_BUILD/loco_esp32_display_probe.bin" "$C5_OUT/firmware.bin"
         xtensa-esp-elf-size -A "$C5_OUT/firmware.elf" > "$C5_OUT/sections.txt"
         xtensa-esp-elf-readelf -h "$C5_OUT/firmware.elf" > "$C5_OUT/readelf-header.txt"
-        grep -F "Machine:                           Tensilica Xtensa Processor" "$C5_OUT/readelf-header.txt"
-        python3 /project/tools/ci/verify_esp_app_version.py \
+        grep -E "Machine:.*Xtensa" "$C5_OUT/readelf-header.txt"
+        python3 $C5_ROOT/tools/ci/verify_esp_app_version.py \
           "$C5_OUT/firmware.bin" "$C5_SOURCE" loco_esp32_display_probe \
           > "$C5_OUT/app-version.log"
-        python3 /project/tools/ci/hw4_mem_c5_capture.py \
+        python3 $C5_ROOT/tools/ci/hw4_mem_c5_capture.py \
           --out "$C5_OUT" --source-sha "$C5_SOURCE" --source-tree "$C5_TREE" \
           --label "$C5_LABEL" --variant "$C5_VARIANT" --image-id "$C5_IMAGE_ID"
       ' > "$R/docker-output.log" 2>&1 || {

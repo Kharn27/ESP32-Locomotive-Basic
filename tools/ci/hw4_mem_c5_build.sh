@@ -8,7 +8,7 @@ IMAGE=espressif/idf@sha256:bf72fe7a15c22849a9a94147301165a545fb8905d97c176cf748e
 OUT="$ROOT/reports/hw4-mem-c5"
 mkdir -p "$OUT"
 trap 'rc=$?; printf "C5_BUILD_EXIT=%s\n" "$rc" > "$OUT/build-exit.txt"; if [ "$rc" -ne 0 ]; then echo "C5_MEASUREMENT_INVALID rc=$rc"; fi' EXIT
-test "$(git -C "$ROOT" rev-parse HEAD)" = "${GITHUB_SHA:?workflow SHA required}"
+test "$(git -C "$ROOT" rev-parse HEAD)" = "${C5_WORKFLOW_HEAD:?checkout HEAD required}"
 test "$(git -C "$ROOT" status --porcelain --untracked-files=no)" = ""
 test "$(git -C "$ROOT" ls-remote origin refs/heads/main | cut -f1)" = "$EXPECTED_BASE" || {
   echo "STOP: main drift from C5-approved 03f83"; exit 6;

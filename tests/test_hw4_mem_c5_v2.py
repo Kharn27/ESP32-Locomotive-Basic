@@ -317,7 +317,10 @@ class Comparator(unittest.TestCase):
             if field == "state": lv["state"] = "closed"
             elif field == "number": lv["number"] = 330
             else: lv[field]["sha"] = "f" * 40
-            with self.subTest(field=field), self.assertRaises(ValueError):
+            # Head substitution reaches the real-checkout guard; a missing
+            # Git object/checkout is also a fail-closed negative.
+            with self.subTest(field=field), self.assertRaises(
+                    (ValueError, subprocess.CalledProcessError)):
                 p.checked_git(lv, REPO, PR, "base", "head", BASE)
         with mock.patch.object(p, "git", side_effect=[BASE, "commit", HEAD,
                                                      "commit", "commit", MERGE,

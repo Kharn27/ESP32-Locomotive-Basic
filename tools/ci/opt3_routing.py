@@ -27,7 +27,8 @@ FAMILIES = {
         "j1-13-a-integer-relations.yml", "j1-14-a-if-inline-else.yml",
         "j1-15-a-string-scalar.yml", "j1-16-a-real5-scalar.yml",
         "j1-16-d-a-negative-store.yml", "j1-16-e-a-small-store.yml",
-        "j1-17-c-a-pen-cpc.yml", "clk-01-acquisition.yml"),
+        "j1-17-c-a-pen-cpc.yml", "clk-01-acquisition.yml",
+        "clk-03-acquisition.yml"),
     "HW4": ("hw4-c3-b1-scroll.yml", "hw4-c3-b2-scroll.yml",
             "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
             "hw4-scroll-opt-a0-memory.yml",
@@ -179,6 +180,17 @@ CLK01_PATHS = (
     ".github/workflows/clk-01-acquisition.yml",
 )
 
+# CLK-03-C2: exact five-route contract of the isolated CPC6128 TIME oracle.
+# Do not share or widen this trigger with CLK-01 or unrelated source paths.
+CLK03_WORKFLOW = "clk-03-acquisition.yml"
+CLK03_PATHS = (
+    ".github/workflows/clk-03-acquisition.yml",
+    "tools/clk_03_*",
+    "tests/test_clk_03_time.py",
+    "tests/fixtures/cpc6128/clk_03_time/**",
+    "docs/CLK-03*",
+)
+
 
 class UnsafeRoute(ValueError):
     pass
@@ -242,7 +254,7 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(expected) == 36 and len(set(expected)) == 36,
+    demand(len(expected) == 37 and len(set(expected)) == 37,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(set(sources) == set(expected), "UNKNOWN_OR_MISSING_WORKFLOW")
     a0_paths = filters(sources[HW4_A0])
@@ -268,6 +280,21 @@ def audit(sources):
     demand(CLK01_WORKFLOW in triggered_names(
            [".github/workflows/" + CLK01_WORKFLOW], sources),
            "CLK01_SELF_CHANGE_UNROUTED")
+    clk03_src = sources[CLK03_WORKFLOW]
+    clk03_paths = filters(clk03_src)
+    demand(clk03_paths is not None and
+           len(clk03_paths) == len(CLK03_PATHS) and
+           set(clk03_paths) == set(CLK03_PATHS),
+           "CLK03_FILTER_CONTRACT_MISMATCH")
+    # Restrict the isolated workflow to its two approved event sources.
+    # The exact five paths above bind pull_request; workflow_dispatch is manual.
+    events = re.findall(r"(?m)^  ([a-z][\\w-]*):",
+                        clk03_src.split("\\npermissions:", 1)[0])
+    demand(events == ["pull_request", "workflow_dispatch"],
+           "CLK03_EVENT_CONTRACT_MISMATCH")
+    demand(CLK03_WORKFLOW in triggered_names(
+           [".github/workflows/" + CLK03_WORKFLOW], sources),
+           "CLK03_SELF_CHANGE_UNROUTED")
     for name, src in sources.items():
         demand(re.search(r"(?m)^  workflow_dispatch:", src),
                "MANUAL_DISPATCH_REMOVED_" + name)
@@ -978,7 +1005,109 @@ def clk01_negative_tests(sources):
         print("CI-OPT3 CLK01_UNRELATED_ROUTE_REJECTED", path)
 
 
+def clk03_negative_tests(sources):
+    """In-memory falsifications: keep CLK-03 in its own closed CPC family."""
+    original = sources[CLK03_WORKFLOW]
+    for required in CLK03_PATHS:
+        needle = "      - '" + required + "'\\n"
+        demand(original.count(needle) == 1,
+               "CLK03_NEGATIVE_INERT_" + required)
+        mutated = {**sources, CLK03_WORKFLOW: original.replace(needle, "", 1)}
+        try:
+            audit(mutated)
+        except UnsafeRoute as exc:
+            demand(str(exc) == "CLK03_FILTER_CONTRACT_MISMATCH",
+                   "CLK03_REMOVAL_WRONG_REJECTION_" + required + ":" + str(exc))
+        else:
+            raise UnsafeRoute("CLK03_REMOVED_FILTER_ACCEPTED_" + required)
+        print("CI-OPT3 CLK03_FILTER_REMOVAL_REJECTED", required)
+
+    cases = {
+        "UNKNOWN_WORKFLOW": (
+            {**sources, "clk-03-unregistered.yml": original},
+            "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "WORKFLOW_REMOVED": (
+            {k: v for k, v in sources.items() if k != CLK03_WORKFLOW},
+            "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "WORKFLOW_RENAMED": (
+            {**{k: v for k, v in sources.items() if k != CLK03_WORKFLOW},
+             "clk-03-renamed.yml": original},
+            "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "OVERBROAD_TOOL": (
+            {**sources, CLK03_WORKFLOW: original.replace(
+                "'tools/clk_03_*'", "'tools/**'", 1)},
+            "CLK03_FILTER_CONTRACT_MISMATCH"),
+        "OVERBROAD_FIXTURE": (
+            {**sources, CLK03_WORKFLOW: original.replace(
+                "'tests/fixtures/cpc6128/clk_03_time/**'",
+                "'tests/fixtures/**'", 1)},
+            "CLK03_FILTER_CONTRACT_MISMATCH"),
+        "OVERBROAD_DOC": (
+            {**sources, CLK03_WORKFLOW: original.replace(
+                "'docs/CLK-03*'", "'docs/**'", 1)},
+            "CLK03_FILTER_CONTRACT_MISMATCH"),
+        "DUPLICATE_PATH": (
+            {**sources, CLK03_WORKFLOW: original.replace(
+                "      - 'tools/clk_03_*'\\n",
+                "      - 'tools/clk_03_*'\\n"
+                "      - 'tools/clk_03_*'\\n", 1)},
+            "CLK03_FILTER_CONTRACT_MISMATCH"),
+        "SELF_CHANGE_UNROUTED": (
+            {**sources, CLK03_WORKFLOW: original.replace(
+                "'.github/workflows/clk-03-acquisition.yml'",
+                "'.github/workflows/ci-opt3-routing.yml'", 1)},
+            "CLK03_FILTER_CONTRACT_MISMATCH"),
+        "PR_TRIGGER_REMOVED": (
+            {**sources, CLK03_WORKFLOW: original.replace(
+                "  pull_request:\\n", "", 1)},
+            "PULL_REQUEST_MISSING"),
+        "DISPATCH_TRIGGER_REMOVED": (
+            {**sources, CLK03_WORKFLOW: original.replace(
+                "  workflow_dispatch:\\n", "", 1)},
+            "CLK03_EVENT_CONTRACT_MISMATCH"),
+        "PUSH_TRIGGER_ADDED": (
+            {**sources, CLK03_WORKFLOW: original.replace(
+                "  workflow_dispatch:\\n",
+                "  workflow_dispatch:\\n  push:\\n", 1)},
+            "CLK03_EVENT_CONTRACT_MISMATCH"),
+    }
+    for label, (mutated, code) in cases.items():
+        demand(mutated != sources, "CLK03_NEGATIVE_INERT_" + label)
+        try:
+            audit(mutated)
+        except UnsafeRoute as exc:
+            demand(str(exc) == code,
+                   "CLK03_WRONG_REJECTION_" + label + ":" + str(exc))
+        else:
+            raise UnsafeRoute("CLK03_FALSIFICATION_ACCEPTED_" + label)
+        print("CI-OPT3 CLK03_FALSIFICATION_REJECTED", label, code)
+
+    examples = (
+        ".github/workflows/clk-03-acquisition.yml",
+        "tools/clk_03_cpc_time.py",
+        "tests/test_clk_03_time.py",
+        "tests/fixtures/cpc6128/clk_03_time/corpus.json",
+        "docs/CLK-03-cpc-time-oracle.md",
+    )
+    for path in examples:
+        demand(CLK03_WORKFLOW in triggered_names([path], sources),
+               "CLK03_REQUIRED_PR_PATH_UNROUTED_" + path)
+        demand("CPC_ACQUISITION" in family_routes([path], sources),
+               "CLK03_WRONG_FAMILY_" + path)
+        print("CI-OPT3 CLK03_PR_ROUTE_VERIFIED", path)
+    for path in (
+        "tools/clk_01_cpc.py", "tools/clk_030_cpc.py",
+        "tools/ci/opt3_routing.py", "docs/CLK-04-roadmap.md",
+        "docs/README.md", "core/basic_executor.c",
+        "firmware/esp32_display_probe/main/main.c",
+    ):
+        demand(CLK03_WORKFLOW not in triggered_names([path], sources),
+               "CLK03_UNRELATED_PR_PATH_ROUTED_" + path)
+        print("CI-OPT3 CLK03_UNRELATED_ROUTE_REJECTED", path)
+
+
 def negative_tests(sources):
+    clk03_negative_tests(sources)
     clk01_negative_tests(sources)
     r1_negative_tests(sources)
     cls_route_negative_tests(sources)
@@ -1113,7 +1242,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=36 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=37 FAMILIES=5")
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 import struct
+import subprocess
 import sys
 from pathlib import Path
 
@@ -49,7 +50,12 @@ def read_json(path):
     return value
 
 
-def verify_provenance(provenance, live, repo, pr_number):
+def git(path, *args):
+    return subprocess.check_output(["git", "-C", str(path), *args],
+                                   text=True, stderr=subprocess.PIPE).strip()
+
+
+def verify_provenance(provenance, live, repo, pr_number, base_checkout, head_checkout):
     require(provenance.get("status") == "PROVENANCE_PASS", "missing successful Git provenance")
     require(provenance.get("repo") == repo and provenance.get("pr_number") == pr_number,
             "PR identity mismatch")
@@ -66,8 +72,26 @@ def verify_provenance(provenance, live, repo, pr_number):
     # output and require real source trees for both inputs.
     for label in ("base", "head"):
         checked_sha(provenance.get(label + "_tree", ""))
+    require(provenance.get("policy_main") ==
+            "03f83c39e6f9ed4daeddb1ed93a989a35d726e30" and
+            base == provenance["policy_main"], "approved main base changed")
     require(provenance.get("ancestry_verified") is True and mb != head,
             "merge-base graph or ancestry check missing")
+    # Re-check Git objects and the actual merge-base independently of the
+    # provenance producer. JSON-only evidence is never authoritative.
+    for label, folder, sha in (("base", base_checkout, base),
+                               ("head", head_checkout, head)):
+        require(git(folder, "rev-parse", "HEAD") == sha, "checkout SHA changed: " + label)
+        require(git(folder, "cat-file", "-t", sha) == "commit",
+                "commit object not found: " + label)
+        require(git(folder, "rev-parse", "HEAD^{tree}") ==
+                provenance[label + "_tree"], "checkout tree changed: " + label)
+    require(git(head_checkout, "merge-base", base, head) == mb,
+            "merge-base substituted")
+    for sha in (base, head):
+        rc = subprocess.run(["git", "-C", str(head_checkout), "merge-base",
+                             "--is-ancestor", mb, sha], capture_output=True)
+        require(rc.returncode == 0, "corrupted Git graph")
     return base, head
 
 
@@ -252,11 +276,15 @@ def main(argv=None):
     ap.add_argument("--repo", required=True)
     ap.add_argument("--pr-number", required=True, type=int)
     ap.add_argument("--output", type=Path, required=True)
+    ap.add_argument("--base-checkout", type=Path, required=True)
+    ap.add_argument("--head-checkout", type=Path, required=True)
     args = ap.parse_args(argv)
     args.output.mkdir(parents=True, exist_ok=True)
     try:
         p = read_json(args.provenance)
-        base, head = verify_provenance(p, read_json(args.live_pr), args.repo, args.pr_number)
+        base, head = verify_provenance(p, read_json(args.live_pr), args.repo,
+                                       args.pr_number, args.base_checkout,
+                                       args.head_checkout)
         memory = {label: {variant: build_metrics(args.root, label, variant, sha,
                                                   p[label + "_tree"])
                           for variant in CLOCKS}
@@ -264,6 +292,7 @@ def main(argv=None):
         report = evaluate(memory, p)
         rc = 0 if report["status"] == "INCREMENTAL_PASS" else 1
     except (OSError, ValueError, KeyError, TypeError, IndexError, UnicodeError,
+            subprocess.CalledProcessError,
             json.JSONDecodeError) as exc:
         report = {"contract": VERSION, "status": "MEASUREMENT_INVALID",
                   "historical_debt": "UNVERIFIED",

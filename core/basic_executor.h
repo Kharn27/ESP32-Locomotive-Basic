@@ -45,7 +45,8 @@ typedef enum {
     BE_WHILE_WITHOUT_WEND, /* Host cause; CPC WEND missing screen/ERR29 */
     BE_WHILE_OPERAND_MISSING, /* Host cause; CPC operand missing screen/ERR22 */
     BE_WHILE_CONDITION_INVALID, /* B2 non-oracled INTEGER expression */
-    BE_WHILE_STACK_FULL /* Host capacity 8, NOT a CPC ROM limit */
+    BE_WHILE_STACK_FULL, /* Host capacity 8, NOT a CPC ROM limit */
+    BE_DATA_EXHAUSTED /* J1.25-B2 host cause: no remaining INTEGER DATA; NOT CPC ERR=4 */
 } BEStatus;
 
 /* Typed, caller-owned video event, never encoded in PRINT.
@@ -138,6 +139,11 @@ typedef struct {
     size_t while_depth;
     BEWhileFrame while_stack[BE_WHILE_STACK_CAPACITY];
     BasicVariableStore *variables; /* Optional borrowed caller-owned store. */
+    /* J1.25-B2 retains this ABI layout. On the closed INTEGER DATA corpus,
+     * the final WHILE frame's after_cursor/after_statement are the DATA
+     * record/item offsets. DATA and WHILE are rejected in the same program;
+     * WHILE-only programs retain all 8 frame slots and prior semantics.
+     * No pointer into editable program storage is retained. */
 } BasicExecutor;
 
 /* Validate a program and reset execution to its first line.

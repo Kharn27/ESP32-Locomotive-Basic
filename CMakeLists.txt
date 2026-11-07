@@ -73,6 +73,21 @@ if(BUILD_TESTING)
 endif()
 if(BUILD_TESTING)
     # J1.25-B1: 12 original/repeat CPC RAM and LIST sources, lexical only.
+    # C1: RED/GREEN main-compatible WHILE when DATA-family is not reached.
+    add_executable(test_j1_25_b2_c1_while_guard
+        tests/test_j1_25_b2_c1_while_guard.c)
+    target_link_libraries(test_j1_25_b2_c1_while_guard PRIVATE
+        basic_executor basic_program basic_tokenizer)
+    add_test(NAME j1_25_b2_c1_skipped_data_while_no_regression
+             COMMAND test_j1_25_b2_c1_while_guard)
+
+    # J1.25-B2: closed INTEGER RUN witness, original/repeat CPC captures.
+    add_executable(test_j1_25_b2_integer_run tests/test_j1_25_b2_integer_run.c)
+    target_link_libraries(test_j1_25_b2_integer_run PRIVATE
+        basic_session_runtime basic_tokenizer basic_program)
+    add_test(NAME j1_25_b2_integer_run_cpc
+             COMMAND test_j1_25_b2_integer_run "${CMAKE_CURRENT_SOURCE_DIR}")
+
     add_executable(test_j1_25_b1_token_list tests/test_j1_25_b1_token_list.c)
     target_link_libraries(test_j1_25_b1_token_list PRIVATE
         basic_tokenizer basic_listing basic_program basic_executor)

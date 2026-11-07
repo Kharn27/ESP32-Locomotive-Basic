@@ -34,7 +34,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Unit tests: positives and fail-closed negatives
+      - name: 'Unit tests: positives and fail-closed negatives'
         run: |
           set -euo pipefail
           python3 -m compileall -q tools/ci/hw4_mem_c5_v2.py tools/ci/hw4_mem_c5_provenance.py tools/ci/hw4_mem_c5_capture.py

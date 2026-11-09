@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "mission": "CLK-04-A1",
+  "status": "SEALED_INPUTS_NOT_OBSERVATIONS",
+  "cases": [
+    {
+      "id": "F_ZERO",
+      "kind": "known",
+      "lines": [
+        "10 T!=0",
+        "15 STOP",
+        "20 PRINT #8,@T!",
+        "30 PRINT #8,T!",
+        "40 PRINT #8,T!*2",
+        "50 PRINT #8,T!>=0",
+        "60 PRINT #8,T!>32767",
+        "70 END"
+      ],
+      "printer_numeric_count": 5
+    },
+    {
+      "id": "F_ONE",
+      "kind": "known",
+      "lines": [
+        "10 T!=1",
+        "15 STOP",
+        "20 PRINT #8,@T!",
+        "30 PRINT #8,T!",
+        "40 PRINT #8,T!*2",
+        "50 PRINT #8,T!>=0",
+        "60 PRINT #8,T!>32767",
+        "70 END"
+      ],
+      "printer_numeric_count": 5
+    },
+    {
+      "id": "F_NEG_ONE",
+      "kind": "known",
+      "lines": [
+        "10 T!=-1",
+        "15 STOP",
+        "20 PRINT #8,@T!",
+        "30 PRINT #8,T!",
+        "40 PRINT #8,T!*2",
+        "50 PRINT #8,T!>=0",
+        "60 PRINT #8,T!>32767",
+        "70 END"
+      ],
+      "printer_numeric_count": 5
+    },
+    {
+      "id": "F_HALF",
+      "kind": "known",
+      "lines": [
+        "10 T!=0.5",
+        "15 STOP",
+        "20 PRINT #8,@T!",
+        "30 PRINT #8,T!",
+        "40 PRINT #8,T!*2",
+        "50 PRINT #8,T!>=0",
+        "60 PRINT #8,T!>32767",
+        "70 END"
+      ],
+      "printer_numeric_count": 5
+    },
+    {
+      "id": "F_QUARTER",
+      "kind": "known",
+      "lines": [
+        "10 T!=1.25",
+        "15 STOP",
+        "20 PRINT #8,@T!",
+        "30 PRINT #8,T!",
+        "40 PRINT #8,T!*2",
+        "50 PRINT #8,T!>=0",
+        "60 PRINT #8,T!>32767",
+        "70 END"
+      ],
+      "printer_numeric_count": 5
+    },
+    {
+      "id": "T_DYNAMIC_PAIR",
+      "kind": "time",
+      "lines": [
+        "10 T!=TIME",
+        "20 U!=TIME",
+        "25 STOP",
+        "30 PRINT #8,@T!",
+        "40 PRINT #8,T!",
+        "50 PRINT #8,T!*2",
+        "60 PRINT #8,T!>=0",
+        "70 PRINT #8,T!>32767",
+        "80 PRINT #8,@U!",
+        "90 PRINT #8,U!",
+        "100 PRINT #8,U!>=T!",
+        "110 PRINT #8,TIME",
+        "120 END"
+      ],
+      "printer_numeric_count": 9
+    }
+  ]
+}

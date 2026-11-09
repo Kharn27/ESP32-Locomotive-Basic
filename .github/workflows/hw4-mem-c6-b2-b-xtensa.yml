@@ -1,0 +1,139 @@
+# Issue #351: one non-required lab. Historical C5/RENDER-A/C3/A0 unchanged.
+name: LAB HW4-MEM-C6-B2-B 8-XTENSA #330 TWO_CHANNELS NOT_REQUIRED
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hw4-mem-c6-b2-b-xtensa.yml'
+      - 'tools/ci/hw4_mem_c6_b2b.py'
+      - 'tests/test_hw4_mem_c6_b2b.py'
+      - 'docs/HW4-MEM-C6-B2-B.md'
+      - 'tools/ci/opt3_routing.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: hw4-c6-b2-b-330-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  host-negatives:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Exact proposed LAB HEAD without persisted token
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: No Xtensa builds before adversarial host PASS
+        env:
+          LAB_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          LAB_BASE: ${{ github.event.pull_request.base.sha || '' }}
+          EVENT_PR: ${{ github.event.pull_request.number || '' }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$LAB_HEAD"
+          test "$LAB_BASE" = 6d3aae8a95b97e18174d758f35ef240740e9a861 || {
+            echo 'C6_B2B_STOP_BASE_DRIFT'; exit 2;
+          }
+          test "$EVENT_NAME" = pull_request && test -n "$EVENT_PR" || {
+            echo 'C6_B2B_DISPATCH_OR_EVENT_NOT_8_BUILD_AUTHORIZED'; exit 2;
+          }
+          # Forbid running PR #330's changes as the controller or accepting forks.
+          test "$EVENT_PR" != 330
+          python3 -m py_compile tools/ci/hw4_mem_c6_b2b.py tests/test_hw4_mem_c6_b2b.py
+          python3 -m unittest discover -s tests -p test_hw4_mem_c6_b2b.py -v
+          python3 -m unittest discover -s tests -p test_hw4_mem_c6_refs.py -v
+          python3 -m unittest discover -s tests -p test_hw4_mem_c6_b2_a_live.py -v
+          echo 'C6_B2B_HOST_NEGATIVES_VERIFIED_NOT_MEMORY_BUILD'
+
+  eight-real-xtensa:
+    needs: host-negatives
+    runs-on: ubuntu-22.04
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ github.token }}
+      LAB_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      LAB_BASE: ${{ github.event.pull_request.base.sha || '' }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Exact proposed LAB controller HEAD / full Git graph
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Fail-closed preflight (main, PR #330) before any Docker build
+        shell: bash
+        env:
+          EVENT_PR: ${{ github.event.pull_request.number || '' }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_BASE: ${{ github.event.pull_request.base.sha || '' }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REPO: ${{ github.event.pull_request.head.repo.full_name || '' }}
+        run: |
+          set -euo pipefail
+          test "$EVENT_NAME" = pull_request
+          test "$EVENT_REPO" = "$GITHUB_REPOSITORY"
+          test "$EVENT_BASE" = 6d3aae8a95b97e18174d758f35ef240740e9a861
+          test "$LAB_HEAD" = "$EVENT_HEAD"
+          test "$(git rev-parse HEAD)" = "$LAB_HEAD"
+          python3 - <<'PY'
+          import json, os, urllib.request
+          repo=os.environ['GITHUB_REPOSITORY']
+          token=os.environ['GH_TOKEN']
+          def get(path):
+              q=urllib.request.Request('https://api.github.com/repos/'+repo+path, method='GET',headers={
+                  'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json',
+                  'X-GitHub-Api-Version':'2022-11-28'})
+              with urllib.request.urlopen(q,timeout=25) as f:return json.load(f)
+          m=get('/branches/main')['commit']['sha']
+          assert m==os.environ['LAB_BASE'], 'MAIN_MOVED_STOP'
+          lab=get('/pulls/'+os.environ['EVENT_PR'])
+          assert lab['head']['sha']==os.environ['LAB_HEAD'], 'LAB_HEAD_MOVED_STOP'
+          assert lab['base']['sha']==m and lab['base']['ref']=='main', 'LAB_BASE_MOVED_STOP'
+          assert lab['head']['repo']['full_name']==repo, 'FORK_UNTRUSTED_STOP'
+          p=get('/pulls/330')
+          assert p['state']=='open' and p['merged_at'] is None, 'PR330_CLOSED_STOP'
+          assert p['base']['sha']=='4d261f2a76374ab99a4dd7415cae7a097330c46b', 'PR330_BASE_MOVED_STOP'
+          assert p['head']['sha']=='64b0087d5087903fee175c4f149c65a65bb43fe6', 'PR330_HEAD_MOVED_STOP'
+          print('C6_B2B_8BUILD_PREFLIGHT_PIN',m,p['base']['sha'],p['head']['sha'])
+          PY
+      - name: Build exact B/H and M/test-merge 4+4 clean CONSOLE SPI40/SPI20
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/hw4-mem-c6-b2-b
+          python3 tools/ci/hw4_mem_c6_b2b.py \
+            --workspace "$GITHUB_WORKSPACE" \
+            --output "$GITHUB_WORKSPACE/reports/hw4-mem-c6-b2-b"
+      - name: Archive reproducibility and 8-build manifests SHA256
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT=reports/hw4-mem-c6-b2-b
+          mkdir -p "$OUT"
+          (
+            cd "$OUT"
+            find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt
+            sha256sum --check SHA256SUMS.txt
+          )
+          echo 'C6_B2B_INDEPENDENT_TWO_CHANNELS_NOT_REQUIRED' >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish actual/partial build evidence (no false PASS on failure)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hw4-c6-b2-b-330-8build-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            reports/hw4-mem-c6-b2-b/

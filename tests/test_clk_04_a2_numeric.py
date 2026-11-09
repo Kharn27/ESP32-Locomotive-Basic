@@ -33,7 +33,7 @@ class CandidateModel(unittest.TestCase):
     def test_all_corpus_values_roundtrip(self):
         values=[int(i["value"]) for c in a2.source_cases() for i in c["items"]]
         self.assertEqual(values,a2.mandatory_values())
-        self.assertEqual(len(values),36)
+        self.assertEqual(len(values),37)
         for n in values:
             self.assertEqual(model.decode_nonnegative_integer(
                 model.encode_uint32(n)),n)

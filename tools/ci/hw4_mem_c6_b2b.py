@@ -136,7 +136,7 @@ def pin_git(root, proof):
     args = ['git', '-C', str(root), 'commit-tree', merged,
             '-p', proof['M'], '-p', proof['H']]
     c = sh(args, env=env)
-    assert SHA.fullmatch(c)
+    require(SHA.fullmatch(c), 'TEST_MERGE_COMMIT_SHA_INVALID')
     require(c not in (proof['M'], proof['H'], proof['old_preview']),
             'TEST_MERGE_REUSES_EXISTING_COMMIT')
     require(git(root, 'rev-parse', c+'^{tree}') == merged,

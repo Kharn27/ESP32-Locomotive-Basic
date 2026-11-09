@@ -194,7 +194,7 @@ class ProvenanceNegatives(unittest.TestCase):
                      "CFG_MISSING")
             rejected(lambda:a2.cfg_process(path,{"returncode":0,
                      "wall_seconds":1,"started_utc":"2026-11-09T00:00:00+00:00"}),
-                     "PROCESS_PROVENANCE")
+                     "ABSENT_OR_SYMLINK_")
 
 
 if __name__=="__main__":

@@ -1465,8 +1465,8 @@ def c6_b2a_negative_tests(sources):
             "  contents: read", "  contents: write", 1)},
          "C6_B2A_PERMISSIONS_MISMATCH"),
         ("WRONG_SOURCE", {**sources, C6_B2A_WORKFLOW: original.replace(
-            "ref: \${{ steps.pin.outputs.trusted_main_sha }}",
-            "ref: \${{ github.sha }}", 1)},
+            "ref: ${{ steps.pin.outputs.trusted_main_sha }}",
+            "ref: ${{ github.sha }}", 1)},
          "C6_B2A_TRUST_SOURCE_MISMATCH"),
         ("FALSE_HEAD", {**sources, C6_B2A_WORKFLOW: original.replace(
             "live['head']['sha'] == os.environ['EVENT_HEAD']",

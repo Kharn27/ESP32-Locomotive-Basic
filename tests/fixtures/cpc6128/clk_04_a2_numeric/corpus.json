@@ -272,20 +272,20 @@
         {
           "variable": "B!",
           "value": "8388607",
-          "arithmetic": null,
-          "arithmetic_variable": null
+          "arithmetic": "(2^23)-1",
+          "arithmetic_variable": "F!"
         },
         {
           "variable": "C!",
           "value": "8388608",
-          "arithmetic": null,
-          "arithmetic_variable": null
+          "arithmetic": "2^23",
+          "arithmetic_variable": "G!"
         },
         {
           "variable": "D!",
           "value": "8388609",
-          "arithmetic": null,
-          "arithmetic_variable": null
+          "arithmetic": "(2^23)+1",
+          "arithmetic_variable": "H!"
         }
       ],
       "lines": [
@@ -293,18 +293,36 @@
         "20 B!=8388607",
         "30 C!=8388608",
         "40 D!=8388609",
+        "50 F!=(2^23)-1",
+        "60 G!=2^23",
+        "70 H!=(2^23)+1",
         "90 STOP",
         "100 PRINT #8,@A!",
         "110 PRINT #8,A!",
         "120 PRINT #8,@B!",
         "130 PRINT #8,B!",
-        "140 PRINT #8,@C!",
-        "150 PRINT #8,C!",
-        "160 PRINT #8,@D!",
-        "170 PRINT #8,D!",
-        "180 END"
+        "140 PRINT #8,@F!",
+        "150 PRINT #8,F!",
+        "160 PRINT #8,B!=F!",
+        "170 PRINT #8,(F!+1)-F!",
+        "180 PRINT #8,F!-(F!-1)",
+        "190 PRINT #8,@C!",
+        "200 PRINT #8,C!",
+        "210 PRINT #8,@G!",
+        "220 PRINT #8,G!",
+        "230 PRINT #8,C!=G!",
+        "240 PRINT #8,(G!+1)-G!",
+        "250 PRINT #8,G!-(G!-1)",
+        "260 PRINT #8,@D!",
+        "270 PRINT #8,D!",
+        "280 PRINT #8,@H!",
+        "290 PRINT #8,H!",
+        "300 PRINT #8,D!=H!",
+        "310 PRINT #8,(H!+1)-H!",
+        "320 PRINT #8,H!-(H!-1)",
+        "330 END"
       ],
-      "printer_numeric_count": 8
+      "printer_numeric_count": 23
     },
     {
       "id": "D1_02",
@@ -313,26 +331,26 @@
         {
           "variable": "A!",
           "value": "16777215",
-          "arithmetic": null,
-          "arithmetic_variable": null
+          "arithmetic": "(2^24)-1",
+          "arithmetic_variable": "E!"
         },
         {
           "variable": "B!",
           "value": "16777216",
-          "arithmetic": null,
-          "arithmetic_variable": null
+          "arithmetic": "2^24",
+          "arithmetic_variable": "F!"
         },
         {
           "variable": "C!",
           "value": "16777217",
-          "arithmetic": null,
-          "arithmetic_variable": null
+          "arithmetic": "(2^24)+1",
+          "arithmetic_variable": "G!"
         },
         {
           "variable": "D!",
           "value": "1073741823",
-          "arithmetic": null,
-          "arithmetic_variable": null
+          "arithmetic": "(2^30)-1",
+          "arithmetic_variable": "H!"
         }
       ],
       "lines": [
@@ -340,18 +358,42 @@
         "20 B!=16777216",
         "30 C!=16777217",
         "40 D!=1073741823",
+        "50 E!=(2^24)-1",
+        "60 F!=2^24",
+        "70 G!=(2^24)+1",
+        "80 H!=(2^30)-1",
         "90 STOP",
         "100 PRINT #8,@A!",
         "110 PRINT #8,A!",
-        "120 PRINT #8,@B!",
-        "130 PRINT #8,B!",
-        "140 PRINT #8,@C!",
-        "150 PRINT #8,C!",
-        "160 PRINT #8,@D!",
-        "170 PRINT #8,D!",
-        "180 END"
+        "120 PRINT #8,@E!",
+        "130 PRINT #8,E!",
+        "140 PRINT #8,A!=E!",
+        "150 PRINT #8,(E!+1)-E!",
+        "160 PRINT #8,E!-(E!-1)",
+        "170 PRINT #8,@B!",
+        "180 PRINT #8,B!",
+        "190 PRINT #8,@F!",
+        "200 PRINT #8,F!",
+        "210 PRINT #8,B!=F!",
+        "220 PRINT #8,(F!+1)-F!",
+        "230 PRINT #8,F!-(F!-1)",
+        "240 PRINT #8,@C!",
+        "250 PRINT #8,C!",
+        "260 PRINT #8,@G!",
+        "270 PRINT #8,G!",
+        "280 PRINT #8,C!=G!",
+        "290 PRINT #8,(G!+1)-G!",
+        "300 PRINT #8,G!-(G!-1)",
+        "310 PRINT #8,@D!",
+        "320 PRINT #8,D!",
+        "330 PRINT #8,@H!",
+        "340 PRINT #8,H!",
+        "350 PRINT #8,D!=H!",
+        "360 PRINT #8,(H!+1)-H!",
+        "370 PRINT #8,H!-(H!-1)",
+        "380 END"
       ],
-      "printer_numeric_count": 8
+      "printer_numeric_count": 28
     },
     {
       "id": "D1_03",
@@ -360,14 +402,14 @@
         {
           "variable": "A!",
           "value": "1073741824",
-          "arithmetic": null,
-          "arithmetic_variable": null
+          "arithmetic": "2^30",
+          "arithmetic_variable": "E!"
         },
         {
           "variable": "B!",
           "value": "1073741825",
-          "arithmetic": null,
-          "arithmetic_variable": null
+          "arithmetic": "(2^30)+1",
+          "arithmetic_variable": "F!"
         },
         {
           "variable": "C!",
@@ -380,22 +422,34 @@
         "10 A!=1073741824",
         "20 B!=1073741825",
         "30 C!=2147483647",
-        "40 G!=(2^31)-1",
+        "40 E!=2^30",
+        "50 F!=(2^30)+1",
+        "60 G!=(2^31)-1",
         "90 STOP",
         "100 PRINT #8,@A!",
         "110 PRINT #8,A!",
-        "120 PRINT #8,@B!",
-        "130 PRINT #8,B!",
-        "140 PRINT #8,@C!",
-        "150 PRINT #8,C!",
-        "160 PRINT #8,@G!",
-        "170 PRINT #8,G!",
-        "180 PRINT #8,C!=G!",
-        "190 PRINT #8,(G!+1)-G!",
-        "200 PRINT #8,G!-(G!-1)",
-        "210 END"
+        "120 PRINT #8,@E!",
+        "130 PRINT #8,E!",
+        "140 PRINT #8,A!=E!",
+        "150 PRINT #8,(E!+1)-E!",
+        "160 PRINT #8,E!-(E!-1)",
+        "170 PRINT #8,@B!",
+        "180 PRINT #8,B!",
+        "190 PRINT #8,@F!",
+        "200 PRINT #8,F!",
+        "210 PRINT #8,B!=F!",
+        "220 PRINT #8,(F!+1)-F!",
+        "230 PRINT #8,F!-(F!-1)",
+        "240 PRINT #8,@C!",
+        "250 PRINT #8,C!",
+        "260 PRINT #8,@G!",
+        "270 PRINT #8,G!",
+        "280 PRINT #8,C!=G!",
+        "290 PRINT #8,(G!+1)-G!",
+        "300 PRINT #8,G!-(G!-1)",
+        "310 END"
       ],
-      "printer_numeric_count": 11
+      "printer_numeric_count": 21
     },
     {
       "id": "D2_01",

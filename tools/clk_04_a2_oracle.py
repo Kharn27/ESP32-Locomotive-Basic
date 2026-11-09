@@ -189,16 +189,35 @@ def run_double_screen(cap,folder,cmds,snaps,timeout=130):
             "wall_seconds":seconds,"returncode":proc.returncode}
 
 
+def list_commands(lines):
+    """Finish lengthy screen LIST before LIST #8, then drain printer output."""
+    big = len(lines) > 20
+    screen_wait = 14 if big else 2
+    printer_wait = 14 if big else 3
+    return ["MODE 1","NEW",*lines,"LIST",
+        " ".join(["CAP32_DELAY"]*screen_wait) +
+        " CAP32_SCRNSHOT CAP32_SNAPSHOT",
+        "LIST #8", " ".join(["CAP32_DELAY"]*printer_wait) +
+        " CAP32_EXIT"]
+
+
+def run_commands(lines):
+    """After CONT, allow long PRINT series to finish before second PNG."""
+    wait = 14 if len(lines)>20 else 6
+    return ["MODE 1","NEW",*lines,"RUN",
+       "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
+       "CONT"," ".join(["CAP32_DELAY"]*wait)+" CAP32_SCRNSHOT CAP32_EXIT"]
+
+
 def capture_case(cap,out,session,case,snap_root):
     folder = out/session/case["id"]
     lines=case["lines"]
     nums=[int(s.split(" ",1)[0]) for s in lines]
     snaps=snap_root/(session+"-"+case["id"]+"-list")
     snaps.mkdir()
-    listcmd=["MODE 1","NEW",*lines,"LIST",
-       "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
-       "LIST #8","CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_EXIT"]
-    listing=prior.run(cap,folder/"list",listcmd,snaps,timeout=130)
+    listcmd=list_commands(lines)
+    listing=prior.run(cap,folder/"list",listcmd,snaps,
+                      timeout=200 if len(lines)>20 else 130)
     files=list(snaps.glob("*.sna"))
     need(len(files)==1,"LIST_SNA_MISSING")
     program,region=prior.ram_parser().extract_snapshot(read(files[0]),nums)
@@ -208,10 +227,9 @@ def capture_case(cap,out,session,case,snap_root):
 
     snaps=snap_root/(session+"-"+case["id"]+"-stop")
     snaps.mkdir()
-    controls=["MODE 1","NEW",*lines,"RUN",
-       "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
-       "CONT"," ".join(["CAP32_DELAY"]*6)+" CAP32_SCRNSHOT CAP32_EXIT"]
-    execution=run_double_screen(cap,folder/"run",controls,snaps,timeout=130)
+    controls=run_commands(lines)
+    execution=run_double_screen(cap,folder/"run",controls,snaps,
+                                timeout=200 if len(lines)>20 else 130)
     files=list(snaps.glob("*.sna"))
     need(len(files)==1,"STOP_SNA_MISSING")
     stop_prog,window,stop=snapshot_window(read(files[0]),lines,case["items"])
@@ -361,12 +379,8 @@ def verify(out,head,seal):
         for case in cases:
             data=group["cases"][case["id"]]
             folder=out/session/case["id"]
-            expected_list=["MODE 1","NEW",*case["lines"],"LIST",
-               "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
-               "LIST #8","CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_EXIT"]
-            expected_run=["MODE 1","NEW",*case["lines"],"RUN",
-               "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
-               "CONT"," ".join(["CAP32_DELAY"]*6)+" CAP32_SCRNSHOT CAP32_EXIT"]
+            expected_list=list_commands(case["lines"])
+            expected_run=run_commands(case["lines"])
             listing=cfg_process(folder/"list",data["list"])
             running=cfg_process(folder/"run",data["run"],double=True)
             need(listing==expected_list and running==expected_run,

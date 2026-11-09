@@ -4,7 +4,7 @@ on:
     paths:
       - '.github/workflows/clk-04-a2-numeric-oracle.yml'
       - 'tools/clk_04_a2_*'
-      - 'tests/test_clk_04_a2_oracle.py'
+      - 'tests/test_clk_04_a2_numeric.py'
       - 'tests/fixtures/cpc6128/clk_04_a2_numeric/**'
       - 'docs/CLK-04-A2*'
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          python3 -m unittest discover -s tests -p 'test_clk_04_a2_oracle.py' -v
+          python3 -m unittest discover -s tests -p 'test_clk_04_a2_numeric.py' -v
           python3 tools/clk_04_a2_oracle.py --self-test
           python3 tools/clk_04_a2_numeric.py
 

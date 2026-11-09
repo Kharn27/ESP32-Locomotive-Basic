@@ -97,6 +97,27 @@
         "120 END"
       ],
       "printer_numeric_count": 9
+    },
+    {
+      "id": "T_LATE_BOUNDED",
+      "kind": "time",
+      "lines": [
+        "10 T!=TIME",
+        "20 U!=TIME",
+        "25 STOP",
+        "30 PRINT #8,@T!",
+        "40 PRINT #8,T!",
+        "50 PRINT #8,T!*2",
+        "60 PRINT #8,T!>=0",
+        "70 PRINT #8,T!>32767",
+        "80 PRINT #8,@U!",
+        "90 PRINT #8,U!",
+        "100 PRINT #8,U!>=T!",
+        "110 PRINT #8,TIME",
+        "120 END"
+      ],
+      "printer_numeric_count": 9,
+      "pre_run_delays": 160
     }
   ]
 }

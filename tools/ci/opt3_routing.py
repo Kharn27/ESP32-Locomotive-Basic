@@ -333,13 +333,13 @@ def audit(sources):
     demand(lab_paths is not None and len(lab_paths) == len(C6_B2A_PATHS)
            and set(lab_paths) == set(C6_B2A_PATHS),
            "C6_B2A_FILTER_CONTRACT_MISMATCH")
-    lab_events = re.findall(r"(?m)^  ([a-z][\\w-]*):",
-                            lab.split("\\npermissions:", 1)[0])
+    lab_events = re.findall(r"(?m)^  ([a-z][\w-]*):",
+                            lab.split("\npermissions:", 1)[0])
     demand(lab_events == ["pull_request", "workflow_dispatch"],
            "C6_B2A_EVENT_CONTRACT_MISMATCH")
-    demand("permissions:\\n  contents: read\\n" in lab and
+    demand("permissions:\n  contents: read\n" in lab and
            "secrets." not in lab and not re.search(
-               r"(?m)^\\s+(?:contents|pull-requests|actions): write\\s*$", lab),
+               r"(?m)^\s+(?:contents|pull-requests|actions): write\s*$", lab),
            "C6_B2A_PERMISSIONS_MISMATCH")
     demand("ref: ${{ steps.pin.outputs.trusted_main_sha }}" in lab and
            "EXPECTED_MAIN: 0d5315be79262bb0355f8141a351937272f548fd" in lab and
@@ -1430,7 +1430,91 @@ def clk04_negative_tests(sources):
         print("CI-OPT3 CLK04_UNRELATED_ROUTE_REJECTED", path)
 
 
+def c6_b2a_negative_tests(sources):
+    """B2-A in-memory falsifications only. Existing gates untouched."""
+    original = sources[C6_B2A_WORKFLOW]
+    for path in C6_B2A_PATHS:
+        needle = "      - '" + path + "'\n"
+        demand(original.count(needle) == 1, "C6_B2A_NEGATIVE_INERT_" + path)
+        changed = {**sources, C6_B2A_WORKFLOW: original.replace(needle, "", 1)}
+        try:
+            audit(changed)
+        except UnsafeRoute as exc:
+            demand(str(exc) == "C6_B2A_FILTER_CONTRACT_MISMATCH",
+                   "C6_B2A_NEGATIVE_WRONG_REASON_" + path + ":" + str(exc))
+        else:
+            raise UnsafeRoute("C6_B2A_REMOVED_FILTER_ACCEPTED_" + path)
+        print("CI-OPT3 C6_B2A_FILTER_REMOVAL_REJECTED", path)
+    mutations = (
+        ("UNKNOWN_WORKFLOW", {**sources, "unlisted.yml": original},
+         "UNKNOWN_OR_MISSING_WORKFLOW"),
+        ("DUPLICATE_FILTER", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "      - 'tools/ci/opt3_routing.py'\n",
+            "      - 'tools/ci/opt3_routing.py'\n" * 2, 1)},
+         "C6_B2A_FILTER_CONTRACT_MISMATCH"),
+        ("BROAD_FILTER", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "'docs/HW4-MEM-C6-B2-A-live.md'", "'docs/**'", 1)},
+         "C6_B2A_FILTER_CONTRACT_MISMATCH"),
+        ("UNSAFE_EVENT", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "  workflow_dispatch:\n", "  push:\n    branches: [main]\n  workflow_dispatch:\n", 1)},
+         "C6_B2A_EVENT_CONTRACT_MISMATCH"),
+        ("PR_TARGET", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "  pull_request:\n", "  pull_request_target:\n", 1)},
+         "PULL_REQUEST_MISSING"),
+        ("WRITE_TOKEN", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "  contents: read", "  contents: write", 1)},
+         "C6_B2A_PERMISSIONS_MISMATCH"),
+        ("WRONG_SOURCE", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "ref: \${{ steps.pin.outputs.trusted_main_sha }}",
+            "ref: \${{ github.sha }}", 1)},
+         "C6_B2A_TRUST_SOURCE_MISMATCH"),
+        ("FALSE_HEAD", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "live['head']['sha'] == os.environ['EVENT_HEAD']",
+            "live['head']['sha'] != os.environ['EVENT_HEAD']", 1)},
+         "C6_B2A_TRUST_SOURCE_MISMATCH"),
+        ("HOST_TEST_REMOVED", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "-p 'test_hw4_mem_c6_refs.py' -v", "-p 'unknown.py' -v", 1)},
+         "C6_B2A_HOST_TESTS_MISSING"),
+        ("NO_ARTIFACT", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "if-no-files-found: error", "if-no-files-found: ignore", 1)},
+         "C6_B2A_ARTIFACT_GUARD_MISSING"),
+        ("MASKED_FAILURE", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "          set -euo pipefail",
+            "          continue-on-error: true\n          set -euo pipefail", 1)},
+         "C6_B2A_ARTIFACT_GUARD_MISSING"),
+        ("FALSE_MEMORY_PASS", {**sources, C6_B2A_WORKFLOW: original.replace(
+            "report['PR_INCREMENTAL_VERDICT'] == 'UNVERIFIED'",
+            "report['PR_INCREMENTAL_VERDICT'] == 'PASS'", 1)},
+         "C6_B2A_MEMORY_PASS_SPOOF"),
+    )
+    for label, changed, expected in mutations:
+        demand(changed != sources, "C6_B2A_NEGATIVE_INERT_" + label)
+        try:
+            audit(changed)
+        except UnsafeRoute as exc:
+            demand(str(exc) == expected,
+                   "C6_B2A_WRONG_REJECTION_" + label + ":" + str(exc))
+        else:
+            raise UnsafeRoute("C6_B2A_FALSIFICATION_ACCEPTED_" + label)
+        print("CI-OPT3 C6_B2A_FALSIFICATION_REJECTED", label, expected)
+    original_hw4, original_xtensa = FAMILIES["HW4"], FAMILIES["XTENSA"]
+    try:
+        FAMILIES["HW4"] = tuple(x for x in original_hw4 if x != C6_B2A_WORKFLOW)
+        FAMILIES["XTENSA"] = original_xtensa + (C6_B2A_WORKFLOW,)
+        try:
+            audit(sources)
+        except UnsafeRoute as exc:
+            demand(str(exc) == "C6_B2A_WRONG_FAMILY",
+                   "C6_B2A_WRONG_FAMILY_REASON_" + str(exc))
+        else:
+            raise UnsafeRoute("C6_B2A_WRONG_FAMILY_ACCEPTED")
+    finally:
+        FAMILIES["HW4"], FAMILIES["XTENSA"] = original_hw4, original_xtensa
+    print("CI-OPT3 C6_B2A_WRONG_FAMILY_REJECTED")
+
+
 def negative_tests(sources):
+    c6_b2a_negative_tests(sources)
     clk04_negative_tests(sources)
     c5_negative_tests(sources)
     clk03_negative_tests(sources)

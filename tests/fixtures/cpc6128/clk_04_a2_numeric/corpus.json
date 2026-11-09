@@ -1,0 +1,483 @@
+{
+  "schema": 1,
+  "mission": "CLK-04-A2",
+  "status": "SEALED_INPUTS_NOT_OBSERVATIONS",
+  "range": "uint32_nonnegative_candidate_not_claimed_cpc_range",
+  "cases": [
+    {
+      "id": "D0_01",
+      "tier": "D0",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "0",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "B!",
+          "value": "1",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "C!",
+          "value": "2",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "D!",
+          "value": "3",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        }
+      ],
+      "lines": [
+        "10 A!=0",
+        "20 B!=1",
+        "30 C!=2",
+        "40 D!=3",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 PRINT #8,@B!",
+        "130 PRINT #8,B!",
+        "140 PRINT #8,@C!",
+        "150 PRINT #8,C!",
+        "160 PRINT #8,@D!",
+        "170 PRINT #8,D!",
+        "180 END"
+      ],
+      "printer_numeric_count": 8
+    },
+    {
+      "id": "D0_02",
+      "tier": "D0",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "7",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "B!",
+          "value": "8",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "C!",
+          "value": "9",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "D!",
+          "value": "127",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        }
+      ],
+      "lines": [
+        "10 A!=7",
+        "20 B!=8",
+        "30 C!=9",
+        "40 D!=127",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 PRINT #8,@B!",
+        "130 PRINT #8,B!",
+        "140 PRINT #8,@C!",
+        "150 PRINT #8,C!",
+        "160 PRINT #8,@D!",
+        "170 PRINT #8,D!",
+        "180 END"
+      ],
+      "printer_numeric_count": 8
+    },
+    {
+      "id": "D0_03",
+      "tier": "D0",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "128",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "B!",
+          "value": "129",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "C!",
+          "value": "255",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "D!",
+          "value": "256",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        }
+      ],
+      "lines": [
+        "10 A!=128",
+        "20 B!=129",
+        "30 C!=255",
+        "40 D!=256",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 PRINT #8,@B!",
+        "130 PRINT #8,B!",
+        "140 PRINT #8,@C!",
+        "150 PRINT #8,C!",
+        "160 PRINT #8,@D!",
+        "170 PRINT #8,D!",
+        "180 END"
+      ],
+      "printer_numeric_count": 8
+    },
+    {
+      "id": "D0_04",
+      "tier": "D0",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "257",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "B!",
+          "value": "32767",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "C!",
+          "value": "32768",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "D!",
+          "value": "32769",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        }
+      ],
+      "lines": [
+        "10 A!=257",
+        "20 B!=32767",
+        "30 C!=32768",
+        "40 D!=32769",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 PRINT #8,@B!",
+        "130 PRINT #8,B!",
+        "140 PRINT #8,@C!",
+        "150 PRINT #8,C!",
+        "160 PRINT #8,@D!",
+        "170 PRINT #8,D!",
+        "180 END"
+      ],
+      "printer_numeric_count": 8
+    },
+    {
+      "id": "D0_05",
+      "tier": "D0",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "50375",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "B!",
+          "value": "50376",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "C!",
+          "value": "50377",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "D!",
+          "value": "65535",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        }
+      ],
+      "lines": [
+        "10 A!=50375",
+        "20 B!=50376",
+        "30 C!=50377",
+        "40 D!=65535",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 PRINT #8,@B!",
+        "130 PRINT #8,B!",
+        "140 PRINT #8,@C!",
+        "150 PRINT #8,C!",
+        "160 PRINT #8,@D!",
+        "170 PRINT #8,D!",
+        "180 END"
+      ],
+      "printer_numeric_count": 8
+    },
+    {
+      "id": "D0_06",
+      "tier": "D0",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "65536",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        }
+      ],
+      "lines": [
+        "10 A!=65536",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 END"
+      ],
+      "printer_numeric_count": 2
+    },
+    {
+      "id": "D1_01",
+      "tier": "D1",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "65537",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "B!",
+          "value": "8388607",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "C!",
+          "value": "8388608",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "D!",
+          "value": "8388609",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        }
+      ],
+      "lines": [
+        "10 A!=65537",
+        "20 B!=8388607",
+        "30 C!=8388608",
+        "40 D!=8388609",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 PRINT #8,@B!",
+        "130 PRINT #8,B!",
+        "140 PRINT #8,@C!",
+        "150 PRINT #8,C!",
+        "160 PRINT #8,@D!",
+        "170 PRINT #8,D!",
+        "180 END"
+      ],
+      "printer_numeric_count": 8
+    },
+    {
+      "id": "D1_02",
+      "tier": "D1",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "16777215",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "B!",
+          "value": "16777216",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "C!",
+          "value": "16777217",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "D!",
+          "value": "1073741823",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        }
+      ],
+      "lines": [
+        "10 A!=16777215",
+        "20 B!=16777216",
+        "30 C!=16777217",
+        "40 D!=1073741823",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 PRINT #8,@B!",
+        "130 PRINT #8,B!",
+        "140 PRINT #8,@C!",
+        "150 PRINT #8,C!",
+        "160 PRINT #8,@D!",
+        "170 PRINT #8,D!",
+        "180 END"
+      ],
+      "printer_numeric_count": 8
+    },
+    {
+      "id": "D1_03",
+      "tier": "D1",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "1073741824",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "B!",
+          "value": "1073741825",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "C!",
+          "value": "2147483647",
+          "arithmetic": "(2^31)-1",
+          "arithmetic_variable": "G!"
+        }
+      ],
+      "lines": [
+        "10 A!=1073741824",
+        "20 B!=1073741825",
+        "30 C!=2147483647",
+        "40 G!=(2^31)-1",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 PRINT #8,@B!",
+        "130 PRINT #8,B!",
+        "140 PRINT #8,@C!",
+        "150 PRINT #8,C!",
+        "160 PRINT #8,@G!",
+        "170 PRINT #8,G!",
+        "180 PRINT #8,C!=G!",
+        "190 PRINT #8,(G!+1)-G!",
+        "200 PRINT #8,G!-(G!-1)",
+        "210 END"
+      ],
+      "printer_numeric_count": 11
+    },
+    {
+      "id": "D2_01",
+      "tier": "D2",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "2147483648",
+          "arithmetic": "2^31",
+          "arithmetic_variable": "E!"
+        },
+        {
+          "variable": "B!",
+          "value": "2147483649",
+          "arithmetic": "(2^31)+1",
+          "arithmetic_variable": "F!"
+        }
+      ],
+      "lines": [
+        "10 A!=2147483648",
+        "20 B!=2147483649",
+        "30 E!=2^31",
+        "40 F!=(2^31)+1",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 PRINT #8,@E!",
+        "130 PRINT #8,E!",
+        "140 PRINT #8,A!=E!",
+        "150 PRINT #8,(E!+1)-E!",
+        "160 PRINT #8,E!-(E!-1)",
+        "170 PRINT #8,@B!",
+        "180 PRINT #8,B!",
+        "190 PRINT #8,@F!",
+        "200 PRINT #8,F!",
+        "210 PRINT #8,B!=F!",
+        "220 PRINT #8,(F!+1)-F!",
+        "230 PRINT #8,F!-(F!-1)",
+        "240 END"
+      ],
+      "printer_numeric_count": 14
+    },
+    {
+      "id": "D2_02",
+      "tier": "D2",
+      "items": [
+        {
+          "variable": "A!",
+          "value": "4294967294",
+          "arithmetic": "(2^32)-2",
+          "arithmetic_variable": "E!"
+        },
+        {
+          "variable": "B!",
+          "value": "4294967295",
+          "arithmetic": "(2^32)-1",
+          "arithmetic_variable": "F!"
+        }
+      ],
+      "lines": [
+        "10 A!=4294967294",
+        "20 B!=4294967295",
+        "30 E!=(2^32)-2",
+        "40 F!=(2^32)-1",
+        "90 STOP",
+        "100 PRINT #8,@A!",
+        "110 PRINT #8,A!",
+        "120 PRINT #8,@E!",
+        "130 PRINT #8,E!",
+        "140 PRINT #8,A!=E!",
+        "150 PRINT #8,(E!+1)-E!",
+        "160 PRINT #8,E!-(E!-1)",
+        "170 PRINT #8,@B!",
+        "180 PRINT #8,B!",
+        "190 PRINT #8,@F!",
+        "200 PRINT #8,F!",
+        "210 PRINT #8,B!=F!",
+        "220 PRINT #8,(F!+1)-F!",
+        "230 PRINT #8,F!-(F!-1)",
+        "240 END"
+      ],
+      "printer_numeric_count": 14
+    }
+  ]
+}

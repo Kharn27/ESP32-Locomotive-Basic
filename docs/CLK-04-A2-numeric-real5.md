@@ -67,7 +67,7 @@ Sur environnement disposant du sous-module et Caprice32 vérifiés :
     sha256sum /nouvelle/sortie-a2/manifest.json
     python3 tools/clk_04_a2_oracle.py --verify /nouvelle/sortie-a2 --head "$(git rev-parse HEAD)" --seal SHA_EXTERNE_PUBLIE --report /sortie-hors-archive.json
 
-CI-OPT3 : 40 workflows/5 familles, ajout A2 dans CPC_ACQUISITION seulement, filtre contractuel cinq chemins + falsifications (suppressions, renommage, workflow inconnu, élargissement, doublon, push/dispatch et mauvaise famille). Les tests historiques A1, C5, CLK03 et autres restent intacts.
+CI-OPT3 : 42 workflows/5 familles, ajout A2 dans CPC_ACQUISITION seulement, filtre contractuel cinq chemins + falsifications (suppressions, renommage, workflow inconnu, élargissement, doublon, push/dispatch et mauvaise famille). Les tests historiques A1, C5, CLK03 et autres restent intacts.
 
 ## Registre d'observations et décision
 
@@ -84,3 +84,11 @@ CI-OPT3 : 40 workflows/5 familles, ajout A2 dans CPC_ACQUISITION seulement, filt
 | CYD physique | ON_DEVICE_UNVERIFIED | Hors mandat A2 |
 
 Les résultats et les URL de runs/artefacts du HEAD de livraison devront être ajoutés après exécution réelle. Une contradiction authentique est conservée comme résultat scientifique avec STOP_ARCHITECTURAL, jamais corrigée en retouchant l'archive. La phase B de CLK-04 et tout REAL5 natif CORE restent bloqués. **Seul le Pilotage émet un verdict et fusionne la PR.**
+
+## Résultats de l'acquisition de référence et rapprochement de main (09/11/2026)
+
+L'acquisition A2 achevée sur `a9355e507ad17531163c8d578cc3f451c63f5dad` est indépendante de la branche de production : [run A2 #42653720557](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42653720557), trois jobs SUCCESS, 37 valeurs x deux sessions = 74 correspondances octet/octets, zéro écart, zéro entrée sans identité contrôlée ; les catégories restent `VERIFIED_CPC_SAMPLES_ONLY` et `RANGE_UNVERIFIED` (aucune preuve exhaustive CPC de `uint32_t`). Des captures PNG boot/LIST/STOP/CONT des deux sessions ont été inspectées ; elles demeurent des indices de chronologie et non la preuve numérique (fenêtres RAM et printer brut).
+
+Sceau indépendant du manifeste RAW (publié dans les logs avant replay) : `aaa77eed457f51d28e7eee7d06e17d2457cf3c5fb95ae6bfafabbe2db2202014`, [RAW #13692283699](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42653720557/artifacts/13692283699), [sceau externe #13692103933](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42653720557/artifacts/13692103933), [rapport #13693078282](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42653720557/artifacts/13693078282). Le manifeste contient 360 fichiers bruts, aucune ROM/SNA complète. Les runs transverses antérieurs sur cet ancien HEAD (C99 4/4, ARCH, CI-OPT3, CPC historique, CPC permanent, Xtensa trois profils) ont réussi.
+
+**Rapprochement de base :** `main@2dee58a2268de98c4eae7fc769928c04bab0a903` a intégré HW4-MEM-C6-B2-A (#349) puis HW4-MEM-C6-B2-B (#351), soit 41 workflows avant A2. Le seul conflit est le routeur `tools/ci/opt3_routing.py`. Le merge A2 doit conserver les contrôles B2-A/B2-B, A1/C5 et ajouter exclusivement les contrôles A2 dans `CPC_ACQUISITION`, pour 42 workflows / 5 familles. Les CI sur le HEAD de rapprochement sont à documenter séparément ; les preuves numériques anciennes demeurent historiquement scellées mais ne sont pas des runs du nouveau HEAD.

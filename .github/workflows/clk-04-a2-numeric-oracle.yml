@@ -23,7 +23,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Pin checkout and run A1 synthetic negative/source tests
+      - name: Pin checkout and run A2 synthetic negative/source tests
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         shell: bash

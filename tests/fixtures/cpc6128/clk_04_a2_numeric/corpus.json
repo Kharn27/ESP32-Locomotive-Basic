@@ -157,28 +157,28 @@
         },
         {
           "variable": "B!",
-          "value": "32767",
+          "value": "5256",
           "arithmetic": null,
           "arithmetic_variable": null
         },
         {
           "variable": "C!",
-          "value": "32768",
+          "value": "32767",
           "arithmetic": null,
           "arithmetic_variable": null
         },
         {
           "variable": "D!",
-          "value": "32769",
+          "value": "32768",
           "arithmetic": null,
           "arithmetic_variable": null
         }
       ],
       "lines": [
         "10 A!=257",
-        "20 B!=32767",
-        "30 C!=32768",
-        "40 D!=32769",
+        "20 B!=5256",
+        "30 C!=32767",
+        "40 D!=32768",
         "90 STOP",
         "100 PRINT #8,@A!",
         "110 PRINT #8,A!",
@@ -198,34 +198,34 @@
       "items": [
         {
           "variable": "A!",
-          "value": "50375",
+          "value": "32769",
           "arithmetic": null,
           "arithmetic_variable": null
         },
         {
           "variable": "B!",
-          "value": "50376",
+          "value": "50375",
           "arithmetic": null,
           "arithmetic_variable": null
         },
         {
           "variable": "C!",
-          "value": "50377",
+          "value": "50376",
           "arithmetic": null,
           "arithmetic_variable": null
         },
         {
           "variable": "D!",
-          "value": "65535",
+          "value": "50377",
           "arithmetic": null,
           "arithmetic_variable": null
         }
       ],
       "lines": [
-        "10 A!=50375",
-        "20 B!=50376",
-        "30 C!=50377",
-        "40 D!=65535",
+        "10 A!=32769",
+        "20 B!=50375",
+        "30 C!=50376",
+        "40 D!=50377",
         "90 STOP",
         "100 PRINT #8,@A!",
         "110 PRINT #8,A!",
@@ -245,19 +245,28 @@
       "items": [
         {
           "variable": "A!",
+          "value": "65535",
+          "arithmetic": null,
+          "arithmetic_variable": null
+        },
+        {
+          "variable": "B!",
           "value": "65536",
           "arithmetic": null,
           "arithmetic_variable": null
         }
       ],
       "lines": [
-        "10 A!=65536",
+        "10 A!=65535",
+        "20 B!=65536",
         "90 STOP",
         "100 PRINT #8,@A!",
         "110 PRINT #8,A!",
-        "120 END"
+        "120 PRINT #8,@B!",
+        "130 PRINT #8,B!",
+        "140 END"
       ],
-      "printer_numeric_count": 2
+      "printer_numeric_count": 4
     },
     {
       "id": "D1_01",

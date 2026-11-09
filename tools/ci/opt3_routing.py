@@ -33,7 +33,7 @@ FAMILIES = {
             "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
             "hw4-scroll-opt-a0-memory.yml",
             "hw4-disp-profile-c3.yml", "hw4-disp-render-a.yml",
-            "hw4-mem-c5-v2.yml"),
+            "hw4-mem-c5-v2.yml", "hw4-mem-c6-b2-a-live.yml"),
     "XTENSA": ("ci-xtensa.yml",),
 }
 EXPECTED_ROUTES = {
@@ -213,6 +213,18 @@ CLK04_PATHS = (
 )
 
 
+# B2-A: strictly additive non-required read-only GitHub API lab, Issue #348.
+C6_B2A_WORKFLOW = "hw4-mem-c6-b2-a-live.yml"
+C6_B2A_PATHS = (
+    ".github/workflows/hw4-mem-c6-b2-a-live.yml",
+    "tools/ci/opt3_routing.py",
+    "tools/ci/hw4_mem_c6_refs.py",
+    "tests/test_hw4_mem_c6_refs.py",
+    "tests/test_hw4_mem_c6_b2_a_live.py",
+    "docs/HW4-MEM-C6-B2-A-live.md",
+)
+
+
 class UnsafeRoute(ValueError):
     pass
 
@@ -275,8 +287,8 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(FAMILIES) == 5 and len(expected) == 39 and
-           len(set(expected)) == 39,
+    demand(len(FAMILIES) == 5 and len(expected) == 40 and
+           len(set(expected)) == 40,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(HW4_MEM_C5 in FAMILIES["HW4"] and
            all(HW4_MEM_C5 not in names for family, names in
@@ -312,6 +324,44 @@ def audit(sources):
                            c5_src.split("\npermissions:", 1)[0])
     demand(c5_events == ["pull_request", "workflow_dispatch"],
            "C5_EVENT_CONTRACT_MISMATCH")
+    # Exact B2-A family, paths, trusted source, permissions, event and status.
+    demand(C6_B2A_WORKFLOW in FAMILIES["HW4"] and
+           all(C6_B2A_WORKFLOW not in names for f, names in FAMILIES.items()
+               if f != "HW4"), "C6_B2A_WRONG_FAMILY")
+    lab = sources[C6_B2A_WORKFLOW]
+    lab_paths = filters(lab)
+    demand(lab_paths is not None and len(lab_paths) == len(C6_B2A_PATHS)
+           and set(lab_paths) == set(C6_B2A_PATHS),
+           "C6_B2A_FILTER_CONTRACT_MISMATCH")
+    lab_events = re.findall(r"(?m)^  ([a-z][\\w-]*):",
+                            lab.split("\\npermissions:", 1)[0])
+    demand(lab_events == ["pull_request", "workflow_dispatch"],
+           "C6_B2A_EVENT_CONTRACT_MISMATCH")
+    demand("permissions:\\n  contents: read\\n" in lab and
+           "secrets." not in lab and not re.search(
+               r"(?m)^\\s+(?:contents|pull-requests|actions): write\\s*$", lab),
+           "C6_B2A_PERMISSIONS_MISMATCH")
+    demand("ref: ${{ steps.pin.outputs.trusted_main_sha }}" in lab and
+           "EXPECTED_MAIN: 0d5315be79262bb0355f8141a351937272f548fd" in lab and
+           "persist-credentials: false" in lab and
+           "live['head']['sha'] == os.environ['EVENT_HEAD']" in lab and
+           "MAIN_DRIFT_AFTER_CLI" in lab and
+           "cancel-in-progress: false" in lab,
+           "C6_B2A_TRUST_SOURCE_MISMATCH")
+    demand("needs: host-adversarial" in lab and
+           "python3 -m py_compile" in lab and
+           "-p 'test_hw4_mem_c6_refs.py' -v" in lab and
+           "-p 'test_hw4_mem_c6_b2_a_live.py' -v" in lab,
+           "C6_B2A_HOST_TESTS_MISSING")
+    demand("actions/upload-artifact@v4" in lab and
+           "if-no-files-found: error" in lab and "if: success()" in lab and
+           "SHA256SUMS.txt" in lab and "--pr 330" in lab and
+           "--pr 339" in lab and "continue-on-error:" not in lab and
+           "|| true" not in lab, "C6_B2A_ARTIFACT_GUARD_MISSING")
+    demand("PROVENANCE_ONLY" in lab and "NOT_MEMORY_GATE" in lab and
+           "report['PR_INCREMENTAL_VERDICT'] == 'UNVERIFIED'" in lab and
+           "report['INTEGRATION_MEMORY_VERDICT'] == 'UNVERIFIED'" in lab and
+           "FALSE_READY" in lab, "C6_B2A_MEMORY_PASS_SPOOF")
     clk_paths = filters(sources[CLK01_WORKFLOW])
     demand(clk_paths is not None and
            len(clk_paths) == len(CLK01_PATHS) and
@@ -1518,7 +1568,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=39 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=40 FAMILIES=5")
 
 
 if __name__ == "__main__":

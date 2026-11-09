@@ -23,7 +23,7 @@ import clk_04_real5_oracle as a1
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "tests/fixtures/cpc6128/clk_04_a2_numeric/corpus.json"
-SOURCE_SHA = "67588fe25c2e39fddb892dc9644190111d151f8b1de5790aa4fa65b31a5c73df"
+SOURCE_SHA = "9c36655e872f0a4d2af423f242c8185dfb7053fa418bf81e4ac608f1b5588d53"
 SESSIONS = prior.SESSIONS
 PINS = {"caprice_commit": prior.CAP_SHA, "rom_sha256": prior.ROM_SHA,
         "image": prior.IMAGE}
@@ -33,7 +33,7 @@ PRINT = re.compile(rb"[ \t]*([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[Ee][+-]?[0
 
 def mandatory_values():
     fixed = {0, 1, 2, 3, 7, 8, 9, 127, 128, 129, 255, 256, 257,
-             32767, 32768, 32769, 50375, 50376, 50377,
+             32767, 32768, 32769, 5256, 50375, 50376, 50377,
              65535, 65536, 65537, 4294967294, 4294967295}
     for n in (23, 24, 30, 31):
         fixed.update((2**n - 1, 2**n, 2**n + 1))
@@ -439,7 +439,7 @@ def verify(out,head,seal):
 
 def self_test():
     cases=source_cases()
-    need(len(cases)==11 and sum(len(c["items"]) for c in cases)==36,
+    need(len(cases)==11 and sum(len(c["items"]) for c in cases)==37,
          "SELF_CORPUS_COUNT")
     from clk_04_a2_numeric import self_test as model_test
     model_test()

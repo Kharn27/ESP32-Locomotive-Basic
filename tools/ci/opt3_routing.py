@@ -396,7 +396,7 @@ def audit(sources):
            "fetch-depth: 0" in b2b and
            "EVENT_REPO" in b2b and
            "FORK_UNTRUSTED_STOP" in b2b and
-           "ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}" in b2b,
+           b2b.count("ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}") == 2,
            "C6_B2B_CONTROLLER_SOURCE_MISMATCH")
     demand("LAB_BASE" in b2b and
            "6d3aae8a95b97e18174d758f35ef240740e9a861" in b2b and
@@ -409,7 +409,9 @@ def audit(sources):
     demand("python3 -m unittest discover -s tests -p test_hw4_mem_c6_b2b.py -v"
            in b2b and "python3 -m py_compile" in b2b and
            "python3 tools/ci/hw4_mem_c6_b2b.py" in b2b and
-           "8-XTENSA" in b2b and "NOT_REQUIRED" in b2b,
+           "8-XTENSA" in b2b and "NOT_REQUIRED" in b2b and
+           "run-id: 42657443478" in b2b and
+           "--reuse" in b2b and "Build only seven remaining" in b2b,
            "C6_B2B_EIGHT_BUILD_NOT_GUARDED")
     demand("if-no-files-found: error" in b2b and
            "actions/upload-artifact@v4" in b2b and

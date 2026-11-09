@@ -107,14 +107,23 @@ jobs:
           assert p['head']['sha']=='64b0087d5087903fee175c4f149c65a65bb43fe6', 'PR330_HEAD_MOVED_STOP'
           print('C6_B2B_8BUILD_PREFLIGHT_PIN',m,p['base']['sha'],p['head']['sha'])
           PY
-      - name: Build exact B/H and M/test-merge 4+4 clean CONSOLE SPI40/SPI20
+      - name: Download previously built byte-identical B/SPI40 only (from aborted first run)
+        uses: actions/download-artifact@v4
+        with:
+          name: hw4-c6-b2-b-330-8build-42657443478-1
+          run-id: 42657443478
+          github-token: ${{ github.token }}
+          path: ${{ github.workspace }}/reports/c6b2b-prior
+      - name: Build only seven remaining clean cells (1+7 <= 8)
+
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p reports/hw4-mem-c6-b2-b
           python3 tools/ci/hw4_mem_c6_b2b.py \
             --workspace "$GITHUB_WORKSPACE" \
-            --output "$GITHUB_WORKSPACE/reports/hw4-mem-c6-b2-b"
+            --output "$GITHUB_WORKSPACE/reports/hw4-mem-c6-b2-b" \
+            --reuse "$GITHUB_WORKSPACE/reports/c6b2b-prior"
       - name: Archive reproducibility and 8-build manifests SHA256
         if: always()
         shell: bash

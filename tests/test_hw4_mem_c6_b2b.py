@@ -31,6 +31,8 @@ class C6B2BHost(unittest.TestCase):
     def test_budget_exact(self):
         self.assertEqual(c.MAX_BUILDS,8)
         self.assertEqual(len(c.LABELS)*len(c.VARIANTS),8)
+        self.assertEqual(c.REUSED_RUN,42657443478)
+        self.assertEqual(c.REUSED_ARTIFACT,13691574947)
         self.assertEqual(set(c.PAIRS),{'PR_INCREMENTAL','INTEGRATION_CANDIDATE'})
 
     def test_pair_pass_not_other_pair(self):
@@ -155,6 +157,8 @@ class C6B2BHost(unittest.TestCase):
             (path/'source.json').write_text(json.dumps({
                 'source_sha':'a'*40,'source_tree':'b'*40,
                 'source_label':'base','variant':'spi40',
+                'profile':'CONSOLE','clock_hz':40000000,
+                'container_image':c.IMAGE,'docker_image_id':'sha256:'+'a'*64,
                 'map_sha256':'1'*64,'github_run_id':'other',
                 'github_run_attempt':'1','lab_head':'d'*40}))
             (path/'firmware.map').write_bytes(b'fake')
@@ -171,6 +175,15 @@ class C6B2BHost(unittest.TestCase):
             with self.assertRaisesRegex(c.Invalid,'COMMAND_FAILURE'):
                 c.sh(['git','merge-tree'])
 
+    def test_reused_artifact_missing_failclosed(self):
+        with self.assertRaisesRegex(c.Invalid,'REUSED_ARTIFACT_MISSING'):
+            c.verify_and_reuse(Path('/nonexistent'),Path('/nonexistent'),
+                               Path('/nonexistent'),{},'token','sha256:'+'a'*64)
+
+    def test_reused_manifest_hash_is_pinned(self):
+        self.assertEqual(len(c.REUSED_SHA256SUMS),64)
+        self.assertEqual(c.REUSED_HEAD,'2f472b2e2c99637eed408229cc00bac0d256ead3')
+
     def test_old_preview_is_not_candidate(self):
         self.assertNotEqual(c.LEGACY_PREVIEW,c.POLICY_MAIN)
         self.assertNotEqual(c.LEGACY_PREVIEW,c.EXPECTED_H)
@@ -182,11 +195,13 @@ class C6B2BHost(unittest.TestCase):
             (path/'source.json').write_text(json.dumps({
                 'source_sha':'a'*40,'source_tree':'b'*40,
                 'source_label':'base','variant':'spi40',
+                'profile':'CONSOLE','clock_hz':40000000,
+                'container_image':c.IMAGE,'docker_image_id':'sha256:'+'a'*64,
                 'map_sha256':c.digest(path/'firmware.map'),
                 'github_run_id':'R','github_run_attempt':'1','lab_head':'d'*40,
                 'app_source_sha7':'a'*40}))
             with patch.dict(os.environ,{'GITHUB_RUN_ID':'R','GITHUB_RUN_ATTEMPT':'1','LAB_HEAD':'d'*40}):
-                with self.assertRaisesRegex(c.Invalid,'SHA7_ONLY'):
+                with self.assertRaisesRegex(c.Invalid,'APP_SOURCE_FULL_SHA_MISSING'):
                     c.validate_cell(Path(tmp),'base','spi40','a'*40,'b'*40)
 
 

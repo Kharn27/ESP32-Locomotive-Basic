@@ -33,7 +33,8 @@ FAMILIES = {
             "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
             "hw4-scroll-opt-a0-memory.yml",
             "hw4-disp-profile-c3.yml", "hw4-disp-render-a.yml",
-            "hw4-mem-c5-v2.yml", "hw4-mem-c6-b2-a-live.yml"),
+            "hw4-mem-c5-v2.yml", "hw4-mem-c6-b2-a-live.yml",
+            "hw4-mem-c6-b2-b-xtensa.yml"),
     "XTENSA": ("ci-xtensa.yml",),
 }
 EXPECTED_ROUTES = {
@@ -225,6 +226,17 @@ C6_B2A_PATHS = (
 )
 
 
+# C6-B2-B #351: eight-build #330 proof; additive, non-required.
+C6_B2B_WORKFLOW = "hw4-mem-c6-b2-b-xtensa.yml"
+C6_B2B_PATHS = (
+    ".github/workflows/hw4-mem-c6-b2-b-xtensa.yml",
+    "tools/ci/hw4_mem_c6_b2b.py",
+    "tests/test_hw4_mem_c6_b2b.py",
+    "docs/HW4-MEM-C6-B2-B.md",
+    "tools/ci/opt3_routing.py",
+)
+
+
 class UnsafeRoute(ValueError):
     pass
 
@@ -287,8 +299,8 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(FAMILIES) == 5 and len(expected) == 40 and
-           len(set(expected)) == 40,
+    demand(len(FAMILIES) == 5 and len(expected) == 41 and
+           len(set(expected)) == 41,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(HW4_MEM_C5 in FAMILIES["HW4"] and
            all(HW4_MEM_C5 not in names for family, names in
@@ -362,6 +374,51 @@ def audit(sources):
            "report['PR_INCREMENTAL_VERDICT'] == 'UNVERIFIED'" in lab and
            "report['INTEGRATION_MEMORY_VERDICT'] == 'UNVERIFIED'" in lab and
            "FALSE_READY" in lab, "C6_B2A_MEMORY_PASS_SPOOF")
+    # B2-B must only touch its five exact paths; never become required.
+    demand(C6_B2B_WORKFLOW in FAMILIES["HW4"] and
+           all(C6_B2B_WORKFLOW not in names for f, names in FAMILIES.items()
+               if f != "HW4"), "C6_B2B_WRONG_FAMILY")
+    b2b = sources[C6_B2B_WORKFLOW]
+    b2b_paths = filters(b2b)
+    demand(b2b_paths is not None and len(b2b_paths) == len(C6_B2B_PATHS)
+           and set(b2b_paths) == set(C6_B2B_PATHS),
+           "C6_B2B_FILTER_CONTRACT_MISMATCH")
+    b2b_events = re.findall(r"(?m)^  ([a-z][\w-]*):",
+                            b2b.split("\npermissions:", 1)[0])
+    demand(b2b_events == ["pull_request", "workflow_dispatch"],
+           "C6_B2B_EVENT_CONTRACT_MISMATCH")
+    demand("permissions:\n  contents: read\n  pull-requests: read\n  actions: read\n" in b2b
+           and "pull_request_target:" not in b2b and "secrets." not in b2b
+           and not re.search(r"(?m)^\s+(?:contents|pull-requests|actions): write\s*$", b2b),
+           "C6_B2B_PERMISSIONS_MISMATCH")
+    demand("needs: host-negatives" in b2b and
+           "persist-credentials: false" in b2b and
+           "fetch-depth: 0" in b2b and
+           "EVENT_REPO" in b2b and
+           "FORK_UNTRUSTED_STOP" in b2b and
+           b2b.count("ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}") == 2,
+           "C6_B2B_CONTROLLER_SOURCE_MISMATCH")
+    demand("LAB_BASE" in b2b and
+           "6d3aae8a95b97e18174d758f35ef240740e9a861" in b2b and
+           "4d261f2a76374ab99a4dd7415cae7a097330c46b" in b2b and
+           "64b0087d5087903fee175c4f149c65a65bb43fe6" in b2b and
+           "PR330_HEAD_MOVED_STOP" in b2b and
+           "GITHUB_TOKEN" not in b2b and
+           "github.token" in b2b,
+           "C6_B2B_PROVENANCE_MISMATCH")
+    demand("python3 -m unittest discover -s tests -p test_hw4_mem_c6_b2b.py -v"
+           in b2b and "python3 -m py_compile" in b2b and
+           "python3 tools/ci/hw4_mem_c6_b2b.py" in b2b and
+           "8-XTENSA" in b2b and "NOT_REQUIRED" in b2b and
+           "run-id: 42657443478" in b2b and
+           "--reuse" in b2b and "Build only seven remaining" in b2b,
+           "C6_B2B_EIGHT_BUILD_NOT_GUARDED")
+    demand("if-no-files-found: error" in b2b and
+           "actions/upload-artifact@v4" in b2b and
+           "SHA256SUMS.txt" in b2b and
+           "continue-on-error" not in b2b and
+           "|| true" not in b2b,
+           "C6_B2B_ARTIFACT_MISSING_OR_RC_MASKED")
     clk_paths = filters(sources[CLK01_WORKFLOW])
     demand(clk_paths is not None and
            len(clk_paths) == len(CLK01_PATHS) and
@@ -1513,7 +1570,85 @@ def c6_b2a_negative_tests(sources):
     print("CI-OPT3 C6_B2A_WRONG_FAMILY_REJECTED")
 
 
+def c6_b2b_negative_tests(sources):
+    """Only mutate ephemeral workflow strings, never the old source files."""
+    original = sources[C6_B2B_WORKFLOW]
+    for path in C6_B2B_PATHS:
+        needle = "      - '" + path + "'\n"
+        demand(original.count(needle) == 1, "C6_B2B_NEGATIVE_INERT_"+path)
+        broken = {**sources, C6_B2B_WORKFLOW: original.replace(needle, "", 1)}
+        try:
+            audit(broken)
+        except UnsafeRoute as exc:
+            demand(str(exc) == "C6_B2B_FILTER_CONTRACT_MISMATCH",
+                   "C6_B2B_WRONG_REJECTION_"+path+":"+str(exc))
+        else:
+            raise UnsafeRoute("C6_B2B_MISSING_FILTER_ACCEPTED_"+path)
+        print("CI-OPT3 C6_B2B_FILTER_REMOVAL_REJECTED", path)
+    cases = [
+        ("UNKNOWN_WORKFLOW", {**sources, "extra-xtensa.yml": original},
+         "UNKNOWN_OR_MISSING_WORKFLOW"),
+        ("DUPLICATE_PATH", {**sources, C6_B2B_WORKFLOW: original.replace(
+         "      - 'tools/ci/opt3_routing.py'\n",
+         "      - 'tools/ci/opt3_routing.py'\n"*2, 1)},
+         "C6_B2B_FILTER_CONTRACT_MISMATCH"),
+        ("OVERBROAD_PATH", {**sources, C6_B2B_WORKFLOW: original.replace(
+         "'docs/HW4-MEM-C6-B2-B.md'", "'docs/**'", 1)},
+         "C6_B2B_FILTER_CONTRACT_MISMATCH"),
+        ("WRONG_EVENT", {**sources, C6_B2B_WORKFLOW: original.replace(
+         "  workflow_dispatch:\n", "  push:\n    branches: [main]\n  workflow_dispatch:\n", 1)},
+         "C6_B2B_EVENT_CONTRACT_MISMATCH"),
+        ("PR_TARGET", {**sources, C6_B2B_WORKFLOW: original.replace(
+         "  pull_request:\n", "  pull_request_target:\n", 1)},
+         "PULL_REQUEST_MISSING"),
+        ("WRITE_TOKEN", {**sources, C6_B2B_WORKFLOW: original.replace(
+         "  contents: read", "  contents: write", 1)},
+         "C6_B2B_PERMISSIONS_MISMATCH"),
+        ("WRONG_HEAD", {**sources, C6_B2B_WORKFLOW: original.replace(
+         "ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}",
+         "ref: $" + "{{ github.sha }}", 1)},
+         "C6_B2B_CONTROLLER_SOURCE_MISMATCH"),
+        ("MISSING_TEST", {**sources, C6_B2B_WORKFLOW: original.replace(
+         "test_hw4_mem_c6_b2b.py -v", "test_missing.py -v", 1)},
+         "C6_B2B_EIGHT_BUILD_NOT_GUARDED"),
+        ("NO_ARTIFACT", {**sources, C6_B2B_WORKFLOW: original.replace(
+         "if-no-files-found: error", "if-no-files-found: ignore", 1)},
+         "C6_B2B_ARTIFACT_MISSING_OR_RC_MASKED"),
+        ("HIDDEN_RC", {**sources, C6_B2B_WORKFLOW: original.replace(
+         "          set -euo pipefail", "          continue-on-error: true\n          set -euo pipefail", 1)},
+         "C6_B2B_ARTIFACT_MISSING_OR_RC_MASKED"),
+        ("FAKE_MAIN", {**sources, C6_B2B_WORKFLOW: original.replace(
+         "6d3aae8a95b97e18174d758f35ef240740e9a861", "0"*40)},
+         "C6_B2B_PROVENANCE_MISMATCH"),
+    ]
+    for label, changed, expected in cases:
+        demand(changed != sources,"C6_B2B_NEGATIVE_INERT_"+label)
+        try:
+            audit(changed)
+        except UnsafeRoute as exc:
+            demand(str(exc) == expected,
+                   "C6_B2B_NEGATIVE_WRONG_REASON_"+label+":"+str(exc))
+        else:
+            raise UnsafeRoute("C6_B2B_FALSIFICATION_ACCEPTED_"+label)
+        print("CI-OPT3 C6_B2B_FALSIFICATION_REJECTED", label, expected)
+    hw4, xtensa = FAMILIES["HW4"], FAMILIES["XTENSA"]
+    try:
+        FAMILIES["HW4"] = tuple(n for n in hw4 if n != C6_B2B_WORKFLOW)
+        FAMILIES["XTENSA"] = xtensa + (C6_B2B_WORKFLOW,)
+        try:
+            audit(sources)
+        except UnsafeRoute as exc:
+            demand(str(exc) == "C6_B2B_WRONG_FAMILY",
+                   "C6_B2B_FAMILY_NEGATIVE_WRONG_REASON_"+str(exc))
+        else:
+            raise UnsafeRoute("C6_B2B_FAMILY_SPOOF_ACCEPTED")
+    finally:
+        FAMILIES["HW4"], FAMILIES["XTENSA"] = hw4, xtensa
+    print("CI-OPT3 C6_B2B_WRONG_FAMILY_REJECTED")
+
+
 def negative_tests(sources):
+    c6_b2b_negative_tests(sources)
     c6_b2a_negative_tests(sources)
     clk04_negative_tests(sources)
     c5_negative_tests(sources)
@@ -1652,7 +1787,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=40 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=41 FAMILIES=5")
 
 
 if __name__ == "__main__":

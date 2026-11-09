@@ -3,7 +3,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/clk-04-real5-oracle.yml'
-      - 'tools/clk_03_*'
+      - 'tools/clk_04_real5_*'
       - 'tests/test_clk_04_real5_oracle.py'
       - 'tests/fixtures/cpc6128/clk_04_real5/**'
       - 'docs/CLK-04-A1*'

@@ -298,7 +298,7 @@ def audit(sources):
            [".github/workflows/" + HW4_MEM_C5], sources),
            "C5_SELF_CHANGE_UNROUTED")
     # No new CI source such as push, schedule or workflow_run is authorized.
-    c5_events = re.findall(r"(?m)^  ([a-z][\\w-]*):",
+    c5_events = re.findall(r"(?m)^  ([a-z][\w-]*):",
                            c5_src.split("\npermissions:", 1)[0])
     demand(c5_events == ["pull_request", "workflow_dispatch"],
            "C5_EVENT_CONTRACT_MISMATCH")

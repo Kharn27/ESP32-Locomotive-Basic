@@ -32,7 +32,8 @@ FAMILIES = {
     "HW4": ("hw4-c3-b1-scroll.yml", "hw4-c3-b2-scroll.yml",
             "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
             "hw4-scroll-opt-a0-memory.yml",
-            "hw4-disp-profile-c3.yml", "hw4-disp-render-a.yml"),
+            "hw4-disp-profile-c3.yml", "hw4-disp-render-a.yml",
+            "hw4-mem-c5-v2.yml"),
     "XTENSA": ("ci-xtensa.yml",),
 }
 EXPECTED_ROUTES = {
@@ -170,6 +171,16 @@ HW4_RENDER_A_PATHS = (
     ".github/workflows/hw4-disp-render-a.yml",
 )
 
+# C5-C1: additive HW4 memory prototype; exact five PR paths, fail-closed.
+HW4_MEM_C5 = "hw4-mem-c5-v2.yml"
+HW4_MEM_C5_PATHS = (
+    "tools/ci/hw4_mem_c5_*.py",
+    "tools/ci/hw4_mem_c5_build.sh",
+    "tests/test_hw4_mem_c5_v2.py",
+    "docs/HW4-MEM-C5-v2.md",
+    ".github/workflows/hw4-mem-c5-v2.yml",
+)
+
 # CLK-01 C1: exact, closed PR routing contract (Issue #308, PR #320).
 CLK01_WORKFLOW = "clk-01-acquisition.yml"
 CLK01_PATHS = (
@@ -254,8 +265,13 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(expected) == 37 and len(set(expected)) == 37,
+    demand(len(FAMILIES) == 5 and len(expected) == 38 and
+           len(set(expected)) == 38,
            "DUPLICATE_OR_MISSING_FAMILY")
+    demand(HW4_MEM_C5 in FAMILIES["HW4"] and
+           all(HW4_MEM_C5 not in names for family, names in
+               FAMILIES.items() if family != "HW4"),
+           "C5_WRONG_FAMILY")
     demand(set(sources) == set(expected), "UNKNOWN_OR_MISSING_WORKFLOW")
     a0_paths = filters(sources[HW4_A0])
     demand(a0_paths is not None and
@@ -272,6 +288,20 @@ def audit(sources):
            len(render_paths) == len(HW4_RENDER_A_PATHS) and
            set(render_paths) == set(HW4_RENDER_A_PATHS),
            "HW4_RENDER_A_FILTER_CONTRACT_MISMATCH")
+    c5_src = sources[HW4_MEM_C5]
+    c5_paths = filters(c5_src)
+    demand(c5_paths is not None and
+           len(c5_paths) == len(HW4_MEM_C5_PATHS) and
+           set(c5_paths) == set(HW4_MEM_C5_PATHS),
+           "C5_FILTER_CONTRACT_MISMATCH")
+    demand(HW4_MEM_C5 in triggered_names(
+           [".github/workflows/" + HW4_MEM_C5], sources),
+           "C5_SELF_CHANGE_UNROUTED")
+    # No new CI source such as push, schedule or workflow_run is authorized.
+    c5_events = re.findall(r"(?m)^  ([a-z][\w-]*):",
+                           c5_src.split("\npermissions:", 1)[0])
+    demand(c5_events == ["pull_request", "workflow_dispatch"],
+           "C5_EVENT_CONTRACT_MISMATCH")
     clk_paths = filters(sources[CLK01_WORKFLOW])
     demand(clk_paths is not None and
            len(clk_paths) == len(CLK01_PATHS) and
@@ -1106,7 +1136,144 @@ def clk03_negative_tests(sources):
         print("CI-OPT3 CLK03_UNRELATED_ROUTE_REJECTED", path)
 
 
+def c5_negative_tests(sources):
+    """C5-C1: adversarial in-memory inventory, filters and HW4 family tests."""
+    original = sources[HW4_MEM_C5]
+    exact = filters(original)
+    demand(exact is not None and len(exact) == 5 and
+           len(set(exact)) == 5 and set(exact) == set(HW4_MEM_C5_PATHS),
+           "C5_NEGATIVE_PRECONDITION")
+    for required in HW4_MEM_C5_PATHS:
+        needle = "      - '" + required + "'\n"
+        demand(original.count(needle) == 1,
+               "C5_NEGATIVE_INERT_" + required)
+        broken = {**sources, HW4_MEM_C5: original.replace(needle, "", 1)}
+        try:
+            audit(broken)
+        except UnsafeRoute as exc:
+            demand(str(exc) == "C5_FILTER_CONTRACT_MISMATCH",
+                   "C5_REMOVAL_WRONG_REJECTION_" + required + ":" + str(exc))
+        else:
+            raise UnsafeRoute("C5_REQUIRED_FILTER_REMOVAL_ACCEPTED_" + required)
+        print("CI-OPT3 C5_REQUIRED_FILTER_REMOVAL_REJECTED", required)
+
+    cases = {
+        "UNKNOWN_WORKFLOW": (
+            {**sources, "hw4-mem-c5-unlisted.yml": original},
+            "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "C5_REMOVED": (
+            {k: v for k, v in sources.items() if k != HW4_MEM_C5},
+            "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "C5_RENAMED": (
+            {**{k: v for k, v in sources.items() if k != HW4_MEM_C5},
+             "hw4-mem-c5-renamed.yml": original},
+            "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "DUPLICATE_FILTER": (
+            {**sources, HW4_MEM_C5: original.replace(
+                "      - 'tools/ci/hw4_mem_c5_*.py'\n",
+                "      - 'tools/ci/hw4_mem_c5_*.py'\n"
+                "      - 'tools/ci/hw4_mem_c5_*.py'\n", 1)},
+            "C5_FILTER_CONTRACT_MISMATCH"),
+        "OVERBROAD_TOOL": (
+            {**sources, HW4_MEM_C5: original.replace(
+                "'tools/ci/hw4_mem_c5_*.py'", "'tools/**'", 1)},
+            "C5_FILTER_CONTRACT_MISMATCH"),
+        "OVERBROAD_TEST": (
+            {**sources, HW4_MEM_C5: original.replace(
+                "'tests/test_hw4_mem_c5_v2.py'", "'tests/**'", 1)},
+            "C5_FILTER_CONTRACT_MISMATCH"),
+        "OVERBROAD_DOC": (
+            {**sources, HW4_MEM_C5: original.replace(
+                "'docs/HW4-MEM-C5-v2.md'", "'docs/**'", 1)},
+            "C5_FILTER_CONTRACT_MISMATCH"),
+        "OVERBROAD_FIRMWARE": (
+            {**sources, HW4_MEM_C5: original.replace(
+                "'tools/ci/hw4_mem_c5_build.sh'", "'firmware/**'", 1)},
+            "C5_FILTER_CONTRACT_MISMATCH"),
+        "UNLISTED_FILTER_ADDED": (
+            {**sources, HW4_MEM_C5: original.replace(
+                "      - 'tools/ci/hw4_mem_c5_*.py'\n",
+                "      - 'tools/ci/hw4_mem_c5_*.py'\n"
+                "      - 'core/**'\n", 1)},
+            "C5_FILTER_CONTRACT_MISMATCH"),
+        "SELF_EDIT_REMOVED": (
+            {**sources, HW4_MEM_C5: original.replace(
+                "'.github/workflows/hw4-mem-c5-v2.yml'",
+                "'.github/workflows/ci-opt3-routing.yml'", 1)},
+            "C5_FILTER_CONTRACT_MISMATCH"),
+        "PR_TRIGGER_REMOVED": (
+            {**sources, HW4_MEM_C5: original.replace(
+                "  pull_request:\n", "", 1)},
+            "PULL_REQUEST_MISSING"),
+        "DISPATCH_TRIGGER_REMOVED": (
+            {**sources, HW4_MEM_C5: original.replace(
+                "  workflow_dispatch:\n", "", 1)},
+            "C5_EVENT_CONTRACT_MISMATCH"),
+        "UNAUTHORIZED_PUSH_ADDED": (
+            {**sources, HW4_MEM_C5: original.replace(
+                "  workflow_dispatch:\n",
+                "  workflow_dispatch:\n  push:\n", 1)},
+            "C5_EVENT_CONTRACT_MISMATCH"),
+    }
+    for label, (mutated, expected_error) in cases.items():
+        demand(mutated != sources, "C5_NEGATIVE_INERT_" + label)
+        try:
+            audit(mutated)
+        except UnsafeRoute as exc:
+            demand(str(exc) == expected_error,
+                   "C5_WRONG_REJECTION_" + label + ":" + str(exc))
+        else:
+            raise UnsafeRoute("C5_FALSIFICATION_ACCEPTED_" + label)
+        print("CI-OPT3 C5_FALSIFICATION_REJECTED", label, expected_error)
+
+    # A misclassified HW4 workflow must fail even if the count stays 38.
+    original_hw4 = FAMILIES["HW4"]
+    original_xtensa = FAMILIES["XTENSA"]
+    try:
+        FAMILIES["HW4"] = tuple(n for n in original_hw4 if n != HW4_MEM_C5)
+        FAMILIES["XTENSA"] = original_xtensa + (HW4_MEM_C5,)
+        try:
+            audit(sources)
+        except UnsafeRoute as exc:
+            demand(str(exc) == "C5_WRONG_FAMILY",
+                   "C5_FAMILY_WRONG_REJECTION_" + str(exc))
+        else:
+            raise UnsafeRoute("C5_WRONG_FAMILY_ACCEPTED")
+    finally:
+        FAMILIES["HW4"] = original_hw4
+        FAMILIES["XTENSA"] = original_xtensa
+    print("CI-OPT3 C5_WRONG_FAMILY_REJECTED")
+
+    required_examples = (
+        "tools/ci/hw4_mem_c5_v2.py",
+        "tools/ci/hw4_mem_c5_build.sh",
+        "tests/test_hw4_mem_c5_v2.py",
+        "docs/HW4-MEM-C5-v2.md",
+        ".github/workflows/hw4-mem-c5-v2.yml",
+    )
+    for path in required_examples:
+        demand(HW4_MEM_C5 in triggered_names([path], sources),
+               "C5_REQUIRED_PR_PATH_UNROUTED_" + path)
+        demand("HW4" in family_routes([path], sources),
+               "C5_REQUIRED_PATH_WRONG_FAMILY_" + path)
+        print("CI-OPT3 C5_PR_ROUTE_VERIFIED", path)
+    for path in (
+        "core/basic_executor.c",
+        "firmware/esp32_display_probe/main/main.c",
+        "tools/ci/opt3_routing.py",
+        "tools/j1_19_a_paper_oracle.py",
+        "tests/fixtures/cpc6128/j1_21_a_cls/archive.json",
+        "tests/oracles/hw4_esc_r1_verify.py",
+        "docs/CLK-03-cpc-time-oracle.md",
+        "docs/ROADMAP_GATES.md",
+    ):
+        demand(HW4_MEM_C5 not in triggered_names([path], sources),
+               "C5_UNRELATED_PR_PATH_ROUTED_" + path)
+        print("CI-OPT3 C5_UNRELATED_ROUTE_REJECTED", path)
+
+
 def negative_tests(sources):
+    c5_negative_tests(sources)
     clk03_negative_tests(sources)
     clk01_negative_tests(sources)
     r1_negative_tests(sources)
@@ -1242,7 +1409,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=37 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=38 FAMILIES=5")
 
 
 if __name__ == "__main__":

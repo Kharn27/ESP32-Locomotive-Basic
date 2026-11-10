@@ -51,8 +51,15 @@ def job(text, name):
 
 def check_wiring(text):
     """No change to the routing guard may silently disable mandatory full."""
+    router = job(text, "route")
+    host = job(text, "host-negatives-and-c99")
     cpc = job(text, "cpc-acquire")
     replay = job(text, "sealed-replay")
+    demand(re.search(r"(?m)^    (?:if|needs):", router) is None and
+           "python3 tools/ci/clk_04_a4_fast_route.py" in router,
+           "ROUTE_JOB_CONDITIONAL_OR_MISSING")
+    demand(re.search(r"(?m)^    (?:if|needs):", host) is None,
+           "HOST_JOB_CONDITIONAL")
     demand(re.search(r"(?m)^    needs: \[host-negatives-and-c99, route\]$", cpc)
            is not None, "CPC_GATE_DEPENDENCIES_CHANGED")
     demand(re.search(r"(?m)^    if: needs\.route\.outputs\.mode == 'full'$", cpc)

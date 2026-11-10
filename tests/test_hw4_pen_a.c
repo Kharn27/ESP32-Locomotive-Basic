@@ -899,8 +899,186 @@ static void test_cpc_palette_native_cls_keeps_inks(void)
     assert_colour(0U,3U);
 }
 
+/* J1.21-C2: the exact C1 direct event is consumed by the existing HW4
+ * MODE1 bridge, not a 10 CLS / RUN workaround and not host !CLS. */
+static void test_j121_c2_direct_cls_mode1(void)
+{
+    static const char *const spellings[]={"CLS","cls","cLs","  ClS  "};
+    BasicVariableStore store;
+    BasicVariableEntry entries[16];
+    uint8_t original_program[sizeof(f.program_bytes)];
+    BasicVariableEntry original_entries[16];
+    BasicProgram program_before;
+    BasicSessionRuntime runtime_before;
+    BasicVariableStore store_before;
+    uint8_t inks_before[4];
+    uint8_t old_pen,old_paper,old_border,read_cell;
+    bool known=false,emitted=true,cleared=true;
+    size_t old_program_size;
+    setup();
+    assert(bvs_init(&store,entries,16U)==BVS_OK);
+    assert(bsr_init_with_store(&f.runtime,&f.program,&store).status==BSR_OK);
+    assert(submit("10 A%=2").status==BSR_OK);
+    assert(submit("20 END").status==BSR_OK);
+    assert(submit("RUN").status==BSR_OK);
+    for(unsigned step_index=0U;step_index<8U;++step_index) {
+        BSRResult result=step(OUT_CAP,EVENT_CAP);
+        if(result.status==BSR_END) break;
+        assert(result.status==BSR_OK);
+    }
+    assert(f.runtime.state==BSR_IDLE && store.count==1U);
+    old_program_size=f.program.size;
+    program_before=f.program;
+    runtime_before=f.runtime;
+    store_before=store;
+    memcpy(original_program,f.program_bytes,sizeof(original_program));
+    memcpy(original_entries,entries,sizeof(original_entries));
+    assert(cpc_video_set_ink(&f.video,0U,6U));
+    assert(cpc_video_set_ink(&f.video,1U,26U));
+    assert(cpc_video_set_ink(&f.video,2U,20U));
+    assert(cpc_video_set_ink(&f.video,3U,18U));
+    assert(cpc_video_set_border(&f.video,15U));
+    assert(cpc_video_set_text_colors(&f.video,3U,2U));
+    memcpy(inks_before,f.video.ink,sizeof(inks_before));
+    old_pen=f.video.pen;old_paper=f.video.paper;old_border=f.video.border;
+    for(size_t i=0U;i<sizeof(spellings)/sizeof(spellings[0]);++i) {
+        static const uint8_t marked[]="SCREEN_CONTENT";
+        BEVideoEvent untouched;
+        CpcText text_before;
+        CpcVideo video_before;
+        assert(cpc_text_write(&f.text,marked,sizeof(marked)-1U));
+        assert(pixel_at(0U,0U)!=old_paper || i!=0U);
+        /* API C1 writes exactly one event, no temporary BASIC mutation. */
+        f.written=123U;f.event_written=456U;
+        assert(bsr_prepare_direct_events(&f.runtime,
+               (const uint8_t *)spellings[i],strlen(spellings[i]),
+               f.output,sizeof(f.output),&f.written,
+               f.events,1U,&f.event_written).status==BSR_OK);
+        assert(f.written==0U && f.event_written==1U);
+        assert(f.events[0].type==BE_VIDEO_CLEAR_TEXT &&
+               f.events[0].print_offset==0U &&
+               f.events[0].pen==0U && f.events[0].ink==0U &&
+               f.events[0].colour==0U);
+        assert(f.program.size==old_program_size &&
+               memcmp(&f.program,&program_before,sizeof(program_before))==0);
+        assert(memcmp(f.program_bytes,original_program,sizeof(original_program))==0);
+        assert(memcmp(&f.runtime,&runtime_before,sizeof(runtime_before))==0);
+        assert(memcmp(&store,&store_before,sizeof(store_before))==0);
+        assert(memcmp(entries,original_entries,sizeof(original_entries))==0);
+        text_before=f.text;video_before=f.video;
+        assert(hw4_pen_preflight(&f.text,f.output,0U,f.events,1U)==HW4_PEN_OK);
+        assert(memcmp(&f.text,&text_before,sizeof(text_before))==0 &&
+               memcmp(&f.video,&video_before,sizeof(video_before))==0);
+        assert(hw4_pen_replay(&f.text,f.output,0U,f.events,1U)==HW4_PEN_OK);
+        for(size_t j=0U;j<sizeof(f.vram);++j)
+            assert(f.vram[j]==(uint8_t)(old_paper*0x55U));
+        assert(pixel_at(0U,0U)==old_paper);
+        assert(cpc_video_read_cell(&f.video,0U,0U,&read_cell,&known) && !known);
+        assert(f.text.row==0U && f.text.column==0U);
+        assert(f.video.mode==CPC_MODE_1 && f.video.pen==old_pen &&
+               f.video.paper==old_paper && f.video.border==old_border);
+        assert(memcmp(f.video.ink,inks_before,sizeof(inks_before))==0);
+        assert(memcmp(f.program_bytes,original_program,sizeof(original_program))==0);
+        assert(memcmp(entries,original_entries,sizeof(original_entries))==0);
+        assert(memcmp(&f.runtime,&runtime_before,sizeof(runtime_before))==0);
+        emitted=true;cleared=true;
+        assert(cpc_ready_policy_apply(&f.text,CPC_READY_UNCHARACTERIZED_DIRECT,&emitted));
+        assert(!emitted);
+        assert(cpc_uart_console_prompt(&f.text,&cleared) && !cleared);
+        /* Rejected video preflight is entirely non-mutating. */
+        untouched=f.events[0];
+        f.events[0].pen=1U; /* malformed CLEAR_TEXT reserved field */
+        text_before=f.text;video_before=f.video;
+        assert(hw4_pen_preflight(&f.text,f.output,0U,f.events,1U)==
+               HW4_PEN_INVALID_EVENT);
+        assert(hw4_pen_replay(&f.text,f.output,0U,f.events,1U)==
+               HW4_PEN_INVALID_EVENT);
+        assert(memcmp(&f.text,&text_before,sizeof(text_before))==0);
+        assert(memcmp(&f.video,&video_before,sizeof(video_before))==0);
+        assert(f.events[0].pen==1U);
+        f.events[0]=untouched;
+    }
+    /* Host !CLS deliberately restores the boot palette, unlike native CLS. */
+    assert(hw4_pen_console_clear(&f.text));
+    assert(f.video.ink[0]==1U && f.video.ink[1]==24U &&
+           f.video.ink[2]==20U && f.video.ink[3]==6U);
+    assert(f.program.size==old_program_size &&
+           memcmp(f.program_bytes,original_program,sizeof(original_program))==0);
+}
+
+static void test_j121_c2_direct_rejections_and_running(void)
+{
+    static const char *const other[]={
+        "CLS:CLS","CLS #1","CLSX","PRINT \"X\"","10 CLS",
+        "LIST","NEW","RUN","!CLS"
+    };
+    setup();
+    for(size_t i=0U;i<sizeof(other)/sizeof(other[0]);++i) {
+        f.written=55U;f.event_written=66U;
+        memset(f.events,0x5a,sizeof(f.events));
+        assert(bsr_prepare_direct_events(&f.runtime,
+               (const uint8_t *)other[i],strlen(other[i]),
+               f.output,sizeof(f.output),&f.written,
+               f.events,1U,&f.event_written).status!=BSR_OK);
+        assert(f.written==55U && f.event_written==66U);
+        for(size_t j=0U;j<sizeof(f.events);++j)
+            assert(((const uint8_t *)f.events)[j]==0x5aU);
+    }
+    f.written=55U;f.event_written=66U;
+    assert(bsr_prepare_direct_events(&f.runtime,
+           (const uint8_t *)"CLS",3U,f.output,sizeof(f.output),&f.written,
+           f.events,0U,&f.event_written).executor_status==BE_NO_EVENT_SPACE);
+    assert(f.written==55U && f.event_written==66U);
+    assert(submit("10 PRINT \"RUNNING\"").status==BSR_OK);
+    assert(submit("RUN").status==BSR_OK);
+    f.written=55U;f.event_written=66U;
+    assert(bsr_prepare_direct_events(&f.runtime,
+           (const uint8_t *)"CLS",3U,f.output,sizeof(f.output),&f.written,
+           f.events,1U,&f.event_written).status==BSR_BUSY);
+    assert(f.written==55U && f.event_written==66U);
+    assert(f.runtime.state==BSR_RUNNING);
+    assert(bsr_stop(&f.runtime).status==BSR_OK);
+}
+
+/* Source contract: executing direct CLS must use C1/bridge and fail-stop;
+ * this canary specifically rejects a host-only bridge test with NO console
+ * integration. It does not claim to execute ESP-IDF UART or LCD on Linux. */
+static void test_j121_c2_console_wiring_contract(void)
+{
+    const char *path=getenv("HW4_PEN_C2_CONSOLE_SOURCE");
+    static char source[80000];
+    const char *start,*end,*prepared,*preflight,*end_line,*replay,*fail_stop;
+    FILE *fp;
+    size_t n;
+    assert(path!=NULL);
+    fp=fopen(path,"rb");
+    assert(fp!=NULL);
+    n=fread(source,1U,sizeof(source)-1U,fp);
+    assert(!ferror(fp) && feof(fp) && fclose(fp)==0);
+    source[n]='\0';
+    start=strstr(source,"static bool execute_line(");
+    assert(start!=NULL);
+    end=strstr(start,"static bool uart_init(");
+    assert(end!=NULL);
+    prepared=strstr(start,"bsr_prepare_direct_events(");
+    preflight=strstr(start,"hw4_pen_preflight(");
+    end_line=strstr(start,"cpc_uart_console_end_line(&s_text)");
+    replay=strstr(start,"hw4_pen_replay(");
+    fail_stop=strstr(start,"return fail(\"DIRECT_CLS_REPLAY\"");
+    assert(prepared!=NULL && prepared<end && preflight!=NULL &&
+           end_line!=NULL && replay!=NULL && fail_stop!=NULL);
+    assert(prepared<preflight && preflight<end_line &&
+           end_line<replay && replay<fail_stop && fail_stop<end);
+    assert(strstr(start,"s_basic.runtime.state==BSR_IDLE")<prepared);
+    assert(strstr(start,"if(direct_cls) {")!=NULL);
+    assert(strstr(start,"CPC_READY_UNCHARACTERIZED_DIRECT")!=NULL);
+}
+
 int main(void)
 {
+    test_j121_c2_console_wiring_contract();
+    test_j121_c2_direct_rejections_and_running();
+    test_j121_c2_direct_cls_mode1();
     test_cpc_palette_boot_source();
     test_cpc_palette_run_and_clear();
     test_cpc_palette_native_cls_keeps_inks();

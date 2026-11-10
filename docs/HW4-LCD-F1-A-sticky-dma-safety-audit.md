@@ -1,0 +1,72 @@
+# HW4-LCD-F1-A — Audit de sûreté DMA LCD sticky (lecture seule)
+
+**Mandat :** [issue #117, décision Pilotage #6765348010](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/117#issuecomment-6765348010). **Conclusion proposée : `RECOVERY_NOT_PROVEN` — conserver `FAIL-STOP` ; ne pas autoriser F1-B récupération.** Une notification ISR tardive ne suffit pas à prouver que toute la file SPI/DMA et les callbacks sont quiescents.
+
+## 1. Sources, frontières et niveaux de preuve
+
+- `main` audité : **`fe6f73707b0f16c8140246a806a52f9c442ae4f9`**, après #330 ; audit sur le **pilote vivant**, non sur l'historique #115.
+- [Pilote `cyd_ili9341.c` aux lignes exactes](https://github.com/Kharn27/ESP32-Locomotive-Basic/blob/fe6f73707b0f16c8140246a806a52f9c442ae4f9/firmware/components/cyd_ili9341/cyd_ili9341.c) : blob Git **`0565c660b80d0d956ac44764014487a8e757457a`**, **276 lignes**.
+- [Interface `cyd_ili9341.h`](https://github.com/Kharn27/ESP32-Locomotive-Basic/blob/fe6f73707b0f16c8140246a806a52f9c442ae4f9/firmware/components/cyd_ili9341/include/cyd_ili9341.h) : blob **`ae1eb096764b6d8d85591d86ef7cee80faa769a8`** ; `CYD_LCD_DMA_BYTES=5120`.
+- [`idf_component.yml`](https://github.com/Kharn27/ESP32-Locomotive-Basic/blob/fe6f73707b0f16c8140246a806a52f9c442ae4f9/firmware/components/cyd_ili9341/idf_component.yml) épingle **ESP-IDF 5.5.6** et **espressif/esp_lcd_ili9341 2.1.0**.
+- [Contrat officiel `esp_lcd_panel_io_tx_color`, ESP-IDF v5.5.6](https://docs.espressif.com/projects/esp-idf/en/v5.5.6/esp32/api-reference/peripherals/lcd/index.html) : la couleur est mise en file, transférée en arrière-plan DMA/interruptions, et la **durée de vie du buffer incombe à l'appelant**, avec recyclage au callback `on_color_trans_done`. Contrat API **distinct** d'une preuve que `esp_lcd_panel_draw_bitmap` est synchrone ou qu'un timeout annule le transfert.
+- [Appelant CONSOLE aux lignes 305–332 et 461–509](https://github.com/Kharn27/ESP32-Locomotive-Basic/blob/fe6f73707b0f16c8140246a806a52f9c442ae4f9/firmware/esp32_display_probe/main/hw4_c2_console.c) : un propriétaire applicatif sérialise remplissage `cyd_lcd_band` → `cyd_lcd_send`, puis `LCD_FAIL_STOP retry=0` ; cette sérialisation **n'est pas imposée par un verrou dans le driver**.
+
+**Classement des preuves :** `SOURCE_STATIC_AUDITED` pour les conditions et mutations effectives du pilote ; `API_DOCUMENTED` pour l'asynchronisme et le contrat de buffer ; `HOST_MODEL_VERIFIED` seulement pour la machine de simulation ; `TARGET_DMA_QUIESCENCE_UNVERIFIED` et `ON_DEVICE_UNVERIFIED` pour panne/annulation/récupération matérielles. Les anciens logs PO contiennent **0 timeout / 0 défaut DMA reproduit** ; ils ne constituent pas un essai de récupération.
+
+## 2. Chemin exact et ownership
+
+1. **Init** [L175–253](https://github.com/Kharn27/ESP32-Locomotive-Basic/blob/fe6f73707b0f16c8140246a806a52f9c442ae4f9/firmware/components/cyd_ili9341/cyd_ili9341.c#L175-L253). Refuse si `s_panel || s_bus_owned || s_done || s_band || s_fault`. Configure rétroéclairage GPIO21 à 0 ; alloue exactement **5120 octets** par `heap_caps_malloc(CYD_LCD_DMA_BYTES,MALLOC_CAP_INTERNAL|MALLOC_CAP_DMA)` ; crée un sémaphore **binaire** ; initialise SPI2 DMA (`SPI_DMA_CH_AUTO`, `max_transfer_sz=5136`) ; configure `trans_queue_depth=2`, `pclk_hz=LCD_CLOCK_HZ` ; enregistre `on_color_trans_done(s_done)` ; crée et initialise le panel. Les ressources sont conservées après succès. Le bloc `fail:` [L244–252] détruit panel/IO/bus/sémaphore/tampon **pendant l'init uniquement**, avant tout `cyd_lcd_send` explicite ; ce n'est **pas** un protocole de nettoyage après une panne d'envoi.
+2. **Accès à la bande** [L62](https://github.com/Kharn27/ESP32-Locomotive-Basic/blob/fe6f73707b0f16c8140246a806a52f9c442ae4f9/firmware/components/cyd_ili9341/cyd_ili9341.c#L62) : renvoie `s_band` seulement si `s_panel && !s_fault`. Il s'agit d'un **emprunt du buffer unique driver-owned**, non d'un transfert de propriété. Pendant `DMA_SUBMITTED`, `s_fault` vaut encore false : l'API ne refuse **pas à elle seule** un deuxième emprunt concurrent ; la discipline single-owner relève de l'application.
+3. **Envoi** [L65–93](https://github.com/Kharn27/ESP32-Locomotive-Basic/blob/fe6f73707b0f16c8140246a806a52f9c442ae4f9/firmware/components/cyd_ili9341/cyd_ili9341.c#L65-L93) : refuse avant envoi si panel/sémaphore absents ou sticky, contrôle les coordonnées et une surface de **≤2560 pixels** (5120 B RGB565). Draine **un** jeton de sémaphore `xSemaphoreTake(s_done,0)`, appelle `esp_lcd_panel_draw_bitmap(...,s_band)` puis, **uniquement si `ESP_OK`**, attend `xSemaphoreTake(...,pdMS_TO_TICKS(2000))`. Un retour de draw `ESP_OK` signifie que l'appel a réussi, **pas que le DMA est physiquement terminé** ; la confirmation logique attendue est le signal ISR.
+4. **Callback** [L51–60](https://github.com/Kharn27/ESP32-Locomotive-Basic/blob/fe6f73707b0f16c8140246a806a52f9c442ae4f9/firmware/components/cyd_ili9341/cyd_ili9341.c#L51-L60) : ISR `xSemaphoreGiveFromISR((SemaphoreHandle_t)ctx,&task_woken)` ; ignore l'identité de l'IO et l'événement, **aucun identifiant/génération de transfert**, aucune corrélation par pointeur. Le sémaphore binaire ne comptabilise pas les notifications multiples. Un réveil tardif n'est ni une preuve que la file de profondeur 2 est vide ni une preuve de désarmement ISR.
+5. **Succès** : avec sémaphore acquis, `++s_transfers`, `s_last_error=ESP_OK`, envoi synchrone *du point de vue de l'appelant*. Aucune assertion de fin de **toute** transaction concurrente : prérequis non modélisé (unique propriétaire sans transactions extérieures).
+6. **Erreur retour draw / timeout** [L79–92](https://github.com/Kharn27/ESP32-Locomotive-Basic/blob/fe6f73707b0f16c8140246a806a52f9c442ae4f9/firmware/components/cyd_ili9341/cyd_ili9341.c#L79-L92) : expiration après 2000 ms → `ESP_ERR_TIMEOUT`, `++s_timeouts` ; toute erreur retour draw ou attente → **`s_fault=true`**, demande **GPIO backlight=0** (retour `gpio_set_level` ignoré), log `HW4B DMA_FAIL ... buffer_retained=1` ; **aucun `heap_caps_free`, `vSemaphoreDelete`, reset de bus ni `s_fault=false`** sur cette route. Ressources épinglées tant qu'une ISR pourrait viser `s_done` ou lire `s_band`. On peut prouver la **commande logicielle** BL OFF, **pas l'état optique/électrique du GPIO** après une erreur de GPIO.
+7. **Refus après faute** : `cyd_lcd_send` / `send_profiled` [L69], `cyd_lcd_orientation` [L135], `cyd_lcd_init` [L177] et `cyd_lcd_backlight` [L258] refusent. `cyd_lcd_band` retourne NULL. `cyd_lcd_diagnostics` [L262–275] reste lisible. `initialized` signifie `s_panel != NULL`, donc **peut valoir true tout en étant en faute** ; les refus précoces ne modifient pas `s_last_error` ; `timeout_count` n'est incrémenté que sur expiration de l'attente d'un submit réussi, `transfer_count` seulement après obtention d'un jeton, et aucun ne prouve le bus quiescent.
+8. **Appelant** : `render_band` [L305–332] prépare une rangée RGB565 transitoire de **640 B pile**, écrit dans le tampon 5120 B, puis appelle le transfert ; sur faute, `LCD_DMA`. `repaint_dirty` [L461–509] garde les bandes non validées, journalise `LCD_FAIL_STOP ... retry=0`, puis **retourne false sans seconde tentative**. Ce fail-stop n'est **pas** un mécanisme de redessin/reprise automatique.
+
+**Limite distincte :** `cyd_lcd_orientation` peut recevoir une erreur de `swap_xy`/`mirror`/clear [L133–171] qui **n'emprunte pas forcément** le chemin `lcd_send_impl` faute-sticky. L'état logique MADCTL/geometry après erreur de configuration reste à caractériser séparément ; F1-A n'autorise aucun changement à cette politique. Le bloc `init fail` n'est pas une preuve de quiescence d'une transaction couleur déjà envoyée.
+
+## 3. Machine à états / propriété des ressources
+
+**Important :** `DMA_SUBMITTED`, `COMPLETE` et `QUIESCENCE_UNPROVEN` sont des **étiquettes d'audit / modèle**, pas une nouvelle machine à états du firmware ; `s_fault` est le seul verrou d'erreur réel. `s_panel`, `s_io`, `s_done`, `s_band` et `s_bus_owned` sont statiques.
+
+| État / évènement | Panel / SPI / sémaphore / DMA | Backlight | Band / send / init / BL | Diagnostic / suite sûre |
+| --- | --- | --- | --- | --- |
+| **UNINITIALIZED** au démarrage | nuls / non acquis / non alloué | GPIO pas encore initialisé | band NULL, send refusé, init possible | diag initialized=false ; boot seulement |
+| **INIT en cours**, puis **IDLE** après succès | ressources allouées/actives, 5120 B internes DMA, file SPI2 profondeur 2 | demandé OFF à init, ON plus tard après premier frame | band accessible ; send seulement par **propriétaire unique** | initialized=true, fault=false ; pas de mutex driver |
+| **DMA_SUBMITTED** après draw accepté | tampon emprunté par transaction asynchrone ; callback vers `s_done` possible | inchangé | l'application doit **s'interdire** réemploi pendant attente ; pointeur API reste exposé | quiescence **absente** avant confirmation |
+| **COMPLETE** après jeton attendu | réutilisable **si** un seul transfert bien corrélé | inchangé | next band possible par unique propriétaire | succès+1 ; pas de conclusion sur autre transfert |
+| **Soumission refusée** après début de send | transaction potentiellement inconnue ; buffer/sem/bus **retenus** | commande OFF | **FAULT_STICKY**, plus de rendu | retour erreur ne prouve pas « aucune transaction » |
+| **Attente 2000 ms expirée** | DMA/ISR potentiellement actifs ; handles et tampon retenus | commande OFF | **FAULT_STICKY**, aucun retry | timeouts+1, last_error timeout, état réel inconnu |
+| **ISR tardive / double après défaut** | callback peut déposer un jeton dans sémaphore épinglé ; un crédit binaire | reste demandé OFF | toujours **FAULT_STICKY**, aucun free/reset | **QUIESCENCE_UNPROVEN** ; ni ID transaction ni drain queue |
+| **Diagnostic après fault** | ressources épinglées ; initialized=true possible | demandé OFF | diagnostic possible ; band NULL ; backlight refuse | consigner et fail-stop |
+| **INIT échouée avant usage couleur** | `fail:` détruit ressources partielles | commande OFF | autre init éventuellement possible si ressources nulles/fault=false | non extrapolable au timeout DMA |
+
+**Transitions du modèle :** UNINITIALIZED → IDLE (init) ; IDLE → DMA_SUBMITTED (submit) ; DMA_SUBMITTED → COMPLETE → IDLE (jeton) ; DMA_SUBMITTED → FAULT_STICKY (erreur submit ou timeout). FAULT_STICKY → **aucune reprise**. « QUIESCENCE_UNPROVEN » qualifie l'absence de preuve dans l'état sticky, **pas une transition de récupération**.
+
+## 4. Scénarios adversariaux et preuves hôte
+
+`tests/test_hw4_lcd_f1_dma_model.py` n'importe **aucun** header ESP-IDF, ne crée **aucun** SPI/DMA/GPIO, ne réutilise **pas** le pilote et ne change aucune configuration.
+
+~~~sh
+python3 -m py_compile tests/test_hw4_lcd_f1_dma_model.py
+python3 -m unittest discover -s tests -p 'test_hw4_lcd_f1_*.py' -v
+~~~
+
+**11 cas host-only** : succès séquentiel et compteurs ; succès non signalé refusé ; erreur submit sticky ; timeout sticky et retenue du sem/buffer ; ISR tardive après timeout ; double ISR tardive (crédit binaire plafonné à 1) ; callback après submit erreur par prudence ; jeton obsolète vidé avant prochain send ; doubles signaux après succès ; second send concurrent refusé dans le **modèle** ; quatre callbacks tardifs ne valent pas preuve de quiescence. Après chaque panne, les cinq tentatives **reuse/free/reset/reinit/retry** sont rejetées ; band=NULL, backlight ON interdit, diagnostic fault=true. `COMPLETE` modèle exige un jeton mais ne certifie **pas** la fin physique de toute la file SPI.
+
+**Limites :** le modèle refuse un second send concurrent, alors que le vrai driver n'a pas de mutex : c'est une **discipline de client sûr**, pas une garantie firmware. L'ISR spontanée hors vol est un adversaire synthétique, **pas** un événement observé sur le CYD. La simulation ne mesure ni ISR réelle, ni DMA/CPU ordering, ni état électrique GPIO, ni annulation IDF. Aucune injection ni flash sur carte.
+
+La fenêtre la plus dangereuse est : draw accepté → attente expire → **ISR tardive** → quelqu'un efface `s_fault`, libère `s_band` / détruit `s_done` ou lance un autre DMA. Un callback pointant sur un **sémaphore détruit**, ou un DMA lisant une **bande libérée/réutilisée**, peut mener à use-after-free/corruption. Le driver conserve les ressources précisément pour ne pas prendre ce risque ; aucun dommage n'est reproduit dans ce travail.
+
+## 5. Arbre de décision GO / STOP F1-B
+
+1. **Un dernier callback prouve-t-il la file SPI vide, l'ISR désarmée et l'absence de lecture DMA ?** Non : callback sans identifiant de transaction, file profondeur 2 et aucune synchronisation destructive. API : lifecycle buffer à la charge de l'appelant. **STOP F1-B**.
+2. **Le retour erreur draw garantit-il qu'aucune opération n'est partie en file ?** Non démontré par le code seul : soumission partielle reste inconnue. **STOP F1-B**.
+3. **Une ISR tardive unique, même si elle réveille le sem, certifie-t-elle le repos complet ?** Non, pas de preuve queue drain, transaction generation ou barrière ISR. **STOP F1-B**.
+4. **Préconditions avant nouveau mandat, hors F1-A :** contrat ESP-IDF/ILI9341 versionné établissant interruption/annulation/vidage **synchronisés avec ISR** ; ownership exclusif ; génération de transaction ; garantie de quiescence avant `free/delete/bus-reset` ; distinguer timeout logiciel/défaut matériel ; modèles host négatifs ; budget RAM/IRAM sans autre framebuffer ; ensuite test PO sur scénario **non destructif** autorisé séparément.
+5. **Sans ces preuves :** conserver **FAIL-STOP, tampon/sémaphore épinglés, backlight commandé OFF**, et laisser au produit/Pilotage l'éventualité d'un **redémarrage complet contrôlé** plutôt qu'un retry opportuniste. Le reboot lui-même **n'est pas implémenté, testé ou autorisé ici**.
+
+**Mémoire :** delta firmware théorique de F1-A = **0 code/DRAM/BSS/IRAM** (aucun fichier compilé touché) ; le modèle Python et cette note sont hôte seulement. Le pilote conserve 5120 B internes DMA plus sémaphore/handles (surcoût exact non mesuré). Taille d'une future F1-B = **UNVERIFIED** ; ne pas inventer de budget ni ajouter PSRAM/framebuffer.
+
+**Conclusion au Pilotage : `RECOVERY_NOT_PROVEN`.** Audit négatif recevable ; **proposition STOP F1-B** tant qu'aucune vraie quiescence SPI/DMA/ISR ne peut être prouvée. Aucune modification du driver, des gates ou du firmware ; aucune demande de test physique artificiel. PR F1-A Draft, non fusionnée. `ON_DEVICE_UNVERIFIED` pour toute reprise après faute réelle.

@@ -3,7 +3,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/clk-04-a3-lifecycle-oracle.yml'
-      - 'tools/clk_04_a2_*'
+      - 'tools/clk_04_a3_*'
       - 'tests/test_clk_04_a3_lifecycle.py'
       - 'tests/fixtures/cpc6128/clk_04_a3_lifecycle/**'
       - 'docs/CLK-04-A3*'
@@ -53,7 +53,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           submodules: recursive
-      - name: Acquire true CPC integer boundary REAL5 RAM + STOP and CONT screenshots
+      - name: Acquire CPC TIME lifecycle in two independent processes + original SNA windows
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         shell: bash
@@ -147,7 +147,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: clk-04-a3-numeric-comparison
+          name: clk-04-a3-lifecycle-comparison
           path: ${{ runner.temp }}/clk04-a3-comparison.json
           if-no-files-found: warn
           retention-days: 90

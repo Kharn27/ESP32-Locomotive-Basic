@@ -70,5 +70,5 @@ jobs:
         with:
           name: e1-c1-host-isolation-${{ github.run_id }}-${{ github.run_attempt }}
           path: reports/j125-e1-c1-host/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30

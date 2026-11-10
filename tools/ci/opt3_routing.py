@@ -529,7 +529,7 @@ def audit(sources):
            "8c778bf072a06fb7c23b9cccd179041db7f79a52" in a3,
            "A3_CPC_PINS_DRIFT")
     demand("persist-credentials: false" in a3 and
-           "ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}" in a3 and
+           a3.count("ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}") == 3 and
            "continue-on-error" not in a3 and "|| true" not in a3 and
            "if-no-files-found: error" in a3,
            "A3_HEAD_OR_FAIL_CLOSED_INTEGRITY")

@@ -29,7 +29,8 @@ FAMILIES = {
         "j1-16-d-a-negative-store.yml", "j1-16-e-a-small-store.yml",
         "j1-17-c-a-pen-cpc.yml", "clk-01-acquisition.yml",
         "clk-03-acquisition.yml", "clk-04-real5-oracle.yml",
-        "clk-04-a2-numeric-oracle.yml", "clk-04-a3-lifecycle-oracle.yml"),
+        "clk-04-a2-numeric-oracle.yml", "clk-04-a3-lifecycle-oracle.yml",
+        "clk-04-a4-numeric-pipeline.yml"),
     "HW4": ("hw4-c3-b1-scroll.yml", "hw4-c3-b2-scroll.yml",
             "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
             "hw4-scroll-opt-a0-memory.yml",
@@ -224,6 +225,17 @@ CLK04_A3_PATHS = (
     "docs/CLK-04-A3*",
 )
 
+# CLK-04-A4 #359: exactly six isolated triggers, CPC acquisition ONLY.
+CLK04_A4_WORKFLOW = "clk-04-a4-numeric-pipeline.yml"
+CLK04_A4_PATHS = (
+    ".github/workflows/clk-04-a4-numeric-pipeline.yml",
+    "tools/clk_04_a4_*",
+    "tests/test_clk_04_a4_*",
+    "tests/fixtures/cpc6128/clk_04_a4_numeric/**",
+    "docs/CLK-04-A4*",
+    "tools/ci/opt3_routing.py",
+)
+
 # CLK-04-A1: exactly five isolated triggers, no production code.
 CLK04_WORKFLOW = "clk-04-real5-oracle.yml"
 CLK04_PATHS = (
@@ -331,8 +343,8 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(FAMILIES) == 5 and len(expected) == 44 and
-           len(set(expected)) == 44,
+    demand(len(FAMILIES) == 5 and len(expected) == 45 and
+           len(set(expected)) == 45,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(CLK04_A2_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
            all(CLK04_A2_WORKFLOW not in ns for family,ns in FAMILIES.items()
@@ -340,6 +352,9 @@ def audit(sources):
     demand(CLK04_A3_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
            all(CLK04_A3_WORKFLOW not in ns for family, ns in FAMILIES.items()
                if family != "CPC_ACQUISITION"), "A3_WRONG_FAMILY")
+    demand(CLK04_A4_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
+           all(CLK04_A4_WORKFLOW not in ns for family, ns in FAMILIES.items()
+               if family != "CPC_ACQUISITION"), "A4_WRONG_FAMILY")
     demand(HW4_MEM_C5 in FAMILIES["HW4"] and
            all(HW4_MEM_C5 not in names for family, names in
                FAMILIES.items() if family != "HW4"),
@@ -558,6 +573,42 @@ def audit(sources):
     demand(CLK04_A3_WORKFLOW in triggered_names(
            [".github/workflows/" + CLK04_A3_WORKFLOW], sources),
            "A3_SELF_CHANGE_UNROUTED")
+    a4 = sources[CLK04_A4_WORKFLOW]
+    a4_paths = filters(a4)
+    demand(a4_paths is not None and len(a4_paths) == len(CLK04_A4_PATHS)
+           and set(a4_paths) == set(CLK04_A4_PATHS),
+           "A4_FILTER_CONTRACT_MISMATCH")
+    a4_events = re.findall(r"(?m)^  ([a-z][\w-]*):",
+                           a4.split("\npermissions:", 1)[0])
+    demand(a4_events == ["pull_request", "workflow_dispatch"],
+           "A4_EVENT_CONTRACT_MISMATCH")
+    demand("permissions:\n  contents: read\n  packages: read" in a4 and
+           "contents: write" not in a4 and "pull_request_target:" not in a4,
+           "A4_PERMISSIONS_MISMATCH")
+    demand(all(x in a4 for x in (
+           "jobs:\n  host-negatives-and-c99:", "\n  cpc-acquire:",
+           "\n  sealed-replay:", "needs: host-negatives-and-c99",
+           "needs: cpc-acquire",
+           "python3 -m unittest discover -s tests -p 'test_clk_04_a4_numeric.py' -v",
+           "python3 tools/clk_04_a4_oracle.py --acquire",
+           "python3 tools/clk_04_a4_oracle.py --verify",
+           "CLK04_A4_EXTERNAL_MANIFEST_SHA256",
+           "actions/download-artifact@v4", "actions/upload-artifact@v4",
+           "if: always()", "retention-days: 90", "--candidate",
+           "-fsanitize=address,undefined")),
+           "A4_EVIDENCE_PIPELINE_INCOMPLETE")
+    demand("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
+           "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c"
+           in a4 and
+           "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
+           in a4 and
+           "8c778bf072a06fb7c23b9cccd179041db7f79a52" in a4,
+           "A4_CPC_PINS_DRIFT")
+    demand("persist-credentials: false" in a4 and
+           a4.count("ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}") == 3
+           and "continue-on-error" not in a4 and "|| true" not in a4
+           and "if-no-files-found: error" in a4,
+           "A4_HEAD_OR_FAIL_CLOSED_INTEGRITY")
     demand("permissions:\n  contents: read\n  packages: read" in a3 and
            "contents: write" not in a3 and "pull_request_target:" not in a3,
            "A3_PERMISSIONS_MISMATCH")
@@ -1881,6 +1932,79 @@ def clk04_a2_negative_tests(sources):
                "A2_UNRELATED_ROUTE_"+path)
 
 
+def clk04_a4_negative_tests(sources):
+    """A4 synthetic in-memory tampering; keep all old falsifiers untouched."""
+    orig = sources[CLK04_A4_WORKFLOW]
+    for path in CLK04_A4_PATHS:
+        needle = "      - '" + path + "'\n"
+        demand(orig.count(needle) == 1, "A4_NEGATIVE_INERT_"+path)
+        mutant={**sources, CLK04_A4_WORKFLOW:orig.replace(needle,"",1)}
+        try:audit(mutant)
+        except UnsafeRoute as exc:
+            demand(str(exc)=="A4_FILTER_CONTRACT_MISMATCH",
+                   "A4_FILTER_REMOVAL_WRONG_REASON_"+str(exc))
+        else:raise UnsafeRoute("A4_FILTER_REMOVAL_ACCEPTED_"+path)
+    cases = (
+        ("UNKNOWN",{**sources,"unregistered-a4.yml":orig},
+         "UNKNOWN_OR_MISSING_WORKFLOW"),
+        ("DELETED",{k:v for k,v in sources.items() if k!=CLK04_A4_WORKFLOW},
+         "UNKNOWN_OR_MISSING_WORKFLOW"),
+        ("BROAD",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "'tools/clk_04_a4_*'","'tools/**'",1)},
+         "A4_FILTER_CONTRACT_MISMATCH"),
+        ("DUPLICATE",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "      - 'tools/clk_04_a4_*'\n",
+              "      - 'tools/clk_04_a4_*'\n      - 'tools/clk_04_a4_*'\n",1)},
+         "A4_FILTER_CONTRACT_MISMATCH"),
+        ("PUSH",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "  workflow_dispatch:\n","  push:\n  workflow_dispatch:\n",1)},
+         "A4_EVENT_CONTRACT_MISMATCH"),
+        ("PINS",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c",
+              "0"*64,1)}, "A4_CPC_PINS_DRIFT"),
+        ("NO_REPLAY",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "\n  sealed-replay:","\n  replay-disabled:",1)},
+         "A4_EVIDENCE_PIPELINE_INCOMPLETE"),
+        ("HEAD",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "ref: $"+"{{ github.event.pull_request.head.sha || github.sha }}",
+              "ref: $"+"{{ github.sha }}",1)},
+         "A4_HEAD_OR_FAIL_CLOSED_INTEGRITY"),
+        ("WRITE",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "  contents: read","  contents: write",1)},
+         "A4_PERMISSIONS_MISMATCH"),
+    )
+    for label,mutant,code in cases:
+        demand(mutant!=sources, "A4_NEGATIVE_INERT_"+label)
+        try:audit(mutant)
+        except UnsafeRoute as exc:
+            demand(str(exc)==code,"A4_WRONG_REASON_"+label+":"+str(exc))
+        else:raise UnsafeRoute("A4_FALSIFICATION_ACCEPTED_"+label)
+        print("CI-OPT3 A4_FALSIFICATION_REJECTED",label,code)
+    cpc=FAMILIES["CPC_ACQUISITION"];xt=FAMILIES["XTENSA"]
+    try:
+        FAMILIES["CPC_ACQUISITION"]=tuple(x for x in cpc if x!=CLK04_A4_WORKFLOW)
+        FAMILIES["XTENSA"]=xt+(CLK04_A4_WORKFLOW,)
+        try:audit(sources)
+        except UnsafeRoute as exc:
+            demand(str(exc)=="A4_WRONG_FAMILY","A4_WRONG_FAMILY_REASON")
+        else:raise UnsafeRoute("A4_WRONG_FAMILY_ACCEPTED")
+    finally:FAMILIES["CPC_ACQUISITION"],FAMILIES["XTENSA"]=cpc,xt
+    for path in (
+        ".github/workflows/clk-04-a4-numeric-pipeline.yml",
+        "tools/clk_04_a4_numeric_lab.c",
+        "tests/test_clk_04_a4_numeric.py",
+        "tests/fixtures/cpc6128/clk_04_a4_numeric/corpus.json",
+        "docs/CLK-04-A4-minimal-real5-pipeline.md",
+        "tools/ci/opt3_routing.py"):
+        demand(CLK04_A4_WORKFLOW in triggered_names([path],sources),
+               "A4_REQUIRED_ROUTE_MISSING_"+path)
+    for path in ("core/basic_executor.c",
+                 "firmware/esp32_display_probe/main/main.c",
+                 "docs/CLK-04-A3-time-lifecycle.md"):
+        demand(CLK04_A4_WORKFLOW not in triggered_names([path],sources),
+               "A4_UNRELATED_ROUTE_"+path)
+
+
 def clk04_a3_negative_tests(sources):
     """Only synthetic in-memory falsifications. Never alter original source."""
     original = sources[CLK04_A3_WORKFLOW]
@@ -2046,6 +2170,7 @@ def c6_d1_negative_tests(sources):
 
 
 def negative_tests(sources):
+    clk04_a4_negative_tests(sources)
     c6_d1_negative_tests(sources)
     clk04_a3_negative_tests(sources)
     c6_b2b_negative_tests(sources)
@@ -2188,7 +2313,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=44 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=45 FAMILIES=5")
 
 
 if __name__ == "__main__":

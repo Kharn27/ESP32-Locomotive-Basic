@@ -270,6 +270,8 @@ BSRResult bsr_submit(BasicSessionRuntime *runtime,
         runtime->state = BSR_IDLE;
         runtime->executor.call_depth = 0u;
         runtime->executor.statement_offset = 0u;
+        runtime->executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_cursor = 0u;
+        runtime->executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_statement = 0u;
         memset(runtime->executor.call_stack, 0, sizeof(runtime->executor.call_stack));
         runtime->executor.while_depth = 0u;
         memset(runtime->executor.while_stack, 0,
@@ -324,6 +326,8 @@ static BSRResult step_events_impl(BasicSessionRuntime *runtime,
             runtime->state = BSR_IDLE;
             runtime->executor.call_depth = 0u;
             runtime->executor.statement_offset = 0u;
+            runtime->executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_cursor = 0u;
+            runtime->executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_statement = 0u;
             memset(runtime->executor.call_stack, 0,
                    sizeof(runtime->executor.call_stack));
             runtime->executor.while_depth = 0u;
@@ -373,6 +377,8 @@ BSRResult bsr_stop(BasicSessionRuntime *runtime)
     runtime->state = BSR_IDLE;
     runtime->executor.call_depth = 0u;
     runtime->executor.statement_offset = 0u;
+    runtime->executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_cursor = 0u;
+    runtime->executor.while_stack[BE_WHILE_STACK_CAPACITY-1u].after_statement = 0u;
     memset(runtime->executor.call_stack, 0, sizeof(runtime->executor.call_stack));
     runtime->executor.while_depth = 0u;
     memset(runtime->executor.while_stack, 0,

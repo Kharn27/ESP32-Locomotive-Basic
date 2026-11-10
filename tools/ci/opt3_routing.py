@@ -537,7 +537,7 @@ def audit(sources):
            "python3 -m unittest discover -s tests -p test_j125_b2_e1.py -v" in e1 and
            "python3 tools/ci/j125_b2_e1.py --self-test" in e1 and
            "python3 tools/ci/opt3_routing.py --self-test" in e1 and
-           "HOST_ONLY_NO_XTENSA" in e1 and
+           "echo HOST_ONLY_NO_XTENSA" in e1 and
            "actions/upload-artifact@v4" in e1 and
            "if-no-files-found: error" in e1 and "SHA256SUMS.txt" in e1 and
            "continue-on-error" not in e1 and "|| true" not in e1 and
@@ -2111,7 +2111,7 @@ def e1_negative_tests(sources):
     for altered,code in (
         (original.replace("    branches: ["+E1_BRANCH+"]","    branches: [main]",1),
          "E1_PUSH_SCOPE_MISMATCH"),
-        (original.replace("HOST_ONLY_NO_XTENSA","UNSAFE",1),
+        (original.replace("echo HOST_ONLY_NO_XTENSA","echo UNSAFE",1),
          "E1_UNSAFE_BUILD_OR_MISSING_HOST_GUARD"),
         (original.replace("python3 tools/ci/j125_b2_e1.py --self-test",
                           "python3 tools/ci/j125_b2_e1.py --run",1),

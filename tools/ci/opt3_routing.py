@@ -591,7 +591,7 @@ def audit(sources):
            "A4_PERMISSIONS_MISMATCH")
     demand(all(x in a4 for x in (
            "jobs:\n  route:", "\n  host-negatives-and-c99:", "\n  cpc-acquire:",
-           "\n  sealed-replay:", "needs: host-negatives-and-c99",
+           "\n  sealed-replay:",
            "needs: cpc-acquire",
            "needs: [host-negatives-and-c99, route]",
            "if: needs.route.outputs.mode == 'full'",

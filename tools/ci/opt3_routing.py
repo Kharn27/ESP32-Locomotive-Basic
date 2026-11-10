@@ -234,6 +234,10 @@ CLK04_A4_PATHS = (
     "tests/fixtures/cpc6128/clk_04_a4_numeric/**",
     "docs/CLK-04-A4*",
     "tools/ci/opt3_routing.py",
+    "tools/ci/clk_04_a4_fast_route.py",
+    "tools/clk_03_cpc_time.py",
+    "tools/clk_04_real5_oracle.py",
+    "tests/oracles/caprice32",
 )
 
 # CLK-04-A1: exactly five isolated triggers, no production code.
@@ -586,9 +590,13 @@ def audit(sources):
            "contents: write" not in a4 and "pull_request_target:" not in a4,
            "A4_PERMISSIONS_MISMATCH")
     demand(all(x in a4 for x in (
-           "jobs:\n  host-negatives-and-c99:", "\n  cpc-acquire:",
+           "jobs:\n  route:", "\n  host-negatives-and-c99:", "\n  cpc-acquire:",
            "\n  sealed-replay:", "needs: host-negatives-and-c99",
            "needs: cpc-acquire",
+           "needs: [host-negatives-and-c99, route]",
+           "if: needs.route.outputs.mode == 'full'",
+           "python3 tools/ci/clk_04_a4_fast_route.py",
+           "-p 'test_clk_04_a4_fast_route.py' -v",
            "python3 -m unittest discover -s tests -p 'test_clk_04_a4_numeric.py' -v",
            "python3 tools/clk_04_a4_oracle.py --acquire",
            "python3 tools/clk_04_a4_oracle.py --verify",
@@ -605,7 +613,7 @@ def audit(sources):
            "8c778bf072a06fb7c23b9cccd179041db7f79a52" in a4,
            "A4_CPC_PINS_DRIFT")
     demand("persist-credentials: false" in a4 and
-           a4.count("ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}") == 3
+           a4.count("ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}") == 4
            and "continue-on-error" not in a4 and "|| true" not in a4
            and "if-no-files-found: error" in a4,
            "A4_HEAD_OR_FAIL_CLOSED_INTEGRITY")

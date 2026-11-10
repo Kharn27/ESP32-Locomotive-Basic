@@ -40,6 +40,7 @@ NEW_WORKFLOW = (BASE_WORKFLOW
                          "    if: needs.route.outputs.mode == 'full'\n")
                 .replace("  host-negatives-and-c99:\n",
                          "  route:\n    runs-on: ubuntu-24.04\n"
+                         "    steps:\n      - run: python3 tools/ci/clk_04_a4_fast_route.py\n"
                          "  host-negatives-and-c99:\n"))
 
 
@@ -174,6 +175,19 @@ class Routes(unittest.TestCase):
         self.change(route.WORKFLOW, NEW_WORKFLOW.replace(
             "    if: needs.route.outputs.mode == 'full'\n", "    if: always()\n"))
         with self.assertRaisesRegex(route.RouteError, "CPC_GATE_CONDITION_CHANGED"):
+            route.decision(self.root, "pull_request", self.head, self.base)
+
+    def test_router_disabled_stops(self):
+        self.change(route.WORKFLOW, NEW_WORKFLOW.replace(
+            "  route:\n    runs-on:", "  route:\n    if: false\n    runs-on:"))
+        with self.assertRaisesRegex(route.RouteError, "ROUTE_JOB_CONDITIONAL"):
+            route.decision(self.root, "pull_request", self.head, self.base)
+
+    def test_host_disabled_stops(self):
+        self.change(route.WORKFLOW, NEW_WORKFLOW.replace(
+            "  host-negatives-and-c99:\n    runs-on:",
+            "  host-negatives-and-c99:\n    if: false\n    runs-on:"))
+        with self.assertRaisesRegex(route.RouteError, "HOST_JOB_CONDITIONAL"):
             route.decision(self.root, "pull_request", self.head, self.base)
 
     def test_skipped_replay_bypass_stops(self):

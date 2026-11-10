@@ -28,7 +28,8 @@ FAMILIES = {
         "j1-15-a-string-scalar.yml", "j1-16-a-real5-scalar.yml",
         "j1-16-d-a-negative-store.yml", "j1-16-e-a-small-store.yml",
         "j1-17-c-a-pen-cpc.yml", "clk-01-acquisition.yml",
-        "clk-03-acquisition.yml", "clk-04-real5-oracle.yml"),
+        "clk-03-acquisition.yml", "clk-04-real5-oracle.yml",
+        "clk-04-a2-numeric-oracle.yml"),
     "HW4": ("hw4-c3-b1-scroll.yml", "hw4-c3-b2-scroll.yml",
             "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
             "hw4-scroll-opt-a0-memory.yml",
@@ -203,6 +204,16 @@ CLK03_PATHS = (
     "docs/CLK-03*",
 )
 
+# CLK-04-A2: exactly five isolated triggers, CPC acquisition only.
+CLK04_A2_WORKFLOW = "clk-04-a2-numeric-oracle.yml"
+CLK04_A2_PATHS = (
+    ".github/workflows/clk-04-a2-numeric-oracle.yml",
+    "tools/clk_04_a2_*",
+    "tests/test_clk_04_a2_numeric.py",
+    "tests/fixtures/cpc6128/clk_04_a2_numeric/**",
+    "docs/CLK-04-A2*",
+)
+
 # CLK-04-A1: exactly five isolated triggers, no production code.
 CLK04_WORKFLOW = "clk-04-real5-oracle.yml"
 CLK04_PATHS = (
@@ -299,9 +310,12 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(FAMILIES) == 5 and len(expected) == 41 and
-           len(set(expected)) == 41,
+    demand(len(FAMILIES) == 5 and len(expected) == 42 and
+           len(set(expected)) == 42,
            "DUPLICATE_OR_MISSING_FAMILY")
+    demand(CLK04_A2_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
+           all(CLK04_A2_WORKFLOW not in ns for family,ns in FAMILIES.items()
+               if family != "CPC_ACQUISITION"), "A2_WRONG_FAMILY")
     demand(HW4_MEM_C5 in FAMILIES["HW4"] and
            all(HW4_MEM_C5 not in names for family, names in
                FAMILIES.items() if family != "HW4"),
@@ -456,6 +470,18 @@ def audit(sources):
     demand(CLK04_WORKFLOW in triggered_names(
            [".github/workflows/" + CLK04_WORKFLOW], sources),
            "CLK04_SELF_CHANGE_UNROUTED")
+    a2_src = sources[CLK04_A2_WORKFLOW]
+    a2_paths = filters(a2_src)
+    demand(a2_paths is not None and len(a2_paths) == len(CLK04_A2_PATHS)
+           and set(a2_paths) == set(CLK04_A2_PATHS),
+           "A2_FILTER_CONTRACT_MISMATCH")
+    a2_events = re.findall(r"(?m)^  ([a-z][\w-]*):",
+                           a2_src.split("\npermissions:", 1)[0])
+    demand(a2_events == ["pull_request", "workflow_dispatch"],
+           "A2_EVENT_CONTRACT_MISMATCH")
+    demand(CLK04_A2_WORKFLOW in triggered_names(
+           [".github/workflows/" + CLK04_A2_WORKFLOW], sources),
+           "A2_SELF_CHANGE_UNROUTED")
     for name, src in sources.items():
         demand(re.search(r"(?m)^  workflow_dispatch:", src),
                "MANUAL_DISPATCH_REMOVED_" + name)
@@ -1647,9 +1673,116 @@ def c6_b2b_negative_tests(sources):
     print("CI-OPT3 C6_B2B_WRONG_FAMILY_REJECTED")
 
 
+def clk04_a2_negative_tests(sources):
+    """A2: in-memory adversarial workflow inventory and exactly five PR filters."""
+    original = sources[CLK04_A2_WORKFLOW]
+    for required in CLK04_A2_PATHS:
+        needle = "      - '" + required + "'\n"
+        demand(original.count(needle)==1,"A2_NEGATIVE_INERT_"+required)
+        broken={**sources, CLK04_A2_WORKFLOW:original.replace(needle,"",1)}
+        try:
+            audit(broken)
+        except UnsafeRoute as exc:
+            demand(str(exc)=="A2_FILTER_CONTRACT_MISMATCH",
+                   "A2_REMOVAL_WRONG_REASON_"+str(exc))
+        else:
+            raise UnsafeRoute("A2_REMOVAL_ACCEPTED_"+required)
+        print("CI-OPT3 A2_REQUIRED_FILTER_REMOVAL_REJECTED",required)
+
+    changes={
+        "WORKFLOW_DELETED":(
+            {k:v for k,v in sources.items() if k!=CLK04_A2_WORKFLOW},
+            "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "WORKFLOW_RENAMED":(
+            {**{k:v for k,v in sources.items() if k!=CLK04_A2_WORKFLOW},
+             "clk-04-a2-unregistered.yml":original},
+            "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "WORKFLOW_UNLISTED":(
+            {**sources, "unknown-a2.yml":original},
+            "UNKNOWN_OR_MISSING_WORKFLOW"),
+        "DUPLICATE_FILTER":(
+            {**sources, CLK04_A2_WORKFLOW:original.replace(
+                "      - 'tools/clk_04_a2_*'\n",
+                "      - 'tools/clk_04_a2_*'\n"
+                "      - 'tools/clk_04_a2_*'\n",1)},
+            "A2_FILTER_CONTRACT_MISMATCH"),
+        "TOOL_TOO_BROAD":(
+            {**sources, CLK04_A2_WORKFLOW:original.replace(
+                "'tools/clk_04_a2_*'","'tools/**'",1)},
+            "A2_FILTER_CONTRACT_MISMATCH"),
+        "FIXTURE_TOO_BROAD":(
+            {**sources, CLK04_A2_WORKFLOW:original.replace(
+                "'tests/fixtures/cpc6128/clk_04_a2_numeric/**'",
+                "'tests/fixtures/**'",1)},
+            "A2_FILTER_CONTRACT_MISMATCH"),
+        "DOC_TOO_BROAD":(
+            {**sources, CLK04_A2_WORKFLOW:original.replace(
+                "'docs/CLK-04-A2*'","'docs/**'",1)},
+            "A2_FILTER_CONTRACT_MISMATCH"),
+        "PR_REMOVED":(
+            {**sources, CLK04_A2_WORKFLOW:original.replace(
+                "  pull_request:\n","",1)},
+            "PULL_REQUEST_MISSING"),
+        "DISPATCH_REMOVED":(
+            {**sources, CLK04_A2_WORKFLOW:original.replace(
+                "  workflow_dispatch:\n","",1)},
+            "A2_EVENT_CONTRACT_MISMATCH"),
+        "PUSH_ADDED":(
+            {**sources, CLK04_A2_WORKFLOW:original.replace(
+                "  workflow_dispatch:\n","  workflow_dispatch:\n  push:\n",1)},
+            "A2_EVENT_CONTRACT_MISMATCH"),
+    }
+    for label,(mutant,code) in changes.items():
+        demand(mutant!=sources,"A2_NEGATIVE_INERT_"+label)
+        try:
+            audit(mutant)
+        except UnsafeRoute as exc:
+            demand(str(exc)==code,"A2_WRONG_REJECTION_"+label+":"+str(exc))
+        else:
+            raise UnsafeRoute("A2_FALSIFICATION_ACCEPTED_"+label)
+        print("CI-OPT3 A2_FALSIFICATION_REJECTED",label,code)
+
+    orig_cpc=FAMILIES["CPC_ACQUISITION"]
+    orig_xtensa=FAMILIES["XTENSA"]
+    try:
+        FAMILIES["CPC_ACQUISITION"]=tuple(
+            x for x in orig_cpc if x!=CLK04_A2_WORKFLOW)
+        FAMILIES["XTENSA"]=orig_xtensa+(CLK04_A2_WORKFLOW,)
+        try:
+            audit(sources)
+        except UnsafeRoute as exc:
+            demand(str(exc)=="A2_WRONG_FAMILY",
+                   "A2_WRONG_FAMILY_REJECTION_"+str(exc))
+        else:
+            raise UnsafeRoute("A2_MISCLASSIFIED_ACCEPTED")
+    finally:
+        FAMILIES["CPC_ACQUISITION"]=orig_cpc
+        FAMILIES["XTENSA"]=orig_xtensa
+    print("CI-OPT3 A2_WRONG_FAMILY_REJECTED")
+
+    for path in (
+        ".github/workflows/clk-04-a2-numeric-oracle.yml",
+        "tools/clk_04_a2_numeric.py",
+        "tests/test_clk_04_a2_numeric.py",
+        "tests/fixtures/cpc6128/clk_04_a2_numeric/corpus.json",
+        "docs/CLK-04-A2-numeric-real5.md"):
+        demand(CLK04_A2_WORKFLOW in triggered_names([path],sources),
+               "A2_REQUIRED_ROUTE_MISSING_"+path)
+        demand("CPC_ACQUISITION" in family_routes([path],sources),
+               "A2_WRONG_FAMILY_ROUTE_"+path)
+        print("CI-OPT3 A2_PR_ROUTE_VERIFIED",path)
+    for path in ("tools/clk_04_real5_oracle.py", "core/basic_executor.c",
+                 "firmware/esp32_display_probe/main/main.c",
+                 "docs/CLK-04-A1-real5-time-oracle.md",
+                 "tools/ci/hw4_mem_c6_refs.py"):
+        demand(CLK04_A2_WORKFLOW not in triggered_names([path],sources),
+               "A2_UNRELATED_ROUTE_"+path)
+
+
 def negative_tests(sources):
     c6_b2b_negative_tests(sources)
     c6_b2a_negative_tests(sources)
+    clk04_a2_negative_tests(sources)
     clk04_negative_tests(sources)
     c5_negative_tests(sources)
     clk03_negative_tests(sources)
@@ -1787,7 +1920,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=41 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=42 FAMILIES=5")
 
 
 if __name__ == "__main__":

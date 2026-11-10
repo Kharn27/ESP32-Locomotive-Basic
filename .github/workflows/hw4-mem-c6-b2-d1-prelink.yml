@@ -1,0 +1,103 @@
+# Issue #354 A2. Nonrequired, one-shot, 2 B/H SPI40 builds total.
+name: LAB HW4-MEM-C6-B2-D1 PRELINK 2-XTENSA NOT_REQUIRED
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hw4-mem-c6-b2-d1-prelink.yml'
+      - 'tools/ci/hw4_mem_c6_b2_d1.py'
+      - 'tests/test_hw4_mem_c6_b2_d1.py'
+      - 'docs/HW4-MEM-C6-B2-D1.md'
+      - 'tools/ci/opt3_routing.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+# Across commits and manual reruns: the same #330 budget may never be repeated.
+concurrency:
+  group: hw4-mem-c6-b2-d1-one-shot-330
+  cancel-in-progress: false
+
+jobs:
+  host-negative-tests:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout exact proposed HEAD, credentials off
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test D1 fail-closed provenance and closed OPT3 route
+        shell: bash
+        env:
+          LAB_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          LAB_BASE: ${{ github.event.pull_request.base.sha || '' }}
+          LAB_EVENT: ${{ github.event_name }}
+          LAB_REPO: ${{ github.event.pull_request.head.repo.full_name || '' }}
+        run: |
+          set -euo pipefail
+          test "$LAB_EVENT" = pull_request
+          test "$LAB_REPO" = Kharn27/ESP32-Locomotive-Basic
+          test "$LAB_BASE" = 3d7f1dc914324a846ff92ba3a33ab9e03916b076
+          test "$(git rev-parse HEAD)" = "$LAB_HEAD"
+          python3 -m py_compile tools/ci/hw4_mem_c6_b2_d1.py tests/test_hw4_mem_c6_b2_d1.py
+          python3 -m unittest discover -s tests -p test_hw4_mem_c6_b2_d1.py -v
+          python3 tools/ci/opt3_routing.py --self-test \
+            --expect-head "$LAB_HEAD" --base-sha "$LAB_BASE"
+          echo C6_D1_HOST_ADVERSARIAL_PASS_NO_XTENSA
+
+  two-prelink-builds:
+    needs: host-negative-tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    env:
+      GH_TOKEN: ${{ github.token }}
+      LAB_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      LAB_PR_NUMBER: ${{ github.event.pull_request.number || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout trusted controller PR HEAD without persisted token
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch sealed B2-B Oracle (no executable code from artifact)
+        uses: actions/download-artifact@v4
+        with:
+          name: hw4-c6-b2-b-330-8build-42660089530-1
+          run-id: 42660089530
+          github-token: ${{ github.token }}
+          path: ${{ github.workspace }}/reports/c6-d1-oracle
+      - name: One-shot preflight, exactly B and H SPI40, capture true pre-link objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/c6-d1
+          python3 tools/ci/hw4_mem_c6_b2_d1.py \
+            --workspace "$GITHUB_WORKSPACE" \
+            --oracle "$GITHUB_WORKSPACE/reports/c6-d1-oracle" \
+            --out "$GITHUB_WORKSPACE/reports/c6-d1"
+      - name: Seal all finished or partial evidence (never mask build failure)
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/reports/c6-d1"
+          mkdir -p "$OUT"
+          cd "$OUT"
+          find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+          echo 'C6-D1 PRELINK_DIAGNOSTIC_ONLY NOT_REQUIRED ROOT_CAUSE_UNVERIFIED' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve authentic ELF/map/input .o/archives/relocations or precise STOP
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hw4-mem-c6-d1-prelink-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            reports/c6-d1/

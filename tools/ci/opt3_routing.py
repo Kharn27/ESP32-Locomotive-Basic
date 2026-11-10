@@ -605,6 +605,13 @@ def audit(sources):
            "if: always()", "retention-days: 90", "--candidate",
            "-fsanitize=address,undefined")),
            "A4_EVIDENCE_PIPELINE_INCOMPLETE")
+    # The PR fast-path cannot depend on a skipped route or host precondition.
+    route_job = a4.split("\n  route:\n", 1)[1].split("\n  host-negatives-and-c99:", 1)[0]
+    host_job = a4.split("\n  host-negatives-and-c99:\n", 1)[1].split("\n  cpc-acquire:", 1)[0]
+    demand(re.search(r"(?m)^    (?:if|needs):", route_job) is None,
+           "A4_FAST_ROUTE_CONDITIONAL")
+    demand(re.search(r"(?m)^    (?:if|needs):", host_job) is None,
+           "A4_FAST_HOST_CONDITIONAL")
     demand("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
            "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c"
            in a4 and
@@ -1980,6 +1987,13 @@ def clk04_a4_negative_tests(sources):
         ("WRITE",{**sources,CLK04_A4_WORKFLOW:orig.replace(
               "  contents: read","  contents: write",1)},
          "A4_PERMISSIONS_MISMATCH"),
+        ("DISABLED_ROUTE",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "  route:\n    name:", "  route:\n    if: false\n    name:",1)},
+         "A4_FAST_ROUTE_CONDITIONAL"),
+        ("DISABLED_HOST",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "  host-negatives-and-c99:\n    name:",
+              "  host-negatives-and-c99:\n    if: false\n    name:",1)},
+         "A4_FAST_HOST_CONDITIONAL"),
     )
     for label,mutant,code in cases:
         demand(mutant!=sources, "A4_NEGATIVE_INERT_"+label)

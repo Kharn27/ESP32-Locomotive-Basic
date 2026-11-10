@@ -1,0 +1,209 @@
+name: HW4-MEM-C6-B2-A PROVENANCE_ONLY — NOT_MEMORY_GATE
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hw4-mem-c6-b2-a-live.yml'
+      - 'tools/ci/opt3_routing.py'
+      - 'tools/ci/hw4_mem_c6_refs.py'
+      - 'tests/test_hw4_mem_c6_refs.py'
+      - 'tests/test_hw4_mem_c6_b2_a_live.py'
+      - 'docs/HW4-MEM-C6-B2-A-live.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c6-b2-a-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  host-adversarial:
+    name: PROVENANCE_ONLY host tests - NOT_MEMORY_GATE
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact proposed HEAD without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove test code HEAD and run B1/B2-A negatives without token
+        shell: bash
+        env:
+          EXPECT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECT_HEAD"
+          python3 -m py_compile tools/ci/hw4_mem_c6_refs.py tests/test_hw4_mem_c6_refs.py tests/test_hw4_mem_c6_b2_a_live.py
+          python3 -m unittest discover -s tests -p 'test_hw4_mem_c6_refs.py' -v
+          python3 -m unittest discover -s tests -p 'test_hw4_mem_c6_b2_a_live.py' -v
+          echo "C6_B2_A_HOST_ADVERSARIAL_VERIFIED_NOT_MEMORY_GATE HEAD=$EXPECT_HEAD"
+
+  live-github-provenance:
+    name: PROVENANCE_ONLY GitHub API GET #330 #339 - NOT_MEMORY_GATE
+    needs: host-adversarial
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate current main and workflow event via GET (no PR code)
+        id: pin
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR: ${{ github.event.pull_request.number || '' }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || '' }}
+          EVENT_BASE: ${{ github.event.pull_request.base.sha || '' }}
+          EVENT_SHA: ${{ github.sha }}
+          EVENT_REF: ${{ github.ref_name }}
+          EXPECTED_MAIN: 0d5315be79262bb0355f8141a351937272f548fd
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+          repo = 'Kharn27/ESP32-Locomotive-Basic'
+          def get(path):
+              req = urllib.request.Request('https://api.github.com/repos/' + repo + path,
+                  headers={'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
+                           'Accept': 'application/vnd.github+json',
+                           'X-GitHub-Api-Version': '2022-11-28'}, method='GET')
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  assert response.status == 200, 'API_UNAVAILABLE'
+                  return json.load(response)
+          expected = os.environ['EXPECTED_MAIN']
+          assert re.fullmatch('[0-9a-f]{40}', expected), 'BAD_MANDATED_SHA'
+          assert os.environ['GITHUB_REPOSITORY'] == repo, 'WRONG_REPOSITORY'
+          assert get('/branches/main')['commit']['sha'] == expected, 'MAIN_DRIFT'
+          if os.environ['EVENT_NAME'] == 'pull_request':
+              number = os.environ['EVENT_PR']
+              assert number.isdecimal(), 'BAD_EVENT_PR'
+              live = get('/pulls/' + number)
+              assert live['state'] == 'open' and live['merged_at'] is None, 'EVENT_PR_CLOSED'
+              assert live['head']['repo']['full_name'] == repo, 'EVENT_FORK_REFUSED'
+              assert live['base']['ref'] == 'main', 'EVENT_BASE_NOT_MAIN'
+              assert live['head']['sha'] == os.environ['EVENT_HEAD'], 'EVENT_HEAD_DRIFT'
+              assert live['base']['sha'] == os.environ['EVENT_BASE'], 'EVENT_BASE_DRIFT'
+              assert os.environ['EVENT_BASE'] == expected, 'EVENT_BASE_OUTDATED'
+          elif os.environ['EVENT_NAME'] == 'workflow_dispatch':
+              ref = os.environ['EVENT_REF']
+              assert ref == 'feat/hw4-mem-c6-b2-a-live', 'DISPATCH_REF_REFUSED'
+              assert get('/branches/' + ref)['commit']['sha'] == os.environ['EVENT_SHA'], 'DISPATCH_HEAD_DRIFT'
+          else:
+              raise AssertionError('UNEXPECTED_EVENT')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write('trusted_main_sha=' + expected + '\n')
+          print('C6_B2_A_TRUSTED_MAIN_PIN', expected, 'EVENT', os.environ['EVENT_NAME'])
+          PY
+      - name: Checkout trusted main SHA only (never PR 330/339 or proposed HEAD)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ steps.pin.outputs.trusted_main_sha }}
+      - name: Run merged B1 CLI with read-only token and double captures
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TRUSTED_MAIN_SHA: ${{ steps.pin.outputs.trusted_main_sha }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TRUSTED_MAIN_SHA"
+          mkdir -p "$RUNNER_TEMP/c6-b2-a"
+          python3 tools/ci/hw4_mem_c6_refs.py --pr 330 --output "$RUNNER_TEMP/c6-b2-a/pr-330.json"
+          python3 tools/ci/hw4_mem_c6_refs.py --pr 339 --output "$RUNNER_TEMP/c6-b2-a/pr-339.json"
+          python3 - <<'PY'
+          import json, os, pathlib, re, urllib.request
+          repo = 'Kharn27/ESP32-Locomotive-Basic'
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'c6-b2-a'
+          expected = os.environ['TRUSTED_MAIN_SHA']
+          token = os.environ['GITHUB_TOKEN']
+          def get(path):
+              request = urllib.request.Request('https://api.github.com/repos/' + repo + path,
+                  headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json',
+                           'X-GitHub-Api-Version': '2022-11-28'}, method='GET')
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  assert response.status == 200, 'API_UNAVAILABLE'
+                  return json.load(response)
+          # Reject cross-PR and cross-main drift after the CLI reports; not a memory test.
+          assert get('/branches/main')['commit']['sha'] == expected, 'MAIN_DRIFT_AFTER_CLI'
+          for number in (330, 339):
+              path = root / ('pr-' + str(number) + '.json')
+              assert path.is_file() and path.stat().st_size > 0, 'MISSING_ARTIFACT'
+              report = json.loads(path.read_text(encoding='utf-8'))
+              assert report['pr_number'] == number and report['repo'] == repo, 'WRONG_PR_REPORT'
+              assert report['snapshot_status'] == 'PROVENANCE_VERIFIED', 'PROVENANCE_UNVERIFIED'
+              assert report['stable_double_capture'] is True and len(report['observations']) == 2, 'SNAPSHOT_MISSING'
+              assert report['PR_INCREMENTAL_VERDICT'] == 'UNVERIFIED', 'FALSE_INCREMENTAL_PASS'
+              assert report['INTEGRATION_MEMORY_VERDICT'] == 'UNVERIFIED', 'FALSE_INTEGRATION_MEMORY_PASS'
+              assert report['INTEGRATION_READINESS'] in ('BLOCKED_STALE_BASE', 'UNVERIFIED'), 'FALSE_READY'
+              assert report['preview_reason'] != 'PREVIEW_API_UNAVAILABLE', 'PREVIEW_API_REFUSED'
+              assert report['preview_reason'] != 'PREVIEW_ABSENT', 'PREVIEW_ABSENT_UNVERIFIED'
+              live = get('/pulls/' + str(number))
+              assert live['state'] == 'open' and live['merged_at'] is None, 'TARGET_PR_CLOSED'
+              assert live['base']['ref'] == 'main' and live['base']['repo']['full_name'] == repo, 'BAD_PR_BASE'
+              for obs in report['observations']:
+                  assert obs['M'] == expected and obs['repo'] == repo and obs['pr_number'] == number, 'WRONG_MAIN_OBSERVATION'
+                  assert live['base']['sha'] == obs['B'], 'PR_BASE_DRIFT'
+                  assert live['head']['sha'] == obs['H'], 'PR_HEAD_DRIFT'
+                  assert live['merge_commit_sha'] == obs['preview']['sha'], 'PR_PREVIEW_DRIFT'
+                  assert (obs['PR_INCREMENTAL_VERDICT'], obs['INTEGRATION_MEMORY_VERDICT']) == ('UNVERIFIED', 'UNVERIFIED'), 'SPOOFED_PASS'
+                  assert obs['INTEGRATION_READINESS'] == ('BLOCKED_STALE_BASE' if obs['B'] != obs['M'] else 'UNVERIFIED'), 'SPOOFED_READY'
+                  assert re.fullmatch('[0-9a-f]{40}', obs['M']) and re.fullmatch('[0-9a-f]{40}', obs['H']), 'SHORT_SHA'
+                  if obs['preview']['sha'] is not None:
+                      preview = get('/git/commits/' + obs['preview']['sha'])
+                      assert preview['tree']['sha'] == obs['preview']['tree'], 'PREVIEW_TREE_DRIFT'
+                      assert [x['sha'] for x in preview['parents']] == obs['preview']['parents'], 'PREVIEW_PARENT_DRIFT'
+              print('C6_B2_A_LIVE_PROVENANCE_VERIFIED', number, report['preview_reason'], report['INTEGRATION_READINESS'], 'MEMORY_UNVERIFIED')
+          PY
+      - name: Record executable trust provenance and SHA-256 evidence manifest
+        shell: bash
+        env:
+          TRUSTED_MAIN_SHA: ${{ steps.pin.outputs.trusted_main_sha }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/c6-b2-a"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          f = pathlib.Path(os.environ['GITHUB_WORKSPACE']) / 'tools/ci/hw4_mem_c6_refs.py'
+          source = f.read_bytes()
+          actual = subprocess.check_output(['git', '-C', os.environ['GITHUB_WORKSPACE'], 'rev-parse', 'HEAD'], text=True).strip()
+          tree = subprocess.check_output(['git', '-C', os.environ['GITHUB_WORKSPACE'], 'rev-parse', 'HEAD^{tree}'], text=True).strip()
+          assert actual == os.environ['TRUSTED_MAIN_SHA'], 'EXECUTED_SOURCE_SHA_DRIFT'
+          meta = {'contract': 'HW4-MEM-C6-B2-A/host-live-v1',
+                  'source_repo': 'Kharn27/ESP32-Locomotive-Basic',
+                  'source_kind': 'TRUSTED_MERGED_MAIN', 'source_commit': actual,
+                  'source_tree': tree, 'source_python_sha256': hashlib.sha256(source).hexdigest(),
+                  'actions_run_id': os.environ['GITHUB_RUN_ID'],
+                  'actions_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+                  'actions_workflow': os.environ['GITHUB_WORKFLOW'],
+                  'actions_event': os.environ['EVENT_NAME'],
+                  'actions_event_sha': os.environ['EVENT_SHA'],
+                  'actions_proposed_head_sha': os.environ['EVENT_HEAD'],
+                  'memory_gate': False, 'memory_verdict': 'UNVERIFIED'}
+          p = pathlib.Path(os.environ['RUNNER_TEMP']) / 'c6-b2-a' / 'source-provenance.json'
+          p.write_text(json.dumps(meta, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print('C6_B2_A_SOURCE_TRUSTED', actual, meta['source_python_sha256'])
+          PY
+          sha256sum pr-330.json pr-339.json source-provenance.json > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+          echo 'C6_B2_A_EVIDENCE_ARCHIVED_PROVENANCE_ONLY_NOT_MEMORY_GATE'
+      - name: Publish bounded JSON evidence, never a memory PASS
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hw4-mem-c6-b2-a-provenance-only-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/c6-b2-a/pr-330.json
+            ${{ runner.temp }}/c6-b2-a/pr-339.json
+            ${{ runner.temp }}/c6-b2-a/source-provenance.json
+            ${{ runner.temp }}/c6-b2-a/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

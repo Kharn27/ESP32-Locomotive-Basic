@@ -1,0 +1,153 @@
+name: CLK-04-A3 isolated CPC6128 TIME lifecycle oracle
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/clk-04-a3-lifecycle-oracle.yml'
+      - 'tools/clk_04_a3_*'
+      - 'tests/test_clk_04_a3_lifecycle.py'
+      - 'tests/fixtures/cpc6128/clk_04_a3_lifecycle/**'
+      - 'docs/CLK-04-A3*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  negative-tests:
+    name: CLK-04-A3 synthetic verifier negatives (NOT an oracle)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Pin checkout and run A3 synthetic negative/source tests
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          python3 -m unittest discover -s tests -p 'test_clk_04_a3_lifecycle.py' -v
+          python3 tools/clk_04_a3_lifecycle.py --self-test
+
+  cpc-acquire:
+    name: CLK-04-A3 authentic CPC6128 lifecycle chronology, original REAL5 RAM and PRINT linkage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    needs: negative-tests
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      manifest_sha256: ${{ steps.external-seal.outputs.manifest_sha256 }}
+      acquisition_head: ${{ steps.external-seal.outputs.acquisition_head }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: recursive
+      - name: Acquire CPC TIME lifecycle in two independent processes + original SNA windows
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d' ' -f1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          python3 tools/clk_04_a3_lifecycle.py --acquire \
+            --caprice tests/oracles/caprice32 \
+            --output "$RUNNER_TEMP/clk04-a3-cpc-raw" \
+            --head "$EXPECTED_HEAD"
+          ! find "$RUNNER_TEMP/clk04-a3-cpc-raw" -type f \( -name '*.sna' -o -name '*.rom' \) | grep .
+      - name: Publish SHA256 outside raw archive and bind replay to its HEAD
+        id: external-seal
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="$RUNNER_TEMP/clk04-a3-cpc-raw/manifest.json"
+          test -s "$FILE"
+          SEAL="$(sha256sum "$FILE" | awk '{print $1}')"
+          printf 'CLK04_A3_EXTERNAL_MANIFEST_SHA256=%s\n' "$SEAL"
+          printf 'CLK04_A3_ACQUISITION_HEAD=%s\n' "$EXPECTED_HEAD"
+          printf 'manifest_sha256=%s\n' "$SEAL" >> "$GITHUB_OUTPUT"
+          printf 'acquisition_head=%s\n' "$EXPECTED_HEAD" >> "$GITHUB_OUTPUT"
+          printf '{"mission":"CLK-04-A3","head":"%s","manifest_sha256":"%s","origin":"GitHub Actions acquisition job logs / output","oracle_status":"PENDING_REPLAY_AND_SCREEN_REVIEW"}\n' \
+            "$EXPECTED_HEAD" "$SEAL" > "$RUNNER_TEMP/clk04-a3-external-seal.json"
+      - name: Upload unmodified raw CPC evidence, even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-04-a3-cpc-raw
+          path: ${{ runner.temp }}/clk04-a3-cpc-raw/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Upload separate external manifest seal
+        if: steps.external-seal.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-04-a3-external-seal
+          path: ${{ runner.temp }}/clk04-a3-external-seal.json
+          if-no-files-found: error
+          retention-days: 90
+
+  cpc-replay:
+    name: CLK-04-A3 sealed raw replay (boot/STOP PNG requires manual review)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: cpc-acquire
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: clk-04-a3-cpc-raw
+          path: ${{ runner.temp }}/clk04-a3-replay
+      - uses: actions/download-artifact@v4
+        with:
+          name: clk-04-a3-external-seal
+          path: ${{ runner.temp }}/clk04-a3-seal
+      - name: Verify raw artefacts using SHA from the separate acquisition job
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          CAPTURE_HEAD: ${{ needs.cpc-acquire.outputs.acquisition_head }}
+          EXTERNAL_SHA: ${{ needs.cpc-acquire.outputs.manifest_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$CAPTURE_HEAD" = "$EXPECTED_HEAD"
+          test -n "$EXTERNAL_SHA"
+          python3 - "$RUNNER_TEMP/clk04-a3-seal/clk04-a3-external-seal.json" "$EXTERNAL_SHA" "$EXPECTED_HEAD" <<'PY'
+          import json,sys
+          f=json.load(open(sys.argv[1]))
+          assert f["mission"]=="CLK-04-A3" and f["manifest_sha256"]==sys.argv[2] and f["head"]==sys.argv[3]
+          PY
+          python3 tools/clk_04_a3_lifecycle.py --verify "$RUNNER_TEMP/clk04-a3-replay" \
+            --head "$EXPECTED_HEAD" --seal "$EXTERNAL_SHA" \
+            --report "$RUNNER_TEMP/clk04-a3-comparison.json"
+
+      - name: Publish independent lifecycle replay report (NOT raw oracle evidence)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-04-a3-lifecycle-comparison
+          path: ${{ runner.temp }}/clk04-a3-comparison.json
+          if-no-files-found: warn
+          retention-days: 90

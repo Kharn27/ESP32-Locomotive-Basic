@@ -289,6 +289,28 @@ static BEStatus print8_piece(const uint8_t *body, size_t length, size_t *at,
         body[p++] != 0x16u || body[p++] != (uint8_t)',')
         return BE_BAD_SEQUENCE;
     skip_spaces(body, length, &p);
+    if (allow_reference && p < length && body[p] == 0x02u) {
+        BasicVariableKey key;
+        BasicVariableValue value;
+        size_t consumed = 0u;
+        BVBStatus resolved;
+        if (variables == NULL) return BE_UNSUPPORTED;
+        resolved = bvb_read_explicit(body, length, p, variables,
+                                     &key, &consumed, &value);
+        if (resolved != BVB_OK) return binding_error(resolved);
+        if (key.type != (uint8_t)BVT_INTEGER ||
+            value.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
+        if (key.name_length != 1u ||
+            (key.name[0] != (uint8_t)'A' &&
+             key.name[0] != (uint8_t)'B')) return BE_UNSUPPORTED;
+        p += consumed;
+        /* emit_integer already supplies CPC sign alignment and trailing
+         * space: do not add a second layer of blanks for PRINT #8. */
+        st = emit_integer(out, value.data.integer);
+        if (st != BE_OK) return st;
+        *at = p;
+        return BE_OK;
+    }
     if (p == length || body[p++] != (uint8_t)'"') return BE_BAD_SEQUENCE;
     while (p < length) {
         uint8_t c = body[p++];
@@ -1241,7 +1263,94 @@ typedef struct {
     BEForFrame for_frame;
     BEWhileAction while_action;
     BEWhileFrame while_frame;
+    /* J1.25-B2: bounded, pure READ/RESTORE transaction (no heap). */
+    unsigned int data_action; /* 0 none, 1 READ, 2 RESTORE */
+    size_t data_cursor;
+    size_t data_item_offset;
+    size_t data_count;
+    BasicVariableKey data_keys[2];
+    int16_t data_values[2];
 } BEFlow;
+
+
+/* DATA and WHILE cannot share the one bounded per-executor storage slot.
+ * Keep the established 796-byte Xtensa ABI; reject any mixed program at
+ * WHILE evaluation, even when the DATA is skipped by GOTO. */
+#define BE_DATA_RECORD(executor) \
+    ((executor)->while_stack[BE_WHILE_STACK_CAPACITY-1u].after_cursor)
+#define BE_DATA_ITEM(executor) \
+    ((executor)->while_stack[BE_WHILE_STACK_CAPACITY-1u].after_statement)
+
+/* J1.25-B2: parse only sealed unsigned ASCII INTEGER DATA items.
+ * CPC 01 (colon) ends DATA; no STRING/REAL5 or speculative expressions. */
+static BEStatus data_integer_item(const uint8_t *body, size_t length,
+                                  size_t *at, int16_t *value, int *more)
+{
+    size_t p = *at;
+    int32_t number = 0;
+    skip_spaces(body, length, &p);
+    if (p == length || body[p] < (uint8_t)'0' ||
+        body[p] > (uint8_t)'9') return BE_UNSUPPORTED;
+    do {
+        number = number * 10 + (int32_t)(body[p++] - (uint8_t)'0');
+        if (number > INT16_MAX) return BE_INTEGER_OVERFLOW;
+    } while (p < length && body[p] >= (uint8_t)'0' &&
+             body[p] <= (uint8_t)'9');
+    skip_spaces(body, length, &p);
+    if (p < length && body[p] == (uint8_t)',') {
+        ++p;
+        /* Reject dangling commas before any READ commits a value. */
+        {
+            size_t ahead = p;
+            skip_spaces(body, length, &ahead);
+            if (ahead == length || body[ahead] < (uint8_t)'0' ||
+                body[ahead] > (uint8_t)'9') return BE_BAD_SEQUENCE;
+        }
+        *more = 1;
+    } else if (p == length || body[p] == 0x01u) {
+        *more = 0;
+    } else return BE_BAD_SEQUENCE;
+    *value = (int16_t)number;
+    *at = p;
+    return BE_OK;
+}
+
+/* Scan the immutable program in source order, independent of GOTO.
+ * DATA is supported only at a line start (the closed B1 INTEGER shapes).
+ * Cursors are offsets; no pointers to externally editable program storage. */
+static BEStatus data_next_integer(const BasicProgram *program,
+                                  size_t *record, size_t *item,
+                                  int16_t *value)
+{
+    size_t at = *record;
+    size_t next_item = *item;
+    for (;;) {
+        BasicProgramLine line;
+        BPStatus bp = bp_next(program, &at, &line);
+        const uint8_t *body;
+        int more;
+        BEStatus status;
+        if (bp == BP_END) return BE_DATA_EXHAUSTED;
+        if (bp != BP_OK) return BE_BAD_PROGRAM;
+        body = program->data + line.body_offset;
+        if (next_item == 0u) {
+            if (line.body_length == 0u || body[0] != 0x8cu) {
+                at = line.next_offset;
+                continue;
+            }
+            next_item = 1u;
+        } else if (line.body_length == 0u || body[0] != 0x8cu ||
+                   next_item >= line.body_length) {
+            return BE_BAD_PROGRAM;
+        }
+        status = data_integer_item(body, line.body_length, &next_item,
+                                   value, &more);
+        if (status != BE_OK) return status;
+        *record = more ? line.offset : line.next_offset;
+        *item = more ? next_item : 0u;
+        return BE_OK;
+    }
+}
 
 /* A branch or END may skip a suffix. In J0.19, no numbered line
  * containing an actual subsequent assignment is executable. Locate only
@@ -1567,7 +1676,83 @@ static BEStatus execute_line(const BasicProgram *program,
             return comment_end(body, length, pos + 1u,
                                line->next_offset, next);
         }
-        if (token == 0x8au) { /* CPC CLS: no direct firmware side effect. */
+        if (token == 0x8cu) { /* DATA: source-order items, no cursor advance */
+            int more;
+            int16_t ignored;
+            if (variables == NULL || executor->while_depth != 0u)
+                return BE_UNSUPPORTED; /* No mixed DATA/WHILE semantics. */
+            do {
+                status = data_integer_item(body, length, &pos, &ignored, &more);
+                if (status != BE_OK) return status;
+            } while (more);
+            /* A colon after DATA is executable, witnessed by DATA_COLON. */
+        } else if (token == 0xc3u) { /* READ A%[,B%] */
+            size_t record = BE_DATA_RECORD(executor);
+            size_t item = BE_DATA_ITEM(executor);
+            if (variables == NULL || preceding_statement ||
+                executor->while_depth != 0u) return BE_UNSUPPORTED;
+            for (;;) {
+                BasicVariableKey key;
+                size_t consumed = 0u;
+                int16_t value;
+                BVBStatus resolved;
+                skip_spaces(body, length, &pos);
+                if (pos == length || body[pos] != 0x02u) return BE_UNSUPPORTED;
+                if (flow->data_count >= 2u) return BE_UNSUPPORTED;
+                resolved = bvb_resolve_explicit(body, length, pos,
+                                                 &key, &consumed);
+                if (resolved != BVB_OK) return binding_error(resolved);
+                if (key.type != (uint8_t)BVT_INTEGER ||
+                    key.name_length != 1u ||
+                    (key.name[0] != (uint8_t)'A' &&
+                     key.name[0] != (uint8_t)'B')) return BE_UNSUPPORTED;
+                if ((flow->data_count != 0u &&
+                     for_same_key(&key, &flow->data_keys[0])) ||
+                    body[pos + 1u] != 0u || body[pos + 2u] != 0u)
+                    return BE_UNSUPPORTED;
+                status = data_next_integer(program, &record, &item, &value);
+                if (status != BE_OK) return status;
+                flow->data_keys[flow->data_count] = key;
+                flow->data_values[flow->data_count] = value;
+                ++flow->data_count;
+                pos += consumed;
+                skip_spaces(body, length, &pos);
+                if (pos == length) break;
+                if (body[pos++] != (uint8_t)',') return BE_UNSUPPORTED;
+            }
+            flow->data_action = 1u;
+            flow->data_cursor = record;
+            flow->data_item_offset = item;
+            *next = line->next_offset;
+            return BE_OK;
+        } else if (token == 0xc7u) { /* RESTORE or RESTORE 100 only */
+            size_t p = pos;
+            BasicProgramLine target;
+            BPStatus bp;
+            if (variables == NULL || preceding_statement ||
+                executor->while_depth != 0u) return BE_UNSUPPORTED;
+            skip_spaces(body, length, &p);
+            if (p == length) {
+                flow->data_action = 2u;
+                flow->data_cursor = 0u;
+                flow->data_item_offset = 0u;
+            } else {
+                if (length - p != 3u || body[p] != 0x1eu ||
+                    body[p + 1u] != 100u || body[p + 2u] != 0u)
+                    return BE_UNSUPPORTED; /* No arbitrary RESTORE yet. */
+                bp = bp_find(program, 100u, &target);
+                if (bp == BP_NOT_FOUND) return BE_MISSING_TARGET;
+                if (bp != BP_OK) return BE_BAD_PROGRAM;
+                if (target.body_length == 0u ||
+                    program->data[target.body_offset] != 0x8cu)
+                    return BE_UNSUPPORTED;
+                flow->data_action = 2u;
+                flow->data_cursor = target.offset;
+                flow->data_item_offset = 0u;
+            }
+            *next = line->next_offset;
+            return BE_OK;
+        } else if (token == 0x8au) { /* CPC CLS: no direct firmware side effect. */
             status = emit_clear_event(events, out->length);
             if (status != BE_OK) return status;
         } else if (token == 0xbbu) { /* PEN immediate, not a byte-stream escape. */
@@ -2345,6 +2530,16 @@ static BEStatus execute_line(const BasicProgram *program,
             return BE_OK;
         } else if (token == 0xd6u) { /* WHILE : CPC D6 */
             BEWhileFrame frame = {0};
+            /* Reject only a DATA cursor that has actually been consumed.
+             * A DATA/READ/RESTORE in an unreachable line must not break
+             * the already-accepted WHILE/WEND runtime on main.
+             * With depth==8 the last frame is live: its after_* offsets
+             * are WHILE state, not a DATA cursor. Preserve stack-full
+             * diagnosis by checking only when no WHILE frame is active. */
+            if (executor->while_depth == 0u &&
+                (BE_DATA_RECORD(executor) != 0u ||
+                 BE_DATA_ITEM(executor) != 0u))
+                return BE_UNSUPPORTED;
             const BEWhileFrame *existing = NULL;
             size_t end, resume_cursor, resume_statement;
             int condition;
@@ -2473,6 +2668,8 @@ BEStatus be_init_with_store(BasicExecutor *executor, const BasicProgram *program
     executor->while_depth = 0u;
     memset(executor->while_stack, 0, sizeof(executor->while_stack));
     executor->variables = variables;
+    BE_DATA_RECORD(executor) = 0u;
+    BE_DATA_ITEM(executor) = 0u;
     return BE_OK;
 }
 
@@ -2618,6 +2815,18 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
                 return store_error(lookup);
         }
     }
+    if (transition.data_action == 1u) {
+        size_t i, missing = 0u;
+        for (i = 0u; i < transition.data_count; ++i) {
+            size_t index;
+            BVSStatus find = bvs_find(variables, &transition.data_keys[i],
+                                      &index);
+            if (find == BVS_NOT_FOUND) ++missing;
+            else if (find != BVS_OK) return store_error(find);
+        }
+        if (missing > variables->capacity - variables->count)
+            return BE_STORE_FULL; /* No partial multi-READ assignment. */
+    }
     if (probe.length > output_capacity) {
         return BE_NO_SPACE;
     }
@@ -2655,6 +2864,18 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
           transition.for_frame.loop_statement != second_transition.for_frame.loop_statement ||
           transition.for_frame.after_cursor != second_transition.for_frame.after_cursor ||
           transition.for_frame.after_statement != second_transition.for_frame.after_statement)) ||
+        transition.data_action != second_transition.data_action ||
+        transition.data_cursor != second_transition.data_cursor ||
+        transition.data_item_offset != second_transition.data_item_offset ||
+        transition.data_count != second_transition.data_count ||
+        (transition.data_count > 0u &&
+         (!for_same_key(&transition.data_keys[0],
+                        &second_transition.data_keys[0]) ||
+          transition.data_values[0] != second_transition.data_values[0])) ||
+        (transition.data_count > 1u &&
+         (!for_same_key(&transition.data_keys[1],
+                        &second_transition.data_keys[1]) ||
+          transition.data_values[1] != second_transition.data_values[1])) ||
         assignment.present != second.present ||
         (assignment.present &&
          (assignment.key.type != second.key.type ||
@@ -2669,6 +2890,17 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
              assignment.value.data.integer != second.value.data.integer)))))) {
         /* Unreachable while the documented immutable-input contract holds. */
         return BE_BAD_PROGRAM;
+    }
+    if (commit && transition.data_action == 1u) {
+        size_t i;
+        for (i = 0u; i < transition.data_count; ++i) {
+            BasicVariableValue value = {0};
+            value.type = (uint8_t)BVT_INTEGER;
+            value.data.integer = transition.data_values[i];
+            status = store_error(bvs_assign(variables,
+                                           &transition.data_keys[i], &value));
+            if (status != BE_OK) return status; /* preflighted, unreachable */
+        }
     }
     if (commit && assignment.present) {
         status = store_error(assignment.value.type == (uint8_t)BVT_STRING ?
@@ -2714,6 +2946,10 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
     if (transition.action == BE_FLOW_CLEAR) {
         executor->while_depth = 0u;
         memset(executor->while_stack, 0, sizeof(executor->while_stack));
+    }
+    if (transition.data_action != 0u) {
+        BE_DATA_RECORD(executor) = transition.data_cursor;
+        BE_DATA_ITEM(executor) = transition.data_item_offset;
     }
     executor->statement_offset = transition.next_statement;
     executor->cursor = next;

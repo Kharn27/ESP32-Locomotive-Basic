@@ -1769,6 +1769,13 @@ static BEStatus execute_line(const BasicProgram *program,
                     body[pos + 1u] != 0u || body[pos + 2u] != 0u)
                     return BE_UNSUPPORTED;
                 status = data_next_scalar(program, &record, &item, &value);
+                /* Preserve B2's fail-closed refusal for an unsupported
+                 * standalone A$ read with no available DATA at all.
+                 * In a staged mixed READ, exhausting its second field
+                 * remains BE_DATA_EXHAUSTED and fully atomic. */
+                if (status == BE_DATA_EXHAUSTED &&
+                    key.type == (uint8_t)BVT_STRING &&
+                    flow->data_count == 0u) return BE_UNSUPPORTED;
                 if (status != BE_OK) return status;
                 if (value.type != key.type) return BE_UNSUPPORTED;
                 flow->data_keys[flow->data_count] = key;

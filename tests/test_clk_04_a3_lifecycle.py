@@ -188,10 +188,11 @@ class ReplayFailClosed(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             (folder / "evidence.sna").write_bytes(b"secret")
-            # Rejection is enforced during verify after manifest validation;
-            # this structural test establishes inventory cannot silently omit it.
-            self.assertIn("evidence.sna", a3.inventory(folder))
-            self.assertEqual(a3.inventory(folder)["evidence.sna"]["bytes"], 6)
+            # Even partial manifests cannot contain SNA or ROM originals.
+            reject(lambda: a3.inventory(folder), "SENSITIVE_IMAGE_ARCHIVED")
+            (folder / "evidence.sna").unlink()
+            (folder / "cpc6128.rom").write_bytes(b"secret")
+            reject(lambda: a3.inventory(folder), "SENSITIVE_IMAGE_ARCHIVED")
 
     def test_process_separation_and_png_are_required(self):
         p = a3.protocol()

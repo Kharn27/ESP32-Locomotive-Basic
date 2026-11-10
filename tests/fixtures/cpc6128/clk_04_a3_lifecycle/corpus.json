@@ -1,0 +1,227 @@
+{
+  "schema": 1,
+  "mission": "CLK-04-A3",
+  "status": "SEALED_INPUTS_NOT_OBSERVATIONS",
+  "machine": "CPC6128_128K_BASIC_1.1",
+  "sessions": [
+    "original",
+    "repeat"
+  ],
+  "process_policy": "one fresh CPC process per session; all stage commands executed in order in that same process; separate speed gates use separate control processes",
+  "caprice_commit": "8c778bf072a06fb7c23b9cccd179041db7f79a52",
+  "rom_sha256": "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562",
+  "image": "ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c",
+  "output_channel": "CPC ROM PRINT #8 to printer.dat; LIST #8 from CPC ROM; screenshots qualitative only",
+  "speed_guard": {
+    "per_session": "two separate fresh CPC control processes",
+    "short_delays": 2,
+    "long_delays": 18,
+    "min_ticks_difference": 100,
+    "minimum_wall_delta_seconds": "0.5",
+    "bounded_rate_ticks_per_wall_second": [
+      "255",
+      "345"
+    ]
+  },
+  "bounds": {
+    "session_timeout_seconds": 240,
+    "maximum_delay_tokens_per_session": 65,
+    "stop_wait_delay_tokens": 12,
+    "stop_wait_bound_seconds": 90,
+    "maximum_total_sessions": 2
+  },
+  "screens_expected": [
+    "boot",
+    "idle",
+    "run1_stop",
+    "run1_cont",
+    "run2_stop",
+    "run2_cont",
+    "new",
+    "clear",
+    "stop_wait",
+    "stop_cont"
+  ],
+  "snapshots_expected": [
+    "run_program",
+    "run1_stop",
+    "run2_stop",
+    "stop_program",
+    "stop_wait"
+  ],
+  "programs": {
+    "run": [
+      "10 T!=TIME",
+      "20 STOP",
+      "30 PRINT #8,\"A3:RUN:CONT\"",
+      "40 PRINT #8,@T!",
+      "50 PRINT #8,T!",
+      "60 PRINT #8,TIME",
+      "70 PRINT #8,TIME",
+      "80 END"
+    ],
+    "stop": [
+      "10 PRINT #8,\"A3:STOP:BEFORE\"",
+      "20 PRINT #8,TIME",
+      "30 T!=TIME",
+      "40 STOP",
+      "50 PRINT #8,\"A3:STOP:AFTER\"",
+      "60 PRINT #8,@T!",
+      "70 PRINT #8,T!",
+      "80 PRINT #8,TIME",
+      "90 PRINT #8,TIME",
+      "100 END"
+    ]
+  },
+  "stages": [
+    {
+      "id": "boot",
+      "commands": [
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+        "PRINT #8,\"A3:BOOT\"",
+        "PRINT #8,TIME",
+        "CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY",
+        "PRINT #8,TIME"
+      ],
+      "screens": [
+        "boot"
+      ],
+      "snaps": []
+    },
+    {
+      "id": "idle",
+      "commands": [
+        "PRINT #8,\"A3:IDLE\"",
+        "PRINT #8,TIME",
+        "PRINT #8,TIME",
+        "CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY",
+        "PRINT #8,TIME",
+        "PRINT #8,TIME",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT"
+      ],
+      "screens": [
+        "idle"
+      ],
+      "snaps": []
+    },
+    {
+      "id": "run_first",
+      "commands": [
+        "PRINT #8,\"A3:RUN:PRE\"",
+        "PRINT #8,TIME",
+        "NEW",
+        "10 T!=TIME",
+        "20 STOP",
+        "30 PRINT #8,\"A3:RUN:CONT\"",
+        "40 PRINT #8,@T!",
+        "50 PRINT #8,T!",
+        "60 PRINT #8,TIME",
+        "70 PRINT #8,TIME",
+        "80 END",
+        "LIST #8",
+        "CAP32_DELAY CAP32_DELAY CAP32_SNAPSHOT",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
+        "CONT",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT"
+      ],
+      "screens": [
+        "run1_stop",
+        "run1_cont"
+      ],
+      "snaps": [
+        "run_program",
+        "run1_stop"
+      ]
+    },
+    {
+      "id": "run_second",
+      "commands": [
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
+        "CONT",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+        "PRINT #8,\"A3:RUN:POST\"",
+        "PRINT #8,TIME"
+      ],
+      "screens": [
+        "run2_stop",
+        "run2_cont"
+      ],
+      "snaps": [
+        "run2_stop"
+      ]
+    },
+    {
+      "id": "new_direct",
+      "commands": [
+        "PRINT #8,\"A3:NEW:BEFORE\"",
+        "PRINT #8,TIME",
+        "NEW",
+        "LIST #8",
+        "PRINT #8,\"A3:NEW:AFTER\"",
+        "PRINT #8,TIME",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT"
+      ],
+      "screens": [
+        "new"
+      ],
+      "snaps": []
+    },
+    {
+      "id": "clear_direct",
+      "commands": [
+        "T!=777",
+        "PRINT #8,\"A3:CLEAR:BEFORE\"",
+        "PRINT #8,T!",
+        "PRINT #8,TIME",
+        "CLEAR",
+        "PRINT #8,\"A3:CLEAR:AFTER\"",
+        "PRINT #8,T!",
+        "PRINT #8,TIME",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT"
+      ],
+      "screens": [
+        "clear"
+      ],
+      "snaps": []
+    },
+    {
+      "id": "stop_wait_cont",
+      "commands": [
+        "NEW",
+        "10 PRINT #8,\"A3:STOP:BEFORE\"",
+        "20 PRINT #8,TIME",
+        "30 T!=TIME",
+        "40 STOP",
+        "50 PRINT #8,\"A3:STOP:AFTER\"",
+        "60 PRINT #8,@T!",
+        "70 PRINT #8,T!",
+        "80 PRINT #8,TIME",
+        "90 PRINT #8,TIME",
+        "100 END",
+        "LIST #8",
+        "CAP32_DELAY CAP32_DELAY CAP32_SNAPSHOT",
+        "RUN",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
+        "CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY CAP32_DELAY",
+        "CONT",
+        "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT",
+        "PRINT #8,\"A3:FINAL\"",
+        "PRINT #8,TIME",
+        "CAP32_DELAY CAP32_DELAY CAP32_EXIT"
+      ],
+      "screens": [
+        "stop_wait",
+        "stop_cont"
+      ],
+      "snaps": [
+        "stop_program",
+        "stop_wait"
+      ]
+    }
+  ],
+  "classification": "VERIFIED only when same-process ordered printer numbers, SNA REAL5 scalar, source/list/program identity, timestamps and provenance all pass; causal zero-point/reset/wrap UNVERIFIED; no observed reset in-process -> UNSUPPORTED",
+  "stop_condition": "all stages complete then CAP32_EXIT; timeout or unexpected outputs fail-closed; no wrap wait",
+  "reset_in_process": "UNSUPPORTED unless a separate attested reset contract is later sealed before acquisition"
+}

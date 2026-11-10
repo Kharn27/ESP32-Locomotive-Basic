@@ -141,6 +141,7 @@ def make_candidate(root,out):
              GIT_AUTHOR_DATE="2026-11-10T00:00:00+0000",
              GIT_COMMITTER_DATE="2026-11-10T00:00:00+0000")
     c=run("git","-C",root,"commit-tree",candidate_tree,"-p",M,"-p",H,
+          "-m","E1 #358 ephemeral Git test merge M+H, LAB ONLY",
           env=env).strip()
     require(SHA.fullmatch(c),"BAD_C_SHA")
     require(git(root,"rev-parse",c+"^{tree}")==candidate_tree,"C_TREE_SUBSTITUTION")
@@ -355,6 +356,11 @@ def campaign(root,out):
     token=os.environ.get("GH_TOKEN","")
     before=snapshot(token,e)
     put(out/"api-before.json",before)
+    run("git","-C",root,"fetch","--no-tags","origin",
+        "+refs/pull/330/head:refs/remotes/origin/e1-330-head",
+        log=out/"fetch-pr330.log")
+    require(git(root,"rev-parse","refs/remotes/origin/e1-330-head")==H,
+            "PR330_FETCHED_SHA_DRIFT")
     verify_git(root,e)
     state=make_candidate(root,out)
     put(out/"candidate.json",state)

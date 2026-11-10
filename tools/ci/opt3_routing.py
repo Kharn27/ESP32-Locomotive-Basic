@@ -234,6 +234,10 @@ CLK04_A4_PATHS = (
     "tests/fixtures/cpc6128/clk_04_a4_numeric/**",
     "docs/CLK-04-A4*",
     "tools/ci/opt3_routing.py",
+    "tools/ci/clk_04_a4_fast_route.py",
+    "tools/clk_03_cpc_time.py",
+    "tools/clk_04_real5_oracle.py",
+    "tests/oracles/caprice32",
 )
 
 # CLK-04-A1: exactly five isolated triggers, no production code.
@@ -586,9 +590,13 @@ def audit(sources):
            "contents: write" not in a4 and "pull_request_target:" not in a4,
            "A4_PERMISSIONS_MISMATCH")
     demand(all(x in a4 for x in (
-           "jobs:\n  host-negatives-and-c99:", "\n  cpc-acquire:",
-           "\n  sealed-replay:", "needs: host-negatives-and-c99",
+           "jobs:\n  route:", "\n  host-negatives-and-c99:", "\n  cpc-acquire:",
+           "\n  sealed-replay:",
            "needs: cpc-acquire",
+           "needs: [host-negatives-and-c99, route]",
+           "if: needs.route.outputs.mode == 'full'",
+           "python3 tools/ci/clk_04_a4_fast_route.py",
+           "-p 'test_clk_04_a4_fast_route.py' -v",
            "python3 -m unittest discover -s tests -p 'test_clk_04_a4_numeric.py' -v",
            "python3 tools/clk_04_a4_oracle.py --acquire",
            "python3 tools/clk_04_a4_oracle.py --verify",
@@ -597,6 +605,13 @@ def audit(sources):
            "if: always()", "retention-days: 90", "--candidate",
            "-fsanitize=address,undefined")),
            "A4_EVIDENCE_PIPELINE_INCOMPLETE")
+    # The PR fast-path cannot depend on a skipped route or host precondition.
+    route_job = a4.split("\n  route:\n", 1)[1].split("\n  host-negatives-and-c99:", 1)[0]
+    host_job = a4.split("\n  host-negatives-and-c99:\n", 1)[1].split("\n  cpc-acquire:", 1)[0]
+    demand(re.search(r"(?m)^    (?:if|needs):", route_job) is None,
+           "A4_FAST_ROUTE_CONDITIONAL")
+    demand(re.search(r"(?m)^    (?:if|needs):", host_job) is None,
+           "A4_FAST_HOST_CONDITIONAL")
     demand("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
            "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c"
            in a4 and
@@ -605,7 +620,7 @@ def audit(sources):
            "8c778bf072a06fb7c23b9cccd179041db7f79a52" in a4,
            "A4_CPC_PINS_DRIFT")
     demand("persist-credentials: false" in a4 and
-           a4.count("ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}") == 3
+           a4.count("ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}") == 4
            and "continue-on-error" not in a4 and "|| true" not in a4
            and "if-no-files-found: error" in a4,
            "A4_HEAD_OR_FAIL_CLOSED_INTEGRITY")
@@ -1972,6 +1987,13 @@ def clk04_a4_negative_tests(sources):
         ("WRITE",{**sources,CLK04_A4_WORKFLOW:orig.replace(
               "  contents: read","  contents: write",1)},
          "A4_PERMISSIONS_MISMATCH"),
+        ("DISABLED_ROUTE",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "  route:\n    name:", "  route:\n    if: false\n    name:",1)},
+         "A4_FAST_ROUTE_CONDITIONAL"),
+        ("DISABLED_HOST",{**sources,CLK04_A4_WORKFLOW:orig.replace(
+              "  host-negatives-and-c99:\n    name:",
+              "  host-negatives-and-c99:\n    if: false\n    name:",1)},
+         "A4_FAST_HOST_CONDITIONAL"),
     )
     for label,mutant,code in cases:
         demand(mutant!=sources, "A4_NEGATIVE_INERT_"+label)

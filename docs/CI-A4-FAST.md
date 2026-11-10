@@ -30,6 +30,15 @@ Les tests de routage créent des dépôts Git synthétiques et vérifient : work
 
 ### Durées et validation GitHub
 
-Référence historique : [A4 #42810185987](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42810185987) (ancien HEAD, acquisition en dizaines de minutes ; limite de sécurité 100 minutes). Le temps FAST doit être **mesuré sur la PR CI-A4-FAST réelle** ; ne pas confondre plafond de timeout et durée observée. Pour faire la démonstration full, choisir `Run workflow` sur la branche à qualifier : cela provoque une acquisition CPC complète et sa comparaison avec ses propres RAW, sans altérer #360/#366. La décision de lancer une campagne complète supplémentaire sur la seule modification CI appartient au Pilotage.
+Mesures réellement lues dans les **logs GitHub**, sans supposer une durée à partir du timeout :
+
+| Campagne / job | HEAD / run | Intervalle horodaté observé dans le log | Résultat |
+| --- | --- | --- | --- |
+| Acquisition CPC historique A4 | `2ce031b03eada5bcbb0a6f23d57a9bc6173f3a7d` / [#42810185987](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42810185987) / job `129809473659` | **1 829,3 s (~30 min 29 s)** | SUCCESS |
+| Routage FAST | `34c0739ac8959b51585f83b17f127e0e688fb50e` / [#42849441305](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42849441305) / job `129945710463` | **4,0 s** | SUCCESS, `FAST_HOST_ONLY_NO_CPC_EVIDENCE_REUSE` |
+| Tests hôte A4 | même HEAD/run / job `129945710882` | **11,5 s** (en parallèle du routage) | SUCCESS |
+| CPC + replay sur run FAST | même HEAD/run | **0 acquisition ; 0 rejeu** | SKIPPED / SKIPPED |
+
+Ces durées sont l'étendue premier/dernier horodatage **dans les logs**, pas une métrique Actions d'allocation runner. Les deux campagnes ne sont pas sur le même HEAD ; les métriques ne transfèrent aucune preuve CPC. À la mise à jour de cette note, les nouvelles Actions du HEAD de correction OPT3 restent à vérifier avant remise finale. Pour faire la démonstration full, choisir `Run workflow` sur la branche à qualifier : cela provoque une acquisition CPC complète et sa comparaison avec ses propres RAW, sans altérer #360/#366. La décision de lancer une campagne complète supplémentaire sur la seule modification CI appartient au Pilotage.
 
 **Bornes de preuve maintenues :** `CANDIDATE_PARTIAL_MATCH` et `twice_real5_status=UNVERIFIED` (C2), 10 `UNSUPPORTED`, `RANGE_UNVERIFIED` ; aucune qualification CORE/TIME. `ON_DEVICE_UNVERIFIED` pour le CYD physique (CI seulement).

@@ -1,0 +1,174 @@
+name: CLK-04-A4 isolated CPC REAL5 numeric and PRINT pipeline
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/clk-04-a4-numeric-pipeline.yml'
+      - 'tools/clk_04_a4_*'
+      - 'tests/test_clk_04_a4_*'
+      - 'tests/fixtures/cpc6128/clk_04_a4_numeric/**'
+      - 'docs/CLK-04-A4*'
+      - 'tools/ci/opt3_routing.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  host-negatives-and-c99:
+    name: CLK-04-A4 C99 GCC/Clang sanitizers and synthetic falsifiers (NOT CPC)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Pin checkout, corpus and run GCC/Clang C99 with ASan and UBSan
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          echo 'e9fd767a394d7717816fe537695bf09bc5e40a2a5198f338d5c5e4aa42d1c79d  tests/fixtures/cpc6128/clk_04_a4_numeric/corpus.json' | sha256sum --check --status
+          python3 -m unittest discover -s tests -p 'test_clk_04_a4_numeric.py' -v
+          python3 tools/clk_04_a4_oracle.py --self-test
+          for CC in gcc clang; do
+            for FLAGS in "-O2" "-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined"; do
+              $CC -std=c99 -Wall -Wextra -Werror -pedantic $FLAGS \
+                tools/clk_04_a4_numeric_lab.c tests/test_clk_04_a4_numeric_lab.c \
+                -o "$RUNNER_TEMP/clk04-a4-test"
+              "$RUNNER_TEMP/clk04-a4-test"
+              $CC -std=c99 -Wall -Wextra -Werror -pedantic $FLAGS \
+                tools/clk_04_a4_numeric_lab.c tests/test_clk_04_a4_numeric_cli.c \
+                -o "$RUNNER_TEMP/clk04-a4-cli"
+              "$RUNNER_TEMP/clk04-a4-cli" 0 1 5256 32767 32768 65536 4294967295 > "$RUNNER_TEMP/c99-candidates.txt"
+              test "$(wc -l < "$RUNNER_TEMP/c99-candidates.txt")" -eq 7
+            done
+          done
+          ! "$RUNNER_TEMP/clk04-a4-cli" -1 >/dev/null 2>&1
+          ! "$RUNNER_TEMP/clk04-a4-cli" 4294967296 >/dev/null 2>&1
+          ! "$RUNNER_TEMP/clk04-a4-cli" 999x >/dev/null 2>&1
+
+  cpc-acquire:
+    name: CLK-04-A4 ROM-backed CPC6128 scalar RAM and raw PRINT two-session capture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    needs: host-negatives-and-c99
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      manifest_sha256: ${{ steps.external-seal.outputs.manifest_sha256 }}
+      acquisition_head: ${{ steps.external-seal.outputs.acquisition_head }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: recursive
+      - name: Authenticate checkout, ROM and Caprice32 pins; acquire unmodified CPC
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          echo 'e9fd767a394d7717816fe537695bf09bc5e40a2a5198f338d5c5e4aa42d1c79d  tests/fixtures/cpc6128/clk_04_a4_numeric/corpus.json' | sha256sum --check --status
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d' ' -f1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          python3 tools/clk_04_a4_oracle.py --acquire \
+            --caprice tests/oracles/caprice32 \
+            --output "$RUNNER_TEMP/clk04-a4-cpc-raw" --head "$EXPECTED_HEAD"
+          ! find "$RUNNER_TEMP/clk04-a4-cpc-raw" -type f \( -name '*.sna' -o -name '*.rom' \) | grep .
+      - name: Publish independent SHA256 of manifest outside RAW, bound to HEAD
+        id: external-seal
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="$RUNNER_TEMP/clk04-a4-cpc-raw/manifest.json"
+          test -s "$FILE"
+          SEAL="$(sha256sum "$FILE" | awk '{print $1}')"
+          printf 'CLK04_A4_EXTERNAL_MANIFEST_SHA256=%s\n' "$SEAL"
+          printf 'CLK04_A4_ACQUISITION_HEAD=%s\n' "$EXPECTED_HEAD"
+          printf 'manifest_sha256=%s\n' "$SEAL" >> "$GITHUB_OUTPUT"
+          printf 'acquisition_head=%s\n' "$EXPECTED_HEAD" >> "$GITHUB_OUTPUT"
+          printf '{"mission":"CLK-04-A4","head":"%s","manifest_sha256":"%s","status":"PENDING_REPLAY_PNG_REVIEW"}\n' \
+            "$EXPECTED_HEAD" "$SEAL" > "$RUNNER_TEMP/clk04-a4-external-seal.json"
+      - name: Preserve partial RAW even on failure (not proof of success)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-04-a4-cpc-raw
+          path: ${{ runner.temp }}/clk04-a4-cpc-raw/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Publish separate external seal
+        if: steps.external-seal.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-04-a4-external-seal
+          path: ${{ runner.temp }}/clk04-a4-external-seal.json
+          if-no-files-found: error
+          retention-days: 90
+
+  sealed-replay:
+    name: CLK-04-A4 fail-closed RAW replay, C99 comparison and divergence report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: cpc-acquire
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: clk-04-a4-cpc-raw
+          path: ${{ runner.temp }}/clk04-a4-replay
+      - uses: actions/download-artifact@v4
+        with:
+          name: clk-04-a4-external-seal
+          path: ${{ runner.temp }}/clk04-a4-seal
+      - name: Authenticate seal, compile C99, replay ROM RAW before candidate comparison
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          CAPTURE_HEAD: ${{ needs.cpc-acquire.outputs.acquisition_head }}
+          EXTERNAL_SHA: ${{ needs.cpc-acquire.outputs.manifest_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$CAPTURE_HEAD" = "$EXPECTED_HEAD"
+          test -n "$EXTERNAL_SHA"
+          python3 - "$RUNNER_TEMP/clk04-a4-seal/clk04-a4-external-seal.json" "$EXTERNAL_SHA" "$EXPECTED_HEAD" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1]))
+          assert data["mission"]=="CLK-04-A4" and data["manifest_sha256"]==sys.argv[2] and data["head"]==sys.argv[3]
+          PY
+          gcc -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+            tools/clk_04_a4_numeric_lab.c tests/test_clk_04_a4_numeric_cli.c \
+            -o "$RUNNER_TEMP/clk04-a4-c99-candidate"
+          python3 tools/clk_04_a4_oracle.py --verify "$RUNNER_TEMP/clk04-a4-replay" \
+            --head "$EXPECTED_HEAD" --seal "$EXTERNAL_SHA" \
+            --candidate "$RUNNER_TEMP/clk04-a4-c99-candidate" \
+            --report "$RUNNER_TEMP/clk04-a4-comparison.json"
+      - name: Export candidate comparison separately (never RAW)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-04-a4-c99-comparison
+          path: ${{ runner.temp }}/clk04-a4-comparison.json
+          if-no-files-found: warn
+          retention-days: 90

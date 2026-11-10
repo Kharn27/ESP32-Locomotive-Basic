@@ -330,6 +330,9 @@ def classify_sample(row, record):
     n=int(row["value_requested"])
     raw_candidate=bytes.fromhex(fields[1]).hex(" ").upper()
     doubled_candidate=bytes.fromhex(fields[3]).hex(" ").upper()
+    # CPC RAW captures input variable REAL5 only, NOT RAM bytes of T!*2.
+    # A matching integer or raw PRINT cannot verify the product encoding.
+    row["twice_real5_status"]="UNVERIFIED"
     independent=("arithmetic_real5_hex" not in row or
        (row["arithmetic_real5_hex"]==row["cpc_real5_hex"] and
         row["cpc_equal"]=="-1" and row["cpc_plus_step"]=="1" and
@@ -358,7 +361,7 @@ def classify_sample(row, record):
                not observed_algebra or not numeric_candidate or
                "CPC_MISMATCH_STOP" in printed.values() else
             "UNSUPPORTED" if not exact_print or
-               "UNSUPPORTED" in printed.values() else "CANDIDATE_MATCH")
+               "UNSUPPORTED" in printed.values() else "CANDIDATE_PARTIAL_MATCH")
     row["c99_candidate"]={"real5_hex":raw_candidate,
          "twice_real5_hex":doubled_candidate,
          "twice_integer":fields[2],"ge_zero_integer":fields[4],
@@ -468,17 +471,21 @@ def verify(out,head,seal,candidate):
     output=proc.stdout.decode("ascii").splitlines()
     need(len(output)==len(report),"CANDIDATE_CARDINALITY")
     totals={"VERIFIED_CPC_SAMPLE":0,"CANDIDATE_MATCH":0,
+            "CANDIDATE_PARTIAL_MATCH":0,
             "CPC_MISMATCH_STOP":0,"INPUT_UNVERIFIED":0,"UNSUPPORTED":0}
     for row,record in zip(report,output):
         status=classify_sample(row,record)
         totals["VERIFIED_CPC_SAMPLE"]+=1
         totals[status]+=1
+    need(totals["CANDIDATE_MATCH"]==0, "PRODUCT_REAL5_UNVERIFIED_FULL_MATCH")
     status=("STOP_ARCHITECTURAL" if totals["CPC_MISMATCH_STOP"] or
             totals["INPUT_UNVERIFIED"] else
             "UNSUPPORTED" if totals["UNSUPPORTED"] else
             "VERIFIED_CPC_SAMPLES_ONLY")
     output={"mission":"CLK-04-A4","head":head,"seal":seal,"status":status,
             "totals":totals,"samples":report,
+            "unverified_candidate_components":["twice_real5_hex"],
+            "match_scope":"CANDIDATE_PARTIAL_MATCH_EXCLUDES_PRODUCT_REAL5_BYTES",
             "range_claim":"RANGE_UNVERIFIED",
             "human_png_review":"REQUIRED_NOT_AUTOMATED"}
     print("CLK-04-A4 RAW_REPLAY_PASS",json.dumps(totals,sort_keys=True),

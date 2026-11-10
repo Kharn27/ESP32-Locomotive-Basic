@@ -465,7 +465,7 @@ static int diagnostic_provenance_matrix(void)
 static int production_wiring(const char *path)
 {
     FILE *fp=fopen(path,"rb");
-    char src[55000];
+    char src[65536]; /* J1.21-C2: source grows; keep every RUN/BREAK assertion. */
     size_t n;
     static const char *required[]={
         "#include \"hw4_run_break_input.h\"",

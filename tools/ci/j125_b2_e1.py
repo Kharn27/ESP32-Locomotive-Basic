@@ -343,6 +343,9 @@ def host(out,work,state):
         log=out/"host"/"opt3-on-C.log")
     run("bash",loc/"tools/ci/test_ci_arch.sh",
         cwd=loc,log=out/"host"/"ci-arch-on-C.log")
+    env=dict(os.environ,CI_ARCH_BASE=M)
+    run("bash",loc/"tools/ci/ci_arch_changes.sh",cwd=loc,env=env,
+        log=out/"host"/"ci-arch-diff-on-C.log")
     run("python3",loc/"tools/j1_25_b1_data_oracle.py","--self-test",
         cwd=loc,log=out/"host"/"b1-independent-on-C.log",
         check=False) if False else None
@@ -375,11 +378,14 @@ def campaign(root,out):
     safe={key:value for key,value in os.environ.items()
           if key not in ("GH_TOKEN","GITHUB_TOKEN","GITHUB_ACTIONS")}
     safe.pop("GITHUB_ACTIONS",None)
-    docker=["docker","run","--rm","--network","none",
+    docker=["docker","run","--rm",
             "-v",str(root)+":/project","-w","/project",
             "-e","E1_WORK=/project/.e1-358","-e","E1_OUT=/project/"+str(out.relative_to(root)),
             "-e","E1_C="+state["C"],IMAGE,
-            "python3","/project/tools/ci/j125_b2_e1.py","--capture"]
+            "bash","-lc",
+            "git config --global --add safe.directory /project/.e1-358/M && "
+            "git config --global --add safe.directory /project/.e1-358/C && "
+            "python3 /project/tools/ci/j125_b2_e1.py --capture"]
     run(*docker,env=safe,log=out/"docker-build.log")
     require((out/"build-attempts.json").is_file() and
             len(json.loads((out/"build-attempts.json").read_text())["attempts"])==4,

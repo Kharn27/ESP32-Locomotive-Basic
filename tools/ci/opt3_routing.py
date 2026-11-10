@@ -35,7 +35,8 @@ FAMILIES = {
             "hw4-scroll-opt-a0-memory.yml",
             "hw4-disp-profile-c3.yml", "hw4-disp-render-a.yml",
             "hw4-mem-c5-v2.yml", "hw4-mem-c6-b2-a-live.yml",
-            "hw4-mem-c6-b2-b-xtensa.yml", "hw4-mem-c6-b2-d1-prelink.yml"),
+            "hw4-mem-c6-b2-b-xtensa.yml", "hw4-mem-c6-b2-d1-prelink.yml",
+            "j1-25-b2-e1-current-integration.yml"),
     "XTENSA": ("ci-xtensa.yml",),
 }
 EXPECTED_ROUTES = {
@@ -258,6 +259,18 @@ C6_B2B_PATHS = (
 )
 
 
+# #358 E1-C1: host-only V2 lab on M2, independent of CLK04-A3.
+E1_WORKFLOW = "j1-25-b2-e1-current-integration.yml"
+E1_BRANCH = "lab/j1-25-b2-e1-current-integration-m2"
+E1_PATHS = (
+    ".github/workflows/j1-25-b2-e1-current-integration.yml",
+    "tools/ci/j125_b2_e1.py",
+    "tests/test_j125_b2_e1.py",
+    "docs/J1.25-B2-E1-current-integration.md",
+    "tools/ci/opt3_routing.py",
+)
+
+
 # D1 #354: nonrequired one-shot 2 B/H SPI40 pre-link evidence.
 C6_D1_WORKFLOW = "hw4-mem-c6-b2-d1-prelink.yml"
 C6_D1_PATHS = (
@@ -331,8 +344,8 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(FAMILIES) == 5 and len(expected) == 44 and
-           len(set(expected)) == 44,
+    demand(len(FAMILIES) == 5 and len(expected) == 45 and
+           len(set(expected)) == 45,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(CLK04_A2_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
            all(CLK04_A2_WORKFLOW not in ns for family,ns in FAMILIES.items()
@@ -497,6 +510,40 @@ def audit(sources):
            "continue-on-error" not in d1 and "|| true" not in d1 and
            "C6-D1 PRELINK_DIAGNOSTIC_ONLY NOT_REQUIRED" in d1,
            "C6_D1_MASKED_FAILURE_OR_NO_ARTIFACT")
+    demand(E1_WORKFLOW in FAMILIES["HW4"] and
+           all(E1_WORKFLOW not in v for k,v in FAMILIES.items() if k!="HW4"),
+           "E1_WRONG_FAMILY")
+    e1=sources[E1_WORKFLOW]
+    paths=filters(e1)
+    demand(paths is not None and len(paths)==5 and set(paths)==set(E1_PATHS),
+           "E1_FILTER_CONTRACT_MISMATCH")
+    events=re.findall(r"(?m)^  ([a-z][\w-]*):",e1.split("\npermissions:",1)[0])
+    demand(events==["push","pull_request","workflow_dispatch"],
+           "E1_EVENT_CONTRACT_MISMATCH")
+    m=re.search(r"(?ms)^  push:\n(.*?)(?=^  pull_request:)",e1)
+    push_expected=("    branches: ["+E1_BRANCH+"]\n    paths:\n"+
+                   "".join("      - '"+x+"'\n" for x in E1_PATHS))
+    demand(m is not None and m.group(1)==push_expected,
+           "E1_PUSH_SCOPE_MISMATCH")
+    demand("permissions:\n  contents: read\n" in e1 and
+           "pull_request_target:" not in e1 and "secrets." not in e1 and
+           not re.search(r"(?m)^\s+(?:contents|pull-requests|actions): write\s*$",e1),
+           "E1_UNSAFE_PERMISSIONS")
+    demand("group: j125-b2-e1-c1-host-only" in e1 and
+           "cancel-in-progress: false" in e1 and
+           "persist-credentials: false" in e1 and
+           "fetch-depth: 0" in e1 and
+           "if: github.event_name == 'push' && github.ref == 'refs/heads/"+E1_BRANCH+"'" in e1 and
+           "python3 -m unittest discover -s tests -p test_j125_b2_e1.py -v" in e1 and
+           "python3 tools/ci/j125_b2_e1.py --self-test" in e1 and
+           "python3 tools/ci/opt3_routing.py --self-test" in e1 and
+           "HOST_ONLY_NO_XTENSA" in e1 and
+           "actions/upload-artifact@v4" in e1 and
+           "if-no-files-found: error" in e1 and "SHA256SUMS.txt" in e1 and
+           "continue-on-error" not in e1 and "|| true" not in e1 and
+           "idf.py" not in e1 and "docker run" not in e1 and
+           "four-real-xtensa:" not in e1,
+           "E1_UNSAFE_BUILD_OR_MISSING_HOST_GUARD")
     clk_paths = filters(sources[CLK01_WORKFLOW])
     demand(clk_paths is not None and
            len(clk_paths) == len(CLK01_PATHS) and
@@ -2045,7 +2092,39 @@ def c6_d1_negative_tests(sources):
     print("CI-OPT3 C6_D1_WRONG_FAMILY_REJECTED")
 
 
+def e1_negative_tests(sources):
+    original=sources[E1_WORKFLOW]
+    for item in E1_PATHS:
+        line="      - '"+item+"'\n"
+        demand(original.count(line)==2,"E1_NEGATIVE_PRECONDITION")
+        bad={**sources,E1_WORKFLOW:original.replace(line,"",1)}
+        try:audit(bad)
+        except UnsafeRoute as ex:
+            demand(str(ex)=="E1_PUSH_SCOPE_MISMATCH","E1_PUSH_NEGATIVE_REASON")
+        else:raise UnsafeRoute("E1_PUSH_FILTER_REMOVAL_ACCEPTED")
+        before,sep,after=original.partition("  pull_request:\n")
+        bad={**sources,E1_WORKFLOW:before+sep+after.replace(line,"",1)}
+        try:audit(bad)
+        except UnsafeRoute as ex:
+            demand(str(ex)=="E1_FILTER_CONTRACT_MISMATCH","E1_PR_NEGATIVE_REASON")
+        else:raise UnsafeRoute("E1_PR_FILTER_REMOVAL_ACCEPTED")
+    for altered,code in (
+        (original.replace("    branches: ["+E1_BRANCH+"]","    branches: [main]",1),
+         "E1_PUSH_SCOPE_MISMATCH"),
+        (original.replace("HOST_ONLY_NO_XTENSA","UNSAFE",1),
+         "E1_UNSAFE_BUILD_OR_MISSING_HOST_GUARD"),
+        (original.replace("python3 tools/ci/j125_b2_e1.py --self-test",
+                          "python3 tools/ci/j125_b2_e1.py --run",1),
+         "E1_UNSAFE_BUILD_OR_MISSING_HOST_GUARD")):
+        try:audit({**sources,E1_WORKFLOW:altered})
+        except UnsafeRoute as ex:
+            demand(str(ex)==code,"E1_MUTATION_WRONG_REASON:"+str(ex))
+        else:raise UnsafeRoute("E1_BAD_MUTATION_ACCEPTED")
+    print("CI-OPT3 E1_C1_HOST_ONLY_NEGATIVES_PASS")
+
+
 def negative_tests(sources):
+    e1_negative_tests(sources)
     c6_d1_negative_tests(sources)
     clk04_a3_negative_tests(sources)
     c6_b2b_negative_tests(sources)
@@ -2188,7 +2267,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=44 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=45 FAMILIES=5")
 
 
 if __name__ == "__main__":

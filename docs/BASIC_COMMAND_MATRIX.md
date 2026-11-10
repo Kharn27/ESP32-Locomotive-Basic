@@ -1,5 +1,7 @@
 # Matrice de compatibilité Locomotive BASIC 1.1 — DOC-CAT-A
 
+> **ATTENTION — VALIDITÉ HISTORIQUE (audit de lecture du 10/11/2026).** Le **catalogue, sa « vue rapide », les commandes hôte et les exemples** ci-dessous reflètent **DOC-CAT-A au 31/10/2026**, et **ne décrivent pas le `main` actuel**. Plusieurs `NOT_IMPLEMENTED` ont été dépassés par des PR fusionnées : `DATA/READ/RESTORE` bornés, `WHILE/WEND` bornés, `CLS` direct au Ready, `PEN 5..14` logique. **Ne pas** les transférer au rendu MODE1, au CPC global ou à un essai physique. Voir **[DOC-CAT-B — delta vérifié sur `main@6f6aa10…` (12 formes)](DOC-CAT-B-current-basic-delta.md)** pour l'état de lecture daté ; les statuts d'origine restent **intacts et valides à leur SHA**.
+
 **Version de lecture : 31 octobre 2026. Base d'audit : [`main@9d4131ef4847b6e6bb324bc7c3a2baddc3851ac3`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/9d4131ef4847b6e6bb324bc7c3a2baddc3851ac3). Mandat : [#212](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/212).** Cette page est un **instantané du code à ce SHA**. La documentation historique et les rapports restent des archives à date, pas des propriétés automatiquement transférables au HEAD.
 
 ## Lire les statuts sans les fusionner

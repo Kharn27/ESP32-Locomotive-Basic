@@ -1,14 +1,16 @@
 # LOCO-CYD — Locomotive BASIC 1.1 pour ESP32 CYD
 
+> **Couverture BASIC — état audité au 10/11/2026 :** lire d'abord le [delta DOC-CAT-B post-B3 (12 formes, `main@6f6aa10…`)](docs/DOC-CAT-B-current-basic-delta.md). La [matrice DOC-CAT-A](docs/BASIC_COMMAND_MATRIX.md) est une **photographie du 31/10/2026**, pas un inventaire automatiquement à jour. Les résultats C99, preuves CPC et tests PO restent distincts.
+
 > **Objectif : recréer fidèlement, à terme avec une compatibilité complète, le véritable Locomotive BASIC 1.1 de l’Amstrad CPC 6128 sur ESP32 — en C natif, sans émulation Z80.**
 >
 > **Ce projet n’est pas un interpréteur BASIC générique.** Il vise précisément le dialecte, les tokens, la syntaxe, les règles d’exécution et les comportements historiques du **Locomotive BASIC 1.1 livré avec l’Amstrad CPC 6128**.
 >
 > **Project goal (English):** a native-C, ultimately fully compatible reimplementation of the **Amstrad CPC 6128 Locomotive BASIC 1.1** — not a generic BASIC interpreter and not a Z80 emulator.
 
-**État : développement en cours — compatibilité CPC complète NON encore atteinte.** La fidélité au CPC 6128 est l’**objectif de référence**, pas une certification de la version actuelle. Pour connaître les capacités **réellement exécutées**, leurs limites et les preuves indépendantes, consulter d'abord la **[matrice de couverture Locomotive BASIC 1.1](docs/BASIC_COMMAND_MATRIX.md)** ; le [suivi des jalons](docs/PROJECT_STATUS.md) conserve l'historique des décisions.
+**État : développement en cours — compatibilité CPC complète NON encore atteinte.** La fidélité au CPC 6128 est l’**objectif de référence**, pas une certification de la version actuelle. Pour connaître les changements de couverture **prouvés depuis le 31/10**, consulter d'abord le **[delta DOC-CAT-B post-B3](docs/DOC-CAT-B-current-basic-delta.md)**, puis la **[matrice historique Locomotive BASIC 1.1](docs/BASIC_COMMAND_MATRIX.md)** ; le [suivi des jalons](docs/PROJECT_STATUS.md) conserve l'historique des décisions.
 
-> **Lecture du statut :** la section « Où en sommes-nous ? — 27 octobre 2026 » ci-dessous est une **photographie historique datée**, pas le bilan actuel. La [matrice](docs/BASIC_COMMAND_MATRIX.md) distingue en particulier `CLS` (vraie instruction CPC **non implémentée**) et `!CLS` (commande de service firmware **HOST_ONLY**, sans token CPC, qui conserve le programme). Elle sépare également oracle CPC, token/LIST, RUN C99, connexion CYD et tests physiques PO.
+> **Lecture du statut :** la section « Où en sommes-nous ? — 27 octobre 2026 » ci-dessous est une **photographie historique datée**, pas le bilan actuel. **Au 31/10 seulement**, la [matrice DOC-CAT-A](docs/BASIC_COMMAND_MATRIX.md) classait `CLS` comme non implémenté ; depuis, `CLS` **direct au Ready** a été livré et réceptionné sur un SHA précis ([PR #339](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/339)), tandis que `!CLS` reste une commande de service `HOST_ONLY` distincte. Les formes BASIC numérotées ne sont pas généralisables sans preuve. Le [delta DOC-CAT-B](docs/DOC-CAT-B-current-basic-delta.md) distingue token/LIST, RUN C99, oracle CPC, raccord CYD et essais physiques PO.
 
 ## Le BASIC que nous voulons retrouver
 

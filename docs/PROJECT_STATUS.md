@@ -1,5 +1,7 @@
 # État du projet — ESP32 Locomotive BASIC
 
+> **Journal historique, pas état consolidé du HEAD.** La date et les qualificatifs de chaque jalon/PR décrivent sa situation documentée à ce moment ; les anciennes mentions « non implémenté » ou « en revue » ne sont pas un verdict sur les fusions postérieures. Pour les **formes BASIC réévaluées sur `main@6f6aa10…` au 10/11/2026**, consulter le **[delta DOC-CAT-B](DOC-CAT-B-current-basic-delta.md)** ; la [matrice DOC-CAT-A](BASIC_COMMAND_MATRIX.md) demeure datée du 31/10. Pas de requalification des archives ni des résultats PO.
+
 **Mis à jour :** 26 octobre 2026. **Branche de référence :** `main`. Les jalons marqués « en revue » ne sont pas acquis avant revue/merge du chef de projet.
 
 ## Suivi des jalons

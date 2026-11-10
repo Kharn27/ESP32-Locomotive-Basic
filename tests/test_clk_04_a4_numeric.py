@@ -131,6 +131,13 @@ class ProductReal5EvidenceNegatives(unittest.TestCase):
         self.assertEqual(verdict,"CANDIDATE_PARTIAL_MATCH")
         self.assertEqual(row["twice_real5_status"],"UNVERIFIED")
 
+    def test_raw_print_still_checked_fail_closed(self):
+        row=self.sample()
+        record=self.record("0000000082").replace("2032200D0A","2033200D0A")
+        verdict=a4.classify_sample(row,record)
+        self.assertEqual(verdict,"CPC_MISMATCH_STOP")
+        self.assertEqual(row["twice_real5_status"],"UNVERIFIED")
+
     def test_input_real5_still_checked_fail_closed(self):
         row=self.sample()
         verdict=a4.classify_sample(row,self.record("0000000082","0000000000"))

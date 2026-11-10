@@ -1021,6 +1021,205 @@ static void test_a3_provenance(void)
     assert(step().status == BSR_OK);
 }
 
+
+/* J1-DIAG-RETRO-A4 RED: each native graphic argument failure must
+ * be attributed to a real reached, numbered CPC record. Exact CPC
+ * spelling comes from both original and repeat RUN screen PNGs. */
+static void test_a4_graphic_oracle(void)
+{
+    static const char *const ink16[] = {"10 INK 16,26", "20 PRINT \"NEVER\""};
+    static const char *const inkneg[] = {"10 INK -1,26", "20 PRINT \"NEVER\""};
+    static const char *const ink32[] = {"10 INK 1,32", "20 PRINT \"NEVER\""};
+    static const char *const inkminus[] = {"10 INK 1,-1", "20 PRINT \"NEVER\""};
+    static const char *const paper16[] = {
+        "10 REM J119-P16", "20 PAPER 16", "30 PRINT \"NEVER\""
+    };
+    static const char *const paperneg[] = {
+        "10 REM J119-PN1", "20 PAPER -1", "30 PRINT \"NEVER\""
+    };
+    static const char *const paper620[] = {
+        "600 PRINT \"BEFORE\"", "620 PAPER 16", "630 PRINT \"NEVER\""
+    };
+    static const char *const locate0[] = {"10 LOCATE 0,1", "20 PRINT \"NEVER\""};
+    static const char *const locate_y0[] = {"10 LOCATE 1,0", "20 PRINT \"NEVER\""};
+    static const char *const locate_neg[] = {"10 LOCATE -1,1", "20 PRINT \"NEVER\""};
+    static const char *const border_neg[] = {"10 BORDER -1", "20 PRINT \"NEVER\""};
+    static const char *const border_neg1[] = {"10 BORDER -1,1", "20 PRINT \"NEVER\""};
+    static const char *const border_missing[] = {"10 BORDER 1,", "20 PRINT \"NEVER\""};
+    static const char *const locate_contradiction[] = {
+        "10 LOCATE 1", "20 PRINT \"NEVER\""
+    };
+#define A4_CASE(lines,steps,cause,message) \
+    expect_diagnostic(lines, sizeof(lines)/sizeof(lines[0]), steps, \
+                      cause, message, 1)
+    A4_CASE(ink16, 0u, BE_INVALID_INK, "Improper argument in 10\n");
+    A4_CASE(inkneg, 0u, BE_INVALID_INK, "Improper argument in 10\n");
+    A4_CASE(ink32, 0u, BE_INVALID_INK, "Improper argument in 10\n");
+    A4_CASE(inkminus, 0u, BE_INVALID_INK, "Improper argument in 10\n");
+    A4_CASE(paper16, 1u, BE_INVALID_PAPER, "Improper argument in 20\n");
+    A4_CASE(paperneg, 1u, BE_INVALID_PAPER, "Improper argument in 20\n");
+    A4_CASE(paper620, 1u, BE_INVALID_PAPER, "Improper argument in 620\n");
+    A4_CASE(locate0, 0u, BE_INVALID_LOCATE, "Improper argument in 10\n");
+    A4_CASE(locate_y0, 0u, BE_INVALID_LOCATE, "Improper argument in 10\n");
+    A4_CASE(locate_neg, 0u, BE_INVALID_LOCATE, "Improper argument in 10\n");
+    A4_CASE(border_neg, 0u, BE_INVALID_BORDER, "Improper argument in 10\n");
+    A4_CASE(border_neg1, 0u, BE_INVALID_BORDER, "Improper argument in 10\n");
+    A4_CASE(border_missing, 0u, BE_OPERAND_MISSING, "Operand missing in 10\n");
+    expect_diagnostic(locate_contradiction, 2u, 0u,
+                      BE_DIAG_CONTRADICTORY, "ERROR\n", 0);
+#undef A4_CASE
+}
+
+/* A4 category/origin must never be promoted by a BEStatus alone, a
+ * different token/value, fake continuation or edited CPC record. */
+static void test_a4_host_fallback(void)
+{
+    BSRResult genuine, forged;
+    CpcStepDiagnostic diag;
+    BasicSessionRuntime before;
+    BasicProgramLine line;
+    uint8_t saved[PROGRAM_CAP], bytes[80];
+    size_t written = 771u;
+    setup();
+    submit("10 INK 16,26");
+    submit("20 PRINT \"NEVER\"");
+    submit("RUN");
+    genuine = step();
+    assert(genuine.status == BSR_EXECUTOR_ERROR &&
+           genuine.executor_status == BE_INVALID_INK);
+    diag = cpc_diag_policy_step(genuine, &f.runtime);
+    assert(diag.category != CPC_DIAG_HOST_GENERIC &&
+           diag.line_number == 10u);
+    before = f.runtime;
+    memcpy(saved, f.storage, sizeof saved);
+    assert(bp_find(&f.program, 10u, &line) == BP_OK);
+
+    forged = genuine;
+    forged.status = BSR_SESSION_ERROR; /* host error, not native RUN */
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    forged = genuine;
+    forged.executor_status = BE_INVALID_PAPER; /* false cause */
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    forged.executor_status = BE_INVALID_BORDER;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    forged.executor_status = BE_UNSUPPORTED;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    forged.executor_status = BE_DIAG_CONTRADICTORY;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    forged.status = BSR_INVALID_ARGUMENT;
+    assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+
+    f.storage[line.body_offset] = 0xbfu; /* not INK anymore */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved, sizeof saved);
+    f.storage[line.body_offset + line.body_length - 1u] = 0x1bu; /* INK 16,27 */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved, sizeof saved);
+    f.storage[line.body_offset + line.body_length - 1u] = 0u; /* truncated */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved, sizeof saved);
+    f.storage[line.offset] = 0xffu; /* fake record length */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    memcpy(f.storage, saved, sizeof saved);
+    f.runtime.executor.statement_offset = 2u; /* false reached locus */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.runtime = before;
+    f.runtime.executor.cursor = f.program.size - 2u; /* sentinel */
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.runtime = before;
+    f.runtime.state = BSR_IDLE;
+    assert(cpc_diag_policy_step(genuine, &f.runtime).category ==
+           CPC_DIAG_HOST_GENERIC);
+    f.runtime = before;
+
+    /* Invalid categories, swapped origins, and insufficient capacity
+     * leave every byte and count untouched. */
+    diag.origin = CPC_DIAG_ORIGIN_NATIVE_PEN_CPC_ORACLE;
+    memset(bytes, 0x5a, sizeof bytes);
+    assert(!cpc_diag_policy_format_step(diag, bytes, sizeof bytes, &written));
+    assert(written == 771u);
+    for (size_t i=0u; i<sizeof bytes; ++i) assert(bytes[i] == 0x5au);
+    diag.origin = (CpcDiagOrigin)999;
+    assert(!cpc_diag_policy_format_step(diag, bytes, sizeof bytes, &written));
+    assert(written == 771u);
+}
+
+/* A4 negatives: accepted boundary values, REM/quoted/colon bait and
+ * renderer/transport failures must never become a CPC graphics error. */
+static void test_a4_unwitnessed_graphics_remain_host(void)
+{
+    static const struct {
+        const char *source;
+        BEStatus forged_cause;
+    } cases[] = {
+        {"10 INK 1,27", BE_INVALID_INK}, /* accepted CPC 27 */
+        {"10 INK 1,31", BE_INVALID_INK}, /* accepted CPC 31 */
+        {"10 LOCATE 41,1", BE_INVALID_LOCATE}, /* accepted CPC x=41 */
+        {"10 LOCATE 1,26", BE_INVALID_LOCATE}, /* accepted CPC y=26 */
+        {"10 BORDER 27", BE_INVALID_BORDER}, /* accepted CPC border 27 */
+        {"10 REM INK 16,26", BE_INVALID_INK},
+        {"10 PRINT \"INK 16,26\"", BE_INVALID_INK},
+        {"10 PRINT 1:INK 16,26", BE_INVALID_INK}
+    };
+    for (size_t i=0u; i<sizeof cases / sizeof cases[0]; ++i) {
+        BSRResult forged, actual;
+        uint8_t program_before[PROGRAM_CAP];
+        BasicSessionRuntime runtime_before;
+        setup();
+        submit(cases[i].source);
+        submit("RUN");
+        runtime_before = f.runtime;
+        memcpy(program_before, f.storage, sizeof program_before);
+        forged.status = BSR_EXECUTOR_ERROR;
+        forged.executor_status = cases[i].forged_cause;
+        assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+               CPC_DIAG_HOST_GENERIC);
+        forged.executor_status = BE_UNSUPPORTED;
+        assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+               CPC_DIAG_HOST_GENERIC);
+        forged.executor_status = BE_DIAG_CONTRADICTORY;
+        assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+               CPC_DIAG_HOST_GENERIC);
+        forged.executor_status = BE_NO_EVENT_SPACE; /* renderer/BUF */
+        assert(cpc_diag_policy_step(forged, &f.runtime).category ==
+               CPC_DIAG_HOST_GENERIC);
+        assert(memcmp(program_before, f.storage, sizeof program_before) == 0);
+        assert(memcmp(&runtime_before, &f.runtime, sizeof runtime_before) == 0);
+        actual = step();
+        if (i < 7u)
+            assert(actual.status == BSR_OK &&
+                   actual.executor_status == BE_OK);
+        else
+            assert(actual.status == BSR_EXECUTOR_ERROR &&
+                   actual.executor_status == BE_INVALID_INK);
+    }
+    {
+        /* The very same actual rejected statement is not a CPC origin if
+         * reported by a rendering/transport stage instead of native RUN. */
+        BSRResult actual;
+        setup();
+        submit("10 BORDER -1");
+        submit("RUN");
+        actual = step();
+        assert(actual.status == BSR_EXECUTOR_ERROR &&
+               actual.executor_status == BE_INVALID_BORDER);
+        actual.status = BSR_INVALID_ARGUMENT;
+        assert(cpc_diag_policy_step(actual, &f.runtime).category ==
+               CPC_DIAG_HOST_GENERIC);
+    }
+}
 int main(void)
 {
     test_o2b_if_store_origin();
@@ -1033,6 +1232,9 @@ int main(void)
     test_next_success();
     test_f9_provenance();
     test_a3_provenance();
+    test_a4_graphic_oracle();
+    test_a4_host_fallback();
+    test_a4_unwitnessed_graphics_remain_host();
     puts("J1-DIAG-RETRO-A1a: GOSUB/RETURN CPC, renumber, negative origins, atomicity, Ready OK");
     return 0;
 }

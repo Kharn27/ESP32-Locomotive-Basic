@@ -1,0 +1,152 @@
+# HW4-MEM-C5 #341 — ADDITIVE prototype; never replaces required RENDER-A/C3/A0.
+name: LAB HW4-MEM-C5 v2 PR-real incremental and SPI variant proof
+on:
+  pull_request:
+    paths:
+      - 'tools/ci/hw4_mem_c5_*.py'
+      - 'tools/ci/hw4_mem_c5_build.sh'
+      - 'tests/test_hw4_mem_c5_v2.py'
+      - 'docs/HW4-MEM-C5-v2.md'
+      - '.github/workflows/hw4-mem-c5-v2.yml'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'OPEN real GitHub PR to compare against actual main base'
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: c5-real-pr-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  host-adversarial:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: 'Unit tests: positives and fail-closed negatives'
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q tools/ci/hw4_mem_c5_v2.py tools/ci/hw4_mem_c5_provenance.py tools/ci/hw4_mem_c5_capture.py
+          bash -n tools/ci/hw4_mem_c5_build.sh
+          python3 -m unittest discover -s tests -p test_hw4_mem_c5_v2.py -v
+      - name: Historical comparators are byte-for-byte unchanged vs approved main
+        run: |
+          set -euo pipefail
+          for path in tools/ci/hw4_render_a_memory.py tools/ci/hw4_disp_spi_variants.py tools/ci/hw4_a0_compare_memory.py tools/ci/hw4_a0_provenance.py .github/workflows/hw4-disp-render-a.yml .github/workflows/hw4-disp-profile-c3.yml .github/workflows/hw4-scroll-opt-a0-memory.yml; do
+            test "$(git show 03f83c39e6f9ed4daeddb1ed93a989a35d726e30:"$path" | sha256sum | cut -d' ' -f1)" = "$(sha256sum "$path" | cut -d' ' -f1)"
+          done
+          echo C5_HISTORICAL_COMPARATORS_UNCHANGED=PASS
+
+  four-real-xtensa-builds:
+    needs: host-adversarial
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    env:
+      GH_TOKEN: ${{ github.token }}
+      C5_PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+      C5_WORKFLOW_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      C5_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || '' }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify GitHub PR refs; build real base and HEAD at SPI40 and SPI20
+        run: |
+          set -euo pipefail
+          bash tools/ci/hw4_mem_c5_build.sh
+      - name: Run independent v2 comparator and capture return code without pipe masking
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/hw4-mem-c5/verdict
+          python3 tools/ci/hw4_mem_c5_v2.py \
+            --root reports/hw4-mem-c5 \
+            --provenance reports/hw4-mem-c5/provenance.json \
+            --live-pr reports/hw4-mem-c5/pr-final.json \
+            --repo "$GITHUB_REPOSITORY" --pr-number "$C5_PR_NUMBER" \
+            --base-checkout .c5-worktrees/base --head-checkout .c5-worktrees/head \
+            --output reports/hw4-mem-c5/verdict \
+            2>&1 | tee reports/hw4-mem-c5/verdict/console.log
+          rc=${PIPESTATUS[0]}
+          echo "C5_V2_COMPARATOR_EXIT=$rc"
+          test "$rc" -eq 0
+          cat reports/hw4-mem-c5/verdict/verdict.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Load frozen C3 RENDER-A reference evidence, not a new baseline
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: c3-spi40-ref
+          run-id: 42239047408
+          github-token: ${{ github.token }}
+          path: reports/c5-legacy/render-a
+      - name: Load frozen #339 C3 B3 reference inventory
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: hw4-disp-profile-c3-spi40-spi20
+          run-id: 42365963086
+          github-token: ${{ github.token }}
+          path: reports/c5-legacy/c3
+      - name: Replay unchanged historical gates; require expected red and keep exit codes
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT=reports/hw4-mem-c5/historical
+          mkdir -p "$OUT"
+          RA="$(find reports/c5-legacy/render-a -path '*/ref/run1/sections.txt' -type f -print -quit)"
+          B3="$(find reports/c5-legacy/c3 -path '*/main-b3/elf-sections.txt' -type f -print -quit)"
+          test -n "$RA" && test -s "$RA" && test -n "$B3" && test -s "$B3"
+          test "$(cat "$(dirname "$RA")/source-sha.txt")" = 21e95a7197413923bb5976067a0419bc729c20c1
+          set +e
+          python3 tools/ci/hw4_render_a_memory.py \
+            --baseline "$RA" --optimized reports/hw4-mem-c5/head/spi40/sections.txt \
+            > "$OUT/render-a-historical.log" 2>&1
+          ra_rc=$?
+          python3 tools/ci/hw4_disp_spi_variants.py \
+            --base-sections "$B3" \
+            --spi40-sections reports/hw4-mem-c5/head/spi40/sections.txt \
+            --spi40-cache reports/hw4-mem-c5/head/spi40/CMakeCache.txt \
+            --spi40-commands reports/hw4-mem-c5/head/spi40/compile_commands.json \
+            --spi40-bin reports/hw4-mem-c5/head/spi40/firmware.bin \
+            --spi20-sections reports/hw4-mem-c5/head/spi20/sections.txt \
+            --spi20-cache reports/hw4-mem-c5/head/spi20/CMakeCache.txt \
+            --spi20-commands reports/hw4-mem-c5/head/spi20/compile_commands.json \
+            --spi20-bin reports/hw4-mem-c5/head/spi20/firmware.bin \
+            > "$OUT/spi-c3-historical.log" 2>&1
+          c3_rc=$?
+          set -e
+          printf "RENDER_A_HISTORICAL_EXIT=%s\nC3_HISTORICAL_EXIT=%s\n" "$ra_rc" "$c3_rc" | tee "$OUT/gate-exit-codes.txt"
+          cat "$OUT/render-a-historical.log"
+          cat "$OUT/spi-c3-historical.log"
+          # Negative gate return codes are EXPECTED historical evidence here,
+          # not successful historical gates or masked test exceptions.
+          test "$ra_rc" -eq 1 && grep -Fq 'RENDER-A introduces unauthorized incremental IRAM' "$OUT/render-a-historical.log"
+          test "$c3_rc" -eq 1 && grep -Fq 'IRAM changed' "$OUT/spi-c3-historical.log"
+          printf '\n**Legacy RENDER-A: FAILURE (rc=%s); legacy SPI-C3: FAILURE (rc=%s). Unchanged gates remain red.**\n' "$ra_rc" "$c3_rc" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4.6.2
+        if: success()
+        with:
+          name: hw4-mem-c5-v2-real-pr-evidence
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            reports/hw4-mem-c5/
+      - uses: actions/upload-artifact@v4.6.2
+        if: failure()
+        with:
+          name: hw4-mem-c5-v2-invalid-attempt
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            reports/hw4-mem-c5/

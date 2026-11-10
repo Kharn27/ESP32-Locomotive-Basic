@@ -1,0 +1,93 @@
+# Issue #358 E1. One nonrequired one-shot laboratory, NOT A REQUIRED GATE.
+# LAB_ONLY_NEVER_MERGE. No production checkout receives a GitHub token.
+name: LAB J1.25-B2-E1 CURRENT-MAIN TEST-MERGE 4-XTENSA NOT_REQUIRED
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/j1-25-b2-e1-current-integration.yml'
+      - 'tools/ci/j125_b2_e1.py'
+      - 'tests/test_j125_b2_e1.py'
+      - 'docs/J1.25-B2-E1-current-integration.md'
+      - 'tools/ci/opt3_routing.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+# Do not fan out 4 separate runs or cancel a partially spent build budget.
+concurrency:
+  group: j125-b2-e1-single-campaign-330
+  cancel-in-progress: false
+
+jobs:
+  host-negative-tests:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout immutable LAB controller HEAD; no persisted credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Mandatory fail-closed negative controls before any Xtensa
+        shell: bash
+        env:
+          E1_LAB_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          E1_LAB_BASE: ${{ github.event.pull_request.base.sha || '' }}
+          E1_LAB_PR: ${{ github.event.pull_request.number || '' }}
+        run: |
+          set -euo pipefail
+          test "${{ github.event_name }}" = pull_request
+          test "$E1_LAB_BASE" = 1fe817362c3cd631781a0943dad5925b40dbe4b2
+          test "$(git rev-parse HEAD)" = "$E1_LAB_HEAD"
+          python3 -m py_compile tools/ci/j125_b2_e1.py tests/test_j125_b2_e1.py
+          python3 -m unittest discover -s tests -p test_j125_b2_e1.py -v
+          python3 tools/ci/j125_b2_e1.py --self-test
+          python3 tools/ci/opt3_routing.py --self-test --expect-head "$E1_LAB_HEAD" --base-sha "$E1_LAB_BASE"
+          echo E1_HOST_NEGATIVE_PASS_ZERO_XTENSA_BUILD
+
+  four-real-xtensa:
+    needs: host-negative-tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ github.token }}
+      E1_LAB_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      E1_LAB_BASE: ${{ github.event.pull_request.base.sha || '' }}
+      E1_LAB_PR: ${{ github.event.pull_request.number || '' }}
+    steps:
+      - name: Checkout exact LAB controller HEAD, full graph, credentials off
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Git-authenticated test merge M/H, exactly four Xtensa builds, then C99 on C
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$E1_LAB_HEAD"
+          python3 tools/ci/j125_b2_e1.py --run --out "$GITHUB_WORKSPACE/reports/j125-e1"
+          cat reports/j125-e1/memory-verdict.json
+          echo 'E1_LAB_ONLY_NEVER_MERGE FOUR_REAL_XTENSA_MAX INTEGRATION_NOT_MERGE_READY' >> "$GITHUB_STEP_SUMMARY"
+      - name: Seal partial or full evidence without hiding failure
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/j125-e1
+          cd reports/j125-e1
+          find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+          echo "E1_SOURCE_LAB_HEAD=$E1_LAB_HEAD RUN=$GITHUB_RUN_ID ATTEMPT=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish full / partial authentic evidence; no forced success
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-j125-b2-e1-mc-spi40-spi20-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/j125-e1/
+          retention-days: 30
+          if-no-files-found: error

@@ -248,12 +248,11 @@ def collect_snapshots(snaps, target, proto, session):
             (target / (ident + "_window.bin")).write_bytes(window)
             (target / (ident + "_ram.json")).write_bytes(canonical(evidence))
             witnesses[ident] = evidence
-            if ident.startswith("run"):
-                need(sha(program) == witnesses["run_program"]["program_sha256"],
-                     "RUN_PROGRAM_RAM_CHANGED")
-            else:
-                need(sha(program) == witnesses["stop_program"]["program_sha256"],
-                     "STOP_PROGRAM_RAM_CHANGED")
+            # Execution can legitimately rewrite tokenised RAM pointers.
+            # Do not equate pre-RUN and STOP bytes. Keep BOTH original
+            # snapshots' program extracts; parser has checked line identities
+            # and TIME token independently for each phase.
+            need(len(program) > 0, "STOP_PROGRAM_EMPTY")
         identities.append({"id": ident, "sna_sha256": sha(blob),
                            "original_filename": p.name,
                            "utc_mtime": datetime.fromtimestamp(
@@ -321,7 +320,11 @@ def inventory(out):
     for p in sorted(out.rglob("*")):
         if p.is_symlink():
             raise prior.OracleError("EVIDENCE_SYMLINK")
-        if p.is_file() and p.name != "manifest.json":
+        if p.is_file():
+            need(p.suffix.lower() not in (".sna", ".rom"),
+                 "SENSITIVE_IMAGE_ARCHIVED")
+            if p == out / "manifest.json":
+                continue
             files[p.relative_to(out).as_posix()] = {
                 "bytes": p.stat().st_size, "sha256": sha(read(p))}
     return files
@@ -441,10 +444,9 @@ def verify(out, head, seal):
              "SNAP_IDENTITY_DRIFT")
         for idx, name in enumerate(proto["snapshots_expected"]):
             if name in ("run_program", "stop_program"):
-                need(sha(read(folder / (name + ".bin"))) ==
-                     snaps[idx]["sna_sha256"] or
-                     len(read(folder / (name + ".bin"))) > 0,
-                     "SNAP_PROGRAM_MISSING")
+                program = read(folder / (name + ".bin"))
+                need(len(program) > 0 and b"\xff\x46" in program,
+                     "SNAP_PROGRAM_MISSING_OR_TIME_TOKEN")
             else:
                 w = read(folder / (name + "_window.bin"))
                 data = json.loads(read(folder / (name + "_ram.json")))

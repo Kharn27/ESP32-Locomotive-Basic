@@ -63,4 +63,25 @@ Rejouer avec SHA externe indépendant :
 | Seuil 32767 | UNVERIFIED | Non forcé, incident fortuit seulement |
 | Wrap uint32 / reset matériel | UNSUPPORTED | Hors périmètre |
 
+## Mesures CPC brutes acquises (référence antérieure, encore à rejouer sur le HEAD final)
+
+Archive originale des **deux** processus CPC indépendants : [workflow run #42783257852](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42783257852), [ZIP RAW #13747337365](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/42783257852/artifacts/13747337365). HEAD acquisition : `ad999682e025086d2080915d22afbf7355c25a82` ; SHA256 extérieur constaté par calcul indépendant de `manifest.json` : `53acb97545806c830ccb2810e666327a58fe425f202ec55c9d8b55e2a64f9945`. **Réserve : le replay automatisé de ce run a échoué** car il rejetait `stderr.bin` vide, bien que sa taille zéro et son SHA256 soient exacts. Ce run n'est donc **pas** la validation CI finale. Seul un run complet sur le HEAD final avec replay vert peut qualifier `CPC_ORACLE_VERIFIED`.
+
+Les lectures suivantes sont **des valeurs originales imprimées par la ROM CPC**, reproduites identiquement dans les deux processus (aucune donnée calculée ne remplace l'impression source). Les deux sessions sont horodatées UTC `2026-11-10T08:32:02.674976`–`08:33:55.162604` et `08:34:22.448678`–`08:36:14.935625` ; cadence observée par contrôles séparés `303.810` et `300.408` ticks de TIME/s hôte (estimations de garde, **pas** une constante d'horloge garantie).
+
+| Stade observé, séquence dans un même CPC | original | repeat | Portée scientifique |
+|---|---|---|---|
+| BOOT lectures directes 1/2 | 1614 → 3642 (Δ2028) | 1614 → 3642 (Δ2028) | Premier échantillon non nul ; origine exacte **UNVERIFIED** |
+| IDLE, deux sondes puis attente puis deux sondes | 4434, 4770, 7362, 7698 | identique | progression non décroissante aux points observés, résolution sub-tick **UNVERIFIED** |
+| Avant RUN, puis T! au STOP #1 ; TIME après CONT | 9150 → 12934 → 13670, 13673 | identique | valeurs chronologiques, aucune règle de reset extrapolée |
+| RUN #2, T! au STOP #2 ; TIME après CONT | 14350 → 15086, 15089 ; direct 16554 | identique | exécution répétée dans le même processus |
+| NEW direct | 17490 → 18690 (Δ1200) | identique | LIST #8 vide et compteur observable non décrémenté |
+| CLEAR direct | T!=777, TIME 20718 → T!=0, TIME 22110 (Δ1392) | identique | état des variables distinct de la lecture TIME |
+| STOP/WAIT/CONT | avant 27661, T! au STOP 27664 ; TIME après CONT 31778, 31781 | identique | croissance entre STOP et CONT avec attente bornée, pas preuve d'un état instantané pendant STOP |
+| Lecture finale | 33174 | 33174 | dépassement borné de 32767 entre 31781 et 33174 ; **ni wrap ni origine démontrés** |
+
+SNA/REAL5 **originaux extraits**, identiques aux deux sessions : STOP RUN #1 `@T!=&01DA`, valeur imprimée `12934`, octets `00 00 18 4A 8E` ; STOP RUN #2 `@T!=&01DA`, `14350`, octets `00 00 38 60 8E` ; STOP WAIT `@T!=&0202`, `27664`, octets `00 00 20 58 8F`. Dans chaque cas, l'enregistrement scalaire RAM porte le nom `T!` (octet `D4`) et type REAL5 `04`. Ces valeurs sont contemporaines du STOP, contrairement aux sondes TIME après CONT.
+
+**Inspection humaine des 20 PNG** du ZIP #13747337365 réalisée : démarrage BASIC 1.1, les deux `Break in 20`, `CONT`, `NEW` suivi de `LIST #8` vide, `CLEAR`, `Break in 40` et reprise sont visibles. Les PNG ne servent pas à reconstruire les valeurs TIME. Les fichiers SNA complets et la ROM restent exclus du ZIP. Cette inspection vaut seulement pour cette archive/ce HEAD, pas automatiquement pour une acquisition future.
+
 Les dates de captures PNG et les intervalles hôte n'établissent ni cadence absolue de BASIC ni précision sub-tick. **CPC_ORACLE_VERIFIED** ne peut être déclaré que sur les cas rejoués avec captures PNG manuellement inspectées. `ON_DEVICE_UNVERIFIED` non bloquant pour cet oracle-only. Aucun FAIL/SKIPPED historique HW4 ne devient PASS. PR Draft, revue, acceptation et fusion relèvent du seul Pilotage.

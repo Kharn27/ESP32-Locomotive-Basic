@@ -504,13 +504,13 @@ def audit(sources):
     e1_paths = filters(e1)
     demand(e1_paths is not None and len(e1_paths)==len(E1_PATHS) and
            set(e1_paths)==set(E1_PATHS), "E1_FILTER_CONTRACT_MISMATCH")
-    e1_events = re.findall(r"(?m)^  ([a-z][\\w-]*):",
-                           e1.split("\\npermissions:",1)[0])
+    e1_events = re.findall(r"(?m)^  ([a-z][\w-]*):",
+                           e1.split("\npermissions:",1)[0])
     demand(e1_events==["pull_request","workflow_dispatch"],
            "E1_EVENT_CONTRACT_MISMATCH")
-    demand("permissions:\\n  contents: read\\n  pull-requests: read\\n  actions: read\\n" in e1 and
+    demand("permissions:\n  contents: read\n  pull-requests: read\n  actions: read\n" in e1 and
            "pull_request_target:" not in e1 and "secrets." not in e1 and
-           not re.search(r"(?m)^\\s+(?:contents|pull-requests|actions): write\\s*$",e1),
+           not re.search(r"(?m)^\s+(?:contents|pull-requests|actions): write\s*$",e1),
            "E1_PERMISSIONS_MISMATCH")
     demand("group: j125-b2-e1-single-campaign-330" in e1 and
            "cancel-in-progress: false" in e1 and
@@ -1958,7 +1958,7 @@ def c6_d1_negative_tests(sources):
 def e1_negative_tests(sources):
     original=sources[E1_WORKFLOW]
     for name in E1_PATHS:
-        line="      - '"+name+"'\\n"
+        line="      - '"+name+"'\n"
         demand(line in original,"E1_NEGATIVE_PRECONDITION")
         broken={**sources,E1_WORKFLOW:original.replace(line,"",1)}
         try: audit(broken)

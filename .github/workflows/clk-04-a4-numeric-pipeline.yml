@@ -8,6 +8,10 @@ on:
       - 'tests/fixtures/cpc6128/clk_04_a4_numeric/**'
       - 'docs/CLK-04-A4*'
       - 'tools/ci/opt3_routing.py'
+      - 'tools/ci/clk_04_a4_fast_route.py'
+      - 'tools/clk_03_cpc_time.py'
+      - 'tools/clk_04_real5_oracle.py'
+      - 'tests/oracles/caprice32'
   workflow_dispatch:
 
 permissions:
@@ -15,6 +19,33 @@ permissions:
   packages: read
 
 jobs:
+  route:
+    name: CI-A4-FAST oracle input fingerprint and provenance (NOT CPC)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.classify.outputs.mode }}
+      inputs_sha256: ${{ steps.classify.outputs.inputs_sha256 }}
+      provenance: ${{ steps.classify.outputs.provenance }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test route falsifiers, authenticate HEAD and select CPC mode
+        id: classify
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          EVENT_KIND: ${{ github.event_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_clk_04_a4_fast_route.py' -v
+          python3 tools/ci/clk_04_a4_fast_route.py \
+            --event "$EVENT_KIND" --head "$EXPECTED_HEAD" \
+            --base "$BASE_SHA" --output "$GITHUB_OUTPUT"
   host-negatives-and-c99:
     name: CLK-04-A4 C99 GCC/Clang sanitizers and synthetic falsifiers (NOT CPC)
     runs-on: ubuntu-24.04
@@ -55,7 +86,8 @@ jobs:
     name: CLK-04-A4 ROM-backed CPC6128 scalar RAM and raw PRINT two-session capture
     runs-on: ubuntu-24.04
     timeout-minutes: 100
-    needs: host-negatives-and-c99
+    needs: [host-negatives-and-c99, route]
+    if: needs.route.outputs.mode == 'full'
     container:
       image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
       credentials:

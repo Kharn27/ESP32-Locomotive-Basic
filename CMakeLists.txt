@@ -88,6 +88,13 @@ if(BUILD_TESTING)
     add_test(NAME j1_25_b2_integer_run_cpc
              COMMAND test_j1_25_b2_integer_run "${CMAKE_CURRENT_SOURCE_DIR}")
 
+    # J1.25-B3: bounded scalar STRING and mixed READ, genuine CPC original/repeat.
+    add_executable(test_j1_25_b3_string_run tests/test_j1_25_b3_string_run.c)
+    target_link_libraries(test_j1_25_b3_string_run PRIVATE
+        basic_session_runtime basic_tokenizer basic_program basic_variable_store)
+    add_test(NAME j1_25_b3_string_mixed_cpc
+             COMMAND test_j1_25_b3_string_run "${CMAKE_CURRENT_SOURCE_DIR}")
+
     add_executable(test_j1_25_b1_token_list tests/test_j1_25_b1_token_list.c)
     target_link_libraries(test_j1_25_b1_token_list PRIVATE
         basic_tokenizer basic_listing basic_program basic_executor)

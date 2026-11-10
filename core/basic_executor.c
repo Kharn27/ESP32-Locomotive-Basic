@@ -289,7 +289,8 @@ static BEStatus print8_piece(const uint8_t *body, size_t length, size_t *at,
         body[p++] != 0x16u || body[p++] != (uint8_t)',')
         return BE_BAD_SEQUENCE;
     skip_spaces(body, length, &p);
-    if (allow_reference && p < length && body[p] == 0x02u) {
+    if (allow_reference && p < length &&
+        (body[p] == 0x02u || body[p] == 0x03u)) {
         BasicVariableKey key;
         BasicVariableValue value;
         size_t consumed = 0u;
@@ -298,16 +299,27 @@ static BEStatus print8_piece(const uint8_t *body, size_t length, size_t *at,
         resolved = bvb_read_explicit(body, length, p, variables,
                                      &key, &consumed, &value);
         if (resolved != BVB_OK) return binding_error(resolved);
-        if (key.type != (uint8_t)BVT_INTEGER ||
-            value.type != (uint8_t)BVT_INTEGER) return BE_INVALID_TYPE;
         if (key.name_length != 1u ||
             (key.name[0] != (uint8_t)'A' &&
              key.name[0] != (uint8_t)'B')) return BE_UNSUPPORTED;
         p += consumed;
-        /* emit_integer already supplies CPC sign alignment and trailing
-         * space: do not add a second layer of blanks for PRINT #8. */
-        st = emit_integer(out, value.data.integer);
-        if (st != BE_OK) return st;
+        if (key.type == (uint8_t)BVT_INTEGER &&
+            value.type == (uint8_t)BVT_INTEGER) {
+            /* CPC integer spacing already belongs to emit_integer. */
+            st = emit_integer(out, value.data.integer);
+            if (st != BE_OK) return st;
+        } else if (key.type == (uint8_t)BVT_STRING &&
+                   value.type == (uint8_t)BVT_STRING) {
+            const uint8_t *bytes;
+            size_t n, j;
+            BVSStatus bvs = bvs_string_span(variables, &value.data.string,
+                                             &bytes, &n);
+            if (bvs != BVS_OK) return store_error(bvs);
+            for (j = 0u; j < n; ++j) {
+                st = emit(out, bytes[j]);
+                if (st != BE_OK) return st;
+            }
+        } else return BE_INVALID_TYPE;
         *at = p;
         return BE_OK;
     }
@@ -1269,7 +1281,13 @@ typedef struct {
     size_t data_item_offset;
     size_t data_count;
     BasicVariableKey data_keys[2];
-    int16_t data_values[2];
+    /* Absolute immutable program offsets for quoted bytes; no copy/heap. */
+    struct {
+        uint8_t type;
+        int16_t integer;
+        size_t string_offset;
+        size_t string_length;
+    } data_values[2];
 } BEFlow;
 
 
@@ -1281,53 +1299,76 @@ typedef struct {
 #define BE_DATA_ITEM(executor) \
     ((executor)->while_stack[BE_WHILE_STACK_CAPACITY-1u].after_statement)
 
-/* J1.25-B2: parse only sealed unsigned ASCII INTEGER DATA items.
- * CPC 01 (colon) ends DATA; no STRING/REAL5 or speculative expressions. */
-static BEStatus data_integer_item(const uint8_t *body, size_t length,
-                                  size_t *at, int16_t *value, int *more)
+/* B3 extends only the witnessed B2 unsigned INTEGER and double-quoted
+ * printable STRING DATA items. A comma inside quotes belongs to one item.
+ * No escape grammar, implicit type coercion or expression evaluation. */
+typedef struct {
+    uint8_t type;
+    int16_t integer;
+    size_t string_offset; /* body-relative here, absolute after record scan */
+    size_t string_length;
+} BEDataItem;
+
+static BEStatus data_scalar_item(const uint8_t *body, size_t length,
+                                 size_t *at, BEDataItem *value, int *more)
 {
     size_t p = *at;
-    int32_t number = 0;
+    BEDataItem parsed = {0};
     skip_spaces(body, length, &p);
-    if (p == length || body[p] < (uint8_t)'0' ||
-        body[p] > (uint8_t)'9') return BE_UNSUPPORTED;
-    do {
-        number = number * 10 + (int32_t)(body[p++] - (uint8_t)'0');
-        if (number > INT16_MAX) return BE_INTEGER_OVERFLOW;
-    } while (p < length && body[p] >= (uint8_t)'0' &&
-             body[p] <= (uint8_t)'9');
+    if (p < length && body[p] == (uint8_t)'"') {
+        size_t start = ++p;
+        while (p < length && body[p] != (uint8_t)'"') {
+            /* Same byte policy as the existing bvs_assign_string arena. */
+            if (body[p] < 0x20u || body[p] > 0x7eu)
+                return BE_UNSUPPORTED;
+            ++p;
+        }
+        if (p == length) return BE_TRUNCATED;
+        parsed.type = (uint8_t)BVT_STRING;
+        parsed.string_offset = start;
+        parsed.string_length = p - start;
+        ++p;
+    } else {
+        int32_t number = 0;
+        if (p == length || body[p] < (uint8_t)'0' ||
+            body[p] > (uint8_t)'9') return BE_UNSUPPORTED;
+        do {
+            number = number * 10 + (int32_t)(body[p++] - (uint8_t)'0');
+            if (number > INT16_MAX) return BE_INTEGER_OVERFLOW;
+        } while (p < length && body[p] >= (uint8_t)'0' &&
+                 body[p] <= (uint8_t)'9');
+        parsed.type = (uint8_t)BVT_INTEGER;
+        parsed.integer = (int16_t)number;
+    }
     skip_spaces(body, length, &p);
     if (p < length && body[p] == (uint8_t)',') {
-        ++p;
-        /* Reject dangling commas before any READ commits a value. */
-        {
-            size_t ahead = p;
-            skip_spaces(body, length, &ahead);
-            if (ahead == length || body[ahead] < (uint8_t)'0' ||
-                body[ahead] > (uint8_t)'9') return BE_BAD_SEQUENCE;
-        }
+        size_t ahead = ++p;
+        skip_spaces(body, length, &ahead);
+        /* A dangling separator must never advance the persistent cursor. */
+        if (ahead == length || (body[ahead] != (uint8_t)'"' &&
+            (body[ahead] < (uint8_t)'0' ||
+             body[ahead] > (uint8_t)'9'))) return BE_BAD_SEQUENCE;
         *more = 1;
     } else if (p == length || body[p] == 0x01u) {
         *more = 0;
     } else return BE_BAD_SEQUENCE;
-    *value = (int16_t)number;
+    *value = parsed;
     *at = p;
     return BE_OK;
 }
 
-/* Scan the immutable program in source order, independent of GOTO.
- * DATA is supported only at a line start (the closed B1 INTEGER shapes).
- * Cursors are offsets; no pointers to externally editable program storage. */
-static BEStatus data_next_integer(const BasicProgram *program,
-                                  size_t *record, size_t *item,
-                                  int16_t *value)
+/* Continue the B2 source-order DATA cursor, including across records.
+ * No pointers are retained by BasicExecutor, only record/item offsets. */
+static BEStatus data_next_scalar(const BasicProgram *program,
+                                 size_t *record, size_t *item,
+                                 BEDataItem *value)
 {
-    size_t at = *record;
-    size_t next_item = *item;
+    size_t at = *record, next_item = *item;
     for (;;) {
         BasicProgramLine line;
         BPStatus bp = bp_next(program, &at, &line);
         const uint8_t *body;
+        BEDataItem parsed = {0};
         int more;
         BEStatus status;
         if (bp == BP_END) return BE_DATA_EXHAUSTED;
@@ -1343,11 +1384,14 @@ static BEStatus data_next_integer(const BasicProgram *program,
                    next_item >= line.body_length) {
             return BE_BAD_PROGRAM;
         }
-        status = data_integer_item(body, line.body_length, &next_item,
-                                   value, &more);
+        status = data_scalar_item(body, line.body_length, &next_item,
+                                  &parsed, &more);
         if (status != BE_OK) return status;
+        if (parsed.type == (uint8_t)BVT_STRING)
+            parsed.string_offset += line.body_offset;
         *record = more ? line.offset : line.next_offset;
         *item = more ? next_item : 0u;
+        *value = parsed;
         return BE_OK;
     }
 }
@@ -1678,15 +1722,15 @@ static BEStatus execute_line(const BasicProgram *program,
         }
         if (token == 0x8cu) { /* DATA: source-order items, no cursor advance */
             int more;
-            int16_t ignored;
+            BEDataItem ignored;
             if (variables == NULL || executor->while_depth != 0u)
                 return BE_UNSUPPORTED; /* No mixed DATA/WHILE semantics. */
             do {
-                status = data_integer_item(body, length, &pos, &ignored, &more);
+                status = data_scalar_item(body, length, &pos, &ignored, &more);
                 if (status != BE_OK) return status;
             } while (more);
             /* A colon after DATA is executable, witnessed by DATA_COLON. */
-        } else if (token == 0xc3u) { /* READ A%[,B%] */
+        } else if (token == 0xc3u) { /* B2 INTEGER plus B3 A$ / A%,B$ */
             size_t record = BE_DATA_RECORD(executor);
             size_t item = BE_DATA_ITEM(executor);
             if (variables == NULL || preceding_statement ||
@@ -1694,26 +1738,44 @@ static BEStatus execute_line(const BasicProgram *program,
             for (;;) {
                 BasicVariableKey key;
                 size_t consumed = 0u;
-                int16_t value;
+                BEDataItem value = {0};
                 BVBStatus resolved;
                 skip_spaces(body, length, &pos);
-                if (pos == length || body[pos] != 0x02u) return BE_UNSUPPORTED;
+                if (pos == length || (body[pos] != 0x02u &&
+                    body[pos] != 0x03u)) return BE_UNSUPPORTED;
                 if (flow->data_count >= 2u) return BE_UNSUPPORTED;
                 resolved = bvb_resolve_explicit(body, length, pos,
                                                  &key, &consumed);
                 if (resolved != BVB_OK) return binding_error(resolved);
-                if (key.type != (uint8_t)BVT_INTEGER ||
-                    key.name_length != 1u ||
+                if (key.name_length != 1u ||
                     (key.name[0] != (uint8_t)'A' &&
                      key.name[0] != (uint8_t)'B')) return BE_UNSUPPORTED;
+                if (key.type == (uint8_t)BVT_STRING) {
+                    /* Only witnessed A$ alone, or B$ after A% in one READ. */
+                    if (!((flow->data_count == 0u &&
+                           key.name[0] == (uint8_t)'A') ||
+                          (flow->data_count == 1u &&
+                           key.name[0] == (uint8_t)'B' &&
+                           flow->data_keys[0].type == (uint8_t)BVT_INTEGER &&
+                           flow->data_keys[0].name[0] == (uint8_t)'A')))
+                        return BE_UNSUPPORTED;
+                } else if (key.type != (uint8_t)BVT_INTEGER ||
+                           (flow->data_count != 0u &&
+                            flow->data_keys[0].type == (uint8_t)BVT_STRING)) {
+                    return BE_UNSUPPORTED;
+                }
                 if ((flow->data_count != 0u &&
                      for_same_key(&key, &flow->data_keys[0])) ||
                     body[pos + 1u] != 0u || body[pos + 2u] != 0u)
                     return BE_UNSUPPORTED;
-                status = data_next_integer(program, &record, &item, &value);
+                status = data_next_scalar(program, &record, &item, &value);
                 if (status != BE_OK) return status;
+                if (value.type != key.type) return BE_UNSUPPORTED;
                 flow->data_keys[flow->data_count] = key;
-                flow->data_values[flow->data_count] = value;
+                flow->data_values[flow->data_count].type = value.type;
+                flow->data_values[flow->data_count].integer = value.integer;
+                flow->data_values[flow->data_count].string_offset = value.string_offset;
+                flow->data_values[flow->data_count].string_length = value.string_length;
                 ++flow->data_count;
                 pos += consumed;
                 skip_spaces(body, length, &pos);
@@ -2825,7 +2887,16 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
             else if (find != BVS_OK) return store_error(find);
         }
         if (missing > variables->capacity - variables->count)
-            return BE_STORE_FULL; /* No partial multi-READ assignment. */
+            return BE_STORE_FULL; /* All destinations checked together. */
+        for (i = 0u; i < transition.data_count; ++i) {
+            if (transition.data_values[i].type == (uint8_t)BVT_STRING) {
+                status = store_error(bvs_can_assign_string(variables,
+                    &transition.data_keys[i],
+                    program->data + transition.data_values[i].string_offset,
+                    transition.data_values[i].string_length));
+                if (status != BE_OK) return status;
+            }
+        }
     }
     if (probe.length > output_capacity) {
         return BE_NO_SPACE;
@@ -2871,11 +2942,17 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
         (transition.data_count > 0u &&
          (!for_same_key(&transition.data_keys[0],
                         &second_transition.data_keys[0]) ||
-          transition.data_values[0] != second_transition.data_values[0])) ||
+          transition.data_values[0].type != second_transition.data_values[0].type ||
+          transition.data_values[0].integer != second_transition.data_values[0].integer ||
+          transition.data_values[0].string_offset != second_transition.data_values[0].string_offset ||
+          transition.data_values[0].string_length != second_transition.data_values[0].string_length)) ||
         (transition.data_count > 1u &&
          (!for_same_key(&transition.data_keys[1],
                         &second_transition.data_keys[1]) ||
-          transition.data_values[1] != second_transition.data_values[1])) ||
+          transition.data_values[1].type != second_transition.data_values[1].type ||
+          transition.data_values[1].integer != second_transition.data_values[1].integer ||
+          transition.data_values[1].string_offset != second_transition.data_values[1].string_offset ||
+          transition.data_values[1].string_length != second_transition.data_values[1].string_length)) ||
         assignment.present != second.present ||
         (assignment.present &&
          (assignment.key.type != second.key.type ||
@@ -2894,12 +2971,22 @@ static BEStatus step_events_impl(BasicExecutor *executor, uint8_t *output,
     if (commit && transition.data_action == 1u) {
         size_t i;
         for (i = 0u; i < transition.data_count; ++i) {
-            BasicVariableValue value = {0};
-            value.type = (uint8_t)BVT_INTEGER;
-            value.data.integer = transition.data_values[i];
-            status = store_error(bvs_assign(variables,
-                                           &transition.data_keys[i], &value));
-            if (status != BE_OK) return status; /* preflighted, unreachable */
+            if (transition.data_values[i].type == (uint8_t)BVT_STRING) {
+                status = store_error(bvs_assign_string(variables,
+                    &transition.data_keys[i],
+                    program->data + transition.data_values[i].string_offset,
+                    transition.data_values[i].string_length));
+            } else {
+                BasicVariableValue value = {0};
+                value.type = (uint8_t)BVT_INTEGER;
+                value.data.integer = transition.data_values[i].integer;
+                status = store_error(bvs_assign(variables,
+                                               &transition.data_keys[i], &value));
+            }
+            /* BVS preflight of every destination, aggregate free entries,
+             * and immutable disjoint program/store make later failure
+             * unreachable; thus READ never exposes a partial commit. */
+            if (status != BE_OK) return status;
         }
     }
     if (commit && assignment.present) {

@@ -393,7 +393,11 @@ def verify(out, head, seal):
     actual = inventory(out)
     need(set(actual) == set(m["files"]), "RAW_FILE_SET_DRIFT")
     for k, record in m["files"].items():
-        need(actual[k] == record and record["bytes"] > 0,
+        # A successful CPC process may write zero stderr bytes. The exact
+        # empty file and SHA256 still belong to the mandatory RAW inventory.
+        need(actual[k] == record and
+             (record["bytes"] > 0 or
+              (record["bytes"] == 0 and k.endswith("/process/stderr.bin"))),
              "RAW_HASH_OR_SIZE_DRIFT_" + k)
     seen_nonces, start_stamps = [], []
     for session in SESSIONS:

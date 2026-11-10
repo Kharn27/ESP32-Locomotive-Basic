@@ -322,6 +322,56 @@ def acquire(cap,out,head):
     print("CLK-04-A4 ROM_ACQUIRED_PENDING_PNG_REVIEW",sha(read(out/"manifest.json")))
 
 
+def classify_sample(row, record):
+    """Classify one candidate row AFTER independently authenticated CPC RAW replay."""
+    fields=record.split("\t")
+    need(len(fields)==10 and fields[0]==row["value_requested"],
+         "CANDIDATE_RECORD_ORDER")
+    n=int(row["value_requested"])
+    raw_candidate=bytes.fromhex(fields[1]).hex(" ").upper()
+    doubled_candidate=bytes.fromhex(fields[3]).hex(" ").upper()
+    # CPC RAW captures input variable REAL5 only, NOT RAM bytes of T!*2.
+    # A matching integer or raw PRINT cannot verify the product encoding.
+    row["twice_real5_status"]="UNVERIFIED"
+    independent=("arithmetic_real5_hex" not in row or
+       (row["arithmetic_real5_hex"]==row["cpc_real5_hex"] and
+        row["cpc_equal"]=="-1" and row["cpc_plus_step"]=="1" and
+        row["cpc_minus_step"]=="1"))
+    row["input_identity"]=(
+       "INPUT_UNVERIFIED" if not independent else
+       "SECOND_CPC_CONSTRUCTION_CONCORDANT"
+       if "arithmetic_real5_hex" in row else "DECIMAL_LITERAL_ONLY")
+    # Scientific PRINT may lose decimals: NEVER interpret PRINT rounding
+    # as a difference in the five stored bytes.
+    exact_print=(n<=999999)
+    observed_algebra=(Decimal(row["cpc_ge_zero"])==Decimal(-1) and
+         Decimal(row["cpc_gt_32767"])==Decimal(-1 if n>32767 else 0) and
+         (not exact_print or
+            (Decimal(row["cpc_print"])==Decimal(n) and
+             Decimal(row["cpc_twice"])==Decimal(n*2))))
+    numeric_candidate=(fields[2]==str(n*2) and fields[4]=="-1" and
+                       fields[5]==str(-1 if n>32767 else 0))
+    print_keys=("value","twice","ge_zero","gt_32767")
+    printed={key:("UNSUPPORTED" if fields[6+j]=="UNSUPPORTED" else
+             "CANDIDATE_MATCH" if fields[6+j]==row["raw_print_hex"][key]
+             else "CPC_MISMATCH_STOP") for j,key in enumerate(print_keys)}
+    # Missing C99 PRINT support is explicit; no invented general format.
+    status=("INPUT_UNVERIFIED" if not independent else
+            "CPC_MISMATCH_STOP" if raw_candidate!=row["cpc_real5_hex"] or
+               not observed_algebra or not numeric_candidate or
+               "CPC_MISMATCH_STOP" in printed.values() else
+            "UNSUPPORTED" if not exact_print or
+               "UNSUPPORTED" in printed.values() else "CANDIDATE_PARTIAL_MATCH")
+    row["c99_candidate"]={"real5_hex":raw_candidate,
+         "twice_real5_hex":doubled_candidate,
+         "twice_integer":fields[2],"ge_zero_integer":fields[4],
+         "gt_32767_integer":fields[5],
+         "raw_print_candidates":dict(zip(print_keys,fields[6:])),
+         "print_comparison":printed}
+    row["status"]=status
+    return status
+
+
 def verify(out,head,seal,candidate):
     cases=source_cases()
     need(prior.SHA64.fullmatch(seal or "") and
@@ -421,58 +471,21 @@ def verify(out,head,seal,candidate):
     output=proc.stdout.decode("ascii").splitlines()
     need(len(output)==len(report),"CANDIDATE_CARDINALITY")
     totals={"VERIFIED_CPC_SAMPLE":0,"CANDIDATE_MATCH":0,
+            "CANDIDATE_PARTIAL_MATCH":0,
             "CPC_MISMATCH_STOP":0,"INPUT_UNVERIFIED":0,"UNSUPPORTED":0}
     for row,record in zip(report,output):
-        fields=record.split("\t")
-        need(len(fields)==10 and fields[0]==row["value_requested"],
-             "CANDIDATE_RECORD_ORDER")
-        n=int(row["value_requested"])
-        raw_candidate=bytes.fromhex(fields[1]).hex(" ").upper()
-        doubled_candidate=bytes.fromhex(fields[3]).hex(" ").upper()
-        independent=("arithmetic_real5_hex" not in row or
-           (row["arithmetic_real5_hex"]==row["cpc_real5_hex"] and
-            row["cpc_equal"]=="-1" and row["cpc_plus_step"]=="1" and
-            row["cpc_minus_step"]=="1"))
-        row["input_identity"]=(
-           "INPUT_UNVERIFIED" if not independent else
-           "SECOND_CPC_CONSTRUCTION_CONCORDANT"
-           if "arithmetic_real5_hex" in row else "DECIMAL_LITERAL_ONLY")
-        # Scientific PRINT may lose decimals: NEVER interpret PRINT rounding
-        # as a difference in the five stored bytes.
-        exact_print=(n<=999999)
-        observed_algebra=(Decimal(row["cpc_ge_zero"])==Decimal(-1) and
-             Decimal(row["cpc_gt_32767"])==Decimal(-1 if n>32767 else 0) and
-             (not exact_print or
-                (Decimal(row["cpc_print"])==Decimal(n) and
-                 Decimal(row["cpc_twice"])==Decimal(n*2))))
-        numeric_candidate=(fields[2]==str(n*2) and fields[4]=="-1" and
-                           fields[5]==str(-1 if n>32767 else 0))
-        print_keys=("value","twice","ge_zero","gt_32767")
-        printed={key:("UNSUPPORTED" if fields[6+j]=="UNSUPPORTED" else
-                 "CANDIDATE_MATCH" if fields[6+j]==row["raw_print_hex"][key]
-                 else "CPC_MISMATCH_STOP") for j,key in enumerate(print_keys)}
-        # Missing C99 PRINT support is explicit; no invented general format.
-        status=("INPUT_UNVERIFIED" if not independent else
-                "CPC_MISMATCH_STOP" if raw_candidate!=row["cpc_real5_hex"] or
-                   not observed_algebra or not numeric_candidate or
-                   "CPC_MISMATCH_STOP" in printed.values() else
-                "UNSUPPORTED" if not exact_print or
-                   "UNSUPPORTED" in printed.values() else "CANDIDATE_MATCH")
-        row["c99_candidate"]={"real5_hex":raw_candidate,
-             "twice_real5_hex":doubled_candidate,
-             "twice_integer":fields[2],"ge_zero_integer":fields[4],
-             "gt_32767_integer":fields[5],
-             "raw_print_candidates":dict(zip(print_keys,fields[6:])),
-             "print_comparison":printed}
-        row["status"]=status
+        status=classify_sample(row,record)
         totals["VERIFIED_CPC_SAMPLE"]+=1
         totals[status]+=1
+    need(totals["CANDIDATE_MATCH"]==0, "PRODUCT_REAL5_UNVERIFIED_FULL_MATCH")
     status=("STOP_ARCHITECTURAL" if totals["CPC_MISMATCH_STOP"] or
             totals["INPUT_UNVERIFIED"] else
             "UNSUPPORTED" if totals["UNSUPPORTED"] else
             "VERIFIED_CPC_SAMPLES_ONLY")
     output={"mission":"CLK-04-A4","head":head,"seal":seal,"status":status,
             "totals":totals,"samples":report,
+            "unverified_candidate_components":["twice_real5_hex"],
+            "match_scope":"CANDIDATE_PARTIAL_MATCH_EXCLUDES_PRODUCT_REAL5_BYTES",
             "range_claim":"RANGE_UNVERIFIED",
             "human_png_review":"REQUIRED_NOT_AUTOMATED"}
     print("CLK-04-A4 RAW_REPLAY_PASS",json.dumps(totals,sort_keys=True),

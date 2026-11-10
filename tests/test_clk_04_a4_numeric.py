@@ -92,4 +92,48 @@ class AuthenticityNegatives(unittest.TestCase):
     def test_self_test(self):
         a4.self_test()
 
+
+class ProductReal5EvidenceNegatives(unittest.TestCase):
+    """Synthetic rows only; an input's RAM REAL5 is not the product's RAM REAL5."""
+
+    @staticmethod
+    def sample():
+        return {
+            "value_requested":"1", "cpc_real5_hex":"00 00 00 00 81",
+            "cpc_print":"1", "cpc_twice":"2",
+            "cpc_ge_zero":"-1", "cpc_gt_32767":"0",
+            "raw_print_hex":{
+                "value":"2031200D0A", "twice":"2032200D0A",
+                "ge_zero":"2D31200D0A", "gt_32767":"2030200D0A"
+            }
+        }
+
+    @staticmethod
+    def record(product_hex, input_hex="0000000081"):
+        return "\t".join(("1",input_hex,"2",product_hex,"-1","0",
+                          "2031200D0A","2032200D0A","2D31200D0A","2030200D0A"))
+
+    def test_product_real5_falsification_not_full_match(self):
+        row=self.sample()
+        # The ONLY mutated column is the product REAL5, not the stored input,
+        # numeric 2, predicates, or byte-for-byte PRINT candidates.
+        verdict=a4.classify_sample(row,self.record("0000000000"))
+        self.assertNotEqual(verdict,"CANDIDATE_MATCH")
+        self.assertEqual(verdict,"CANDIDATE_PARTIAL_MATCH")
+        self.assertEqual(row["twice_real5_status"],"UNVERIFIED")
+        self.assertEqual(row["c99_candidate"]["twice_real5_hex"],"00 00 00 00 00")
+        self.assertEqual(set(row["c99_candidate"]["print_comparison"].values()),
+                         {"CANDIDATE_MATCH"})
+
+    def test_plausible_product_is_also_unverified_without_cpc_ram_bytes(self):
+        row=self.sample()
+        verdict=a4.classify_sample(row,self.record("0000000082"))
+        self.assertEqual(verdict,"CANDIDATE_PARTIAL_MATCH")
+        self.assertEqual(row["twice_real5_status"],"UNVERIFIED")
+
+    def test_input_real5_still_checked_fail_closed(self):
+        row=self.sample()
+        verdict=a4.classify_sample(row,self.record("0000000082","0000000000"))
+        self.assertEqual(verdict,"CPC_MISMATCH_STOP")
+
 if __name__=="__main__":unittest.main()

@@ -416,8 +416,10 @@ def verify(out, head, seal):
         seen_nonces.append(meta["process_nonce"])
         prior.cfg_validate(folder / "cap32.cfg")
         cfg = read(folder / "cap32.cfg")
-        need(str(folder / "printer.dat").encode() in cfg,
-             "CFG_PRINTER_PROCESS_MISMATCH")
+        # The replay occurs in a different checkout and RUNNER_TEMP. Reconstruct
+        # paths from the original, sealed autocmd argv instead of the replay
+        # extraction path. They must agree *within* the original CPC process.
+        need(b"printer_file=" in cfg, "CFG_PRINTER_MISSING")
         log = read(folder / "caprice.log")
         need(("returncode=0\npid=%d\n" % meta["pid"]).encode() in log,
              "PROCESS_LOG_PID_MISMATCH")
@@ -425,11 +427,23 @@ def verify(out, head, seal):
         commands = [c for stage in proto["stages"] for c in stage["commands"]]
         need(auto["commands"] == commands and auto["stages"] == proto["stages"],
              "AUTOMATION_PROTOCOL_DRIFT")
-        expected_argv = ["xvfb-run", "-a", str(ROOT / "tests/oracles/caprice32/cap32"),
-                         "-c", str(folder / "cap32.cfg")]
+        observed_argv = auto["argv"]
+        need(isinstance(observed_argv, list) and len(observed_argv) >= 5
+             and observed_argv[:2] == ["xvfb-run", "-a"]
+             and observed_argv[3] == "-c"
+             and observed_argv[2].endswith("/tests/oracles/caprice32/cap32"),
+             "PROCESS_ARGV_PREFIX_DRIFT")
+        original_cfg = Path(observed_argv[4])
+        need(original_cfg.is_absolute() and original_cfg.name == "cap32.cfg"
+             and original_cfg.parent.name == "process"
+             and original_cfg.parent.parent.name == session
+             and ("/printer.dat").encode() in cfg
+             and ("printer_file=" + str(original_cfg.parent / "printer.dat")).encode() in cfg,
+             "PROCESS_CFG_PATH_OR_IDENTITY_DRIFT")
+        expected_argv = observed_argv[:5]
         for c in commands:
             expected_argv += ["-a", c.replace("CAP32_SNAPSHOT", "\x0c\x0d")]
-        need(auto["argv"] == expected_argv, "PROCESS_ARGV_DRIFT")
+        need(observed_argv == expected_argv, "PROCESS_ARGV_DRIFT")
         images = json.loads(read(folder / "screens_index.json"))
         need([x["id"] for x in images] == proto["screens_expected"],
              "SCREEN_INDEX_DRIFT")

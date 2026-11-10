@@ -112,7 +112,7 @@ class SyntheticPrinter(unittest.TestCase):
                "PRINTER_MARKER_OR_ORDER_NEW:AFTER")
 
     def test_stop_cont_missing_rejected(self):
-        forged = self.data.replace(b"A3:STOP:AFTER", b"A3:STOP:WAIT", 1)
+        forged = self.data.replace(b"\r\nA3:STOP:AFTER\r\n", b"\r\nA3:STOP:WAIT\r\n", 1)
         reject(lambda: a3.observe_printer(forged, self.proto),
                "PRINTER_MARKER_OR_ORDER_STOP:AFTER")
 

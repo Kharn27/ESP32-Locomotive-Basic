@@ -77,7 +77,7 @@ class AuthenticityNegatives(unittest.TestCase):
             rejected(lambda:a4.read_values(case,stop,p),"AT_VARIABLE_ADDRESS_MISMATCH")
     def test_absent_archive(self):
         with tempfile.TemporaryDirectory() as td:
-            with self.assertRaises(FileNotFoundError):
+            with self.assertRaisesRegex(a4.prior.OracleError,"ABSENT_OR_SYMLINK_"):
                 a4.verify(Path(td),"0"*40,"0"*64,None)
     def test_wrong_external_seal(self):
         with tempfile.TemporaryDirectory() as td:

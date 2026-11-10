@@ -1,0 +1,74 @@
+# #358 J1.25-B2-E1-C1. Host isolation proof only. NO Xtensa build job.
+# LAB_ONLY_NEVER_MERGE. PRs are forbidden: ordinary CI-XTENSA would trigger.
+name: LAB J1.25-B2-E1-C1 HOST_ONLY_NO_XTENSA V2 (45 workflows)
+on:
+  push:
+    branches: [lab/j1-25-b2-e1-current-integration-m2]
+    paths:
+      - '.github/workflows/j1-25-b2-e1-current-integration.yml'
+      - 'tools/ci/j125_b2_e1.py'
+      - 'tests/test_j125_b2_e1.py'
+      - 'docs/J1.25-B2-E1-current-integration.md'
+      - 'tools/ci/opt3_routing.py'
+  pull_request:
+    paths:
+      - '.github/workflows/j1-25-b2-e1-current-integration.yml'
+      - 'tools/ci/j125_b2_e1.py'
+      - 'tests/test_j125_b2_e1.py'
+      - 'docs/J1.25-B2-E1-current-integration.md'
+      - 'tools/ci/opt3_routing.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: j125-b2-e1-c1-host-only
+  cancel-in-progress: false
+
+jobs:
+  host-isolation-c1:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/lab/j1-25-b2-e1-current-integration-m2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Exact branch HEAD, token not persisted
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: No PR, no Actions target build; host tests, OPT3 and SHA-only diff
+        shell: bash
+        env:
+          C1_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = push
+          test "$GITHUB_REF" = refs/heads/lab/j1-25-b2-e1-current-integration-m2
+          test "$(git rev-parse HEAD)" = "$C1_EXPECTED_HEAD"
+          test "$(git merge-base c4e4ad889fe3bf1a97f1070553bc0ba15a55c8f0 HEAD)" = c4e4ad889fe3bf1a97f1070553bc0ba15a55c8f0
+          mkdir -p reports/j125-e1-c1-host
+          {
+            python3 -m py_compile tools/ci/j125_b2_e1.py tests/test_j125_b2_e1.py tools/ci/opt3_routing.py
+            python3 -m unittest discover -s tests -p test_j125_b2_e1.py -v
+            python3 tools/ci/j125_b2_e1.py --self-test
+            python3 tools/ci/opt3_routing.py --self-test --expect-head "$C1_EXPECTED_HEAD" --base-sha c4e4ad889fe3bf1a97f1070553bc0ba15a55c8f0
+            git diff --name-only c4e4ad889fe3bf1a97f1070553bc0ba15a55c8f0...HEAD | sort | tee reports/j125-e1-c1-host/changed-files.txt
+            diff -u <(printf '%s\n' \
+              .github/workflows/j1-25-b2-e1-current-integration.yml \
+              docs/J1.25-B2-E1-current-integration.md \
+              tests/test_j125_b2_e1.py \
+              tools/ci/j125_b2_e1.py \
+              tools/ci/opt3_routing.py) reports/j125-e1-c1-host/changed-files.txt
+            echo HOST_ONLY_NO_XTENSA E1_C1_CI_ISOLATION_PASS BUILDS_SPENT=0
+          } 2>&1 | tee reports/j125-e1-c1-host/tests.log
+          (cd reports/j125-e1-c1-host && sha256sum tests.log changed-files.txt > SHA256SUMS.txt && sha256sum --check SHA256SUMS.txt)
+      - name: Preserve host-only proof and SHA256 hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e1-c1-host-isolation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/j125-e1-c1-host/
+          if-no-files-found: warn
+          retention-days: 30

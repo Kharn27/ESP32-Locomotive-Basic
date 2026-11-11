@@ -28,6 +28,28 @@ Hw4PenStatus hw4_pen_pixel_index(const CpcVideo *video, uint8_t logical,
         *pixel = 3U;
         return HW4_PEN_OK;
     }
+    if (logical >= 5U && logical <= 14U) {
+        /* J1.17-C-A sealed CPC6128 MODE1 oracle, original + repeat:
+         * C: PAPER0, INK0..3={0,26,6,18} -> white/red/green/background.
+         * D: PAPER0, INK0..3={1,24,20,6} -> yellow/cyan/red/background.
+         * An index of 0 for PEN8/12 is a bounded implementation choice:
+         * the CPC PNGs observe background only, NOT a measured index.
+         * Do not infer logical modulo 4 in an unobserved ink context. */
+        static const uint8_t pen_to_pixel[10] =
+            {1U,2U,3U,0U,1U,2U,3U,0U,1U,2U};
+        const bool context_c = video->ink[0] == 0U &&
+                               video->ink[1] == 26U &&
+                               video->ink[2] == 6U &&
+                               video->ink[3] == 18U;
+        const bool context_d = video->ink[0] == 1U &&
+                               video->ink[1] == 24U &&
+                               video->ink[2] == 20U &&
+                               video->ink[3] == 6U;
+        if (video->paper != 0U || (!context_c && !context_d))
+            return HW4_PEN_UNVERIFIED_VISUAL;
+        *pixel = pen_to_pixel[logical - 5U];
+        return HW4_PEN_OK;
+    }
     return HW4_PEN_UNSUPPORTED_LOGICAL;
 }
 

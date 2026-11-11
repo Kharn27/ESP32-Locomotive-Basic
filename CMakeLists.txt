@@ -633,6 +633,8 @@ if(BUILD_TESTING)
     target_link_libraries(test_hw4_pen_a PRIVATE hw4_pen_bridge
                           cpc_diag_policy cpc_ready_policy)
     add_test(NAME hw4_pen_a_typed_events_mode1 COMMAND test_hw4_pen_a)
+    # HW4-PEN-LOGICAL-B1: separate C/D oracle and atomicity regression gate.
+    add_test(NAME hw4_pen_logical_b1_cpc_cd_mode1 COMMAND test_hw4_pen_a --b1)
     # RED/GREEN: feed the actual production CONSOLE source to the test.
     set_tests_properties(hw4_pen_a_typed_events_mode1 PROPERTIES
         ENVIRONMENT "HW4_PEN_C2_CONSOLE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main/hw4_c2_console.c")

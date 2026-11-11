@@ -1216,8 +1216,17 @@ static void test_j117_ca_palette_and_atomic_guards(void)
                            HW4_PEN_BAD_OFFSET);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    /* Separate, explicitly named B1 gate: no firmware-source canary needed.
+     * The full historical HW4 test still runs these same regressions. */
+    if(argc==2 && strcmp(argv[1],"--b1")==0) {
+        test_j117_ca_pens_mode1_oracle_contexts();
+        test_j117_ca_palette_and_atomic_guards();
+        puts("HW4-PEN-LOGICAL-B1: CPC C/D MODE1 and atomic negatives PASS");
+        return 0;
+    }
+    assert(argc==1);
     test_j121_c2_console_wiring_contract();
     test_j121_c2_direct_rejections_and_running();
     test_j121_c2_direct_cls_mode1();

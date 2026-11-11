@@ -1,5 +1,5 @@
 /* HW4-PEN-A: portable UART-like BASIC -> typed events -> MODE1 VRAM.
- * Does not simulate TFT hardware. Oracle A defines only 0..4 and 15. */
+ * Host tests and sealed J1.17-A/C-A CPC cases; no real TFT simulation. */
 #include "hw4_pen_bridge.h"
 #include "cpc_uart_console.h"
 #include "cpc_diag_policy.h"
@@ -215,8 +215,9 @@ static void test_bridge_preflight_atomic(void)
     assert_rejected_replay(events,2U,print_bytes,sizeof(print_bytes),
                            HW4_PEN_UNSUPPORTED_LOGICAL);
     events[1].pen=5U;
+    /* This boot-red/green palette is neither oracle C nor default D. */
     assert_rejected_replay(events,2U,print_bytes,sizeof(print_bytes),
-                           HW4_PEN_UNSUPPORTED_LOGICAL);
+                           HW4_PEN_UNVERIFIED_VISUAL);
     events[1].pen=15U;
     f.video.ink[3]=6U; /* No generalised logical->pixel palette alias. */
     assert_rejected_replay(events,2U,print_bytes,sizeof(print_bytes),
@@ -747,8 +748,10 @@ static void test_diag_pen_native_and_host_guards(void)
         assert(f.events[0].type==BE_VIDEO_SET_TEXT_PEN &&
                f.events[0].pen==(uint8_t)n &&
                f.events[0].print_offset==0U);
+        /* Logical PEN 5/14 is now valid; this non-oracle palette
+         * still must not be silently rendered as an arbitrary colour. */
         assert(hw4_pen_preflight(&f.text,f.output,f.written,
-                   f.events,f.event_written)==HW4_PEN_UNSUPPORTED_LOGICAL);
+                   f.events,f.event_written)==HW4_PEN_UNVERIFIED_VISUAL);
     }
     setup();
     assert(submit("10 PEN 2:PEN 1:PEN 3:PEN 2").status==BSR_OK);
@@ -1074,6 +1077,145 @@ static void test_j121_c2_console_wiring_contract(void)
     assert(strstr(start,"CPC_READY_UNCHARACTERIZED_DIRECT")!=NULL);
 }
 
+/* HW4-PEN-LOGICAL-B1: compare a bounded native MODE1 candidate with the
+ * independently sealed J1.17-C-A C/D colour observations. The CPC oracle
+ * records only background-coloured ROI for PEN8/12, NOT their hidden index.
+ * Pixel 0 is the candidate representation, checked separately below.
+ * Source archive + external seals are enforced by CPC-PERMANENT CI. */
+static void j117_ca_palette(unsigned context)
+{
+    static const uint8_t c[4]={0U,26U,6U,18U};
+    static const uint8_t d[4]={1U,24U,20U,6U};
+    const uint8_t *ink=context==0U ? c:d;
+    for(unsigned i=0U;i<4U;++i)
+        assert(cpc_video_set_ink(&f.video,i,ink[i]));
+    assert(cpc_video_set_text_colors(&f.video,1U,0U));
+}
+
+static void test_j117_ca_pens_mode1_oracle_contexts(void)
+{
+    /* C: white/red/green/background; D: yellow/cyan/red/background.
+     * No general logical->pixel folding for other modes or ink contexts. */
+    static const uint8_t candidate_pixel[10]=
+        {1U,2U,3U,0U,1U,2U,3U,0U,1U,2U};
+    static const uint8_t c_observed_ink[10]=
+        {26U,6U,18U,0U,26U,6U,18U,0U,26U,6U};
+    static const uint8_t d_observed_ink[10]=
+        {24U,20U,6U,1U,24U,20U,6U,1U,24U,20U};
+    static const char printed[]="J117PEN\n";
+    for(unsigned context=0U;context<2U;++context) {
+        for(unsigned pen=5U;pen<=14U;++pen) {
+            const unsigned k=pen-5U;
+            const uint8_t *observed=context==0U ?
+                                    c_observed_ink:d_observed_ink;
+            char line[32], expected_list[80];
+            uint16_t rendered[CPC_VIDEO_TFT_WIDTH];
+            uint8_t mapped=255U;
+            bool ready=false,reset_page=true,known=false;
+            uint8_t listed=0U;
+            size_t saved_size;
+            unsigned ready_count=0U;
+            setup();
+            j117_ca_palette(context);
+            assert(snprintf(line,sizeof(line),"10 PEN %u",pen)>0);
+            assert(submit(line).status==BSR_OK);
+            assert(submit("20 PRINT \"J117PEN\"").status==BSR_OK);
+            assert(submit("30 END").status==BSR_OK);
+            saved_size=f.program.size;
+            assert(snprintf(expected_list,sizeof(expected_list),
+                "10 PEN %u\n20 PRINT \"J117PEN\"\n30 END\n",pen)>0);
+            assert(submit("LIST").status==BSR_OK);
+            assert(f.written==strlen(expected_list) &&
+                   memcmp(f.output,expected_list,f.written)==0);
+            assert(hw4_pen_pixel_index(&f.video,(uint8_t)pen,&mapped)
+                   ==HW4_PEN_OK);
+            assert(mapped==candidate_pixel[k]); /* chosen internal index */
+            assert(submit("RUN").status==BSR_OK);
+            assert(step(OUT_CAP,3U).status==BSR_OK);
+            assert(f.written==0U && f.event_written==1U);
+            assert(f.events[0].type==BE_VIDEO_SET_TEXT_PEN &&
+                   f.events[0].pen==pen && f.events[0].print_offset==0U);
+            assert(hw4_pen_preflight(&f.text,f.output,f.written,
+                   f.events,f.event_written)==HW4_PEN_OK);
+            assert(hw4_pen_replay(&f.text,f.output,f.written,
+                   f.events,f.event_written)==HW4_PEN_OK);
+            assert(step(OUT_CAP,3U).status==BSR_OK);
+            assert(f.written==sizeof(printed)-1U && f.event_written==0U);
+            assert(memcmp(f.output,printed,f.written)==0);
+            assert(hw4_pen_replay(&f.text,f.output,f.written,
+                   f.events,f.event_written)==HW4_PEN_OK);
+            assert(f.text.bytes_received==f.written);
+            assert(f.text.glyphs_drawn==sizeof(printed)-2U);
+            assert(cpc_video_render_row(&f.video,CPC_VIDEO_VIEW_TOP,
+                   rendered,CPC_VIDEO_TFT_WIDTH));
+            /* This is the OBSERVED CPC colour, unlike the local index. */
+            assert(rendered[0]==cpc_video_palette_rgb565(observed[k]));
+            if(pen==8U || pen==12U) {
+                /* Background-only CPC ROI: do not claim measured index 0. */
+                assert(rendered[0]==cpc_video_palette_rgb565(f.video.ink[0]));
+                assert(pixel_at(0U,0U)==candidate_pixel[k]);
+            } else {
+                assert(pixel_at(0U,0U)==candidate_pixel[k]);
+                assert(rendered[0]!=cpc_video_palette_rgb565(f.video.ink[0]));
+            }
+            assert(cpc_video_read_cell(&f.video,0U,0U,&listed,&known));
+            assert(known && listed==(uint8_t)'J');
+            assert(step(OUT_CAP,3U).status==BSR_OK); /* END */
+            assert(f.written==0U && f.event_written==0U);
+            assert(step(OUT_CAP,3U).status==BSR_END);
+            assert(cpc_ready_policy_apply(&f.text,CPC_READY_RUN_RETURN,&ready));
+            if(ready) ++ready_count;
+            assert(ready_count==1U);
+            assert(cpc_uart_console_prompt(&f.text,&reset_page) && !reset_page);
+            assert(f.program.size==saved_size);
+        }
+    }
+}
+
+/* A later forbidden event must reject the entire PEN5+PRINT step BEFORE
+ * even the first glyph/cursor/ink mutation. An unmeasured ink combination
+ * must not turn a coincidentally identical RGB into a certified mapping. */
+static void test_j117_ca_palette_and_atomic_guards(void)
+{
+    const uint8_t bytes[]={'A','\n','B','\n'};
+    BEVideoEvent events[2]={
+        {BE_VIDEO_SET_TEXT_PEN,5U,0U,0U,0U},
+        {BE_VIDEO_SET_TEXT_PEN,6U,2U,0U,0U}
+    };
+    setup(); /* mixed boot palette is neither witnessed C nor D */
+    assert_rejected_replay(events,2U,bytes,sizeof(bytes),
+                           HW4_PEN_UNVERIFIED_VISUAL);
+    setup();
+    j117_ca_palette(0U);
+    assert(cpc_video_set_ink(&f.video,1U,24U)); /* C partially changed */
+    assert_rejected_replay(events,2U,bytes,sizeof(bytes),
+                           HW4_PEN_UNVERIFIED_VISUAL);
+    setup();
+    j117_ca_palette(1U);
+    assert(cpc_video_set_ink(&f.video,3U,18U)); /* D partially changed */
+    assert_rejected_replay(events,2U,bytes,sizeof(bytes),
+                           HW4_PEN_UNVERIFIED_VISUAL);
+    setup();
+    j117_ca_palette(0U);
+    assert(cpc_video_set_text_colors(&f.video,1U,1U)); /* not PAPER0 */
+    assert_rejected_replay(events,2U,bytes,sizeof(bytes),
+                           HW4_PEN_UNVERIFIED_VISUAL);
+    setup();
+    j117_ca_palette(1U);
+    events[1].type=BE_VIDEO_SET_INK;
+    assert_rejected_replay(events,2U,bytes,sizeof(bytes),
+                           HW4_PEN_SET_INK_UNSUPPORTED);
+    events[1].type=BE_VIDEO_SET_TEXT_PEN;
+    events[1].pen=16U;
+    assert_rejected_replay(events,2U,bytes,sizeof(bytes),
+                           HW4_PEN_UNSUPPORTED_LOGICAL);
+    /* The positive pen5 preflight does not exempt a subsequent bad offset. */
+    events[1].pen=6U;
+    events[1].print_offset=5U;
+    assert_rejected_replay(events,2U,bytes,sizeof(bytes),
+                           HW4_PEN_BAD_OFFSET);
+}
+
 int main(void)
 {
     test_j121_c2_console_wiring_contract();
@@ -1083,6 +1225,8 @@ int main(void)
     test_cpc_palette_run_and_clear();
     test_cpc_palette_native_cls_keeps_inks();
     test_diag_pen_native_and_host_guards();
+    test_j117_ca_pens_mode1_oracle_contexts();
+    test_j117_ca_palette_and_atomic_guards();
     test_order_and_preserved_print();
     test_pen_only_and_oracle_bounds();
     test_bridge_preflight_atomic();

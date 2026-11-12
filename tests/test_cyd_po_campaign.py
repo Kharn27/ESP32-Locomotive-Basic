@@ -53,7 +53,10 @@ def boot(version=VER, idf="v5.5.6", sha=HEAD, omit_start=False) -> bytes:
 
 
 class Device:
-    def __init__(self, startup: bytes | None = None, *, fault: str | None = None):
+    def __init__(self, startup: bytes | None = None, *, fault: str | None = None,
+                 late_fault: str | None = None, fault_shot_seq: int | None = None):
+        self.late_fault = late_fault
+        self.fault_shot_seq = fault_shot_seq
         self.buffer = bytearray(boot() if startup is None else startup)
         self.writes = []
         self.fault = fault
@@ -98,6 +101,31 @@ class Device:
             self.buffer.extend(shot(ident, self.seq, crc_bad=self.fault=='shot_crc',
                                     truncated=self.fault=='shot_truncated',
                                     wrong_head=self.fault=='shot_sha'))
+            fault = self.late_fault if self.seq == self.fault_shot_seq else None
+            def diag(stage, *, dma=0, lcd="ESP_OK"):
+                return (f"HW4-C2 DEVICE_MEMORY stage={stage} "
+                        "heap8_free=251220 heap8_largest=140000 heap8_min=240000 "
+                        "stack_margin_bytes=3360 dma_transfers=1549 "
+                        f"dma_timeouts={dma} dma_fault=0 lcd_error={lcd}\n").encode()
+            after_shot = diag("after_shot", dma=int(fault == "dma_after_shot"))
+            after_line = diag("after_line", lcd="ESP_FAIL" if fault == "lcd_after_line"
+                              else "ESP_OK")
+            if fault == "reverse":
+                self.buffer.extend(after_line + after_shot)
+            elif fault == "missing_after_shot":
+                self.buffer.extend(after_line)
+            elif fault == "missing_after_line":
+                self.buffer.extend(after_shot)
+            elif fault == "truncated_after_line":
+                self.buffer.extend(after_shot
+                                   + b"HW4-C2 DEVICE_MEMORY stage=after_line heap8_f")
+            elif fault == "short_after_line":
+                self.buffer.extend(after_shot
+                                   + b"HW4-C2 DEVICE_MEMORY stage=after_line heap8_free=3\n")
+            elif fault == "truncated_after_shot":
+                self.buffer.extend(b"HW4-C2 DEVICE_MEMORY stage=after_shot heap8_f")
+            else:
+                self.buffer.extend(after_shot + after_line)
         return len(data)
 
     def read(self, size):
@@ -175,6 +203,11 @@ class Tests(unittest.TestCase):
             self.assertEqual(sess.watcher.bad,0)
             self.assertEqual(len(list((sess.folder/'screenshots').glob('*.png'))),12)
             self.assertEqual([s['seq'] for s in sess.shots],list(range(1,13)))
+            self.assertEqual([m['stage'] for m in sess.memory
+                              if m['stage'] in ('after_shot','after_line')],
+                             ['after_shot','after_line'] * 12)
+            self.assertEqual(sess.memory[-2]['stage'], 'after_shot')
+            self.assertEqual(sess.memory[-1]['stage'], 'after_line')
         finally:sess.close()
         result={'status':'PO_REVIEW_PENDING','shots':sess.shots}
         zip_path=po.finalize(sess.folder,result)
@@ -264,8 +297,10 @@ class Tests(unittest.TestCase):
 
     class C1Device(Device):
         def __init__(self, *, manual=False, no_boot=False, sha=HEAD,
-                     fail_open=False, interrupt=False):
-            super().__init__(startup=b'')
+                     fail_open=False, interrupt=False, late_fault=None,
+                     fault_shot_seq=None):
+            super().__init__(startup=b'', late_fault=late_fault,
+                             fault_shot_seq=fault_shot_seq)
             self.is_open = False
             self.trace = []
             self._rts = self._dtr = False
@@ -306,7 +341,8 @@ class Tests(unittest.TestCase):
             if self.interrupt: raise KeyboardInterrupt
             return super().write(data)
 
-    def c1_run(self, device, *, manual=False, shots='none', flash=False, dry=False):
+    def c1_run(self, device, *, manual=False, shots='none', flash=False,
+               dry=False, shot_timeout='3'):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         output = Path(tmp.name)/'campaigns'
@@ -314,7 +350,7 @@ class Tests(unittest.TestCase):
         factory = Mock(return_value=device)
         args = ['--suite','j1_25_b2_b3', '--shots',shots,
                 '--output-root',str(output), '--boot-timeout','.03',
-                '--command-timeout','.2','--shot-timeout','3']
+                '--command-timeout','.2','--shot-timeout',str(shot_timeout)]
         if manual: args.append('--manual-reset')
         if dry: args.append('--dry-run')
         else: args += ['--port','/dev/ttyUSB0',
@@ -382,6 +418,14 @@ class Tests(unittest.TestCase):
                               x['state']=='CRC_OK']),12)
         self.assertEqual(len(list((folder/'screenshots').glob('*.png'))),12)
         self.assertIn('12/12 PNG',out)
+        result = json.loads((folder/'results.json').read_text())
+        self.assertEqual([m['stage'] for m in result['memory']
+                          if m['stage'] in ('after_shot','after_line')],
+                         ['after_shot','after_line'] * 12)
+        self.assertIn(b' DEVICE_MEMORY stage=after_line ',
+                      (folder/'uart.raw.log').read_bytes())
+        self.assertTrue((folder/'uart.raw.log').read_bytes()
+                        .endswith(b'lcd_error=ESP_OK\n'))
         for step in ('BUILD','FLASH'):
             self.assertEqual([x['state'] for x in rows if x['step']==step],
                              ['START','OK'])
@@ -420,6 +464,77 @@ class Tests(unittest.TestCase):
         self.assertEqual(rc,0)
         self.assertEqual(d.trace,[])
         self.assertIn('"classification": "NOT_VERIFIED"',out)
+
+    def test_c2_run_mode_post_shot_memory_all_six(self):
+        d = self.C1Device()
+        rc, folder, rows, output = self.c1_run(d, shots='run')
+        self.assertEqual(rc, 0)
+        result = json.loads((folder / 'results.json').read_text())
+        self.assertEqual(result['status'], 'PO_REVIEW_PENDING')
+        self.assertEqual(len(result['shots']), 6)
+        self.assertEqual([m['stage'] for m in result['memory']
+                          if m['stage'] in ('after_shot', 'after_line')],
+                         ['after_shot', 'after_line'] * 6)
+        self.assertEqual(len([r for r in rows if r['step'] == 'SHOT'
+                              and r['state'] == 'CRC_OK']), 6)
+        self.assertIn('6/6 PNG', output)
+
+    def test_c2_last_shot_late_faults_fail_closed_with_zip(self):
+        # Neither a complete CRC PNG nor a valid CAPTURE_DONE may hide
+        # a subsequent device fault or an unconsumed partial UART line.
+        scenarios = (
+            ('all', 12, 'dma_after_shot', 'DEVICE_MEMORY_FAULT'),
+            ('all', 12, 'lcd_after_line', 'DEVICE_MEMORY_FAULT'),
+            ('all', 12, 'truncated_after_line', 'POST_SHOT_AFTER_LINE_TIMEOUT'),
+            ('all', 12, 'short_after_line', 'INVALID_DEVICE_MEMORY'),
+            ('all', 12, 'missing_after_line', 'POST_SHOT_AFTER_LINE_TIMEOUT'),
+            ('all', 12, 'reverse', 'POST_SHOT_MEMORY_OUT_OF_ORDER'),
+            ('all', 12, 'missing_after_shot', 'POST_SHOT_MEMORY_OUT_OF_ORDER'),
+            ('all', 12, 'truncated_after_shot', 'POST_SHOT_AFTER_SHOT_TIMEOUT'),
+            ('run', 6, 'dma_after_shot', 'DEVICE_MEMORY_FAULT'),
+            ('run', 6, 'truncated_after_line', 'POST_SHOT_AFTER_LINE_TIMEOUT'),
+        )
+        for mode, last_seq, fault, expected in scenarios:
+            with self.subTest(mode=mode, fault=fault):
+                d = self.C1Device(late_fault=fault, fault_shot_seq=last_seq)
+                rc, folder, events, console = self.c1_run(
+                    d, shots=mode, shot_timeout='.05')
+                self.assertEqual(rc, 2)
+                result = json.loads((folder/'results.json').read_text())
+                self.assertEqual(result['status'], 'INCOMPLETE')
+                self.assertIn(expected, ' '.join(result['errors']))
+                self.assertEqual(len(result['shots']), last_seq - 1)
+                self.assertEqual(len([r for r in events if
+                                      r['step'] == 'SHOT' and r['state'] == 'CRC_OK']),
+                                 last_seq - 1)
+                self.assertTrue(any(r['step'] == 'SHOT' and r['state'] == 'FAIL'
+                                    and expected in r['detail'] for r in events))
+                self.assertTrue(any(r['step'] == 'SCENARIO 6/6' and
+                                    r['state'] == 'END FAIL' for r in events))
+                self.assertIn('INCOMPLETE', console)
+                archive = folder / (folder.name + '.zip')
+                self.assertTrue(archive.is_file())
+                with zipfile.ZipFile(archive) as zipped:
+                    self.assertIsNone(zipped.testzip())
+                    self.assertEqual(zipped.read('host-events.jsonl'),
+                                     (folder/'host-events.jsonl').read_bytes())
+                    self.assertEqual(zipped.read('uart.raw.log'),
+                                     (folder/'uart.raw.log').read_bytes())
+                    self.assertEqual(zipped.read('results.json'),
+                                     (folder/'results.json').read_bytes())
+                    self.assertEqual(zipped.read('uart.tx.jsonl'),
+                                     (folder/'uart.tx.jsonl').read_bytes())
+                for row in (folder/'SHA256SUMS').read_text().splitlines():
+                    digest, name = row.split('  ', 1)
+                    self.assertEqual(digest, po.sha256(folder/name))
+                raw = (folder/'uart.raw.log').read_bytes()
+                if fault == 'truncated_after_line':
+                    self.assertTrue(raw.endswith(
+                        b'HW4-C2 DEVICE_MEMORY stage=after_line heap8_f'))
+                    self.assertIn(b' DEVICE_MEMORY stage=after_shot ', raw)
+                if fault == 'truncated_after_shot':
+                    self.assertTrue(raw.endswith(
+                        b'HW4-C2 DEVICE_MEMORY stage=after_shot heap8_f'))
 
     def test_c1_idf_failure_progress_prevents_flash(self):
         with tempfile.TemporaryDirectory() as tmp:

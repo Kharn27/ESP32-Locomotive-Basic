@@ -56,8 +56,8 @@ class HostEvents:
         self.stream = (folder / "host-events.jsonl").open("x", encoding="utf-8", buffering=1)
         self.sequence = 0
 
-    def log(self, step: str, state: str, *, scenario: str | None = None,
-            phase: str | None = None, detail: str = "") -> None:
+    def log(self, step: str, state: str, detail: str = "", *,
+            scenario: str | None = None, phase: str | None = None) -> None:
         self.sequence += 1
         record = {"sequence": self.sequence, "time_utc": utc(),
                   "monotonic_ns": time.monotonic_ns(), "step": step,

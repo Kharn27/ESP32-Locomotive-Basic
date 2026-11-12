@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "name": "j1_25_b2_b3",
+  "scenarios": [
+    {"id": "TWO_INTEGERS", "group": "B2", "source": "tests/oracles/inputs/j1_25_a/TWO_INTEGERS.bas", "category": "AUTO_UART_CRC"},
+    {"id": "RESTORE_BEGIN", "group": "B2", "source": "tests/oracles/inputs/j1_25_a/RESTORE_BEGIN.bas", "category": "AUTO_UART_CRC"},
+    {"id": "RESTORE_TARGET", "group": "B2", "source": "tests/oracles/inputs/j1_25_a/RESTORE_TARGET.bas", "category": "AUTO_UART_CRC"},
+    {"id": "ONE_STRING", "group": "B3", "source": "tests/oracles/inputs/j1_25_a/ONE_STRING.bas", "category": "AUTO_UART_CRC"},
+    {"id": "QUOTED_COMMA", "group": "B3", "source": "tests/oracles/inputs/j1_25_a/QUOTED_COMMA.bas", "category": "AUTO_UART_CRC"},
+    {"id": "MIXED_TYPES", "group": "B3", "source": "tests/oracles/inputs/j1_25_a/MIXED_TYPES.bas", "category": "AUTO_UART_CRC"}
+  ]
+}

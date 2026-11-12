@@ -442,6 +442,47 @@ class Session:
                          if m["stage"] == "run_terminal"]
             require(len(terminals) == 1, "MISSING_OR_DUPLICATE_RUN_MEMORY")
 
+    def post_shot_barrier(self) -> None:
+        """Require both COMPLETE UART memory lines after CAPTURE_DONE.
+
+        A CRC-valid logical PNG is not enough: a DMA/LCD failure may be
+        reported in after_shot or after_line after the PNG has been emitted.
+        Read whole lines via next_line()/inspect() (never sleep/flush as proof).
+        """
+        deadline = time.monotonic() + self.shot_timeout
+        required = ("heap8_free", "heap8_largest", "heap8_min",
+                    "stack_margin_bytes", "dma_transfers", "dma_timeouts",
+                    "dma_fault", "lcd_error")
+        for expected in ("after_shot", "after_line"):
+            while True:
+                try:
+                    line = self.next_line(deadline)
+                except Incomplete as exc:
+                    if str(exc) == "UART_TIMEOUT":
+                        raise Incomplete(
+                            f"POST_SHOT_{expected.upper()}_TIMEOUT "
+                            f"partial_rx_bytes={len(self.pending)}") from exc
+                    raise
+                if "HW4-C2 DEVICE_MEMORY stage=" in line:
+                    match = MEMORY.fullmatch(line)
+                    require(match is not None,
+                            f"POST_SHOT_{expected.upper()}_MALFORMED_MEMORY")
+                    actual = match.group(1)
+                    require(actual == expected,
+                            f"POST_SHOT_MEMORY_OUT_OF_ORDER expected={expected} got={actual}")
+                    fields = kv(match.group(2))
+                    require(all(key in fields for key in required)
+                            and all(fields[key].isdecimal() for key in required[:-1])
+                            and fields["lcd_error"] == "ESP_OK",
+                            f"POST_SHOT_{expected.upper()}_INCOMPLETE_MEMORY")
+                    # inspect() already recorded the complete, fault-free sample.
+                    require(self.memory and self.memory[-1]["stage"] == expected,
+                            f"POST_SHOT_{expected.upper()}_NOT_RECORDED")
+                    break
+                require(not (START in line or "HW4-SHOT-A CAPTURE_" in line
+                             or "HW4-C2 UART_LINE " in line),
+                        f"POST_SHOT_{expected.upper()}_UNEXPECTED_MARKER: {line[:120]}")
+
     def capture(self, scenario: str, stage: str) -> dict:
         require(not self.awaiting_shot and self.shot_metadata is None, "SHOT_STATE_LEAK")
         self.awaiting_shot = True
@@ -455,6 +496,10 @@ class Session:
                     and fields.get("seq") == str(meta["seq"])
                     and fields.get("sha") == self.head and not self.watcher.active,
                     "SHOT_DONE_METADATA_MISMATCH")
+            # Firmware emits memory_report("after_shot") immediately after
+            # CAPTURE_DONE, then memory_report("after_line") after returning
+            # from execute_line. Both are mandatory, including for shot 12/12.
+            self.post_shot_barrier()
             files = set((self.folder / "screenshots").glob("*.png")) - existing
             require(len(files) == 1, "SHOT_PNG_COUNT_MISMATCH")
             src = next(iter(files))

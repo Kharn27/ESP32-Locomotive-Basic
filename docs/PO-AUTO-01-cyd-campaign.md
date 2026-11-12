@@ -65,6 +65,8 @@ Tests simulés **sans CYD** : absence de boot, mauvais HEAD/version/IDF, reboot,
 
 La capture RX brute n'est jamais modifiée par des messages hôte ni confondue avec le journal TX. Des octets de pré-reset peuvent rester dans RX brut, mais sont ignorés par le **parseur de boot** et ne peuvent valider le nouveau démarrage. Les screenshots CRC restent des images de framebuffer logique ; aucune preuve d'équivalence au TFT réel.
 
+**Correctif C2 — barrière post-SHOT fail-closed (#377).** Pour **chaque** capture (LIST ou RUN), le décodeur reçoit d'abord les 240 lignes et le CRC global, puis le runner contrôle `HW4-SHOT-A CAPTURE_DONE` (identité, séquence, SHA) **et attend obligatoirement les deux diagnostics complets** `HW4-C2 DEVICE_MEMORY stage=after_shot`, puis `stage=after_line`, strictement dans cet ordre, avant d'annoncer `[SHOT] CRC_OK`, d'achever le scénario ou d'autoriser `PO_REVIEW_PENDING`. Ces lignes incluent `heap8_free`, `heap8_largest`, `heap8_min`, `stack_margin_bytes`, `dma_transfers`, `dma_timeouts`, `dma_fault` et `lcd_error`; le contrôle est réalisé en lisant de vraies **lignes UART complètes** (pas de délai-sommeil ou de vidage aveugle). La **douzième** capture n'est pas une exception. En cas de défaut DMA/LCD tardif, troncature, doublon/mauvais ordre ou timeout, la campagne s'arrête `INCOMPLETE` avec un journal hôte `[SHOT] FAIL` et un ZIP partiel conservant tous les octets RX, y compris une ligne incomplète. Les deux relevés se retrouvent dans `results.json.memory` et l'archive.
+
 **Preuves hôte attendues** : exécuter les tests simulés sans port matériel :
 
     python3 -m unittest discover -s tests -p 'test_cyd_po_campaign.py' -v

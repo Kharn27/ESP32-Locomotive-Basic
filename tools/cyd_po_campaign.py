@@ -49,6 +49,48 @@ def utc() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
 
+class HostEvents:
+    """Durable, ordered HOST events. Never write into the byte-exact UART RX file."""
+
+    def __init__(self, folder: Path):
+        self.stream = (folder / "host-events.jsonl").open("x", encoding="utf-8", buffering=1)
+        self.sequence = 0
+
+    def log(self, step: str, state: str, detail: str = "", *,
+            scenario: str | None = None, phase: str | None = None) -> None:
+        self.sequence += 1
+        record = {"sequence": self.sequence, "time_utc": utc(),
+                  "monotonic_ns": time.monotonic_ns(), "step": step,
+                  "state": state, "scenario": scenario, "phase": phase,
+                  "detail": detail}
+        self.stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+        self.stream.flush()
+        suffix = (" " + detail) if detail else ""
+        print(f"{record['time_utc']} [{step}] {state}{suffix}",
+              file=sys.stderr if state == "FAIL" else sys.stdout, flush=True)
+
+    def close(self) -> None:
+        self.stream.close()
+
+
+def auto_reset(port, hold_seconds: float = 0.10) -> None:
+    """Pulse ESP32 EN low via active-low RTS while GPIO0/DTR stays released.
+
+    RTS asserted=True pulls EN low; DTR asserted=True pulls GPIO0 low
+    (bootloader selection). NEVER assert DTR during this reset, and never
+    reopen the serial port. A successful pulse is NOT a boot attestation.
+    """
+    require(port.is_open, "RESET_REQUIRES_OPEN_UART")
+    port.dtr = False                   # GPIO0 high: normal flash boot
+    port.rts = False                   # EN high: initial idle
+    try:
+        port.rts = True                # EN low: assert reset
+        time.sleep(hold_seconds)       # Physical reset pulse, not a boot ACK
+    finally:
+        port.rts = False               # EN high: release reset
+        port.dtr = False               # Keep GPIO0 high; never enter bootloader
+
+
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as stream:
@@ -148,7 +190,7 @@ def make_folder(base: Path, suite: str, head: str) -> Path:
     return path
 
 
-def run_idf(folder: Path, head: str, port: str) -> dict:
+def run_idf(folder: Path, head: str, port: str, progress=None) -> dict:
     build_dir = folder / "_idf_build"
     sdkconfig = folder / "sdkconfig"
     def command(args: list[str], logfile: Path) -> None:
@@ -156,30 +198,44 @@ def run_idf(folder: Path, head: str, port: str) -> dict:
             process = subprocess.run(args, cwd=PROJECT, stdout=output,
                                      stderr=subprocess.STDOUT, check=False)
         require(process.returncode == 0, "IDF_COMMAND_FAILED: " + logfile.name)
-    probe = subprocess.run(["idf.py", "--version"], cwd=PROJECT,
-                           capture_output=True, text=True, check=False)
-    require(probe.returncode == 0 and probe.stdout.strip() == "ESP-IDF v5.5.6",
-            "WRONG_HOST_IDF_VERSION")
-    common = ["idf.py", "-B", str(build_dir), "-DSDKCONFIG=" + str(sdkconfig),
-              "-DLOCO_CYD_PROFILE=CONSOLE"]
-    # set-target and build share a single log, kept even on failure.
-    with (folder / "build.log").open("xb") as output:
-        for action in (["set-target", "esp32"], ["build"]):
-            p = subprocess.run(common + action, cwd=PROJECT, stdout=output,
-                               stderr=subprocess.STDOUT, check=False)
-            require(p.returncode == 0, "IDF_BUILD_FAILED")
-    app = build_dir / "loco_esp32_display_probe.bin"
-    cache = (build_dir / "CMakeCache.txt").read_text(encoding="utf-8")
-    require("LOCO_CYD_PROFILE:STRING=CONSOLE" in cache, "WRONG_BUILD_PROFILE")
-    # Reuse existing exact app-descriptor parser; do not trust a stale build.
-    from ci.verify_esp_app_version import boot_version
-    version = boot_version(app.read_bytes(), "loco_esp32_display_probe")
-    require(version.startswith(head[:7]), "STALE_APP_BINARY")
-    build_hash = sha256(app)
-    command(common + ["-p", port, "flash"], folder / "flash.log")
+    def report(step: str, state: str, detail: str = "") -> None:
+        if progress is not None:
+            progress(step, state, detail)
+
+    report("BUILD", "START", f"profile=CONSOLE target=esp32 HEAD={head}")
+    try:
+        probe = subprocess.run(["idf.py", "--version"], cwd=PROJECT,
+                               capture_output=True, text=True, check=False)
+        require(probe.returncode == 0 and probe.stdout.strip() == "ESP-IDF v5.5.6",
+                "WRONG_HOST_IDF_VERSION")
+        common = ["idf.py", "-B", str(build_dir), "-DSDKCONFIG=" + str(sdkconfig),
+                  "-DLOCO_CYD_PROFILE=CONSOLE"]
+        # Build logs stay on disk; only phase summaries reach the operator.
+        with (folder / "build.log").open("xb") as output:
+            for action in (["set-target", "esp32"], ["build"]):
+                p = subprocess.run(common + action, cwd=PROJECT, stdout=output,
+                                   stderr=subprocess.STDOUT, check=False)
+                require(p.returncode == 0, "IDF_BUILD_FAILED")
+        app = build_dir / "loco_esp32_display_probe.bin"
+        cache = (build_dir / "CMakeCache.txt").read_text(encoding="utf-8")
+        require("LOCO_CYD_PROFILE:STRING=CONSOLE" in cache, "WRONG_BUILD_PROFILE")
+        from ci.verify_esp_app_version import boot_version
+        version = boot_version(app.read_bytes(), "loco_esp32_display_probe")
+        require(version.startswith(head[:7]), "STALE_APP_BINARY")
+        build_hash = sha256(app)
+    except (Incomplete, OSError, ValueError, subprocess.SubprocessError) as exc:
+        report("BUILD", "FAIL", str(exc))
+        raise
+    report("BUILD", "OK", f"profile=CONSOLE HEAD={head} binary_sha256={build_hash}")
+    report("FLASH", "START", f"port={port} target=esp32")
+    try:
+        command(common + ["-p", port, "flash"], folder / "flash.log")
+    except (Incomplete, OSError, ValueError, subprocess.SubprocessError) as exc:
+        report("FLASH", "FAIL", f"port={port} {exc}")
+        raise
+    report("FLASH", "OK", f"port={port}")
     return {"binary_sha256": build_hash, "binary_version": version,
             "binary_path": str(app.relative_to(folder)), "profile": "CONSOLE"}
-
 
 def collision_guard(port: str) -> None:
     # Advisory preflight complements pyserial POSIX exclusive fd ownership.
@@ -220,6 +276,12 @@ class Session:
         self.watcher = Watcher(folder / "screenshots")
         self.rx_bytes = 0
         self.tx_count = 0
+
+    def arm_boot(self) -> None:
+        """Capture pre-reset RX intact, but never use stale bytes as new boot proof."""
+        self.pump()
+        self.lines.clear()
+        self.pending.clear()
 
     def close(self) -> None:
         self.raw.close()
@@ -380,6 +442,47 @@ class Session:
                          if m["stage"] == "run_terminal"]
             require(len(terminals) == 1, "MISSING_OR_DUPLICATE_RUN_MEMORY")
 
+    def post_shot_barrier(self) -> None:
+        """Require both COMPLETE UART memory lines after CAPTURE_DONE.
+
+        A CRC-valid logical PNG is not enough: a DMA/LCD failure may be
+        reported in after_shot or after_line after the PNG has been emitted.
+        Read whole lines via next_line()/inspect() (never sleep/flush as proof).
+        """
+        deadline = time.monotonic() + self.shot_timeout
+        required = ("heap8_free", "heap8_largest", "heap8_min",
+                    "stack_margin_bytes", "dma_transfers", "dma_timeouts",
+                    "dma_fault", "lcd_error")
+        for expected in ("after_shot", "after_line"):
+            while True:
+                try:
+                    line = self.next_line(deadline)
+                except Incomplete as exc:
+                    if str(exc) == "UART_TIMEOUT":
+                        raise Incomplete(
+                            f"POST_SHOT_{expected.upper()}_TIMEOUT "
+                            f"partial_rx_bytes={len(self.pending)}") from exc
+                    raise
+                if "HW4-C2 DEVICE_MEMORY stage=" in line:
+                    match = MEMORY.fullmatch(line)
+                    require(match is not None,
+                            f"POST_SHOT_{expected.upper()}_MALFORMED_MEMORY")
+                    actual = match.group(1)
+                    require(actual == expected,
+                            f"POST_SHOT_MEMORY_OUT_OF_ORDER expected={expected} got={actual}")
+                    fields = kv(match.group(2))
+                    require(all(key in fields for key in required)
+                            and all(fields[key].isdecimal() for key in required[:-1])
+                            and fields["lcd_error"] == "ESP_OK",
+                            f"POST_SHOT_{expected.upper()}_INCOMPLETE_MEMORY")
+                    # inspect() already recorded the complete, fault-free sample.
+                    require(self.memory and self.memory[-1]["stage"] == expected,
+                            f"POST_SHOT_{expected.upper()}_NOT_RECORDED")
+                    break
+                require(not (START in line or "HW4-SHOT-A CAPTURE_" in line
+                             or "HW4-C2 UART_LINE " in line),
+                        f"POST_SHOT_{expected.upper()}_UNEXPECTED_MARKER: {line[:120]}")
+
     def capture(self, scenario: str, stage: str) -> dict:
         require(not self.awaiting_shot and self.shot_metadata is None, "SHOT_STATE_LEAK")
         self.awaiting_shot = True
@@ -393,6 +496,10 @@ class Session:
                     and fields.get("seq") == str(meta["seq"])
                     and fields.get("sha") == self.head and not self.watcher.active,
                     "SHOT_DONE_METADATA_MISMATCH")
+            # Firmware emits memory_report("after_shot") immediately after
+            # CAPTURE_DONE, then memory_report("after_line") after returning
+            # from execute_line. Both are mandatory, including for shot 12/12.
+            self.post_shot_barrier()
             files = set((self.folder / "screenshots").glob("*.png")) - existing
             require(len(files) == 1, "SHOT_PNG_COUNT_MISMATCH")
             src = next(iter(files))
@@ -417,7 +524,7 @@ def write_json(path: Path, obj: dict) -> None:
         stream.write("\n")
 
 
-def finalize(folder: Path, result: dict) -> Path:
+def finalize(folder: Path, result: dict, events: HostEvents | None = None) -> Path:
     write_json(folder / "results.json", result)
     lines = ["# Compte rendu PO — à compléter", "", "Statut automatique : **" + result["status"] + "**",
              "", "La validation UART/CRC ne valide **pas** le TFT réel ni l'imprimante CPC.", "",
@@ -429,17 +536,30 @@ def finalize(folder: Path, result: dict) -> Path:
     files = sorted(p for p in folder.rglob("*") if p.is_file() and
                    "_idf_build" not in p.relative_to(folder).parts and
                    p.name != "SHA256SUMS" and p.suffix != ".zip")
-    (folder / "SHA256SUMS").write_text("".join(f"{sha256(p)}  {p.relative_to(folder)}\n"
-                                             for p in files), encoding="ascii")
     archive = folder / (folder.name + ".zip")
-    # zip created exclusive first; zipfile accepts an already-open handle.
+    # Final host events are flushed before writing event-file and SHA256SUMS.
+    # ZIP's own SHA-256 is printed only *after* sealing (no self-reference).
     with archive.open("xb") as stream:
         with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED,
                              compresslevel=6) as zipped:
-            for path in files + [folder / "SHA256SUMS"]:
-                zipped.write(path, arcname=str(path.relative_to(folder)))
+            for path in files:
+                if path.name != "host-events.jsonl":
+                    zipped.write(path, arcname=str(path.relative_to(folder)))
+            if events is not None:
+                events.log("ARCHIVE", "DONE", detail="payload copied; sealing events and checksums")
+                count = sum(c.get("status") == "AUTO_UART_CRC_CANDIDATE"
+                            for c in result.get("scenarios", []))
+                events.log("SUMMARY", result["status"],
+                           detail=(f"{count}/{len(result.get('scenario_sources', []))} scenarios "
+                                   f"{len(result.get('shots', []))}/{result.get('expected_png_count', 0)} PNG "
+                                   f"ZIP={archive} SHA256=AFTER_SEAL"))
+            (folder / "SHA256SUMS").write_text(
+                "".join(f"{sha256(p)}  {p.relative_to(folder)}\n" for p in files),
+                encoding="ascii")
+            if events is not None:
+                zipped.write(folder / "host-events.jsonl", arcname="host-events.jsonl")
+            zipped.write(folder / "SHA256SUMS", arcname="SHA256SUMS")
     return archive
-
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
@@ -450,6 +570,8 @@ def main(argv: list[str] | None = None) -> int:
                       help="require full boot version and SHA match local HEAD")
     ap.add_argument("--suite", default="j1_25_b2_b3")
     ap.add_argument("--shots", choices=("all", "run", "none"), default="all")
+    ap.add_argument("--manual-reset", action="store_true",
+                    help="operator resets CYD after UART opens; default pulses EN automatically")
     ap.add_argument("--dry-run", action="store_true", help="validate + print only, no hardware/files")
     ap.add_argument("--output-root", type=Path, default=ROOT / "cyd-campaigns")
     ap.add_argument("--boot-timeout", type=float, default=60)
@@ -462,6 +584,10 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("--port and exactly one of --flash / --existing-firmware required")
     folder = None
     session = None
+    events = None
+    phase = "INIT"
+    case_id = None
+    scenario_step = None
     result = {"status": "INCOMPLETE", "classification": "AUTO_UART_CRC",
               "manual": "MANUAL_PO_VISUAL", "scenarios": [], "shots": [],
               "memory": [], "errors": [], "historical_render_a": "EXCLUDED_FROM_PHYSICAL_QUALIFICATION"}
@@ -474,30 +600,37 @@ def main(argv: list[str] | None = None) -> int:
                               "planned": steps, "classification": "NOT_VERIFIED"}, indent=2))
             return 0
         folder = make_folder(a.output_root, a.suite, head)
+        events = HostEvents(folder)
         expected_shots = len(steps) * {"all": 2, "run": 1, "none": 0}[a.shots]
         result.update({"head": head, "suite": a.suite, "shots_mode": a.shots,
                        "expected_png_count": expected_shots, "coverage": "EXHAUSTIVE"
                        if a.shots == "all" else "REDUCED_SMOKE",
                        "started_utc": utc(), "port": a.port, "idf": "v5.5.6",
+                       "reset_mode": "MANUAL" if a.manual_reset else "AUTO_EN",
                        "scenario_sources": [{"id": p["id"], "path": p["source"],
                                              "sha256": p["source_sha256"]} for p in steps]})
         write_json(folder / "manifest.json", {"schema": 1, "head": head,
             "suite": a.suite, "shots_mode": a.shots, "expected_png_count": expected_shots,
             "coverage": result["coverage"], "started_utc": result["started_utc"],
+            "reset_mode": result["reset_mode"],
             "plan": steps, "classification": "NOT_VERIFIED_UNTIL_RESULTS"})
-        firmware = run_idf(folder, head, a.port) if a.flash else {"mode": "existing_firmware"}
+        if a.flash:
+            phase = "BUILD"
+            firmware = run_idf(folder, head, a.port, progress=events.log)
+        else:
+            events.log("BUILD", "SKIP", detail=f"existing-firmware HEAD={head}")
+            events.log("FLASH", "SKIP", detail="existing-firmware; no flash")
+            firmware = {"mode": "existing_firmware"}
         result["firmware"] = firmware
-        # Recheck after build/flash before trusting the source identity.
+        phase = "UART"
         require(identity() == head, "SOURCE_CHANGED_AFTER_BUILD")
         collision_guard(a.port)
         try:
-            import serial  # pyserial is only required by the hardware path.
+            import serial  # Hardware-only dependency.
         except ImportError as exc:
             raise Incomplete("PYSERIAL_MISSING: python3 -m pip install pyserial") from exc
-        print("Press CYD RESET once after the serial port opens, to capture a COMPLETE boot.",
-              flush=True)
-        # Preconfigure inactive modem lines before opening the port. A USB
-        # serial driver can still glitch DTR/RTS, hence mandatory boot audit.
+        # Idle modem lines are configured BEFORE opening. Only one exclusive
+        # owner ever exists; never run an idf monitor while holding this fd.
         port = serial.Serial(port=None, baudrate=115200, timeout=0.10,
                              write_timeout=5, exclusive=True)
         port.dtr = False
@@ -508,33 +641,98 @@ def main(argv: list[str] | None = None) -> int:
                 port.open()
             session = Session(port, folder, head, firmware.get("binary_version"),
                               a.boot_timeout, a.command_timeout, a.shot_timeout)
+            events.log("UART", "OPEN", detail=f"port={a.port} baud=115200 exclusive=1 RX=armed")
+            # RX is open and writes original bytes before any reset line changes.
+            # Discard only *parsing state* from pre-reset data, never RX evidence.
+            session.arm_boot()
+            phase = "RESET"
+            if a.manual_reset:
+                events.log("RESET", "MANUAL_WAIT",
+                           detail="Press CYD RESET once now (no automatic DTR/RTS pulse)")
+            else:
+                events.log("RESET", "AUTO_START",
+                           detail="DTR=released GPIO0=high; RTS pulses EN low/high")
+                auto_reset(port)
+                events.log("RESET", "AUTO_DONE",
+                           detail="EN=released; awaiting full UART boot (not attested yet)")
+            phase = "BOOT"
+            events.log("BOOT", "WAIT", detail=f"HEAD={head} idf=v5.5.6")
             version = session.boot()
             result["observed_app_version"] = version
-            for item in steps:
-                last_command = None
-                case = {"id": item["id"], "status": "INCOMPLETE", "commands": 0,
+            events.log("BOOT", "VERIFIED", detail=f"version={version} sha={head} idf=v5.5.6")
+            shot_index = 0
+            for index, item in enumerate(steps, 1):
+                case_id = item["id"]
+                scenario_step = f"SCENARIO {index}/{len(steps)}"
+                phase = "START"
+                group = next(spec["group"] for spec in suite["scenarios"]
+                             if spec["id"] == case_id)
+                events.log(scenario_step, "START", scenario=case_id,
+                           detail=f"{group}/{case_id}")
+                case = {"id": case_id, "status": "INCOMPLETE", "commands": 0,
                         "source_sha256": item["source_sha256"],
                         "rx_start_bytes": session.rx_bytes, "tx_start_count": session.tx_count}
                 result["scenarios"].append(case)
+                last_command = None
+                loaded = 0
                 for command in item["commands"]:
                     if command == "!SHOT":
-                        # No positional ambiguity: last executed non-SHOT command.
                         require(last_command in ("LIST", "RUN"), "SHOT_BEFORE_TERMINAL")
                         stage = last_command
-                        session.capture(item["id"], stage)
+                        shot_index += 1
+                        phase = f"SHOT_{stage}"
+                        detail = f"{case_id} {stage} ({shot_index}/{expected_shots})"
+                        events.log("SHOT", "START", scenario=case_id, phase=stage,
+                                   detail=detail)
+                        try:
+                            session.capture(case_id, stage)
+                        except (Incomplete, OSError, ValueError, KeyboardInterrupt) as exc:
+                            events.log("SHOT", "FAIL", scenario=case_id, phase=stage,
+                                       detail=detail + " " + str(exc))
+                            raise
+                        events.log("SHOT", "CRC_OK", scenario=case_id, phase=stage,
+                                   detail=detail)
                     else:
+                        if command == "NEW":
+                            phase = "NEW"
+                            events.log(scenario_step, "NEW", scenario=case_id,
+                                       detail="clear previous program")
+                        elif command == "LIST":
+                            phase = "LIST"
+                            events.log(scenario_step, "LIST START", scenario=case_id)
+                        elif command == "RUN":
+                            phase = "RUN"
+                            events.log(scenario_step, "RUN START", scenario=case_id)
+                        else:
+                            phase = "BASIC_LOAD"
                         transition = ("NEW_RETURN" if command == "NEW" else
                                       "LIST_RETURN" if command == "LIST" else
                                       "NUMBERED_STORED" if command[0].isdigit() else
                                       "RUN_RETURN")
                         session.submit(command, transition, run=(command == "RUN"))
                         last_command = command
+                        if command[0].isdigit():
+                            loaded += 1
+                            if loaded == len([c for c in item["commands"]
+                                             if c and c[0].isdigit()]):
+                                events.log(scenario_step, "BASIC_LOADED",
+                                           scenario=case_id, detail=f"{loaded} lines")
+                        elif command == "LIST":
+                            events.log(scenario_step, "LIST END", scenario=case_id)
+                        elif command == "RUN":
+                            events.log(scenario_step, "RUN TERMINAL", scenario=case_id,
+                                       detail="normal RUN_TERMINAL+INPUT_READY")
                     case["commands"] += 1
                 case["status"] = "AUTO_UART_CRC_CANDIDATE"
                 case["rx_end_bytes"] = session.rx_bytes
                 case["tx_end_count"] = session.tx_count
                 case["captures"] = [s["stage"] for s in session.shots
-                                    if s["scenario"] == item["id"]]
+                                    if s["scenario"] == case_id]
+                events.log(scenario_step, "END PASS", scenario=case_id,
+                           detail=f"{group}/{case_id} captures={len(case['captures'])}")
+                case_id = None
+                scenario_step = None
+            phase = "VERIFY"
             require(identity() == head, "SOURCE_CHANGED_DURING_CAMPAIGN")
             for source in steps:
                 require(sha256(ROOT / source["source"]) == source["source_sha256"],
@@ -546,8 +744,21 @@ def main(argv: list[str] | None = None) -> int:
     except (Incomplete, OSError, ValueError, subprocess.SubprocessError, KeyboardInterrupt,
             json.JSONDecodeError) as exc:
         reason = "INTERRUPTED_BY_OPERATOR" if isinstance(exc, KeyboardInterrupt) else str(exc)
-        result["errors"].append(reason)
-        print("PO-AUTO-01 INCOMPLETE: " + reason, file=sys.stderr)
+        if phase == "BOOT" and not a.manual_reset:
+            reason += " ; new launch with --manual-reset if adapter cannot pulse EN"
+        result["errors"].append(f"phase={phase} scenario={case_id or '-'} reason={reason}")
+        result["failed_phase"] = phase
+        result["failed_scenario"] = case_id
+        if events is not None:
+            if scenario_step is not None:
+                events.log(scenario_step, "END FAIL", scenario=case_id, phase=phase,
+                           detail=reason)
+            if phase in ("UART", "RESET", "BOOT", "VERIFY"):
+                events.log(phase, "FAIL", scenario=case_id, detail=reason)
+            elif phase not in ("BUILD", "FLASH") or isinstance(exc, KeyboardInterrupt):
+                events.log(phase, "FAIL", scenario=case_id, detail=reason)
+        else:
+            print("PO-AUTO-01 INCOMPLETE: " + reason, file=sys.stderr, flush=True)
     finally:
         if session is not None:
             result["memory"] = session.memory
@@ -557,13 +768,27 @@ def main(argv: list[str] | None = None) -> int:
             session.close()
         if folder is not None:
             result["completed_utc"] = utc()
+            if events is not None:
+                events.log("ARCHIVE", "START", detail=f"folder={folder}")
             try:
-                archive = finalize(folder, result)
-                print(f"PO-AUTO-01 {result['status']} : {folder}\nZIP: {archive}\n"
-                      f"ZIP_SHA256: {sha256(archive)}", flush=True)
-            except (OSError, ValueError) as exc:
+                archive = finalize(folder, result, events=events)
+                digest = sha256(archive)
+                completed = sum(c.get("status") == "AUTO_UART_CRC_CANDIDATE"
+                                for c in result["scenarios"])
+                print(f"{utc()} [SUMMARY] {completed}/{len(result.get('scenario_sources', []))} "
+                      f"scenarios {len(result['shots'])}/{result.get('expected_png_count', 0)} PNG "
+                      f"status={result['status']} ZIP={archive} SHA256={digest}", flush=True)
+            except (OSError, ValueError, Incomplete) as exc:
                 result["status"] = "INCOMPLETE"
-                print("ARCHIVE_FAILURE: " + str(exc), file=sys.stderr)
+                if events is not None:
+                    events.log("ARCHIVE", "FAIL", detail=str(exc))
+                    events.log("SUMMARY", "INCOMPLETE",
+                               detail=f"ZIP=UNAVAILABLE SHA256=UNAVAILABLE reason={exc}")
+                else:
+                    print("ARCHIVE_FAILURE: " + str(exc), file=sys.stderr, flush=True)
+            finally:
+                if events is not None:
+                    events.close()
     return 0 if result["status"] == "PO_REVIEW_PENDING" else 2
 
 

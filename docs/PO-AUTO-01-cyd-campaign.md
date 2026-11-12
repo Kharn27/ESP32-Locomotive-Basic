@@ -1,12 +1,12 @@
 # PO-AUTO-01 — recette CYD UART/CRC reproductible (#373)
 
-**Statut :** outil proposé pour revue du **Pilotage** ; la réussite automatique ne certifie pas l'écran physique, la compatibilité générale CPC, ni une imprimante `PRINT #8`. Aucune modification du cœur C99, HAL, vidéo, ROM, baseline ou firmware. La campagne physique de référence #371 concerne `main@4a386ee82f6ca2c5bbf73cf17c794f5274b449e9` et le prototype *hors dépôt* ; elle ne vaut pas test du runner intégré.
+**Statut :** révision PO-AUTO-01-C1 sous GO Pilotage (#377) ; la réussite automatique ne certifie pas l'écran physique, la compatibilité générale CPC, ni une imprimante `PRINT #8`. Aucune modification du cœur C99, HAL, vidéo, ROM, baseline ou firmware. La campagne physique de référence #371 concerne `main@4a386ee82f6ca2c5bbf73cf17c794f5274b449e9` et le prototype *hors dépôt* ; elle ne vaut pas test du runner intégré.
 
 ## Prérequis et démarrage Linux
 
 - Checkout Git de la révision à tester, avec **aucun fichier suivi modifié** (`git status --porcelain --untracked-files=no` vide). Sources `.bas` immuables dans `tests/oracles/inputs/j1_25_a` ; leurs empreintes SHA-256 sont calculées au départ, listées dans le manifeste et dans les résultats.
 - ESP-IDF **v5.5.6** disponible dans le shell (`idf.py`), cible ESP32 classique, profil `CONSOLE`, **sans PSRAM** ; permissions sur `/dev/ttyUSB0` ; `python3 -m pip install pyserial` dans l'environnement Python de l'utilisateur.
-- **Arrêter `idf.py monitor`, minicom, screen, tout autre lecteur/émetteur UART**. Le runner vérifie `fuser` si installé, puis utilise un unique `serial.Serial(exclusive=True)` pour RX/TX après l'éventuel flash. La phase `idf.py flash` a son accès série propre *avant* cette session. Ne jamais ouvrir un second monitor. Une ouverture de port peut agir sur DTR/RTS : après ouverture, **appuyer une seule fois sur RESET** et laisser enregistrer le boot entier, sans taper de commandes concurrentes.
+- **Arrêter `idf.py monitor`, minicom, screen, tout autre lecteur/émetteur UART**. Le runner vérifie `fuser` si installé, puis utilise un unique `serial.Serial(exclusive=True)` pour RX/TX après l'éventuel flash. La phase `idf.py flash` a son accès série propre *avant* cette session. Ne jamais ouvrir un second monitor. À l'ouverture du port série exclusif, le runner prépare la réception RX et déclenche **automatiquement** un reset CYD : DTR/GPIO0 reste relâché (boot normal), RTS pulse EN bas/haut. Ne pas lancer un moniteur simultanément. Pour les adaptateurs ne prenant pas ce reset en charge, utiliser **--manual-reset** lors d'un nouveau lancement et appuyer une seule fois sur RESET à l'affichage de MANUAL_WAIT.
 
 Depuis la racine du checkout :
 
@@ -15,6 +15,8 @@ python3 tools/cyd_po_campaign.py --dry-run --suite j1_25_b2_b3
 python3 tools/cyd_po_campaign.py --port /dev/ttyUSB0 --flash --suite j1_25_b2_b3 --shots all
 # Réutilisation du binaire déjà flashé : le boot capturé DOIT correspondre au HEAD entier.
 python3 tools/cyd_po_campaign.py --port /dev/ttyUSB0 --existing-firmware --suite j1_25_b2_b3 --shots all
+# Repli explicite, pas de transition automatique après un échec :
+python3 tools/cyd_po_campaign.py --port /dev/ttyUSB0 --existing-firmware --manual-reset --suite j1_25_b2_b3 --shots all
 ```
 
 `--flash` : le runner construit **une seule fois** CONSOLE dans le dossier d'archives (`_idf_build`, `sdkconfig`), contrôle le profil CMake et le descripteur `loco_esp32_display_probe` du **binaire** via `tools/ci/verify_esp_app_version.py`, flashe une fois puis exige un nouveau boot complet attesté. Aucune commande Git mutante, aucun effacement NVS, aucun pull/rebase, aucun autre profil. Le SHA du build local et le SHA compilé exposé au boot doivent correspondre au HEAD à 40 caractères. `--existing-firmware` **n'atteste jamais le firmware au simple vu d'un argument de l'opérateur** : il requiert `START project/version/idf/target`, `HW4-DISP-PROFILE BOOT sha=<40 hex>` puis `UART_READY` et `INPUT_READY`, dans cet ordre. Une version incohérente, un boot absent ou un reset intempestif donnent `INCOMPLETE`.
@@ -47,3 +49,27 @@ python3 -m unittest discover -s tests -p 'test_cyd_po_campaign.py' -v
 ```
 
 Tests simulés **sans CYD** : absence de boot, mauvais HEAD/version/IDF, reboot, panique, ligne UART hors ordre, RUN sans terminal ou terminal incorrect, capture tronquée/CRC fausse/SHA décalé/doublon, 12 PNG et hashes/ZIP, refus d'écrasement, interruption, mémoire défaillante et séparation RX/TX. La CI ne flashe rien et ne peut attribuer une réussite physique. Pilotage effectue la revue de la PR Draft et décide seul de la fusion ; le PO est l'autorité pour les observations physiques.
+## C1 — Reset EN automatique et progression hôte horodatée (#377)
+
+**Ordre nominal et preuve de boot.** Une seule instance de serial.Serial(exclusive=True) ouvre UART0 115200 avec DTR et RTS désassertés. Le runner crée d'abord uart.raw.log et uart.tx.jsonl, arme la réception puis pulse **RTS/EN uniquement** pendant 100 ms : EN passe à zéro puis revient à l'état haut, tandis que DTR/GPIO0 ne passe jamais à l'état bas (pas de bootloader). Aucune deuxième connexion UART, aucun idf.py monitor et aucun reset pendant RUN ou les captures. Le retour électrique des lignes ne suffit jamais : session.boot() attend obligatoirement START (projet/version/ESP-IDF v5.5.6/target), l'annonce du SHA complet, UART_READY et INPUT_READY **dans cet ordre**. Tout échec produit INCOMPLETE et un ZIP partiel.
+
+**Repli manuel.** L'option --manual-reset n'effectue aucun pulse DTR/RTS. Après [RESET] MANUAL_WAIT, appuyer une seule fois sur le bouton RESET du CYD. Un échec du reset automatique ne déclenche ni second reset ni repli caché : relancer une nouvelle campagne avec --manual-reset. Le mode --dry-run reste sans accès série, sans reset, sans flash et sans création de dossier.
+
+**Progression console et traçabilité.** Chaque phase est imprimée immédiatement, horodatée en UTC, et enregistrée dans host-events.jsonl (dans le dossier ET dans le ZIP). Le journal JSONL contient des champs sequence croissants, time_utc, monotonic_ns, step, state, scenario, phase et detail :
+
+- [BUILD] START/OK/FAIL, profil CONSOLE et HEAD ; [FLASH] START/OK/FAIL et port. --existing-firmware affiche SKIP. Le détail CMake et esptool reste uniquement dans build.log / flash.log.
+- [UART] OPEN ; [RESET] AUTO_START/AUTO_DONE ou MANUAL_WAIT ; [BOOT] WAIT/VERIFIED/FAIL avec SHA complet.
+- [SCENARIO 1/6] jusqu'à [SCENARIO 6/6] : START groupe/nom, NEW, BASIC_LOADED N lines, LIST START/END, RUN START/TERMINAL, END PASS/FAIL. Pas de spam par ligne BASIC.
+- [SHOT] scénario LIST|RUN START/CRC_OK/FAIL (n/12), ou (n/6) en mode run ; aucune capture en mode none.
+- [ARCHIVE] START/DONE/FAIL ; [SUMMARY] x/6 scenarios y/12 PNG status ZIP SHA256. Les événements sont flushés et scellés dans SHA256SUMS et le ZIP. L'empreinte SHA-256 du ZIP ne peut être incluse dans ce ZIP lui-même : le JSONL inscrit SHA256=AFTER_SEAL puis la ligne finale console donne la véritable empreinte, calculée après fermeture du fichier ZIP.
+
+La capture RX brute n'est jamais modifiée par des messages hôte ni confondue avec le journal TX. Des octets de pré-reset peuvent rester dans RX brut, mais sont ignorés par le **parseur de boot** et ne peuvent valider le nouveau démarrage. Les screenshots CRC restent des images de framebuffer logique ; aucune preuve d'équivalence au TFT réel.
+
+**Correctif C2 — barrière post-SHOT fail-closed (#377).** Pour **chaque** capture (LIST ou RUN), le décodeur reçoit d'abord les 240 lignes et le CRC global, puis le runner contrôle `HW4-SHOT-A CAPTURE_DONE` (identité, séquence, SHA) **et attend obligatoirement les deux diagnostics complets** `HW4-C2 DEVICE_MEMORY stage=after_shot`, puis `stage=after_line`, strictement dans cet ordre, avant d'annoncer `[SHOT] CRC_OK`, d'achever le scénario ou d'autoriser `PO_REVIEW_PENDING`. Ces lignes incluent `heap8_free`, `heap8_largest`, `heap8_min`, `stack_margin_bytes`, `dma_transfers`, `dma_timeouts`, `dma_fault` et `lcd_error`; le contrôle est réalisé en lisant de vraies **lignes UART complètes** (pas de délai-sommeil ou de vidage aveugle). La **douzième** capture n'est pas une exception. En cas de défaut DMA/LCD tardif, troncature, doublon/mauvais ordre ou timeout, la campagne s'arrête `INCOMPLETE` avec un journal hôte `[SHOT] FAIL` et un ZIP partiel conservant tous les octets RX, y compris une ligne incomplète. Les deux relevés se retrouvent dans `results.json.memory` et l'archive.
+
+**Preuves hôte attendues** : exécuter les tests simulés sans port matériel :
+
+    python3 -m unittest discover -s tests -p 'test_cyd_po_campaign.py' -v
+    python3 tools/cyd_po_campaign.py --dry-run --suite j1_25_b2_b3 --shots all
+
+Les mocks vérifient les états DTR/RTS avant et après le pulse, le même propriétaire série, la progression six scénarios et douze images CRC, les journaux JSONL dans le ZIP et les cas négatifs : absent boot, mauvais SHA, port occupé, échec IDF et interruption clavier. Une exécution sur un vrai CYD reste strictement sous autorité du PO ; aucun résultat de test hôte ne constitue une attestation physique.

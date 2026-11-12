@@ -12,7 +12,9 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
+import contextlib
+import types
 import zipfile
 import zlib
 
@@ -51,7 +53,10 @@ def boot(version=VER, idf="v5.5.6", sha=HEAD, omit_start=False) -> bytes:
 
 
 class Device:
-    def __init__(self, startup: bytes | None = None, *, fault: str | None = None):
+    def __init__(self, startup: bytes | None = None, *, fault: str | None = None,
+                 late_fault: str | None = None, fault_shot_seq: int | None = None):
+        self.late_fault = late_fault
+        self.fault_shot_seq = fault_shot_seq
         self.buffer = bytearray(boot() if startup is None else startup)
         self.writes = []
         self.fault = fault
@@ -96,6 +101,31 @@ class Device:
             self.buffer.extend(shot(ident, self.seq, crc_bad=self.fault=='shot_crc',
                                     truncated=self.fault=='shot_truncated',
                                     wrong_head=self.fault=='shot_sha'))
+            fault = self.late_fault if self.seq == self.fault_shot_seq else None
+            def diag(stage, *, dma=0, lcd="ESP_OK"):
+                return (f"HW4-C2 DEVICE_MEMORY stage={stage} "
+                        "heap8_free=251220 heap8_largest=140000 heap8_min=240000 "
+                        "stack_margin_bytes=3360 dma_transfers=1549 "
+                        f"dma_timeouts={dma} dma_fault=0 lcd_error={lcd}\n").encode()
+            after_shot = diag("after_shot", dma=int(fault == "dma_after_shot"))
+            after_line = diag("after_line", lcd="ESP_FAIL" if fault == "lcd_after_line"
+                              else "ESP_OK")
+            if fault == "reverse":
+                self.buffer.extend(after_line + after_shot)
+            elif fault == "missing_after_shot":
+                self.buffer.extend(after_line)
+            elif fault == "missing_after_line":
+                self.buffer.extend(after_shot)
+            elif fault == "truncated_after_line":
+                self.buffer.extend(after_shot
+                                   + b"HW4-C2 DEVICE_MEMORY stage=after_line heap8_f")
+            elif fault == "short_after_line":
+                self.buffer.extend(after_shot
+                                   + b"HW4-C2 DEVICE_MEMORY stage=after_line heap8_free=3\n")
+            elif fault == "truncated_after_shot":
+                self.buffer.extend(b"HW4-C2 DEVICE_MEMORY stage=after_shot heap8_f")
+            else:
+                self.buffer.extend(after_shot + after_line)
         return len(data)
 
     def read(self, size):
@@ -173,6 +203,11 @@ class Tests(unittest.TestCase):
             self.assertEqual(sess.watcher.bad,0)
             self.assertEqual(len(list((sess.folder/'screenshots').glob('*.png'))),12)
             self.assertEqual([s['seq'] for s in sess.shots],list(range(1,13)))
+            self.assertEqual([m['stage'] for m in sess.memory
+                              if m['stage'] in ('after_shot','after_line')],
+                             ['after_shot','after_line'] * 12)
+            self.assertEqual(sess.memory[-2]['stage'], 'after_shot')
+            self.assertEqual(sess.memory[-1]['stage'], 'after_line')
         finally:sess.close()
         result={'status':'PO_REVIEW_PENDING','shots':sess.shots}
         zip_path=po.finalize(sess.folder,result)
@@ -222,6 +257,297 @@ class Tests(unittest.TestCase):
             with patch.object(sess.port, 'read', side_effect=KeyboardInterrupt):
                 with self.assertRaises(KeyboardInterrupt):sess.submit('NEW','NEW_RETURN')
         finally:sess.close()
+
+    def test_c1_en_only_pulse_and_failure_release(self):
+        class Pins:
+            is_open = True
+            def __init__(self):
+                self.trace = []
+                self._dtr = self._rts = False
+                self.fail = False
+            @property
+            def dtr(self): return self._dtr
+            @dtr.setter
+            def dtr(self, value):
+                self.trace.append(('DTR', value))
+                self._dtr = value
+            @property
+            def rts(self): return self._rts
+            @rts.setter
+            def rts(self, value):
+                self.trace.append(('RTS', value))
+                self._rts = value
+                if self.fail and value: raise OSError('RTS_FAIL')
+        p = Pins()
+        with patch.object(po.time, 'sleep') as delay:
+            po.auto_reset(p)
+        delay.assert_called_once_with(.10)
+        self.assertEqual(p.trace, [('DTR',False), ('RTS',False), ('RTS',True),
+                                   ('RTS',False), ('DTR',False)])
+        self.assertFalse(p.dtr or p.rts)
+        p.is_open = False
+        with self.assertRaisesRegex(po.Incomplete, 'RESET_REQUIRES_OPEN_UART'):
+            po.auto_reset(p, 0)
+        p.is_open = True
+        p.fail = True
+        with self.assertRaisesRegex(OSError, 'RTS_FAIL'):
+            po.auto_reset(p, 0)
+        self.assertFalse(p.dtr or p.rts)
+        self.assertEqual(p.trace[-2:], [('RTS',False), ('DTR',False)])
+
+    class C1Device(Device):
+        def __init__(self, *, manual=False, no_boot=False, sha=HEAD,
+                     fail_open=False, interrupt=False, late_fault=None,
+                     fault_shot_seq=None):
+            super().__init__(startup=b'', late_fault=late_fault,
+                             fault_shot_seq=fault_shot_seq)
+            self.is_open = False
+            self.trace = []
+            self._rts = self._dtr = False
+            self.manual = manual
+            self.no_boot = no_boot
+            self.sha = sha
+            self.fail_open = fail_open
+            self.interrupt = interrupt
+            self.pulses = self.reads = 0
+        @property
+        def dtr(self): return self._dtr
+        @dtr.setter
+        def dtr(self, value):
+            self.trace.append(('DTR', value)); self._dtr = value
+        @property
+        def rts(self): return self._rts
+        @rts.setter
+        def rts(self, value):
+            old = self._rts
+            self.trace.append(('RTS', value)); self._rts = value
+            if old and not value and self.is_open:
+                self.pulses += 1
+                if not self.no_boot and not self._dtr:
+                    self.buffer.extend(boot(sha=self.sha))
+        def __enter__(self):
+            if self.fail_open: raise OSError('USB busy')
+            self.is_open = True
+            self.trace.append(('OPEN', True))
+            return self
+        def __exit__(self, *args): self.is_open = False
+        def open(self): self.is_open = True
+        def read(self, size):
+            self.reads += 1
+            if self.manual and self.reads == 2 and not self.no_boot:
+                self.buffer.extend(boot(sha=self.sha))
+            return super().read(size)
+        def write(self, data):
+            if self.interrupt: raise KeyboardInterrupt
+            return super().write(data)
+
+    def c1_run(self, device, *, manual=False, shots='none', flash=False,
+               dry=False, shot_timeout='3'):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        output = Path(tmp.name)/'campaigns'
+        out, err = io.StringIO(), io.StringIO()
+        factory = Mock(return_value=device)
+        args = ['--suite','j1_25_b2_b3', '--shots',shots,
+                '--output-root',str(output), '--boot-timeout','.03',
+                '--command-timeout','.2','--shot-timeout',str(shot_timeout)]
+        if manual: args.append('--manual-reset')
+        if dry: args.append('--dry-run')
+        else: args += ['--port','/dev/ttyUSB0',
+                      '--flash' if flash else '--existing-firmware']
+        def idf(folder, head, port, progress=None):
+            for stage in ('BUILD','FLASH'):
+                if progress:
+                    progress(stage,'START',f'HEAD={head} port={port}')
+                    progress(stage,'OK','simulated test')
+            return {'binary_version': VER, 'profile': 'CONSOLE'}
+        with patch.object(po,'identity',return_value=HEAD), \
+             patch.object(po,'collision_guard'), \
+             patch.object(po,'run_idf',side_effect=idf) as build, \
+             patch.dict(sys.modules,{'serial':types.SimpleNamespace(Serial=factory)}), \
+             contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = po.main(args)
+        if dry:
+            self.assertFalse(output.exists())
+            factory.assert_not_called()
+            build.assert_not_called()
+            return code, None, [], out.getvalue()+err.getvalue()
+        dirs = list(output.glob('CYD_*'))
+        self.assertEqual(len(dirs),1)
+        folder = dirs[0]
+        rows = [json.loads(x) for x in
+                (folder/'host-events.jsonl').read_text().splitlines()]
+        self.assertEqual([x['sequence'] for x in rows],list(range(1,len(rows)+1)))
+        factory.assert_called_once()
+        if flash: build.assert_called_once()
+        else: build.assert_not_called()
+        return code,folder,rows,out.getvalue()+err.getvalue()
+
+    def test_c1_six_cases_progress_boot_order_and_archive(self):
+        d = self.C1Device()
+        rc,folder,rows,out = self.c1_run(d)
+        self.assertEqual(rc,0)
+        self.assertEqual(d.pulses,1)
+        self.assertFalse(d.dtr or d.rts)
+        events = [(x['step'],x['state']) for x in rows]
+        self.assertLess(events.index(('UART','OPEN')),events.index(('RESET','AUTO_START')))
+        self.assertLess(events.index(('RESET','AUTO_DONE')),events.index(('BOOT','WAIT')))
+        self.assertLess(events.index(('BOOT','VERIFIED')),events.index(('SCENARIO 1/6','START')))
+        for n in range(1,7):
+            stages = [x['state'] for x in rows if x['step']==f'SCENARIO {n}/6']
+            self.assertEqual(stages,['START','NEW','BASIC_LOADED','LIST START',
+                                     'LIST END','RUN START','RUN TERMINAL','END PASS'])
+        self.assertIn('[SCENARIO 6/6] END PASS',out)
+        self.assertIn('6/6 scenarios 0/0 PNG',out)
+        self.assertEqual(json.loads((folder/'results.json').read_text())['status'],
+                         'PO_REVIEW_PENDING')
+        self.assertTrue((folder/'uart.raw.log').read_bytes().startswith(boot()))
+        with zipfile.ZipFile(folder/(folder.name+'.zip')) as z:
+            for name in ('host-events.jsonl','uart.raw.log','uart.tx.jsonl'):
+                self.assertEqual(z.read(name),(folder/name).read_bytes())
+            self.assertIn('"step": "SUMMARY"',z.read('host-events.jsonl').decode())
+        for row in (folder/'SHA256SUMS').read_text().splitlines():
+            digest,name=row.split('  ',1)
+            self.assertEqual(digest,po.sha256(folder/name))
+
+    def test_c1_twelve_crc_shot_progress_and_flash_phase(self):
+        d = self.C1Device()
+        rc,folder,rows,out = self.c1_run(d, shots='all', flash=True)
+        self.assertEqual(rc,0)
+        self.assertEqual(len([x for x in rows if x['step']=='SHOT' and
+                              x['state']=='CRC_OK']),12)
+        self.assertEqual(len(list((folder/'screenshots').glob('*.png'))),12)
+        self.assertIn('12/12 PNG',out)
+        result = json.loads((folder/'results.json').read_text())
+        self.assertEqual([m['stage'] for m in result['memory']
+                          if m['stage'] in ('after_shot','after_line')],
+                         ['after_shot','after_line'] * 12)
+        self.assertIn(b' DEVICE_MEMORY stage=after_line ',
+                      (folder/'uart.raw.log').read_bytes())
+        self.assertTrue((folder/'uart.raw.log').read_bytes()
+                        .endswith(b'lcd_error=ESP_OK\n'))
+        for step in ('BUILD','FLASH'):
+            self.assertEqual([x['state'] for x in rows if x['step']==step],
+                             ['START','OK'])
+
+    def test_c1_manual_port_error_wrong_sha_no_boot_interrupt(self):
+        manual = self.C1Device(manual=True)
+        rc,folder,rows,_ = self.c1_run(manual,manual=True)
+        self.assertEqual(rc,0)
+        self.assertEqual(manual.pulses,0)
+        self.assertFalse(any(k=='RTS' and v for k,v in manual.trace))
+        self.assertIn(('RESET','MANUAL_WAIT'),[(x['step'],x['state']) for x in rows])
+        for label,dev in (('port',self.C1Device(fail_open=True)),
+                          ('sha',self.C1Device(sha='a'*40)),
+                          ('boot',self.C1Device(no_boot=True)),
+                          ('ctrlc',self.C1Device(interrupt=True))):
+            with self.subTest(label=label):
+                code,f,ev,text = self.c1_run(dev)
+                self.assertEqual(code,2)
+                self.assertEqual(json.loads((f/'results.json').read_text())['status'],
+                                 'INCOMPLETE')
+                self.assertIn('[SUMMARY]',text)
+                with zipfile.ZipFile(f/(f.name+'.zip')) as z:
+                    self.assertIn('host-events.jsonl',z.namelist())
+                    self.assertEqual(z.read('host-events.jsonl'),
+                                     (f/'host-events.jsonl').read_bytes())
+                if label=='boot':
+                    self.assertIn('--manual-reset',text)
+                    self.assertEqual(dev.pulses,1)
+                    self.assertIn(('BOOT','FAIL'),[(x['step'],x['state']) for x in ev])
+                if label=='port': self.assertEqual(dev.pulses,0)
+                if label=='ctrlc': self.assertIn('END FAIL',text)
+
+    def test_c1_dry_run_no_port_reset_archive(self):
+        d = self.C1Device()
+        rc,_,_,out = self.c1_run(d,dry=True)
+        self.assertEqual(rc,0)
+        self.assertEqual(d.trace,[])
+        self.assertIn('"classification": "NOT_VERIFIED"',out)
+
+    def test_c2_run_mode_post_shot_memory_all_six(self):
+        d = self.C1Device()
+        rc, folder, rows, output = self.c1_run(d, shots='run')
+        self.assertEqual(rc, 0)
+        result = json.loads((folder / 'results.json').read_text())
+        self.assertEqual(result['status'], 'PO_REVIEW_PENDING')
+        self.assertEqual(len(result['shots']), 6)
+        self.assertEqual([m['stage'] for m in result['memory']
+                          if m['stage'] in ('after_shot', 'after_line')],
+                         ['after_shot', 'after_line'] * 6)
+        self.assertEqual(len([r for r in rows if r['step'] == 'SHOT'
+                              and r['state'] == 'CRC_OK']), 6)
+        self.assertIn('6/6 PNG', output)
+
+    def test_c2_last_shot_late_faults_fail_closed_with_zip(self):
+        # Neither a complete CRC PNG nor a valid CAPTURE_DONE may hide
+        # a subsequent device fault or an unconsumed partial UART line.
+        scenarios = (
+            ('all', 12, 'dma_after_shot', 'DEVICE_MEMORY_FAULT'),
+            ('all', 12, 'lcd_after_line', 'DEVICE_MEMORY_FAULT'),
+            ('all', 12, 'truncated_after_line', 'POST_SHOT_AFTER_LINE_TIMEOUT'),
+            ('all', 12, 'short_after_line', 'INVALID_DEVICE_MEMORY'),
+            ('all', 12, 'missing_after_line', 'POST_SHOT_AFTER_LINE_TIMEOUT'),
+            ('all', 12, 'reverse', 'POST_SHOT_MEMORY_OUT_OF_ORDER'),
+            ('all', 12, 'missing_after_shot', 'POST_SHOT_MEMORY_OUT_OF_ORDER'),
+            ('all', 12, 'truncated_after_shot', 'POST_SHOT_AFTER_SHOT_TIMEOUT'),
+            ('run', 6, 'dma_after_shot', 'DEVICE_MEMORY_FAULT'),
+            ('run', 6, 'truncated_after_line', 'POST_SHOT_AFTER_LINE_TIMEOUT'),
+        )
+        for mode, last_seq, fault, expected in scenarios:
+            with self.subTest(mode=mode, fault=fault):
+                d = self.C1Device(late_fault=fault, fault_shot_seq=last_seq)
+                rc, folder, events, console = self.c1_run(
+                    d, shots=mode, shot_timeout='.05')
+                self.assertEqual(rc, 2)
+                result = json.loads((folder/'results.json').read_text())
+                self.assertEqual(result['status'], 'INCOMPLETE')
+                self.assertIn(expected, ' '.join(result['errors']))
+                self.assertEqual(len(result['shots']), last_seq - 1)
+                self.assertEqual(len([r for r in events if
+                                      r['step'] == 'SHOT' and r['state'] == 'CRC_OK']),
+                                 last_seq - 1)
+                self.assertTrue(any(r['step'] == 'SHOT' and r['state'] == 'FAIL'
+                                    and expected in r['detail'] for r in events))
+                self.assertTrue(any(r['step'] == 'SCENARIO 6/6' and
+                                    r['state'] == 'END FAIL' for r in events))
+                self.assertIn('INCOMPLETE', console)
+                archive = folder / (folder.name + '.zip')
+                self.assertTrue(archive.is_file())
+                with zipfile.ZipFile(archive) as zipped:
+                    self.assertIsNone(zipped.testzip())
+                    self.assertEqual(zipped.read('host-events.jsonl'),
+                                     (folder/'host-events.jsonl').read_bytes())
+                    self.assertEqual(zipped.read('uart.raw.log'),
+                                     (folder/'uart.raw.log').read_bytes())
+                    self.assertEqual(zipped.read('results.json'),
+                                     (folder/'results.json').read_bytes())
+                    self.assertEqual(zipped.read('uart.tx.jsonl'),
+                                     (folder/'uart.tx.jsonl').read_bytes())
+                for row in (folder/'SHA256SUMS').read_text().splitlines():
+                    digest, name = row.split('  ', 1)
+                    self.assertEqual(digest, po.sha256(folder/name))
+                raw = (folder/'uart.raw.log').read_bytes()
+                if fault == 'truncated_after_line':
+                    self.assertTrue(raw.endswith(
+                        b'HW4-C2 DEVICE_MEMORY stage=after_line heap8_f'))
+                    self.assertIn(b' DEVICE_MEMORY stage=after_shot ', raw)
+                if fault == 'truncated_after_shot':
+                    self.assertTrue(raw.endswith(
+                        b'HW4-C2 DEVICE_MEMORY stage=after_shot heap8_f'))
+
+    def test_c1_idf_failure_progress_prevents_flash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rows=[]
+            with patch.object(po.subprocess,'run',
+                              return_value=types.SimpleNamespace(
+                                  returncode=0,stdout='ESP-IDF v4.4',stderr='')):
+                with self.assertRaisesRegex(po.Incomplete,'WRONG_HOST_IDF_VERSION'):
+                    po.run_idf(Path(tmp),HEAD,'/dev/ttyUSB0',
+                               progress=lambda *x: rows.append(x))
+            self.assertEqual([x[:2] for x in rows],
+                             [('BUILD','START'),('BUILD','FAIL')])
+            self.assertFalse((Path(tmp)/'flash.log').exists())
 
 
 if __name__ == '__main__':

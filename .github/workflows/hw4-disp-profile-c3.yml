@@ -54,13 +54,13 @@ jobs:
             cd /project/firmware/esp32_display_probe
             mkdir -p reports/hw4-c3
             for hz in 40000000 20000000; do
-              if test "$hz" = 40000000; then tag=spi40; else tag=spi20; fi
+              if test "$hz" = 40000000; then tag=spi40; fallback=OFF; else tag=spi20; fallback=ON; fi
               build="build-hw4-c3-$tag"
               out="reports/hw4-c3/$tag"
               config="$PWD/sdkconfig.hw4-c3-$tag"
               mkdir -p "$out"
-              idf.py -B "$build" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE=CONSOLE -DCYD_LCD_SPI_HZ="$hz" set-target esp32 > "$out/set-target.log" 2>&1 || { cat "$out/set-target.log"; exit 1; }
-              idf.py -B "$build" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE=CONSOLE -DCYD_LCD_SPI_HZ="$hz" build > "$out/build.log" 2>&1 || { tail -100 "$out/build.log"; exit 1; }
+              idf.py -B "$build" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE=CONSOLE -DCYD_LCD_SPI_HZ="$hz" -DCYD_LCD_SPI20_OPT_IN="$fallback" set-target esp32 > "$out/set-target.log" 2>&1 || { cat "$out/set-target.log"; exit 1; }
+              idf.py -B "$build" -DSDKCONFIG="$config" -DLOCO_CYD_PROFILE=CONSOLE -DCYD_LCD_SPI_HZ="$hz" -DCYD_LCD_SPI20_OPT_IN="$fallback" build > "$out/build.log" 2>&1 || { tail -100 "$out/build.log"; exit 1; }
               grep -Fx "CYD_LCD_SPI_HZ:STRING=$hz" "$build/CMakeCache.txt"
               grep -Fx "LOCO_CYD_PROFILE:STRING=CONSOLE" "$build/CMakeCache.txt"
               grep -F "REQUESTED_SPI_HZ=$hz" "$out/set-target.log"

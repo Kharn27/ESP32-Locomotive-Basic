@@ -20,9 +20,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define C99_ALIGNOF(type) offsetof(struct { char lead; type member; }, member)
+/* A block-local tagged wrapper keeps offsetof's type argument C99-only. */
 #define TYPE_ROW(type) \
-    printf("  %-27s %8zu %8zu\n", #type, sizeof(type), C99_ALIGNOF(type))
+    do { \
+        struct C99AlignProbe { char lead; type member; }; \
+        printf("  %-27s %8zu %8zu\n", #type, sizeof(type), \
+               offsetof(struct C99AlignProbe, member)); \
+    } while (0)
 
 typedef struct {
     const char *name;

@@ -48,3 +48,16 @@ et, après `NEW`, le **même** texte avec `10 PEN 5`. Fournir `git rev-parse HEA
 **Frontière des traces :** les callbacks firmware `run_preflight` / `run_replay` n'émettent **aucun `VIDEO_EVENT` par instruction** ; `VIDEO_EVENT logical=5 pixel=1` n'est donc **pas** un critère UART recevable. La correspondance événement logique `5` → pixel MODE1 candidat `1` est une **assertion C99 hôte** de `test_hw4_pen_a.c`, pas une observation instrumentée sur la CYD. Ne pas modifier le firmware pour obtenir cette trace. Le Pilotage conserve le **GO FLASH** et l'acceptation physique du HEAD final.
 
 **Réserves :** `PEN8/12` index internes CPC `UNVERIFIED`, autre palette et autres modes `UNVERIFIED`, incident historique #226 `ORIGINAL_PEN_UNIDENTIFIED`. La PR est livrée au Pilotage sans auto-acceptation ni fusion.
+
+
+## B1-C2 — cache SPI20 historique et Build standard CONSOLE
+
+**Mandat :** [rectificatif Pilotage #370](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/370#issuecomment-6825484299). Réception PEN1/PEN5 du PO **positive sur SPI20** au HEAD B1-C1 ; elle ne prouve pas le comportement physique SPI40 et n'exige aucun nouveau PEN1 pour la variation de texte PRINT.
+
+Le projet de référence et son répertoire VS Code restent **uniquement** `firmware/esp32_display_probe/build/`. En `CONSOLE`, **Build standard sans flags** doit produire `CYD_LCD_SPI_HZ=40000000`, même quand ce même `CMakeCache.txt` conserve l'ancien `CYD_LCD_SPI_HZ:STRING=20000000`. Cette valeur est la **sortie** de la politique, pas un opt-in : la correction la normalise à l'aide de `set(... CACHE ... FORCE)`. Aucun `fullclean`, nouveau répertoire ou paramètre `-D` n'est demandé au PO.
+
+Le **repli CONSOLE SPI20 délibéré** est maintenant le booléen indépendant `CYD_LCD_SPI20_OPT_IN=ON` (réservé aux développeurs/CI, via `-DCYD_LCD_SPI20_OPT_IN=ON`). Ce choix persiste dans le cache, est imprimé dans `HW4-DISP-C3 ... SPI20_OPT_IN=ON` et revient à SPI40 après `OFF`. L'ancien `-DCYD_LCD_SPI_HZ=20000000` seul **ne constitue plus** un choix traçable. HW3/BASIC_PROBE restent obligatoirement SPI20 ; 40 MHz hors CONSOLE, valeurs invalides dont 55 MHz, et opt-in hors CONSOLE sont refusés. La fréquence électrique demeure **UNMEASURED** ; SPI2/DMA/HAL inchangés.
+
+**Preuve hôte CI :** `python3 tools/ci/hw4_disp_spi_policy.py` crée un unique `build/` temporaire avec sélecteur historique/cache SPI20, compile son témoin, substitue le véritable sélecteur B1-C2 puis exécute **`cmake --build build` sans flags ni suppression du cache**. Le témoin recompilé affiche SPI40 ; le test couvre également fallback explicite persistant et retour SPI40. Le workflow de comparaison Xtensa C3 demande désormais lui-même le repli pour sa variante SPI20, dans ses dossiers temporaires CI. Ce témoin hôte ne constitue ni un build Xtensa ni un essai CYD.
+
+**Recette PO uniquement après GO Pilotage sur le HEAD B1-C2 :** branche #370 mise à jour dans VS Code, boutons **Build → Flash → Monitor** habituels, sans autres manipulations. Attendu au boot : `HW4-DISP-PROFILE BOOT spi_request_hz=40000000 variant=SPI40 ... sha=<HEAD>`. Exécuter le seul cas `NEW; 10 PEN 5; 20 PRINT "PEN5"; 30 END; LIST; RUN` et transmettre UART brut (boot, LIST_BYTES, RUN_TERMINAL state=5, READY_POLICY emitted=1, DEVICE_MEMORY, DMA), plus le TFT observé. Le Pilotage conserve l'autorisation d'essai et la fusion.

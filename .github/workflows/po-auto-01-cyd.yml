@@ -1,0 +1,50 @@
+name: PO-AUTO-01 CYD host UART/CRC regression
+
+on:
+  pull_request:
+    paths:
+      - 'tools/cyd_po_campaign.py'
+      - 'tools/cyd_po_suites/**'
+      - 'tools/hw4_shot_decode.py'
+      - 'tools/hw4_shot_watch.py'
+      - 'tests/test_cyd_po_campaign.py'
+      - 'docs/PO-AUTO-01-cyd-campaign.md'
+      - '.github/workflows/po-auto-01-cyd.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-uart:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Confirm checkout identity
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Python syntax and simulated UART/CRC negatives
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/cyd_po_campaign.py tests/test_cyd_po_campaign.py
+          python3 -m unittest discover -s tests -p 'test_cyd_po_campaign.py' -v
+      - name: Dry-run actual frozen corpus on pristine checkout
+        run: |
+          set -euo pipefail
+          python3 tools/cyd_po_campaign.py --dry-run --suite j1_25_b2_b3 --shots all > "$RUNNER_TEMP/po_auto_plan.json"
+          python3 - "$RUNNER_TEMP/po_auto_plan.json" <<'PY'
+          import json, sys
+          p = json.load(open(sys.argv[1], encoding='utf-8'))
+          assert len(p['planned']) == 6
+          assert sum(x['commands'].count('!SHOT') for x in p['planned']) == 12
+          assert p['classification'] == 'NOT_VERIFIED'
+          PY
+          echo 'HOST_VERIFIED_ONLY — CYD physical test NOT VERIFIED'

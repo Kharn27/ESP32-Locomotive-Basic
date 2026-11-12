@@ -1,6 +1,6 @@
 # HW4-PEN-LOGICAL-B1 — projection PEN 5..14, MODE1 C/D uniquement
 
-**Mandat :** [#248 — GO Pilotage après réception physique PEN5](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/248#issuecomment-6774378726). **Base figée :** [`main@4a386ee82f6ca2c5bbf73cf17c794f5274b449e9`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/4a386ee82f6ca2c5bbf73cf17c794f5274b449e9). PR Draft dédiée, sans reprise de #226.
+**Mandat :** [#248 — GO Pilotage après réception physique PEN5](https://github.com/Kharn27/ESP32-Locomotive-Basic/issues/248#issuecomment-6774378726). **Base scientifique initiale :** [`main@4a386ee82f6ca2c5bbf73cf17c794f5274b449e9`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/4a386ee82f6ca2c5bbf73cf17c794f5274b449e9). **Base de requalification B1-C1 :** [`main@972ea3573516a19e617c68911a87913554ea9218`](https://github.com/Kharn27/ESP32-Locomotive-Basic/commit/972ea3573516a19e617c68911a87913554ea9218), après fusion du correctif C99 Clang 21 [#375](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/375). Même PR Draft #370, sans reprise de #226.
 
 ## Origine / frontière de preuve
 
@@ -43,6 +43,8 @@ LIST
 RUN
 ```
 
-et, après `NEW`, le **même** texte avec `10 PEN 5`. Fournir `git rev-parse HEAD`, boot/version, log UART brut (`LIST_BYTES`, `RUN_START`, `VIDEO_EVENT logical=5 pixel=1`, `RUN_TERMINAL`, `READY_POLICY`, `DEVICE_MEMORY`), photo TFT réelle si possible (capture logique distincte), heap/pile/DMA. Pour PEN5, résultat attendu : `RUN_TERMINAL state=5`, **aucun** `VIDEO_REJECT status=4`, PRINT effectivement rendu, Ready unique, programme conservé. La couleur dépend du contexte INK D courant ; ne pas inférer la couleur C sur un boot D.
+et, après `NEW`, le **même** texte avec `10 PEN 5`. Fournir `git rev-parse HEAD`, boot/version (ESP-IDF, firmware et SHA du binaire), **UART RX brut** avec `LIST_BYTES`, `RUN_START ... sha=<HEAD>`, `RUN_TERMINAL state=5 ... sha=<HEAD>`, `READY_POLICY ... emitted=1` et `DEVICE_MEMORY` ; relever heap libre/minimum, pile et compteurs DMA (`dma_timeouts`, `dma_fault`, `lcd_error`) **tels qu'émis**, sans inventer de valeurs. Joindre une photo **TFT physique** de chaque témoin (distincte d'une capture logique) ; vérifier que `20 PRINT "PEN5"` apparaît après `RUN`, que Ready n'est émis qu'une fois et que `LIST` conserve le programme. Pour PEN5, exiger l'**absence** de `VIDEO_REJECT` (dont `status=4`) et de `ERROR` : une absence de trace ne prouve pas à elle seule le rendu physique. En contexte INK D au boot, l'affichage candidat PEN5 est jaune ; ne pas inférer la couleur C sur un boot D.
+
+**Frontière des traces :** les callbacks firmware `run_preflight` / `run_replay` n'émettent **aucun `VIDEO_EVENT` par instruction** ; `VIDEO_EVENT logical=5 pixel=1` n'est donc **pas** un critère UART recevable. La correspondance événement logique `5` → pixel MODE1 candidat `1` est une **assertion C99 hôte** de `test_hw4_pen_a.c`, pas une observation instrumentée sur la CYD. Ne pas modifier le firmware pour obtenir cette trace. Le Pilotage conserve le **GO FLASH** et l'acceptation physique du HEAD final.
 
 **Réserves :** `PEN8/12` index internes CPC `UNVERIFIED`, autre palette et autres modes `UNVERIFIED`, incident historique #226 `ORIGINAL_PEN_UNIDENTIFIED`. La PR est livrée au Pilotage sans auto-acceptation ni fusion.

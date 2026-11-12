@@ -65,3 +65,20 @@ jobs:
           # Core/HW4 co-mutation rejected by ci_arch_changes.sh using same base.
           echo "CI_ARCH_SHARED_BASE=$base"
           echo "CI_ARCH_LCD_OWNER=1 ARCHIVE_EXISTING_IMMUTABLE=PASS"
+
+      - name: PO-AUTO-01 fail-closed UART, PNG/CRC and dry-run on host
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/cyd_po_campaign.py tests/test_cyd_po_campaign.py
+          python3 -m unittest discover -s tests -p 'test_cyd_po_campaign.py' -v
+          python3 tools/cyd_po_campaign.py --dry-run --suite j1_25_b2_b3 --shots all > "$RUNNER_TEMP/po-auto-plan.json"
+          python3 - "$RUNNER_TEMP/po-auto-plan.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding='utf-8') as stream:
+              plan = json.load(stream)
+          assert len(plan["planned"]) == 6
+          assert sum(x["commands"].count("!SHOT") for x in plan["planned"]) == 12
+          assert plan["classification"] == "NOT_VERIFIED"
+          PY
+          echo 'HOST_VERIFIED_ONLY - CYD physical test NOT VERIFIED'

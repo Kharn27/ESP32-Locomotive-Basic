@@ -161,6 +161,10 @@ HW4_C3_PATHS = (
     "video/hw4_disp_profile.*",
     "tools/ci/hw4_disp_spi_*.py",
     ".github/workflows/hw4-disp-profile-c3.yml",
+    "tools/ci/hw4_mem_c7_*.py",
+    "tools/ci/hw4_mem_c7_build.sh",
+    "tests/test_hw4_mem_c7.py",
+    "docs/HW4-MEM-C7.md",
 )
 
 
@@ -172,6 +176,10 @@ HW4_RENDER_A_PATHS = (
     "tools/ci/hw4_render_a_memory.py",
     "docs/HW4-DISP-RENDER-A.md",
     ".github/workflows/hw4-disp-render-a.yml",
+    "tools/ci/hw4_mem_c7_*.py",
+    "tools/ci/hw4_mem_c7_build.sh",
+    "tests/test_hw4_mem_c7.py",
+    "docs/HW4-MEM-C7.md",
 )
 
 # C5-C1: additive HW4 memory prototype; exact five PR paths, fail-closed.

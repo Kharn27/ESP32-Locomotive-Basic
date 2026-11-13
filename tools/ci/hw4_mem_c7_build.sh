@@ -120,3 +120,95 @@ test "$(git -C "$ROOT" ls-remote origin refs/heads/main | cut -f1)" = "$EXPECTED
   echo "STOP: main advanced during build"; exit 6;
 }
 echo "C7_REAL_PAIR_STABLE=PASS four-independent-builds"
+
+
+# #379: replay unchanged old memory gates against independently rebuilt frozen
+# references. Exit 1 is a real HISTORICAL_FAILURE, never a historic PASS.
+case "${C7_MODE:?mode required}" in
+  render) HIST_SHA=21e95a7197413923bb5976067a0419bc729c20c1; HIST_DRAM=54864 ;;
+  c3) HIST_SHA=989ec54989537a31c3a9be8074f1ce7c47708f17; HIST_DRAM=54168 ;;
+  *) echo "FAIL_CLOSED: unknown C7 mode"; exit 2 ;;
+esac
+HIST="$ROOT/.c7-worktrees/historical"
+git -C "$ROOT" cat-file -e "$HIST_SHA^{commit}"
+git -C "$ROOT" worktree add --detach "$HIST" "$HIST_SHA" > "$OUT/worktree-historical.log" 2>&1
+test "$(git -C "$HIST" rev-parse HEAD)" = "$HIST_SHA"
+HIST_F="$HIST/firmware/esp32_display_probe"
+mkdir -p "$OUT/historical"
+docker run --rm -v "$ROOT:$ROOT" -w "$HIST_F" \
+  -e IDF_GIT_SAFE_DIR="$HIST" -e C7_OUT="$OUT/historical" -e HIST_SHA="$HIST_SHA" -e C7_ROOT="$ROOT" \
+  "$IMAGE" bash -lc '
+    set -euo pipefail
+    idf.py --version | grep -Fx "ESP-IDF v5.5.6"
+    idf.py -B build-c7-historical -DSDKCONFIG="$PWD/sdkconfig.c7-historical" \
+      -DLOCO_CYD_PROFILE=CONSOLE -DCYD_LCD_SPI_HZ=40000000 \
+      set-target esp32 > "$C7_OUT/configure.log" 2>&1 || { tail -100 "$C7_OUT/configure.log"; exit 1; }
+    idf.py -B build-c7-historical -DSDKCONFIG="$PWD/sdkconfig.c7-historical" \
+      -DLOCO_CYD_PROFILE=CONSOLE -DCYD_LCD_SPI_HZ=40000000 \
+      build > "$C7_OUT/build.log" 2>&1 || { tail -100 "$C7_OUT/build.log"; exit 1; }
+    cp build-c7-historical/loco_esp32_display_probe.elf "$C7_OUT/historical.elf"
+    cp build-c7-historical/loco_esp32_display_probe.bin "$C7_OUT/historical.bin"
+    xtensa-esp-elf-size -A "$C7_OUT/historical.elf" > "$C7_OUT/sections.txt"
+    python3 "$C7_ROOT/tools/ci/verify_esp_app_version.py" \
+      "$C7_OUT/historical.bin" "$HIST_SHA" loco_esp32_display_probe
+  ' > "$OUT/historical/docker-output.log" 2>&1 || {
+    tail -100 "$OUT/historical/docker-output.log"; exit 9;
+  }
+python3 - "$OUT/historical/sections.txt" "$HIST_DRAM" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, "tools/ci")
+from hw4_a0_compare_memory import read_size
+m=read_size(Path(sys.argv[1]))
+assert m["iram"] == 67331 and m["dram"] == int(sys.argv[2]), m
+print("C7_FROZEN_HISTORICAL_REAL_ELF=PASS",m)
+PY
+LEGACY_LOG="$OUT/historical/legacy-$C7_MODE.log"
+set +e
+if [ "$C7_MODE" = render ]; then
+  python3 tools/ci/hw4_render_a_memory.py \
+    --baseline "$OUT/historical/sections.txt" \
+    --optimized "$OUT/head/spi40/sections.txt" > "$LEGACY_LOG" 2>&1
+else
+  python3 tools/ci/hw4_disp_spi_variants.py \
+    --base-sections "$OUT/historical/sections.txt" \
+    --spi40-sections "$OUT/head/spi40/sections.txt" \
+    --spi40-cache "$OUT/head/spi40/CMakeCache.txt" \
+    --spi40-commands "$OUT/head/spi40/compile_commands.json" \
+    --spi40-bin "$OUT/head/spi40/firmware.bin" \
+    --spi20-sections "$OUT/head/spi20/sections.txt" \
+    --spi20-cache "$OUT/head/spi20/CMakeCache.txt" \
+    --spi20-commands "$OUT/head/spi20/compile_commands.json" \
+    --spi20-bin "$OUT/head/spi20/firmware.bin" > "$LEGACY_LOG" 2>&1
+fi
+legacy_rc=$?
+set -e
+printf 'HISTORICAL_GATE=%s EXIT_CODE=%s OLD_SHA=%s\n' "$C7_MODE" "$legacy_rc" "$HIST_SHA" | tee "$OUT/historical/exit-code.txt"
+cat "$LEGACY_LOG"
+test "$legacy_rc" -eq 1
+if [ "$C7_MODE" = render ]; then
+  grep -Fq 'RENDER-A introduces unauthorized incremental IRAM' "$LEGACY_LOG"
+else
+  grep -Fq 'IRAM changed' "$LEGACY_LOG"
+fi
+echo "HISTORICAL_FAILURE=TRUE (+220 IRAM) legacy_rc=1 mode=$C7_MODE"
+
+# Fetch authoritative GitHub refs again AFTER both historical and PR builds.
+curl -fsS --max-time 30 --retry 2 \
+  -H 'Accept: application/vnd.github+json' \
+  -H "Authorization: Bearer ${GH_TOKEN:?GH_TOKEN required}" \
+  "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$OUT/pr-final.json"
+test "$(jq -r '.base.sha' "$OUT/pr-final.json")" = "$BASE"
+test "$(jq -r '.head.sha' "$OUT/pr-final.json")" = "$HEAD"
+test "$(git -C "$ROOT" ls-remote origin refs/heads/main | cut -f1)" = "$BASE"
+mkdir -p "$OUT/verdict"
+python3 tools/ci/hw4_mem_c7_v2.py \
+  --root "$OUT" --provenance "$OUT/provenance.json" \
+  --live-pr-start "$OUT/pr-live.json" --live-pr "$OUT/pr-final.json" \
+  --repo "$GITHUB_REPOSITORY" --pr-number "$PR_NUMBER" \
+  --base-checkout "$ROOT/.c7-worktrees/base" --head-checkout "$ROOT/.c7-worktrees/head" \
+  --output "$OUT/verdict" | tee "$OUT/verdict/console.log"
+# Comparator exit is enforced by pipefail; no legacy or incremental error masking.
+cat "$OUT/verdict/verdict.md" >> "$GITHUB_STEP_SUMMARY"
+printf '\n**Historical comparator: real FAILURE (rc=1), +220 B debt, ROOT_CAUSE_UNVERIFIED.**\n' >> "$GITHUB_STEP_SUMMARY"
+echo "C7_REAL_FIVE_XTENSA_BUILDS=PASS mode=$C7_MODE BASE_SHA=$BASE HEAD_SHA=$HEAD"

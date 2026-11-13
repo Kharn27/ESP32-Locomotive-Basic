@@ -60,7 +60,8 @@ def provenance():
     return {"status": "PROVENANCE_PASS", "repo": REPO, "pr_number": PR,
             "base_sha": BASE, "head_sha": HEAD,
             "base_tree": BASE_TREE, "head_tree": HEAD_TREE, "merge_base": MERGE,
-            "ancestry_verified": True, "policy_main": BASE,
+            "ancestry_verified": True, "diverged_from_base": False,
+            "policy_main": BASE,
             "anchors": copy.deepcopy(c.ANCHORS),
             "historical_bytes": copy.deepcopy(c.EXPECTED)}
 

@@ -27,7 +27,7 @@ def verify_archive(path, key):
     entries = manifest.decode('utf8').splitlines()
     assert len(entries) == count, 'manifest count drift'
     for entry in entries:
-        m = re.fullmatch(r'([0-9a-f]{64})  \\./(.+)', entry)
+        m = re.fullmatch(r'([0-9a-f]{64})  \./(.+)', entry)
         assert m and sha256(z.read(m[2])).hexdigest() == m[1], 'member hash drift: ' + entry
     print('C8_ARCHIVE_INTEGRITY=PASS label=%s verified=%d zip=%s' % (key, count, zip_sha))
     return z
@@ -41,18 +41,18 @@ def parse_map(z, label, variant):
     section = ''
     fill = 0
     for line in lines[begin+1:end]:
-        m = re.match(r'^\\s*(\\.[\\w.$-]+)\\s*0x[0-9a-f]+\\s+0x([0-9a-f]+)\\s+(.+\\.a\\([^)]+\\))\\s*$', line)
+        m = re.match(r'^\s*(\.[\w.$-]+)\s*0x[0-9a-f]+\s+0x([0-9a-f]+)\s+(.+\.a\([^)]+\))\s*$', line)
         if m:
             section, size, obj = m.groups()
         else:
-            m = re.match(r'^\\s*0x[0-9a-f]+\\s+0x([0-9a-f]+)\\s+(.+\\.a\\([^)]+\\))\\s*$', line)
+            m = re.match(r'^\s*0x[0-9a-f]+\s+0x([0-9a-f]+)\s+(.+\.a\([^)]+\))\s*$', line)
             if m:
                 size, obj = m.groups()
             else:
-                header = re.match(r'^\\s*(\\.[\\w.$-]+)\\s*$', line)
+                header = re.match(r'^\s*(\.[\w.$-]+)\s*$', line)
                 if header:
                     section = header[1]
-                pad = re.match(r'^\\s*\\*fill\\*\\s+0x[0-9a-f]+\\s+0x([0-9a-f]+)', line)
+                pad = re.match(r'^\s*\*fill\*\s+0x[0-9a-f]+\s+0x([0-9a-f]+)', line)
                 if pad:
                     fill += int(pad[1],16)
                 continue
@@ -61,7 +61,7 @@ def parse_map(z, label, variant):
     return extent, items, fill
 
 def allocated_sections(data):
-    assert data[:6] == b'\\x7fELF\\x01\\x01', 'not ELF32 little-endian'
+    assert data[:6] == b'\x7fELF\x01\x01', 'not ELF32 little-endian'
     offset = struct.unpack_from('<I', data, 32)[0]
     size, count, index = struct.unpack_from('<HHH', data, 46)
     hdr = [struct.unpack_from('<10I', data, offset+i*size) for i in range(count)]
@@ -70,7 +70,7 @@ def allocated_sections(data):
     result = {}
     for sh in hdr:
         at=sh[0]
-        name=strings[at:strings.find(b'\\0', at)].decode('utf8')
+        name=strings[at:strings.find(b'\0', at)].decode('utf8')
         if sh[2] & 2:
             result[name] = (sh[5], b'' if sh[1]==8 else data[sh[4]:sh[4]+sh[5]])
     return result

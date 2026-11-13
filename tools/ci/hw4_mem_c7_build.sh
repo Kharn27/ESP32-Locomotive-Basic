@@ -185,13 +185,21 @@ legacy_rc=$?
 set -e
 printf 'HISTORICAL_GATE=%s EXIT_CODE=%s OLD_SHA=%s\n' "$C7_MODE" "$legacy_rc" "$HIST_SHA" | tee "$OUT/historical/exit-code.txt"
 cat "$LEGACY_LOG"
-test "$legacy_rc" -eq 1
-if [ "$C7_MODE" = render ]; then
-  grep -Fq 'RENDER-A introduces unauthorized incremental IRAM' "$LEGACY_LOG"
+if [ "$legacy_rc" -eq 1 ]; then
+  if [ "$C7_MODE" = render ]; then
+    grep -Fq 'RENDER-A introduces unauthorized incremental IRAM' "$LEGACY_LOG"
+  else
+    grep -Fq 'IRAM changed' "$LEGACY_LOG"
+  fi
+  # An old comparator fails as historically designed; a new incremental pass
+  # must never relabel that old return code as an old PASS.
+  echo "HISTORICAL_FAILURE=TRUE old_exit=1 mode=$C7_MODE"
+elif [ "$legacy_rc" -eq 0 ]; then
+  echo "HISTORICAL_FAILURE=FALSE old_exit=0 mode=$C7_MODE"
 else
-  grep -Fq 'IRAM changed' "$LEGACY_LOG"
+  echo "MEASUREMENT_INVALID: unexpected historical comparator exit $legacy_rc"
+  exit 2
 fi
-echo "HISTORICAL_FAILURE=TRUE (+220 IRAM) legacy_rc=1 mode=$C7_MODE"
 
 # Fetch authoritative GitHub refs again AFTER both historical and PR builds.
 curl -fsS --max-time 30 --retry 2 \

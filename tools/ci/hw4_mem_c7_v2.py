@@ -270,10 +270,11 @@ def markdown(report):
               "C3_HISTORICAL head SPI40=" + report["spi_c3"]["historical"]["head"]["spi40"]["status"] +
               " SPI20=" + report["spi_c3"]["historical"]["head"]["spi20"]["status"],
               "SPI_VARIANTS_PARITY=" + report["spi_c3"]["variants"]["status"],
-              "HISTORICAL_FAILURE=TRUE (+220 IRAM)" if (
-                  report["render_a"]["historical"]["head"]["delta_iram"] == 220 and
-                  all(report["spi_c3"]["historical"]["head"][v]["delta_iram"] == 220
-                      for v in CLOCKS)) else "HISTORICAL_FAILURE=UNEXPECTED",
+              ("HISTORICAL_FAILURE=TRUE" if report["historical_debt"] == "HISTORICAL_DEBT"
+                  else "HISTORICAL_FAILURE=FALSE") + " (+" +
+                  str(report["render_a"]["historical"]["head"]["delta_iram"]) +
+                  " IRAM); C3_SPI20_DELTA=+" +
+                  str(report["spi_c3"]["historical"]["head"]["spi20"]["delta_iram"]),
               "INCREMENTAL_PASS" if report["status"] == "INCREMENTAL_PASS"
                   else "INCREMENTAL_FAIL",
               "C7_CONTRACT=" + report["status"],
@@ -310,10 +311,8 @@ def main(argv=None):
                           for variant in CLOCKS}
                   for label, sha in (("base", base), ("head", head))}
         report = evaluate(memory, p)
-        if (report["render_a"]["historical"]["head"]["delta_iram"] != 220 or
-            any(report["spi_c3"]["historical"]["head"][v]["delta_iram"] != 220
-                for v in CLOCKS)):
-            raise ValueError("historical +220 IRAM witness invalid")
+        # Historical verdict remains independently measured, even if future code
+        # reductions genuinely close the old debt; never force old failure to PASS.
         rc = 0 if report["status"] == "INCREMENTAL_PASS" else 1
     except (OSError, ValueError, KeyError, TypeError, IndexError, UnicodeError,
             subprocess.CalledProcessError,

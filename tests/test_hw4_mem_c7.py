@@ -133,6 +133,55 @@ class Comparator(unittest.TestCase):
                     for v in c.CLOCKS}
                 for l, s, t in (("base", BASE, BASE_TREE), ("head", HEAD, HEAD_TREE))}
 
+    def test_c7_real_comparator_cli_return_codes_synthetic(self):
+        """Actually invoke C7 main(), proving rc=0, rc=1 and rc=2 paths.
+
+        These are synthetic fixtures, not Xtensa ELF measurements. The CI
+        workflows separately run five real Xtensa builds per consumer.
+        """
+        pv = self.root / "provenance.json"
+        lv = self.root / "pr.json"
+        pv.write_text(json.dumps(provenance()))
+        lv.write_text(json.dumps(live()))
+        dest = self.root / "verdict"
+
+        def invoke():
+            sequence = [BASE, "commit", BASE_TREE, HEAD, "commit", HEAD_TREE, MERGE]
+            with mock.patch.object(c, "git", side_effect=sequence), \
+                 mock.patch.object(c.subprocess, "run",
+                                   return_value=mock.Mock(returncode=0)):
+                return c.main(["--root", str(self.root), "--provenance", str(pv),
+                               "--live-pr-start", str(lv), "--live-pr", str(lv),
+                               "--repo", REPO, "--pr-number", str(PR),
+                               "--output", str(dest),
+                               "--base-checkout", "base", "--head-checkout", "head"])
+
+        self.assertEqual(invoke(), 0)
+        self.assertEqual(json.loads((dest / "verdict.json").read_text())["status"],
+                         "INCREMENTAL_PASS")
+        for variant in c.CLOCKS:
+            for key in ("iram", "dram", "bss"):
+                with self.subTest(variant=variant, metric=key):
+                    changes = {key: {"iram": 67551, "dram": 54864, "bss": 43792}[key] + 1}
+                    self.write("head", variant, HEAD, HEAD_TREE, c.CLOCKS[variant],
+                               **changes)
+                    self.assertEqual(invoke(), 1, (variant, key))
+                    self.assertEqual(json.loads((dest / "verdict.json").read_text())["status"],
+                                     "INCREMENTAL_FAIL")
+                    self.write("head", variant, HEAD, HEAD_TREE, c.CLOCKS[variant])
+        # Invalid compiled SPI20 opt-in cache is NOT an incremental test success.
+        path = self.root / "head/spi20/CMakeCache.txt"
+        old_cache = path.read_text()
+        self.mutate(variant="spi20", fname="CMakeCache.txt",
+                    replacement=old_cache.replace("CYD_LCD_SPI20_OPT_IN:BOOL=ON",
+                                                  "CYD_LCD_SPI20_OPT_IN:BOOL=OFF"))
+        self.assertEqual(invoke(), 2)
+        self.mutate(variant="spi20", fname="CMakeCache.txt", replacement=old_cache)
+        # Tampered real artifacts are invalid, even with all metrics equal.
+        self.mutate(fname="sections.txt", replacement=sect(iram=67552),
+                    update_digest=False)
+        self.assertEqual(invoke(), 2)
+
     def test_positive_debt_not_erased(self):
         r = c.evaluate(self.metrics(), provenance())
         self.assertEqual(r["historical_debt"], "HISTORICAL_DEBT")

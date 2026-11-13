@@ -135,3 +135,8 @@ Comparateur historique *seulement indicatif et non A/B chronométrique contrôl�
 ## Barrière
 
 PR Draft `Refs #303`. Le développeur ne fusionne pas, ne s'auto-approuve pas, ne modifie pas le calendrier ni le transport SPI/DMA et n'engage pas DMA/PACING. La décision technique et l'éventuelle campagne CYD appartiennent au **PILOTAGE**.
+
+
+## Témoin de non-régression C8-A (documentaire, Issue #380)
+
+Voir [HW4-MEM-C8-A.md](HW4-MEM-C8-A.md) : la PR C8-A vérifie le contrat incrémental C7 depuis le `main` après #381. Son blocage `NO_SAFE_PATCH` ne résout pas la dette historique IRAM +220. Ce lien déclenche le workflow RENDER-A existant **sans aucune mutation de sa logique**.

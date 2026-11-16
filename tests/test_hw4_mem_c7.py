@@ -401,9 +401,6 @@ class Comparator(unittest.TestCase):
         self.assertEqual(report["spi_variants_parity"], "SPI_VARIANTS_PARITY_UNVERIFIED")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 # Independent C7 single-byte adversarial regression checks (synthetic fixtures).
 class SingleByte(unittest.TestCase):
     def test_independent_plus_one_iram_dram_bss(self):
@@ -632,3 +629,7 @@ class HistoricalWitness(unittest.TestCase):
             b.write_text("")
             with self.assertRaises(ValueError):
                 legacy.attest(mode, 1, log, h, a, b)
+
+
+if __name__ == "__main__":
+    unittest.main()

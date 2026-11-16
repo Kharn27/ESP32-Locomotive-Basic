@@ -363,6 +363,10 @@ def markdown(report):
              "", "PR #" + str(p["pr_number"]) + " GitHub real base " + p["base_sha"] +
              " → HEAD " + p["head_sha"], "Merge-base: " + p["merge_base"],
              "Historical debt: **" + report["historical_debt"] + "**",
+             "Allocation: **" + report["allocation"]["status"] + "** " +
+             str(report["allocation"]["limit"]) +
+             " (issue #385 / PR #387 only; not inherited by later PRs)",
+             "Historical references retained: C3 DRAM 54864 B / B3 cost <=696 B",
              "", "| Channel | Base IRAM / DRAM / BSS | HEAD IRAM / DRAM / BSS | Incremental |",
              "|---|---|---|---|"]
     for variant in CLOCKS:
@@ -417,7 +421,9 @@ def main(argv=None):
                                                   p[label + "_tree"])
                           for variant in CLOCKS}
                   for label, sha in (("base", base), ("head", head))}
-        report = evaluate(memory, p)
+        allocation = authorize_esc_b1(p, latest, args.repo,
+                                       args.pr_number, args.head_checkout)
+        report = evaluate(memory, p, allocation)
         # Historical verdict remains independently measured, even if future code
         # reductions genuinely close the old debt; never force old failure to PASS.
         rc = 0 if report["status"] == "INCREMENTAL_PASS" else 1

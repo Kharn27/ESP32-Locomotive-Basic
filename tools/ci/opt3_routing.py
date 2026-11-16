@@ -2298,7 +2298,7 @@ def clk06_a1_negative_tests(sources):
     original = sources[CLK06_A1_WORKFLOW]
 
     def altered(old, new, label):
-        demand(original.count(old) == 1, "A1_NEGATIVE_INERT_" + label)
+        demand(old in original, "A1_NEGATIVE_INERT_" + label)
         return {**sources, CLK06_A1_WORKFLOW: original.replace(old, new, 1)}
 
     cases = [

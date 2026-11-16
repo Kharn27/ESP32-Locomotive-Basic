@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - '.github/workflows/hw4-mem-c6-b2-a-live.yml'
-      - 'tools/ci/opt3_routing.py'
       - 'tools/ci/hw4_mem_c6_refs.py'
       - 'tests/test_hw4_mem_c6_refs.py'
       - 'tests/test_hw4_mem_c6_b2_a_live.py'

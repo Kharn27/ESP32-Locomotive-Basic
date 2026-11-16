@@ -71,7 +71,7 @@ def program_for(case):
         num = int(line.split(' ',1)[0])
         body = b'X'
         for word, token in [('AFTER ',b'\x80'), ('REMAIN(0)',b'\xff\x13'),
-                            ('GOSUB ',b'\x9f'), ('RETURN',b'\x1d')]:
+                            ('GOSUB ',b'\x9f'), ('RETURN',b'\xc9')]:
             if word in line: body += token
         length = len(body)+5
         result += length.to_bytes(2,'little') + num.to_bytes(2,'little') + body + b'\x00'
@@ -115,8 +115,8 @@ class VerifierTests(unittest.TestCase):
                 'head':'a'*40,'corpus_sha256':oracle.CORPUS_SHA,
                 'caprice_commit':oracle.CAP_SHA,'rom_sha256':oracle.ROM_SHA,
                 'container_image':oracle.IMAGE,
-                'caprice_binary_sha256':'f'*64,
-                'caprice_version':'FAKE_NOT_EMULATOR',
+                'caprice_binary_sha256':oracle.CAP_BINARY_SHA,
+                'caprice_version':'Caprice32 v4.6.0-'+oracle.CAP_SHA+'\nFAKE_TEST_ONLY',
                 'observation_class':'ROM_BACKED_CPC6128_RAW_PENDING_SCREEN_REVIEW',
                 'rom_archived':False,'sna_archived':False,
                 'session_names':['original','repeat'],'sessions':{},
@@ -221,7 +221,7 @@ class VerifierTests(unittest.TestCase):
                     'caprice_binary_sha256','status','observation_class']:
             with self.subTest(key=key):
                 m=self.new_manifest()
-                m[key]='unverified' if key=='caprice_binary_sha256' else '0'*64
+                m[key]='0'*64
                 with self.assertRaises(oracle.OracleError):
                     oracle.verify(self.folder,'a'*40,self.seal(m))
 

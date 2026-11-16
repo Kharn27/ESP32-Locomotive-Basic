@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "tests/fixtures/cpc6128/clk_06_a1_after_remain/corpus.json"
 CORPUS_SHA = "4f1120f76ff52f9cab67a83da82623a6e6fd23711db432eec3622a38c187d443"
 CAP_SHA = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+CAP_BINARY_SHA = "5170b3fc68ab116e7698e6e68a742e324d0e9dbfd87eeb7b2090e13c639f73eb"
 ROM_SHA = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
 IMAGE = ("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
          "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c")
@@ -188,7 +189,7 @@ def ram_checked(image: bytes, case: dict) -> dict:
     # Token IDs are from the supplied CPC BASIC ROM listing, not a native
     # tokenizer. Only look for tokens in their corresponding acquired RAM line.
     signatures = (("AFTER ", b"\x80"), ("REMAIN(0)", b"\xff\x13"),
-                  ("GOSUB ", b"\x9f"), ("RETURN", b"\x1d"))
+                  ("GOSUB ", b"\x9f"), ("RETURN", b"\xc9"))
     seen = set()
     for source, rec in zip(case["lines"], records):
         payload = image[rec["offset"]+4:rec["offset"]+rec["length"]-1]
@@ -239,9 +240,10 @@ def acquire(cap: Path, out: Path, head: str) -> None:
     need((cap / "rom/amsdos.rom").is_file(), "AMSDOS_ROM_MISSING")
     executable = cap / "cap32"
     need(executable.is_file(), "CAPRICE_EXECUTABLE_MISSING")
+    need(digest(read(executable)) == CAP_BINARY_SHA, "CAPRICE_BINARY_SHA_MISMATCH")
     version = subprocess.check_output([str(executable), "--version"],
                                       text=True).strip()
-    need(bool(version), "CAPRICE_VERSION_MISSING")
+    need(version.startswith("Caprice32 v4.6.0-" + CAP_SHA), "CAPRICE_VERSION_MISMATCH")
     helper = clk03()
     out.mkdir(parents=True)
     manifest = {"schema": 1, "mission": "CLK-06-A1", "status": "ACQUISITION_PARTIAL",
@@ -317,8 +319,9 @@ def verify(folder: Path, head: str, seal: str) -> bool:
     need(m.get("corpus_sha256") == CORPUS_SHA and
          m.get("caprice_commit") == CAP_SHA and m.get("rom_sha256") == ROM_SHA
          and m.get("container_image") == IMAGE and
-         bool(SHA64.fullmatch(m.get("caprice_binary_sha256", ""))) and
-         isinstance(m.get("caprice_version"), str) and m["caprice_version"] and
+         m.get("caprice_binary_sha256") == CAP_BINARY_SHA and
+         isinstance(m.get("caprice_version"), str) and
+         m["caprice_version"].startswith("Caprice32 v4.6.0-" + CAP_SHA) and
          m.get("rom_archived") is False and m.get("sna_archived") is False and
          m.get("observation_class") == "ROM_BACKED_CPC6128_RAW_PENDING_SCREEN_REVIEW",
          "PROVENANCE_UNVERIFIED")

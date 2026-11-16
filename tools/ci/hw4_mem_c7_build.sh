@@ -185,21 +185,19 @@ legacy_rc=$?
 set -e
 printf 'HISTORICAL_GATE=%s EXIT_CODE=%s OLD_SHA=%s\n' "$C7_MODE" "$legacy_rc" "$HIST_SHA" | tee "$OUT/historical/exit-code.txt"
 cat "$LEGACY_LOG"
-if [ "$legacy_rc" -eq 1 ]; then
-  if [ "$C7_MODE" = render ]; then
-    grep -Fq 'RENDER-A introduces unauthorized incremental IRAM' "$LEGACY_LOG"
-  else
-    grep -Fq 'IRAM changed' "$LEGACY_LOG"
-  fi
-  # An old comparator fails as historically designed; a new incremental pass
-  # must never relabel that old return code as an old PASS.
-  echo "HISTORICAL_FAILURE=TRUE old_exit=1 mode=$C7_MODE"
-elif [ "$legacy_rc" -eq 0 ]; then
-  echo "HISTORICAL_FAILURE=FALSE old_exit=0 mode=$C7_MODE"
-else
-  echo "MEASUREMENT_INVALID: unexpected historical comparator exit $legacy_rc"
-  exit 2
-fi
+# C7-C1 #388: the old gate must REALLY return 1. Its first error is
+# DRAM when 40 B ESC state is present, before reaching its IRAM check.
+# Compare the actual first diagnostic to STRICT historical/main ELF sections;
+# no grep on one favorite IRAM string and no acceptance of rc=0/2.
+python3 tools/ci/hw4_mem_c7_legacy.py \
+  --mode "$C7_MODE" --old-rc "$legacy_rc" \
+  --legacy-log "$LEGACY_LOG" \
+  --historical "$OUT/historical/sections.txt" \
+  --spi40 "$OUT/head/spi40/sections.txt" \
+  --spi20 "$OUT/head/spi20/sections.txt" \
+  | tee "$OUT/historical/legacy-witness-$C7_MODE.log"
+# Historical failure remains an independently visible failure. Only
+# the authenticated C7 main-to-HEAD check below can produce SUCCESS.
 
 # Fetch authoritative GitHub refs again AFTER both historical and PR builds.
 curl -fsS --max-time 30 --retry 2 \

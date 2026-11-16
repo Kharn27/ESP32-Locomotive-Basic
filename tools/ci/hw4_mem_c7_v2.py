@@ -237,7 +237,7 @@ def build_metrics(root, label, variant, sha, tree):
                       cache, re.M) is not None, "explicit SPI20 opt-in cache mismatch")
     sections = read_size(folder / "sections.txt")
     data_sections = re.findall(
-        r"^\\s*\\.dram0\\.data\\s+(\\d+)\\s+(?:0x[0-9A-Fa-f]+|\\d+)\\s*$",
+        r"^\s*\.dram0\.data\s+(\d+)\s+(?:0x[0-9A-Fa-f]+|\d+)\s*$",
         data["sections.txt"].decode("utf-8"), re.M)
     require(len(data_sections) == 1 and int(data_sections[0]) > 0,
             "missing/ambiguous .dram0.data section")

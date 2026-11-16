@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "mission": "CLK-06-A1",
+  "status": "INPUT_ONLY_NOT_AN_ORACLE",
+  "cases": [
+    {
+      "id": "A01_NEVER_ARMED", "question": "REMAIN(0) before any AFTER and after a bounded loop",
+      "run_delays": 4,
+      "lines": [
+        "10 PRINT #8,\"A01:BEGIN\"",
+        "20 PRINT #8,\"A01:R0=\";REMAIN(0)",
+        "30 FOR I%=1 TO 600",
+        "40 NEXT I%",
+        "50 PRINT #8,\"A01:R1=\";REMAIN(0)",
+        "60 END"
+      ]
+    },
+    {
+      "id": "A02_ARM_FIRE", "question": "AFTER on channel 0 and handler GOSUB/RETURN",
+      "run_delays": 12,
+      "lines": [
+        "10 C%=0",
+        "20 PRINT #8,\"A02:BEGIN\"",
+        "30 AFTER 10,0 GOSUB 1000",
+        "40 FOR I%=1 TO 4500",
+        "50 NEXT I%",
+        "60 PRINT #8,\"A02:COUNT=\";C%",
+        "70 END",
+        "1000 C%=C%+1",
+        "1010 PRINT #8,\"A02:HANDLER=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "A03_ONESHOT", "question": "Single delivery over long bounded loop; reject inferred repetition",
+      "run_delays": 16,
+      "lines": [
+        "10 C%=0",
+        "20 PRINT #8,\"A03:BEGIN\"",
+        "30 AFTER 1,0 GOSUB 1000",
+        "40 FOR I%=1 TO 7500",
+        "50 NEXT I%",
+        "60 PRINT #8,\"A03:COUNT=\";C%",
+        "70 END",
+        "1000 C%=C%+1",
+        "1010 PRINT #8,\"A03:HIT=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "A04_CANCEL_EARLY", "question": "REMAIN(0) immediately after AFTER, cancellation and non-delivery",
+      "run_delays": 10,
+      "lines": [
+        "10 C%=0",
+        "20 AFTER 250,0 GOSUB 1000",
+        "30 PRINT #8,\"A04:CANCEL=\";REMAIN(0)",
+        "40 FOR I%=1 TO 3000",
+        "50 NEXT I%",
+        "60 PRINT #8,\"A04:COUNT=\";C%",
+        "70 PRINT #8,\"A04:R2=\";REMAIN(0)",
+        "80 END",
+        "1000 C%=C%+1",
+        "1010 PRINT #8,\"A04:HIT=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "A05_REMAIN_AFTER_FIRE", "question": "REMAIN(0) after expected event window without predicted numeric return",
+      "run_delays": 12,
+      "lines": [
+        "10 C%=0",
+        "20 AFTER 1,0 GOSUB 1000",
+        "30 FOR I%=1 TO 4000",
+        "40 NEXT I%",
+        "50 PRINT #8,\"A05:R=\";REMAIN(0)",
+        "60 PRINT #8,\"A05:COUNT=\";C%",
+        "70 END",
+        "1000 C%=C%+1",
+        "1010 PRINT #8,\"A05:HIT=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "A06_REARM_SAME_CHANNEL", "question": "Replace pending channel-0 callback with second AFTER",
+      "run_delays": 12,
+      "lines": [
+        "10 A%=0:B%=0",
+        "20 AFTER 250,0 GOSUB 1000",
+        "30 AFTER 5,0 GOSUB 1100",
+        "40 FOR I%=1 TO 4500",
+        "50 NEXT I%",
+        "60 PRINT #8,\"A06:A=\";A%",
+        "70 PRINT #8,\"A06:B=\";B%",
+        "80 END",
+        "1000 A%=A%+1",
+        "1010 PRINT #8,\"A06:FIRST=\";A%",
+        "1020 RETURN",
+        "1100 B%=B%+1",
+        "1110 PRINT #8,\"A06:SECOND=\";B%",
+        "1120 RETURN"
+      ]
+    },
+    {
+      "id": "A07_NESTED_RETURN", "question": "Timer handler nested GOSUB and RETURN; main flow resumes",
+      "run_delays": 12,
+      "lines": [
+        "10 C%=0",
+        "20 AFTER 5,0 GOSUB 1000",
+        "30 FOR I%=1 TO 4000",
+        "40 NEXT I%",
+        "50 PRINT #8,\"A07:MAIN=\";C%",
+        "60 END",
+        "1000 PRINT #8,\"A07:HANDLER_BEGIN\"",
+        "1010 GOSUB 2000",
+        "1020 PRINT #8,\"A07:HANDLER_END\"",
+        "1030 RETURN",
+        "2000 C%=C%+1",
+        "2010 PRINT #8,\"A07:NESTED\"",
+        "2020 RETURN"
+      ]
+    },
+    {
+      "id": "A08_BAD_ARGUMENT", "question": "Negative AFTER argument on channel 0; exact diagnostic from real screen only",
+      "run_delays": 3,
+      "lines": [
+        "10 PRINT #8,\"A08:BEGIN\"",
+        "20 AFTER -1,0 GOSUB 1000",
+        "30 PRINT #8,\"A08:AFTER\"",
+        "40 END",
+        "1000 PRINT #8,\"A08:HANDLER\"",
+        "1010 RETURN"
+      ]
+    }
+  ]
+}

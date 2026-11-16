@@ -20,6 +20,7 @@ if(LOCO_CYD_PROFILE STREQUAL "CONSOLE")
             "../../../integration/hw4_pen_bridge.c"
             "../../../integration/hw4_run_scheduler.c"
             "../../../integration/hw4_run_break_input.c"
+            "../../../integration/hw4_cpc_escape_contract.c"
             "../../../io/cpc_uart_console.c"
             "../../../io/uart_line.c" "../../../io/hw4_shot_uart.c"
             "../../../io/cpc_screen_nav.c"

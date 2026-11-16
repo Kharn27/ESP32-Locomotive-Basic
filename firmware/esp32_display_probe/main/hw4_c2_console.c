@@ -7,6 +7,7 @@
 #include "hw4_pen_bridge.h"
 #include "hw4_run_scheduler.h"
 #include "hw4_run_break_input.h"
+#include "hw4_cpc_escape_contract.h"
 #include "hw4_clk02_phase.h"
 #include "hw4_run_diag_source.h"
 #include "basic_variable_store.h"
@@ -191,6 +192,11 @@ static BEVideoEvent s_run_public_events[PEN_EVENT_CAPACITY];
 static BEVideoEvent s_run_preview_events[PEN_EVENT_CAPACITY];
 static Hw4RunPreview s_run_preview;
 static Hw4RunBreakInput s_run_input;
+static Hw4EscRunControl s_run_esc;
+/* Authentic currently executing BSR statement, committed/replayed only. */
+static uint16_t s_run_candidate_line, s_run_last_line;
+static bool s_run_candidate_valid, s_run_last_line_valid;
+static bool s_run_cpc_esc_break;
 static bool s_run_active;
 static bool s_run_skip_crlf_lf;
 static size_t s_run_quanta;
@@ -547,6 +553,8 @@ static bool run_preflight(void *ctx,const uint8_t *bytes,size_t length,
                           const BEVideoEvent *events,size_t count)
 {
     (void)ctx;
+    s_run_candidate_valid=hw4_run_scheduler_statement_line(
+        &s_run_scheduler,&s_run_candidate_line);
     s_run_video_failure=hw4_pen_preflight(&s_text,bytes,length,events,count);
     return s_run_video_failure==HW4_PEN_OK;
 }
@@ -555,6 +563,10 @@ static bool run_replay(void *ctx,const uint8_t *bytes,size_t length,
 {
     (void)ctx;
     s_run_video_failure=hw4_pen_replay(&s_text,bytes,length,events,count);
+    if(s_run_video_failure==HW4_PEN_OK && s_run_candidate_valid) {
+        s_run_last_line=s_run_candidate_line;
+        s_run_last_line_valid=true;
+    }
     return s_run_video_failure==HW4_PEN_OK;
 }
 static bool display_error(void)
@@ -633,6 +645,12 @@ static bool basic_submit(const uint8_t *source,size_t length,
 static bool basic_run(Hw4Clk02Phase *phase)
 {
     hw4_run_break_input_init(&s_run_input);
+    hw4_esc_run_control_init(&s_run_esc);
+    s_run_candidate_valid=false;
+    s_run_last_line_valid=false;
+    s_run_candidate_line=0U;
+    s_run_last_line=0U;
+    s_run_cpc_esc_break=false;
     if(!hw4_run_scheduler_init(&s_run_scheduler,&s_basic.runtime))
         return fail("RUN_SCHEDULER_INIT",-1);
     s_run_preview.output=s_basic.scratch.temporary;
@@ -651,6 +669,8 @@ static bool basic_run(Hw4Clk02Phase *phase)
     hw4_dp_reset(&s_disp_profile);
     s_disp_scroll_checkpoint_us=s_text.scroll_wall_us;
     ++s_disp_run_seq;
+    printf("HW4-ESC-BREAK-B1 UART_ESC_IDLE_US=%llu source=transport_not_CPC\n",
+           (unsigned long long)HW4_ESC_UART_IDLE_US);
     printf("HW4-RUN-B RUN_START quantum=%u uart_poll_max=%u "
            "budget=none sha=%s\n",RUN_QUANTUM,RUN_UART_POLL_BYTES,
            HW4_SHOT_GIT_SHA);
@@ -734,6 +754,27 @@ static bool basic_run_slice(Hw4Clk02Phase *phase)
                "policy=host_not_cpc\n",(int)s_run_scheduler.last_result.status);
         (void)bsr_stop(&s_basic.runtime);
         if(!display_error()) return false;
+    } else if(slice.state==HW4_RUN_BROKEN && s_run_cpc_esc_break) {
+        if(s_run_last_line_valid) {
+            char message[32];
+            int length=snprintf(message,sizeof(message),"Break in %u\n",
+                                (unsigned)s_run_last_line);
+            if(length<=0 || (size_t)length>=sizeof(message))
+                return fail("ESC_BREAK_FORMAT",length);
+            if(!cpc_text_write(&s_text,(const uint8_t *)message,(size_t)length))
+                return fail("ESC_BREAK_TEXT",-1);
+        } else {
+            /* Never invent a numbered CPC diagnostic before the first step. */
+            static const uint8_t unverified[]="Break\n";
+            if(!cpc_text_write(&s_text,unverified,sizeof(unverified)-1U))
+                return fail("ESC_BREAK_UNVERIFIED_TEXT",-1);
+        }
+        printf("HW4-ESC-BREAK-B1 CPC_BREAK line=%u line_source=%s "
+               "stop_calls=%u steps=%u sha=%s\n",
+               (unsigned)(s_run_last_line_valid?s_run_last_line:0U),
+               s_run_last_line_valid?"BSR_COMMITTED_STATEMENT":"UNVERIFIED",
+               s_run_scheduler.stop_calls,
+               (unsigned)s_run_scheduler.total_steps,HW4_SHOT_GIT_SHA);
     } else if(slice.state!=HW4_RUN_ENDED && slice.state!=HW4_RUN_BROKEN) {
         return fail("RUN_STATE",(int)slice.state);
     }
@@ -910,6 +951,55 @@ static bool execute_line(Hw4Clk02Phase *phase)
     if(!apply_ready_policy(transition) || !prompt()) return false;
     return capture_screen("PROMPT");
 }
+
+/* HOST !BREAK remains separate from the CPC keyboard contract. */
+static bool run_host_break_prefix(void)
+{
+    static const char word[]="!BREAK";
+    if(s_run_input.discard || s_run_input.length==0U ||
+       s_run_input.length>HW4_RUN_BREAK_BYTES) return false;
+    for(size_t i=0U;i<s_run_input.length;++i) {
+        uint8_t c=s_run_input.bytes[i];
+        if(c>=(uint8_t)'a' && c<=(uint8_t)'z')
+            c=(uint8_t)(c-(uint8_t)'a'+(uint8_t)'A');
+        if(c!=(uint8_t)word[i]) return false;
+    }
+    return true;
+}
+static bool run_break_request(const char *source,bool cpc)
+{
+    s_run_break_source=source;
+    s_run_break_requested_us=(uint64_t)esp_timer_get_time();
+    s_run_cpc_esc_break=cpc;
+    s_run_esc.phase=HW4_ESC_STOPPED;
+    if(!hw4_run_scheduler_request_break(&s_run_scheduler))
+        return fail("RUN_BREAK_REQUEST",-1);
+    /* Same bounded existing HOST BREAK drain; never replay typed-ahead E3. */
+    unsigned discarded=0U;
+    for(;discarded<RUN_UART_DRAIN_BYTES;++discarded) {
+        uint8_t ignored=0U;
+        const int consumed=uart_read_bytes(UART_NUM_0,&ignored,1U,0);
+        if(consumed<0) return fail("RUN_UART_DRAIN",consumed);
+        if(consumed==0) break;
+    }
+    printf("HW4-RUN-B UART_DRAIN discarded=%u max=%u\n",
+           discarded,RUN_UART_DRAIN_BYTES);
+    return true;
+}
+static bool run_esc_action(Hw4EscAction action)
+{
+    if(action==HW4_ESC_ACTION_NONE) return true;
+    if(action==HW4_ESC_ACTION_BREAK_REQUEST)
+        return run_break_request("CPC_ESC_DOUBLE",true);
+    printf("HW4-ESC-BREAK-B1 ESC_TRANSITION action=%s steps=%u "
+           "line=%u line_valid=%u sha=%s\n",
+           action==HW4_ESC_ACTION_PAUSE?"PAUSE":"RESUME",
+           (unsigned)s_run_scheduler.total_steps,
+           (unsigned)(s_run_last_line_valid?s_run_last_line:0U),
+           (unsigned)s_run_last_line_valid,HW4_SHOT_GIT_SHA);
+    return true;
+}
+
 static bool uart_init(void)
 {
     uart_config_t config={
@@ -1011,39 +1101,62 @@ void app_main(void)
     for(;;) {
         if(!touch_poll(&phase)) return;
         if(s_run_active) {
-            /* UART is polled before every quantum; no editor/SHOT in RUN. */
+            /* Keep decoder state between all uart_read_bytes invocations.
+             * Only a confirmed RX-empty poll allows the transport timeout. */
+            bool uart_idle=false, break_requested=false;
             for(unsigned i=0U;i<RUN_UART_POLL_BYTES;++i) {
                 uint8_t byte=0U;
+                Hw4EscAction actions[2]={HW4_ESC_ACTION_NONE,HW4_ESC_ACTION_NONE};
                 const int n=uart_read_bytes(UART_NUM_0,&byte,1U,0);
                 if(n<0) { (void)fail("RUN_UART_READ",n); return; }
-                if(n==0) break;
-                const Hw4BreakInputEvent event=
-                    hw4_run_break_input_feed(&s_run_input,byte);
+                if(n==0) { uart_idle=true; break; }
+                const Hw4EscParseState before=s_run_esc.decoder.state;
+                Hw4BreakInputEvent event=HW4_BREAK_INPUT_NONE;
+                if(byte==0x1bU) {
+                    s_run_input.length=0U;
+                    s_run_input.discard=false;
+                    s_run_input.last_cr=false;
+                } else if(before==HW4_ESC_TEXT || byte==(uint8_t)'!' ||
+                          s_run_input.length!=0U || s_run_input.discard) {
+                    /* The HOST rescue remains readable even after corrupt CSI
+                     * input; ANSI control bytes never reach E3/BASIC. */
+                    event=hw4_run_break_input_feed(&s_run_input,byte);
+                }
                 if(event==HW4_BREAK_INPUT_REQUEST) {
-                    s_run_break_source=byte==(uint8_t)'\r' ? "UART_CR" : "UART_LF";
-                    s_run_break_requested_us=(uint64_t)esp_timer_get_time();
                     s_run_skip_crlf_lf=byte==(uint8_t)'\r';
-                    if(!hw4_run_scheduler_request_break(&s_run_scheduler)) {
-                        (void)fail("RUN_BREAK_REQUEST",-1); return;
-                    }
-                    /* Drain the existing UART0 RX queue (512 ring + FIFO)
-                     * without importing another IRAM ringbuffer primitive.
-                     * Discard all typed-ahead BASIC, E3 and !SHOT bytes.
-                     * A late asynchronous CRLF LF is swallowed below. */
-                    unsigned discarded=0U;
-                    for(;discarded<RUN_UART_DRAIN_BYTES;++discarded) {
-                        uint8_t ignored=0U;
-                        const int consumed=uart_read_bytes(UART_NUM_0,
-                                                          &ignored,1U,0);
-                        if(consumed<0) {
-                            (void)fail("RUN_UART_DRAIN",consumed); return;
-                        }
-                        if(consumed==0) break;
-                    }
-                    printf("HW4-RUN-B UART_DRAIN discarded=%u max=%u\n",
-                           discarded,RUN_UART_DRAIN_BYTES);
+                    if(!run_break_request(byte==(uint8_t)'\r' ?
+                                          "UART_CR":"UART_LF",false)) return;
+                    break_requested=true;
                     break;
                 }
+                const size_t count=hw4_esc_run_control_feed(
+                    &s_run_esc,byte,(uint64_t)esp_timer_get_time(),
+                    run_host_break_prefix(),actions);
+                for(size_t j=0U;j<count;++j) {
+                    if(!run_esc_action(actions[j])) return;
+                    if(actions[j]==HW4_ESC_ACTION_RESUME) {
+                        /* Consumed resume key is not a partial host command. */
+                        s_run_input.length=0U;
+                        s_run_input.discard=false;
+                    }
+                    if(actions[j]==HW4_ESC_ACTION_BREAK_REQUEST) {
+                        break_requested=true;
+                        break;
+                    }
+                }
+                if(break_requested) break;
+            }
+            if(uart_idle && !break_requested) {
+                Hw4EscAction action=hw4_esc_run_control_idle(
+                    &s_run_esc,(uint64_t)esp_timer_get_time());
+                if(!run_esc_action(action)) return;
+            }
+            if(s_run_esc.phase==HW4_ESC_PAUSED) {
+                /* No further BASIC step or Ready while paused. UART and
+                 * touch still poll. This delay belongs to CLK02 residual
+                 * wall time, not its standard quantum/yield counters. */
+                vTaskDelay(1);
+                continue;
             }
             if(!basic_run_slice(&phase)) return;
             /* Observe the existing yield call; never alter its cadence. */

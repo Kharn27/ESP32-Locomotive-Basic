@@ -274,7 +274,6 @@ CLK04_PATHS = (
 C6_B2A_WORKFLOW = "hw4-mem-c6-b2-a-live.yml"
 C6_B2A_PATHS = (
     ".github/workflows/hw4-mem-c6-b2-a-live.yml",
-    "tools/ci/opt3_routing.py",
     "tools/ci/hw4_mem_c6_refs.py",
     "tests/test_hw4_mem_c6_refs.py",
     "tests/test_hw4_mem_c6_b2_a_live.py",
@@ -289,7 +288,6 @@ C6_B2B_PATHS = (
     "tools/ci/hw4_mem_c6_b2b.py",
     "tests/test_hw4_mem_c6_b2b.py",
     "docs/HW4-MEM-C6-B2-B.md",
-    "tools/ci/opt3_routing.py",
 )
 
 
@@ -300,7 +298,6 @@ C6_D1_PATHS = (
     "tools/ci/hw4_mem_c6_b2_d1.py",
     "tests/test_hw4_mem_c6_b2_d1.py",
     "docs/HW4-MEM-C6-B2-D1.md",
-    "tools/ci/opt3_routing.py",
 )
 
 
@@ -449,12 +446,13 @@ def audit(sources):
            "if-no-files-found: error" in lab and "if: success()" in lab and
            "SHA256SUMS.txt" in lab and "--pr 330" in lab and
            "--pr 339" in lab and "continue-on-error:" not in lab and
-           "|| true" not in lab, "C6_B2A_ARTIFACT_GUARD_MISSING")
+           "|| true" not in lab and "if: false" not in lab,
+           "C6_B2A_ARTIFACT_GUARD_MISSING")
     demand("PROVENANCE_ONLY" in lab and "NOT_MEMORY_GATE" in lab and
            "report['PR_INCREMENTAL_VERDICT'] == 'UNVERIFIED'" in lab and
            "report['INTEGRATION_MEMORY_VERDICT'] == 'UNVERIFIED'" in lab and
            "FALSE_READY" in lab, "C6_B2A_MEMORY_PASS_SPOOF")
-    # B2-B must only touch its five exact paths; never become required.
+    # B2-B must only touch its four exact paths; never become required.
     demand(C6_B2B_WORKFLOW in FAMILIES["HW4"] and
            all(C6_B2B_WORKFLOW not in names for f, names in FAMILIES.items()
                if f != "HW4"), "C6_B2B_WRONG_FAMILY")
@@ -491,13 +489,14 @@ def audit(sources):
            "python3 tools/ci/hw4_mem_c6_b2b.py" in b2b and
            "8-XTENSA" in b2b and "NOT_REQUIRED" in b2b and
            "run-id: 42657443478" in b2b and
+           "actions/download-artifact@v4" in b2b and
            "--reuse" in b2b and "Build only seven remaining" in b2b,
            "C6_B2B_EIGHT_BUILD_NOT_GUARDED")
     demand("if-no-files-found: error" in b2b and
            "actions/upload-artifact@v4" in b2b and
            "SHA256SUMS.txt" in b2b and
            "continue-on-error" not in b2b and
-           "|| true" not in b2b,
+           "|| true" not in b2b and "if: false" not in b2b,
            "C6_B2B_ARTIFACT_MISSING_OR_RC_MASKED")
     # D1 must never introduce a required memory gate or writable event.
     demand(C6_D1_WORKFLOW in FAMILIES["HW4"] and
@@ -529,6 +528,7 @@ def audit(sources):
            "python3 tools/ci/opt3_routing.py --self-test" in d1 and
            "42660089530" in d1 and
            "hw4-c6-b2-b-330-8build-42660089530-1" in d1 and
+           "actions/download-artifact@v4" in d1 and
            "python3 tools/ci/hw4_mem_c6_b2_d1.py" in d1 and
            "GH_TOKEN: $" + "{{ github.token }}" in d1,
            "C6_D1_SOURCE_AND_OLD_ARTIFACT_MISMATCH")
@@ -537,6 +537,7 @@ def audit(sources):
            "SHA256SUMS.txt" in d1 and
            "actions/upload-artifact@v4" in d1 and
            "continue-on-error" not in d1 and "|| true" not in d1 and
+           "if: false" not in d1 and
            "C6-D1 PRELINK_DIAGNOSTIC_ONLY NOT_REQUIRED" in d1,
            "C6_D1_MASKED_FAILURE_OR_NO_ARTIFACT")
     # CLK-06-A1-C1: no additional triggers, escalation, cancellation or
@@ -1783,6 +1784,27 @@ def clk04_negative_tests(sources):
         print("CI-OPT3 CLK04_UNRELATED_ROUTE_REJECTED", path)
 
 
+
+def c6_lab_route_tests(sources):
+    """Synthetic PR diffs: shared OPT3 changes do not wake historical SHA labs."""
+    labs = (
+        (C6_B2A_WORKFLOW, C6_B2A_PATHS),
+        (C6_B2B_WORKFLOW, C6_B2B_PATHS),
+        (C6_D1_WORKFLOW, C6_D1_PATHS),
+    )
+    common = triggered_names(["tools/ci/opt3_routing.py"], sources)
+    demand(not {name for name, _ in labs}.intersection(common),
+           "C6_COMMON_ROUTER_TRIGGERED_LAB")
+    print("CI-OPT3 C6_ROUTER_ONLY_PR_LABS_NOT_TRIGGERED")
+    for name, paths in labs:
+        for path in paths:
+            routed = {lab for lab, _ in labs
+                      if lab in triggered_names([path], sources)}
+            demand(routed == {name},
+                   "C6_LAB_EXACT_ROUTE_MISMATCH_" + name + ":" + path)
+            print("CI-OPT3 C6_LAB_SPECIFIC_ROUTE_VERIFIED", name, path)
+
+
 def c6_b2a_negative_tests(sources):
     """B2-A in-memory falsifications only. Existing gates untouched."""
     original = sources[C6_B2A_WORKFLOW]
@@ -1802,10 +1824,20 @@ def c6_b2a_negative_tests(sources):
         ("UNKNOWN_WORKFLOW", {**sources, "unlisted.yml": original},
          "UNKNOWN_OR_MISSING_WORKFLOW"),
         ("DUPLICATE_FILTER", {**sources, C6_B2A_WORKFLOW: original.replace(
-            "      - 'tools/ci/opt3_routing.py'\n",
-            "      - 'tools/ci/opt3_routing.py'\n" * 2, 1)},
+            "      - '.github/workflows/hw4-mem-c6-b2-a-live.yml'\n",
+            "      - '.github/workflows/hw4-mem-c6-b2-a-live.yml'\n" * 2, 1)},
          "C6_B2A_FILTER_CONTRACT_MISMATCH"),
-        ("BROAD_FILTER", {**sources, C6_B2A_WORKFLOW: original.replace(
+        ("LEGACY_ROUTER_FILTER", {**sources, C6_B2A_WORKFLOW: original.replace(
+             "      - '.github/workflows/hw4-mem-c6-b2-a-live.yml'\n",
+             "      - '.github/workflows/hw4-mem-c6-b2-a-live.yml'\n      - 'tools/ci/opt3_routing.py'\n", 1)},
+          "C6_B2A_FILTER_CONTRACT_MISMATCH"),
+         ("GLOBAL_TOOLS_FILTER", {**sources, C6_B2A_WORKFLOW: original.replace(
+             "'docs/HW4-MEM-C6-B2-A-live.md'", "'tools/**'", 1)},
+          "C6_B2A_FILTER_CONTRACT_MISMATCH"),
+         ("FALSE_SKIP", {**sources, C6_B2A_WORKFLOW: original.replace(
+             "    runs-on: ubuntu-24.04", "    if: false\n    runs-on: ubuntu-24.04", 1)},
+          "C6_B2A_ARTIFACT_GUARD_MISSING"),
+         ("BROAD_FILTER", {**sources, C6_B2A_WORKFLOW: original.replace(
             "'docs/HW4-MEM-C6-B2-A-live.md'", "'docs/**'", 1)},
          "C6_B2A_FILTER_CONTRACT_MISMATCH"),
         ("UNSAFE_EVENT", {**sources, C6_B2A_WORKFLOW: original.replace(
@@ -1885,10 +1917,20 @@ def c6_b2b_negative_tests(sources):
         ("UNKNOWN_WORKFLOW", {**sources, "extra-xtensa.yml": original},
          "UNKNOWN_OR_MISSING_WORKFLOW"),
         ("DUPLICATE_PATH", {**sources, C6_B2B_WORKFLOW: original.replace(
-         "      - 'tools/ci/opt3_routing.py'\n",
-         "      - 'tools/ci/opt3_routing.py'\n"*2, 1)},
+         "      - '.github/workflows/hw4-mem-c6-b2-b-xtensa.yml'\n",
+         "      - '.github/workflows/hw4-mem-c6-b2-b-xtensa.yml'\n"*2, 1)},
          "C6_B2B_FILTER_CONTRACT_MISMATCH"),
-        ("OVERBROAD_PATH", {**sources, C6_B2B_WORKFLOW: original.replace(
+        ("LEGACY_ROUTER_FILTER", {**sources, C6_B2B_WORKFLOW: original.replace(
+             "      - '.github/workflows/hw4-mem-c6-b2-b-xtensa.yml'\n",
+             "      - '.github/workflows/hw4-mem-c6-b2-b-xtensa.yml'\n      - 'tools/ci/opt3_routing.py'\n", 1)},
+          "C6_B2B_FILTER_CONTRACT_MISMATCH"),
+         ("GLOBAL_TOOLS_FILTER", {**sources, C6_B2B_WORKFLOW: original.replace(
+             "'docs/HW4-MEM-C6-B2-B.md'", "'tools/**'", 1)},
+          "C6_B2B_FILTER_CONTRACT_MISMATCH"),
+         ("FALSE_SKIP", {**sources, C6_B2B_WORKFLOW: original.replace(
+             "    runs-on: ubuntu-22.04", "    if: false\n    runs-on: ubuntu-22.04", 1)},
+          "C6_B2B_ARTIFACT_MISSING_OR_RC_MASKED"),
+         ("OVERBROAD_PATH", {**sources, C6_B2B_WORKFLOW: original.replace(
          "'docs/HW4-MEM-C6-B2-B.md'", "'docs/**'", 1)},
          "C6_B2B_FILTER_CONTRACT_MISMATCH"),
         ("WRONG_EVENT", {**sources, C6_B2B_WORKFLOW: original.replace(
@@ -1913,7 +1955,10 @@ def c6_b2b_negative_tests(sources):
         ("HIDDEN_RC", {**sources, C6_B2B_WORKFLOW: original.replace(
          "          set -euo pipefail", "          continue-on-error: true\n          set -euo pipefail", 1)},
          "C6_B2B_ARTIFACT_MISSING_OR_RC_MASKED"),
-        ("FAKE_MAIN", {**sources, C6_B2B_WORKFLOW: original.replace(
+        ("ARCHIVE_DOWNLOAD_REMOVED", {**sources, C6_B2B_WORKFLOW: original.replace(
+          "uses: actions/download-artifact@v4", "uses: actions/checkout@v4", 1)},
+          "C6_B2B_EIGHT_BUILD_NOT_GUARDED"),
+         ("FAKE_MAIN", {**sources, C6_B2B_WORKFLOW: original.replace(
          "6d3aae8a95b97e18174d758f35ef240740e9a861", "0"*40)},
          "C6_B2B_PROVENANCE_MISMATCH"),
     ]
@@ -2229,10 +2274,20 @@ def c6_d1_negative_tests(sources):
         ("UNKNOWN_WORKFLOW", {**sources, "extra-prelink.yml": original},
          "UNKNOWN_OR_MISSING_WORKFLOW"),
         ("DUPLICATE_PATH", {**sources, C6_D1_WORKFLOW: original.replace(
-             "      - 'tools/ci/opt3_routing.py'\n",
-             "      - 'tools/ci/opt3_routing.py'\n"*2,1)},
+             "      - '.github/workflows/hw4-mem-c6-b2-d1-prelink.yml'\n",
+             "      - '.github/workflows/hw4-mem-c6-b2-d1-prelink.yml'\n"*2,1)},
          "C6_D1_FILTER_CONTRACT_MISMATCH"),
-        ("WIDE_PATH", {**sources, C6_D1_WORKFLOW: original.replace(
+        ("LEGACY_ROUTER_FILTER", {**sources, C6_D1_WORKFLOW: original.replace(
+             "      - '.github/workflows/hw4-mem-c6-b2-d1-prelink.yml'\n",
+             "      - '.github/workflows/hw4-mem-c6-b2-d1-prelink.yml'\n      - 'tools/ci/opt3_routing.py'\n", 1)},
+          "C6_D1_FILTER_CONTRACT_MISMATCH"),
+         ("GLOBAL_TOOLS_FILTER", {**sources, C6_D1_WORKFLOW: original.replace(
+             "'docs/HW4-MEM-C6-B2-D1.md'", "'tools/**'", 1)},
+          "C6_D1_FILTER_CONTRACT_MISMATCH"),
+         ("FALSE_SKIP", {**sources, C6_D1_WORKFLOW: original.replace(
+             "    runs-on: ubuntu-22.04", "    if: false\n    runs-on: ubuntu-22.04", 1)},
+          "C6_D1_MASKED_FAILURE_OR_NO_ARTIFACT"),
+         ("WIDE_PATH", {**sources, C6_D1_WORKFLOW: original.replace(
              "'docs/HW4-MEM-C6-B2-D1.md'", "'docs/**'",1)},
          "C6_D1_FILTER_CONTRACT_MISMATCH"),
         ("PUSH_EVENT", {**sources, C6_D1_WORKFLOW: original.replace(
@@ -2256,7 +2311,10 @@ def c6_d1_negative_tests(sources):
              "-p test_hw4_mem_c6_b2_d1.py -v",
              "-p test_not_there.py -v",1)},
          "C6_D1_SOURCE_AND_OLD_ARTIFACT_MISMATCH"),
-        ("OLD_ARTIFACT_SPOOF", {**sources, C6_D1_WORKFLOW: original.replace(
+        ("ARCHIVE_DOWNLOAD_REMOVED", {**sources, C6_D1_WORKFLOW: original.replace(
+              "uses: actions/download-artifact@v4", "uses: actions/checkout@v4", 1)},
+          "C6_D1_SOURCE_AND_OLD_ARTIFACT_MISMATCH"),
+         ("OLD_ARTIFACT_SPOOF", {**sources, C6_D1_WORKFLOW: original.replace(
              "42660089530", "12345678900",1)},
          "C6_D1_SOURCE_AND_OLD_ARTIFACT_MISMATCH"),
         ("NO_EVIDENCE", {**sources, C6_D1_WORKFLOW: original.replace(
@@ -2408,6 +2466,7 @@ def clk06_a1_negative_tests(sources):
 
 
 def negative_tests(sources):
+    c6_lab_route_tests(sources)
     clk06_a1_negative_tests(sources)
     clk04_a4_negative_tests(sources)
     c6_d1_negative_tests(sources)

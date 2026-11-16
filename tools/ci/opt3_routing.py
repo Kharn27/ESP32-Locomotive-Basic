@@ -593,7 +593,7 @@ def audit(sources):
     checkout_head = "ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}"
     expected_env = "EXPECTED_HEAD: $" + "{{ github.event.pull_request.head.sha || github.sha }}"
     demand(a1.count(checkout_head) == 3 and
-           a1.count(expected_env) == 3 and
+           a1.count(expected_env) == 4 and
            a1.count("persist-credentials: false") == 3 and
            a1.count('test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"') == 3 and
            '--head "$EXPECTED_HEAD"' in acquire and

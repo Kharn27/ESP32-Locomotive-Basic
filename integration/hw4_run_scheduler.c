@@ -2,6 +2,29 @@
 #include <stdint.h>
 #include <string.h>
 
+
+bool hw4_run_scheduler_statement_line(const Hw4RunScheduler *scheduler,
+                                       uint16_t *line_number)
+{
+    BasicProgramLine line;
+    size_t cursor;
+    const BasicSessionRuntime *runtime;
+    if (scheduler == NULL || line_number == NULL ||
+        scheduler->runtime == NULL)
+        return false;
+    runtime = scheduler->runtime;
+    if (runtime->state != BSR_RUNNING || runtime->program == NULL ||
+        runtime->executor.program != runtime->program ||
+        (scheduler->state != HW4_RUN_RUNNING &&
+         scheduler->state != HW4_RUN_YIELDED))
+        return false;
+    cursor = runtime->executor.cursor;
+    if (bp_next(runtime->program, &cursor, &line) != BP_OK)
+        return false;
+    *line_number = line.number;
+    return true;
+}
+
 static Hw4RunSlice outcome(Hw4RunState state, size_t steps)
 {
     Hw4RunSlice result = {state, steps};

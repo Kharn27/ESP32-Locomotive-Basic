@@ -13,7 +13,6 @@ WORKFLOW = ROOT / '.github/workflows/hw4-mem-c6-b2-a-live.yml'
 SENTINEL = '0d5315be79262bb0355f8141a351937272f548fd'
 PATHS = (
     '.github/workflows/hw4-mem-c6-b2-a-live.yml',
-    'tools/ci/opt3_routing.py',
     'tools/ci/hw4_mem_c6_refs.py',
     'tests/test_hw4_mem_c6_refs.py',
     'tests/test_hw4_mem_c6_b2_a_live.py',
@@ -101,6 +100,11 @@ class TrustedWorkflowTests(unittest.TestCase):
         with self.assertRaises(ContractViolation) as caught:
             check_workflow(candidate)
         self.assertEqual(str(caught.exception), expected)
+
+    def test_legacy_router_filter_rejected(self):
+        path = "      - '.github/workflows/hw4-mem-c6-b2-a-live.yml'"
+        self.mutate(path, path + "\n      - 'tools/ci/opt3_routing.py'",
+                    'UNSAFE_PATH_FILTER')
 
     def test_broad_filter_rejected(self):
         self.mutate("      - 'docs/HW4-MEM-C6-B2-A-live.md'", "      - 'docs/**'", 'UNSAFE_PATH_FILTER')

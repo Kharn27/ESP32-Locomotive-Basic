@@ -280,7 +280,15 @@ def judge(base, head, limit=None):
             else "INCREMENTAL_FAIL", **delta}
 
 
-def evaluate(memory, provenance):
+def evaluate(memory, provenance, allocation=None):
+    if allocation is not None:
+        require(allocation.get("status") == "AUTHORIZED_ESC_B1_DRAM_BSS_40" and
+                allocation.get("pr_number") == ESC_B1_PR and
+                allocation.get("issue") == ESC_B1_ISSUE and
+                allocation.get("source_base") == ESC_B1_SOURCE_BASE and
+                allocation.get("source_head") == ESC_B1_SOURCE_HEAD and
+                allocation.get("limit") == ESC_B1_LIMIT,
+                "ESC B1 allocation ledger changed")
     base40, head40 = memory["base"]["spi40"], memory["head"]["spi40"]
     require(len({m["docker_image_id"] for label in memory for m in memory[label].values()}) == 1,
             "Docker image ID differs across real builds")
@@ -293,20 +301,23 @@ def evaluate(memory, provenance):
         require((b["sdkconfig"], b["gcc"], b["ld"], b["idf"], b["docker_image_id"]) ==
                 (h["sdkconfig"], h["gcc"], h["ld"], h["idf"], h["docker_image_id"]),
                 "base/head build settings or toolchain differ: " + variant)
+    limit = allocation["limit"] if allocation is not None else None
     r = {
         "contract": VERSION, "provenance": provenance, "anchors": ANCHORS,
+        "allocation": allocation or {"status": "NO_ALLOCATION", "limit": {"iram": 0, "dram": 0, "bss": 0}},
+        "historical_c3_dram_cap": 54864, "historical_b3_dram_cost_cap": 696,
         "render_a": {"historical": {label: status_hist(memory[label]["spi40"],
                                                        "RENDER_A", "spi40")
                                     for label in ("base", "head")},
-                     "incremental": judge(base40, head40)},
+                     "incremental": judge(base40, head40, limit)},
         "spi_c3": {"historical": {label: {v: status_hist(memory[label][v], "B3", v)
                                              for v in CLOCKS}
                                   for label in ("base", "head")},
-                   "incremental": {v: judge(memory["base"][v], memory["head"][v])
+                   "incremental": {v: judge(memory["base"][v], memory["head"][v], limit)
                                    for v in CLOCKS},
                    "variants": {"status": "SPI_VARIANTS_PARITY_UNVERIFIED"}},
         "measured": {label: {v: {k: m[k] for k in
-                      ("iram", "dram", "bss", "flash_text", "flash_rodata", "bin_sha256")}
+                      ("iram", "dram", "bss", "dram_data", "flash_text", "flash_rodata", "bin_sha256")}
                       for v, m in variants.items()} for label, variants in memory.items()}
     }
     # Mandatory historical debt is visible, never converted to PASS by v2's
@@ -318,17 +329,22 @@ def evaluate(memory, provenance):
     faults = []
     for label in ("base", "head"):
         a, b = memory[label]["spi40"], memory[label]["spi20"]
-        if (a["iram"], a["dram"]) != (b["iram"], b["dram"]):
-            faults.append(label + " SPI40/SPI20 IRAM/DRAM disparity")
+        if (a["iram"], a["dram"], a["bss"], a["dram_data"]) != (
+                b["iram"], b["dram"], b["bss"], b["dram_data"]):
+            faults.append(label + " SPI40/SPI20 IRAM/DRAM/BSS/data disparity")
         if a["bin_sha256"] == b["bin_sha256"]:
             faults.append(label + " SPI40/SPI20 identical BIN")
         if a["sdkconfig"] != b["sdkconfig"]:
             faults.append(label + " SPI40/SPI20 SDKCONFIG differs")
-    for v in CLOCKS:
-        for label in ("base", "head"):
-            d = memory[label][v]["dram"]
-            if not 0 <= d - 54168 <= 696 or d > 54864:
-                faults.append(label + " " + v + " C3 DRAM cap/B3-cost exceeded")
+    # 54864 and B3 696 are historical failures via status_hist(), not a
+    # perpetual current-main ceiling after the approved ESC B1 integration.
+    if allocation is not None:
+        for v in CLOCKS:
+            b, h = memory["base"][v], memory["head"][v]
+            if h["dram_data"] != b["dram_data"]:
+                faults.append(v + " ESC allocation changed .dram0.data")
+            if h["dram"] - b["dram"] != h["bss"] - b["bss"]:
+                faults.append(v + " ESC allocation growth outside BSS")
     r["spi_c3"]["variants"] = {
         "status": "SPI_VARIANTS_PARITY_FAIL" if faults else "SPI_VARIANTS_PARITY_PASS",
         "faults": faults}

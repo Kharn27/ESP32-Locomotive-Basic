@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools" / "ci"))
 import hw4_mem_c7_v2 as c
 import hw4_mem_c7_provenance as p
+import hw4_mem_c7_legacy as legacy
 
 BASE = "e586f0161c73e309291060111335f0b30fc48e84"
 HEAD = "1" * 40
@@ -225,12 +226,18 @@ class Comparator(unittest.TestCase):
         r = c.evaluate(self.metrics(), provenance())
         self.assertEqual(r["spi_c3"]["variants"]["status"], "SPI_VARIANTS_PARITY_FAIL")
 
-    def test_b3_relative_dram_cap_rejected(self):
+    def test_b3_relative_dram_cap_is_historical_not_future_perpetual_ceiling(self):
         for v in c.CLOCKS:
             self.write("base", v, BASE, BASE_TREE, c.CLOCKS[v],
                        dram=54865)
         r = c.evaluate(self.metrics(), provenance())
-        self.assertEqual(r["spi_c3"]["variants"]["status"], "SPI_VARIANTS_PARITY_FAIL")
+        self.assertEqual(r["spi_c3"]["historical"]["base"]["spi40"]["status"],
+                         "HISTORICAL_FAILURE")
+        # No new growth: base 54865 -> head 54864 is allowed. The old
+        # permanent 54864 cap may not block a newer already-accepted main.
+        self.assertEqual(r["spi_c3"]["variants"]["status"],
+                         "SPI_VARIANTS_PARITY_PASS")
+        self.assertEqual(r["status"], "INCREMENTAL_PASS")
 
     def test_profiles_clocks_hal_flags_rejected(self):
         for field, val in (("profile", "HW3"), ("clock_hz", 1), ("variant", "spi20")):
@@ -394,9 +401,6 @@ class Comparator(unittest.TestCase):
         self.assertEqual(report["spi_variants_parity"], "SPI_VARIANTS_PARITY_UNVERIFIED")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 # Independent C7 single-byte adversarial regression checks (synthetic fixtures).
 class SingleByte(unittest.TestCase):
     def test_independent_plus_one_iram_dram_bss(self):
@@ -407,3 +411,225 @@ class SingleByte(unittest.TestCase):
                     head=dict(base); head[key]+=1
                     self.assertEqual(c.judge(base,head)["status"],"INCREMENTAL_FAIL")
 
+
+
+# #388: authenticate allocation only by real PR #387 + pinned B1 Git patch.
+# Synthetic mock Git responses prove both positive and fail-closed branches;
+# no fixture alone creates a deployment authorization.
+class EscB1Allocation(Comparator):
+    def approved(self, changes=None, git_results=None, anc_ok=True):
+        pv = provenance()
+        pv["pr_number"] = c.ESC_B1_PR
+        pv["repo"] = c.ESC_B1_REPO
+        lv = live()
+        lv.update({"number": c.ESC_B1_PR,
+                   "title": "[DRAFT] HW4-ESC-BREAK-B1 (#385)"})
+        lv["head"]["repo"] = {"full_name": c.ESC_B1_REPO}
+        lv["head"]["ref"] = c.ESC_B1_BRANCH
+        if changes:
+            for location, name, value in changes:
+                (pv if location == "provenance" else
+                 lv["head"] if location == "head" else lv)[name] = value
+        names = "\n".join(sorted(c.ESC_B1_PATHS))
+        sequence = git_results or ["commit", "commit", names, names, "approved B1 patch",
+                                   "approved B1 patch"]
+        with mock.patch.object(c, "git", side_effect=sequence), \
+             mock.patch.object(c.subprocess, "run",
+                               return_value=mock.Mock(returncode=0 if anc_ok else 1)):
+            return c.authorize_esc_b1(pv, lv, c.ESC_B1_REPO,
+                                      c.ESC_B1_PR, "/verified-head")
+
+    def b1_metrics(self, growth=40, bss_growth=40, iram_growth=0,
+                   only_variant=None):
+        for variant in c.CLOCKS:
+            if only_variant is not None and variant != only_variant:
+                continue
+            self.write("head", variant, HEAD, HEAD_TREE, c.CLOCKS[variant],
+                       iram=67551 + iram_growth,
+                       dram=54864 + growth, bss=43792 + bss_growth)
+        return self.metrics()
+
+    def test_approved_closed_ledger_and_provenance(self):
+        self.assertEqual(c.ESC_B1_PR, 387)
+        self.assertEqual(c.ESC_B1_ISSUE, 385)
+        self.assertEqual(c.ESC_B1_LIMIT, {"iram": 0, "dram": 40, "bss": 40})
+        self.assertEqual(c.ESC_B1_SOURCE_HEAD,
+                         "010e2d1d14941e4e09c097c8599b5cf4d0527f2f")
+        self.assertEqual(len(c.ESC_B1_PATHS), 10)
+        token = self.approved()
+        self.assertEqual(token["status"], "AUTHORIZED_ESC_B1_DRAM_BSS_40")
+        self.assertEqual(len(token["patch_sha256"]), 64)
+        report = c.evaluate(self.b1_metrics(), provenance(), token)
+        self.assertEqual(report["status"], "INCREMENTAL_PASS")
+        self.assertEqual(report["spi_c3"]["variants"]["status"],
+                         "SPI_VARIANTS_PARITY_PASS")
+        self.assertEqual(report["render_a"]["historical"]["head"]["status"],
+                         "HISTORICAL_FAILURE")
+        self.assertEqual(report["spi_c3"]["historical"]["head"]["spi40"]["status"],
+                         "HISTORICAL_FAILURE")
+        self.assertIn("AUTHORIZED_ESC_B1_DRAM_BSS_40", c.markdown(report))
+        self.assertEqual(report["measured"]["head"]["spi40"]["dram_data"], 11072)
+
+    def test_plus_41_bss_dram_and_plus_one_iram_still_fail(self):
+        token = self.approved()
+        for variant in c.CLOCKS:
+            for dram, bss, iram in ((41, 41, 0), (40, 41, 0),
+                                    (41, 40, 0), (40, 40, 1)):
+                with self.subTest(variant=variant, dram=dram, bss=bss, iram=iram):
+                    self.setUp()
+                    report = c.evaluate(self.b1_metrics(dram, bss, iram),
+                                        provenance(), token)
+                    self.assertEqual(report["status"], "INCREMENTAL_FAIL")
+                    self.assertEqual(report["allocation"]["limit"],
+                                     {"iram": 0, "dram": 40, "bss": 40})
+
+    def test_one_variant_only_or_dram_data_changed_rejected(self):
+        token = self.approved()
+        self.assertEqual(c.evaluate(self.b1_metrics(only_variant="spi40"),
+                                    provenance(), token)["status"], "INCREMENTAL_FAIL")
+        self.setUp()
+        changed_data = c.evaluate(self.b1_metrics(40, 39), provenance(), token)
+        self.assertEqual(changed_data["status"], "INCREMENTAL_FAIL")
+        self.assertIn("ESC allocation changed .dram0.data",
+                      " ".join(changed_data["spi_c3"]["variants"]["faults"]))
+
+    def test_no_budget_for_other_pr_or_reused_head_sha(self):
+        measurements = self.b1_metrics()
+        self.assertEqual(c.evaluate(measurements, provenance())["status"],
+                         "INCREMENTAL_FAIL")
+        for identity in (0, 385, 388, 999):
+            self.assertIsNone(c.authorize_esc_b1(provenance(), live(),
+                                                 c.ESC_B1_REPO, identity, "head"))
+        for metric in ("iram", "dram", "bss"):
+            base = {"iram": 67551, "dram": 54864, "bss": 43792}
+            newer = dict(base)
+            newer[metric] += 1
+            self.assertEqual(c.judge(base, newer)["status"], "INCREMENTAL_FAIL")
+
+    def test_wrong_fork_pr_ref_head_patch_and_ancestry(self):
+        bad = [
+            [("head", "ref", "other-branch")],
+            [("head", "repo", {"full_name": "evil/ESP32-Locomotive-Basic"})],
+            [("head", "sha", "f" * 40)],
+            [("provenance", "pr_number", 388)],
+            [("live", "state", "closed")],
+            [("live", "title", "unrelated")],
+        ]
+        for changes in bad:
+            with self.subTest(changes=changes), self.assertRaisesRegex(
+                    ValueError, "ESC allocation"):
+                self.approved(changes=changes)
+        with self.assertRaisesRegex(ValueError, "ancestry"):
+            self.approved(anc_ok=False)
+        names = "\n".join(sorted(c.ESC_B1_PATHS))
+        for sequence in (
+            ["missing", "commit"],
+            ["commit", "commit", names, "tools/ci/fake.py"],
+            ["commit", "commit", names, names, "original", "tampered"],
+        ):
+            with self.subTest(sequence=sequence), self.assertRaises(
+                    (ValueError, StopIteration)):
+                self.approved(git_results=sequence)
+
+    def test_mutated_allocation_ledger_rejected(self):
+        token = self.approved()
+        for key, val in (("issue", 999), ("source_head", "f" * 40),
+                         ("pr_number", 388),
+                         ("status", "ANY_PR_PLUS_40")):
+            trial = dict(token)
+            trial[key] = val
+            with self.subTest(key=key), self.assertRaisesRegex(
+                    ValueError, "ledger changed"):
+                c.evaluate(self.b1_metrics(), provenance(), trial)
+        for key, val in (("dram", 41), ("bss", 41), ("iram", 1)):
+            with self.subTest(key=key):
+                t = dict(token)
+                t["limit"] = dict(token["limit"])
+                t["limit"][key] = val
+                with self.assertRaises(ValueError):
+                    c.evaluate(self.b1_metrics(), provenance(), t)
+
+    def test_future_main_after_b1_has_no_automatic_allowance(self):
+        # Newer accepted real main is 54904/43832; unchanged branch is PASS
+        # despite old C3/RENDER-A 54864, which must remain historically red.
+        for variant in c.CLOCKS:
+            self.write("base", variant, BASE, BASE_TREE, c.CLOCKS[variant],
+                       dram=54904, bss=43832)
+            self.write("head", variant, HEAD, HEAD_TREE, c.CLOCKS[variant],
+                       dram=54904, bss=43832)
+        r = c.evaluate(self.metrics(), provenance())
+        self.assertEqual(r["status"], "INCREMENTAL_PASS")
+        self.assertEqual(r["allocation"]["status"], "NO_ALLOCATION")
+        self.assertEqual(r["render_a"]["historical"]["base"]["status"],
+                         "HISTORICAL_FAILURE")
+        self.assertEqual(r["spi_c3"]["historical"]["base"]["spi40"]["status"],
+                         "HISTORICAL_FAILURE")
+        self.write("head", "spi40", HEAD, HEAD_TREE, 40000000,
+                   dram=54905, bss=43833)
+        self.write("head", "spi20", HEAD, HEAD_TREE, 20000000,
+                   dram=54905, bss=43833)
+        self.assertEqual(c.evaluate(self.metrics(), provenance())["status"],
+                         "INCREMENTAL_FAIL")
+
+
+class HistoricalWitness(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.folder = Path(temp.name)
+
+    def files(self, mode, dram, iram):
+        anchor = 54864 if mode == "render" else 54168
+        history = self.folder / "historical.txt"
+        spi40 = self.folder / "spi40.txt"
+        spi20 = self.folder / "spi20.txt"
+        for path, data in ((history, sect(iram=67331, dram=anchor, bss=43000)),
+                           (spi40, sect(iram=iram, dram=dram, bss=43792)),
+                           (spi20, sect(iram=iram, dram=dram, bss=43792))):
+            path.write_text(data, encoding="utf-8")
+        log = self.folder / "legacy.log"
+        return log, history, spi40, spi20
+
+    def test_history_dram_first_and_iram_first_both_valid_rc1(self):
+        cases = [
+            ("render", 54904, 67551, "ValueError: " + legacy.RENDER_DRAM, "DRAM"),
+            ("render", 54864, 67551, "ValueError: " + legacy.RENDER_IRAM, "IRAM"),
+            ("c3", 54904, 67551, "AssertionError: ('spi40', '" + legacy.C3_DRAM + "')", "DRAM"),
+            ("c3", 54864, 67551, "AssertionError: ('spi40', '" + legacy.C3_IRAM + "')", "IRAM"),
+        ]
+        for mode, dram, iram, message, first in cases:
+            with self.subTest(mode=mode, first=first):
+                log, h, a, b = self.files(mode, dram, iram)
+                log.write_text("Traceback (most recent call last):\n" + message + "\n")
+                result = legacy.attest(mode, 1, log, h, a, b)
+                self.assertEqual(result["status"], "HISTORICAL_FAILURE")
+                self.assertEqual(result["old_rc"], 1)
+                self.assertEqual(result["first_failed_metric"], first)
+
+    def test_bad_legacy_rc_or_wrong_error_always_stops(self):
+        for mode in ("render", "c3"):
+            log, h, a, b = self.files(mode, 54904, 67551)
+            marker = ("ValueError: " + legacy.RENDER_DRAM if mode == "render"
+                      else "AssertionError: ('spi40', '" + legacy.C3_DRAM + "')")
+            log.write_text("Traceback (most recent call last):\n" + marker + "\n")
+            for rc in (0, 2, 3, -1):
+                with self.subTest(mode=mode, rc=rc), self.assertRaisesRegex(
+                        ValueError, "unexpected rc"):
+                    legacy.attest(mode, rc, log, h, a, b)
+            log.write_text("Traceback (most recent call last):\nIRAM changed\n")
+            with self.assertRaises(ValueError):
+                legacy.attest(mode, 1, log, h, a, b)
+            log.write_text(marker)
+            with self.assertRaises(ValueError):
+                legacy.attest(mode, 1, log, h, a, b)
+            log.write_text("Traceback (most recent call last):\n" + marker + "\n")
+            b.write_text(sect(iram=67552, dram=54904, bss=43792))
+            with self.assertRaisesRegex(ValueError, "SPI mismatch"):
+                legacy.attest(mode, 1, log, h, a, b)
+            b.write_text("")
+            with self.assertRaises(ValueError):
+                legacy.attest(mode, 1, log, h, a, b)
+
+
+if __name__ == "__main__":
+    unittest.main()

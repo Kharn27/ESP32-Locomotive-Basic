@@ -7,7 +7,6 @@ on:
       - 'tools/ci/hw4_mem_c6_b2_d1.py'
       - 'tests/test_hw4_mem_c6_b2_d1.py'
       - 'docs/HW4-MEM-C6-B2-D1.md'
-      - 'tools/ci/opt3_routing.py'
   workflow_dispatch:
 
 permissions:

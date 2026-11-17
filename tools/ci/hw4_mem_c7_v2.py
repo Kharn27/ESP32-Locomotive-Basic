@@ -32,6 +32,29 @@ FILES = ("sections.txt", "firmware.elf", "firmware.bin", "CMakeCache.txt",
          "compile_commands.json", "sdkconfig", "idf-version.txt",
          "gcc-version.txt", "ld-version.txt")
 CLOCKS = {"spi40": 40000000, "spi20": 20000000}
+
+# C7-C1 #388: closed Git-object ledger of the *only* approved growth.
+# Later #387 HEAD must be an ancestor-preserving integration of main and
+# have the same exact base-to-head patch as the original reviewed B1.
+ESC_B1_REPO = "Kharn27/ESP32-Locomotive-Basic"
+ESC_B1_PR = 387
+ESC_B1_ISSUE = 385
+ESC_B1_BRANCH = "feat/hw4-esc-break-b1-console"
+ESC_B1_SOURCE_BASE = "3f84b119c404b95f72eab3b7dd6f3034bfc7c959"
+ESC_B1_SOURCE_HEAD = "010e2d1d14941e4e09c097c8599b5cf4d0527f2f"
+ESC_B1_PATHS = frozenset({
+    "CMakeLists.txt",
+    "docs/HW4-ESC-BREAK-B1-cyd.md",
+    "firmware/esp32_display_probe/main/CMakeLists.txt",
+    "firmware/esp32_display_probe/main/hw4_c2_console.c",
+    "integration/hw4_cpc_escape_contract.c",
+    "integration/hw4_cpc_escape_contract.h",
+    "integration/hw4_run_scheduler.c",
+    "integration/hw4_run_scheduler.h",
+    "tests/test_hw4_cpc_escape_contract.c",
+    "tests/test_hw4_run_break_b.c",
+})
+ESC_B1_LIMIT = {"iram": 0, "dram": 40, "bss": 40}
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
 
@@ -93,6 +116,62 @@ def verify_provenance(provenance, live, repo, pr_number, base_checkout, head_che
                              "--is-ancestor", mb, sha], capture_output=True)
         require(rc.returncode == 0, "corrupted Git graph")
     return base, head
+
+
+def authorize_esc_b1(provenance, live, repo, pr_number, head_checkout):
+    """Allocate ONLY after GitHub PR and original B1 Git patch are verified.
+
+    verify_provenance() must have already proven the live API response,
+    current main/head checkouts, SHA/tree integrity and merge-base.
+    """
+    if pr_number != ESC_B1_PR:
+        return None
+    require(repo == ESC_B1_REPO and provenance.get("repo") == repo and
+            provenance.get("pr_number") == ESC_B1_PR,
+            "ESC allocation wrong repository or PR")
+    require(live.get("number") == ESC_B1_PR and live.get("state") == "open" and
+            live.get("head", {}).get("sha") == provenance.get("head_sha") and
+            live.get("base", {}).get("sha") == provenance.get("base_sha"),
+            "ESC allocation stale or falsified live PR")
+    require(live.get("head", {}).get("repo", {}).get("full_name") == repo and
+            live.get("head", {}).get("ref") == ESC_B1_BRANCH and
+            live.get("base", {}).get("repo", {}).get("full_name") == repo and
+            live.get("base", {}).get("ref") == "main",
+            "ESC allocation fork or unapproved PR branch")
+    require("#385" in live.get("title", "") or
+            "Refs #385" in (live.get("body") or ""),
+            "ESC allocation original issue missing")
+    base, head = provenance["base_sha"], provenance["head_sha"]
+    checked_sha(base)
+    checked_sha(head)
+    require(base != head, "ESC allocation empty PR diff")
+    for original in (ESC_B1_SOURCE_BASE, ESC_B1_SOURCE_HEAD):
+        require(git(head_checkout, "cat-file", "-t", original) == "commit",
+                "ESC approved B1 original commit missing")
+    for before, after in ((ESC_B1_SOURCE_BASE, ESC_B1_SOURCE_HEAD),
+                          (ESC_B1_SOURCE_HEAD, head)):
+        rc = subprocess.run(["git", "-C", str(head_checkout), "merge-base",
+                             "--is-ancestor", before, after],
+                            capture_output=True)
+        require(rc.returncode == 0,
+                "ESC original B1 commit is not in the real Git ancestry")
+    original_paths = frozenset(git(head_checkout, "diff", "--name-only",
+                                   "--no-renames", ESC_B1_SOURCE_BASE,
+                                   ESC_B1_SOURCE_HEAD).splitlines())
+    current_paths = frozenset(git(head_checkout, "diff", "--name-only",
+                                  "--no-renames", base, head).splitlines())
+    require(original_paths == ESC_B1_PATHS and current_paths == ESC_B1_PATHS,
+            "ESC B1 file diff mismatch")
+    opts = ("diff", "--binary", "--no-ext-diff", "--no-renames")
+    original = git(head_checkout, *opts, ESC_B1_SOURCE_BASE, ESC_B1_SOURCE_HEAD)
+    current = git(head_checkout, *opts, base, head)
+    require(original and current == original, "ESC B1 approved patch changed")
+    return {"status": "AUTHORIZED_ESC_B1_DRAM_BSS_40",
+            "issue": ESC_B1_ISSUE, "pr_number": ESC_B1_PR,
+            "source_base": ESC_B1_SOURCE_BASE,
+            "source_head": ESC_B1_SOURCE_HEAD,
+            "patch_sha256": digest(original.encode("utf-8")),
+            "limit": dict(ESC_B1_LIMIT)}
 
 
 def checked_binary(path, expected_sha, prefix):
@@ -157,12 +236,18 @@ def build_metrics(root, label, variant, sha, tree):
                       ("OFF" if variant == "spi40" else "ON") + r"$",
                       cache, re.M) is not None, "explicit SPI20 opt-in cache mismatch")
     sections = read_size(folder / "sections.txt")
+    data_sections = re.findall(
+        r"^\s*\.dram0\.data\s+(\d+)\s+(?:0x[0-9A-Fa-f]+|\d+)\s*$",
+        data["sections.txt"].decode("utf-8"), re.M)
+    require(len(data_sections) == 1 and int(data_sections[0]) > 0,
+            "missing/ambiguous .dram0.data section")
     require(sections["iram"] > 0 and sections["dram"] > 0 and
             sections["bss"] > 0 and sections["dram"] >= sections["bss"],
             "invalid sections or BSS")
     require(meta.get("sdkconfig_sha256") == digest(data["sdkconfig"]),
             "sdkconfig digest incorrect")
     return {"iram": sections["iram"], "dram": sections["dram"], "bss": sections["bss"],
+            "dram_data": int(data_sections[0]),
             "flash_text": sections["flash_text"], "flash_rodata": sections["flash_rodata"],
             "bin_sha256": digest(data["firmware.bin"]), "sdkconfig": digest(data["sdkconfig"]),
             "gcc": gcc, "ld": ld, "idf": idf, "docker_image_id": meta["docker_image_id"],
@@ -183,13 +268,27 @@ def status_hist(memory, anchor, variant):
             "variant": variant}
 
 
-def judge(base, head):
+def judge(base, head, limit=None):
+    limits = limit if limit is not None else {"iram": 0, "dram": 0, "bss": 0}
+    require(set(limits) == {"iram", "dram", "bss"} and
+            all(type(limits[k]) is int and
+                0 <= limits[k] <= ESC_B1_LIMIT[k] for k in limits),
+            "invalid RAM allocation ledger")
     delta = {k: head[k] - base[k] for k in ("iram", "dram", "bss")}
-    return {"status": "INCREMENTAL_PASS" if all(v <= 0 for v in delta.values())
+    return {"status": "INCREMENTAL_PASS" if all(
+                delta[k] <= limits[k] for k in delta)
             else "INCREMENTAL_FAIL", **delta}
 
 
-def evaluate(memory, provenance):
+def evaluate(memory, provenance, allocation=None):
+    if allocation is not None:
+        require(allocation.get("status") == "AUTHORIZED_ESC_B1_DRAM_BSS_40" and
+                allocation.get("pr_number") == ESC_B1_PR and
+                allocation.get("issue") == ESC_B1_ISSUE and
+                allocation.get("source_base") == ESC_B1_SOURCE_BASE and
+                allocation.get("source_head") == ESC_B1_SOURCE_HEAD and
+                allocation.get("limit") == ESC_B1_LIMIT,
+                "ESC B1 allocation ledger changed")
     base40, head40 = memory["base"]["spi40"], memory["head"]["spi40"]
     require(len({m["docker_image_id"] for label in memory for m in memory[label].values()}) == 1,
             "Docker image ID differs across real builds")
@@ -202,20 +301,23 @@ def evaluate(memory, provenance):
         require((b["sdkconfig"], b["gcc"], b["ld"], b["idf"], b["docker_image_id"]) ==
                 (h["sdkconfig"], h["gcc"], h["ld"], h["idf"], h["docker_image_id"]),
                 "base/head build settings or toolchain differ: " + variant)
+    limit = allocation["limit"] if allocation is not None else None
     r = {
         "contract": VERSION, "provenance": provenance, "anchors": ANCHORS,
+        "allocation": allocation or {"status": "NO_ALLOCATION", "limit": {"iram": 0, "dram": 0, "bss": 0}},
+        "historical_c3_dram_cap": 54864, "historical_b3_dram_cost_cap": 696,
         "render_a": {"historical": {label: status_hist(memory[label]["spi40"],
                                                        "RENDER_A", "spi40")
                                     for label in ("base", "head")},
-                     "incremental": judge(base40, head40)},
+                     "incremental": judge(base40, head40, limit)},
         "spi_c3": {"historical": {label: {v: status_hist(memory[label][v], "B3", v)
                                              for v in CLOCKS}
                                   for label in ("base", "head")},
-                   "incremental": {v: judge(memory["base"][v], memory["head"][v])
+                   "incremental": {v: judge(memory["base"][v], memory["head"][v], limit)
                                    for v in CLOCKS},
                    "variants": {"status": "SPI_VARIANTS_PARITY_UNVERIFIED"}},
         "measured": {label: {v: {k: m[k] for k in
-                      ("iram", "dram", "bss", "flash_text", "flash_rodata", "bin_sha256")}
+                      ("iram", "dram", "bss", "dram_data", "flash_text", "flash_rodata", "bin_sha256")}
                       for v, m in variants.items()} for label, variants in memory.items()}
     }
     # Mandatory historical debt is visible, never converted to PASS by v2's
@@ -227,17 +329,22 @@ def evaluate(memory, provenance):
     faults = []
     for label in ("base", "head"):
         a, b = memory[label]["spi40"], memory[label]["spi20"]
-        if (a["iram"], a["dram"]) != (b["iram"], b["dram"]):
-            faults.append(label + " SPI40/SPI20 IRAM/DRAM disparity")
+        if (a["iram"], a["dram"], a["bss"], a["dram_data"]) != (
+                b["iram"], b["dram"], b["bss"], b["dram_data"]):
+            faults.append(label + " SPI40/SPI20 IRAM/DRAM/BSS/data disparity")
         if a["bin_sha256"] == b["bin_sha256"]:
             faults.append(label + " SPI40/SPI20 identical BIN")
         if a["sdkconfig"] != b["sdkconfig"]:
             faults.append(label + " SPI40/SPI20 SDKCONFIG differs")
-    for v in CLOCKS:
-        for label in ("base", "head"):
-            d = memory[label][v]["dram"]
-            if not 0 <= d - 54168 <= 696 or d > 54864:
-                faults.append(label + " " + v + " C3 DRAM cap/B3-cost exceeded")
+    # 54864 and B3 696 are historical failures via status_hist(), not a
+    # perpetual current-main ceiling after the approved ESC B1 integration.
+    if allocation is not None:
+        for v in CLOCKS:
+            b, h = memory["base"][v], memory["head"][v]
+            if h["dram_data"] != b["dram_data"]:
+                faults.append(v + " ESC allocation changed .dram0.data")
+            if h["dram"] - b["dram"] != h["bss"] - b["bss"]:
+                faults.append(v + " ESC allocation growth outside BSS")
     r["spi_c3"]["variants"] = {
         "status": "SPI_VARIANTS_PARITY_FAIL" if faults else "SPI_VARIANTS_PARITY_PASS",
         "faults": faults}
@@ -256,6 +363,10 @@ def markdown(report):
              "", "PR #" + str(p["pr_number"]) + " GitHub real base " + p["base_sha"] +
              " → HEAD " + p["head_sha"], "Merge-base: " + p["merge_base"],
              "Historical debt: **" + report["historical_debt"] + "**",
+             "Allocation: **" + report["allocation"]["status"] + "** " +
+             str(report["allocation"]["limit"]) +
+             " (issue #385 / PR #387 only; not inherited by later PRs)",
+             "Historical references retained: C3 DRAM 54864 B / B3 cost <=696 B",
              "", "| Channel | Base IRAM / DRAM / BSS | HEAD IRAM / DRAM / BSS | Incremental |",
              "|---|---|---|---|"]
     for variant in CLOCKS:
@@ -310,7 +421,9 @@ def main(argv=None):
                                                   p[label + "_tree"])
                           for variant in CLOCKS}
                   for label, sha in (("base", base), ("head", head))}
-        report = evaluate(memory, p)
+        allocation = authorize_esc_b1(p, latest, args.repo,
+                                       args.pr_number, args.head_checkout)
+        report = evaluate(memory, p, allocation)
         # Historical verdict remains independently measured, even if future code
         # reductions genuinely close the old debt; never force old failure to PASS.
         rc = 0 if report["status"] == "INCREMENTAL_PASS" else 1

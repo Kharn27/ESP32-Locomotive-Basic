@@ -4,7 +4,9 @@
 Réutilise PO-AUTO-01 (Session, CRC/PNG, provenance, ZIP, SHA256SUMS),
 sans modifier le firmware ni les outils du dépôt.
 
-LIMITATION: !SHOT n'est accepté qu'au prompt, JAMAIS pendant RUN/PAUSED.
+CAPTURE: HOME (ESC[H) depuis E3, par le routeur UART existant.
+!SHOT est un secours HOST au prompt, non utilisé par ce script.
+Aucune capture HOME/!SHOT pendant RUN/PAUSED.
 Les PNG automatiques prouvent la VRAM logique AVANT RUN et APRES BREAK ;
 une photo du TFT pendant PAUSED reste une observation physique PO.
 """
@@ -158,12 +160,74 @@ class Driver:
         self.event("CHECK", "PASS", name + " " + details)
 
     def shot(self, cid: str, stage: str):
-        # Existing PO-AUTO-01 decoder validates BEGIN/240 ROW/DONE,
-        # CRC32, full firmware SHA, ordered after_shot/after_line memory.
-        self.event("SHOT", "START", f"{cid}_{stage}: prompt only")
-        rec = self.s.capture(cid, stage)
-        self.event("SHOT", "CRC_OK", rec["png"] + " sha256=" + rec["png_sha256"])
-        self.check("SHOT_" + stage, "LOGICAL_VRAM_VERIFIED " + rec["png"])
+        # HW4-SHOT-A: CTRL HOME en E3 = 0x1B 0x5B 0x48, sans CR.
+        # PO-AUTO-01 Session.inspect/Watcher valide strictement la capture,
+        # son identité SHA et CRC et produit le PNG réel du framebuffer logique.
+        # HOME_E3 émet after_shot UNIQUEMENT, pas after_line (!SHOT/prompt).
+        s = self.s
+        self.po.require(not s.awaiting_shot and s.shot_metadata is None,
+                        "SHOT_STATE_LEAK")
+        original = set((s.folder / "screenshots").glob("*.png"))
+        s.awaiting_shot = True
+        self.event("SHOT", "START", f"{cid}_{stage}: HOME_E3 hex=1b5b48")
+        try:
+            self.send_raw(b"\x1b[H", "HOME_E3_SCREENSHOT")
+            done = self.wait("HW4-SHOT-A CAPTURE_DONE ", s.shot_timeout)
+            fields = parse_fields(done, "HW4-SHOT-A CAPTURE_DONE ")
+            meta = s.shot_metadata
+            self.po.require(meta is not None and
+                            fields.get("trigger") == "HOME_E3" and
+                            fields.get("id") == meta["id"] and
+                            fields.get("seq") == str(meta["seq"]) and
+                            fields.get("sha") == EXPECTED_HEAD and
+                            not s.watcher.active,
+                            "HOME_CAPTURE_DONE_MISMATCH")
+            # Contrairement à !SHOT, HOME ne soumet pas une ligne BASIC :
+            # pas de READY_POLICY, INPUT_READY ni stage=after_line après HOME.
+            # La ligne DEVICE_MEMORY stage=after_shot est réellement exigée.
+            deadline = time.monotonic() + s.shot_timeout
+            expected = ("heap8_free", "heap8_largest", "heap8_min",
+                        "stack_margin_bytes", "dma_transfers", "dma_timeouts",
+                        "dma_fault", "lcd_error")
+            while True:
+                line = s.next_line(deadline)
+                if "HW4-C2 DEVICE_MEMORY stage=" in line:
+                    match = self.po.MEMORY.fullmatch(line)
+                    self.po.require(match is not None and
+                                    match.group(1) == "after_shot",
+                                    "HOME_POST_SHOT_MEMORY_INVALID")
+                    mem = self.po.kv(match.group(2))
+                    self.po.require(all(k in mem for k in expected) and
+                                    all(mem[k].isdecimal() for k in expected[:-1]) and
+                                    mem["lcd_error"] == "ESP_OK",
+                                    "HOME_POST_SHOT_MEMORY_INCOMPLETE")
+                    break
+                self.po.require(not ("HW4-SHOT-A CAPTURE_" in line or
+                                     "HW4-C2 UART_LINE " in line or
+                                     "HW4-READY-A READY_POLICY " in line),
+                                "HOME_UNEXPECTED_UART_TRANSITION")
+            self.po.require(s.memory and s.memory[-1]["stage"] == "after_shot",
+                            "HOME_MEMORY_NOT_RECORDED")
+            new = set((s.folder / "screenshots").glob("*.png")) - original
+            self.po.require(len(new) == 1 and s.watcher.bad == 0,
+                            "HOME_PNG_COUNT_OR_CRC_INVALID")
+            src = next(iter(new))
+            name = f"{cid}_{stage}.png"
+            dst = s.folder / "screenshots" / name
+            self.po.require(not dst.exists(), "REFUSE_SHOT_OVERWRITE")
+            src.rename(dst)
+            rec = {"scenario": cid, "stage": stage,
+                   "id": meta["id"], "seq": meta["seq"], "sha": meta["sha"],
+                   "orientation": meta["orient"],
+                   "png": "screenshots/" + name,
+                   "png_sha256": self.po.sha256(dst),
+                   "status": "LOGICAL_VRAM_VERIFIED", "trigger": "HOME_E3"}
+            s.shots.append(rec)
+            self.event("SHOT", "CRC_OK", rec["png"] + " sha256=" + rec["png_sha256"])
+            self.check("SHOT_" + stage, "HOME_E3 LOGICAL_VRAM_VERIFIED " + rec["png"])
+        finally:
+            s.awaiting_shot = False
+            s.shot_metadata = None
 
     def run(self):
         self.s.emit("RUN")
@@ -425,7 +489,7 @@ def run(argv=None) -> int:
     if args.dry_run:
         print(json.dumps({"status": "DRY_RUN_ONLY_NO_DEVICE", "head": head,
                           "scenarios": list(SCENARIOS), "expected_png": EXPECTED_PNG,
-                          "note": "PNG avant RUN/après BREAK uniquement"},
+                          "note": "HOME E3 (ESC[H); PNG avant RUN/après BREAK uniquement"},
                          indent=2, ensure_ascii=False))
         return 0
     folder = None
@@ -454,7 +518,8 @@ def run(argv=None) -> int:
             "scenarios": list(SCENARIOS), "expected_png_count": EXPECTED_PNG,
             "runner_sha256": result["runner_sha256"],
             "scope": "RUN_ESC_PAUSE_RESUME_DOUBLE_ESC_AND_HOST_FALLBACK",
-            "limitations": ["NO_SHOT_DURING_RUN_OR_PAUSED",
+            "limitations": ["HOME_E3_SHOT_ONLY_WHEN_NOT_RUNNING",
+                            "NO_SHOT_DURING_RUN_OR_PAUSED",
                             "LOGICAL_VRAM_IS_NOT_PHYSICAL_TFT"],
             "started_utc": result["started_utc"]})
         events = po.HostEvents(folder)

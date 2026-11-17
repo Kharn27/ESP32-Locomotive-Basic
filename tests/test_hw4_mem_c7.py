@@ -630,7 +630,7 @@ class EscB1Allocation(Comparator):
                     ("diff", "--name-only", "--no-renames", BASE, HEAD): changed})
         for path in c.ESC_B1_CI_PATHS:
             with self.subTest(unmodified=path), self.assertRaisesRegex(
-                    ValueError, "CI-only policy/test blob invalid"):
+                    ValueError, "C7-only policy/test blob invalid"):
                 self.approved(git_overrides={
                     ("ls-tree", HEAD, "--", path):
                     "100644 blob " + "b" * 40 + "\t" + path})

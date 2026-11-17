@@ -417,7 +417,8 @@ class SingleByte(unittest.TestCase):
 # Synthetic mock Git responses prove both positive and fail-closed branches;
 # no fixture alone creates a deployment authorization.
 class EscB1Allocation(Comparator):
-    def approved(self, changes=None, git_results=None, anc_ok=True):
+    def approved(self, changes=None, git_overrides=None, anc_ok=True):
+        """Simulate Git object/tree commands; override individual hostile answers."""
         pv = provenance()
         pv["pr_number"] = c.ESC_B1_PR
         pv["repo"] = c.ESC_B1_REPO
@@ -430,12 +431,46 @@ class EscB1Allocation(Comparator):
             for location, name, value in changes:
                 (pv if location == "provenance" else
                  lv["head"] if location == "head" else lv)[name] = value
-        names = "\n".join(sorted(c.ESC_B1_PATHS))
-        sequence = git_results or ["commit", "commit", names, names, "approved B1 patch",
-                                   "approved B1 patch"]
-        with mock.patch.object(c, "git", side_effect=sequence), \
+
+        original_paths = "\n".join(sorted(c.ESC_B1_PATHS))
+        closed_paths = "\n".join(sorted(
+            c.ESC_B1_PATHS | frozenset(c.ESC_B1_HOST_BLOBS) |
+            c.ESC_B1_CI_PATHS))
+        opts = ("diff", "--binary", "--no-ext-diff", "--no-renames")
+        patch_paths = ("--", *sorted(c.ESC_B1_PATHS))
+
+        def fake_git(folder, *args):
+            if git_overrides and args in git_overrides:
+                return git_overrides[args]
+            if args[:2] == ("cat-file", "-t"):
+                return "commit"
+            if args[:3] == ("diff", "--name-only", "--no-renames"):
+                return (original_paths if args[3] == c.ESC_B1_SOURCE_BASE
+                        else closed_paths)
+            if args[:4] == opts and args[-len(patch_paths):] == patch_paths:
+                return "approved B1 patch"
+            if len(args) == 4 and args[0] == "ls-tree" and args[2] == "--":
+                rev, path = args[1], args[3]
+                if path in c.ESC_B1_PATHS:
+                    if rev in (c.ESC_B1_SOURCE_HEAD, HEAD):
+                        return "100644 blob " + "a" * 40 + "\t" + path
+                elif path in c.ESC_B1_HOST_BLOBS:
+                    if rev == BASE:
+                        return ""
+                    if rev in (c.ESC_B1_PO_HEAD, HEAD):
+                        return ("100644 blob " + c.ESC_B1_HOST_BLOBS[path] +
+                                "\t" + path)
+                elif path in c.ESC_B1_CI_PATHS:
+                    if rev in (BASE, HEAD):
+                        return ("100644 blob " +
+                                ("b" if rev == BASE else "c") * 40 +
+                                "\t" + path)
+            raise AssertionError("unexpected Git lookup: " + repr(args))
+
+        with mock.patch.object(c, "git", side_effect=fake_git), \
              mock.patch.object(c.subprocess, "run",
-                               return_value=mock.Mock(returncode=0 if anc_ok else 1)):
+                               return_value=mock.Mock(
+                                   returncode=0 if anc_ok else 1)):
             return c.authorize_esc_b1(pv, lv, c.ESC_B1_REPO,
                                       c.ESC_B1_PR, "/verified-head")
 
@@ -456,7 +491,13 @@ class EscB1Allocation(Comparator):
         self.assertEqual(c.ESC_B1_SOURCE_HEAD,
                          "010e2d1d14941e4e09c097c8599b5cf4d0527f2f")
         self.assertEqual(len(c.ESC_B1_PATHS), 10)
+        self.assertEqual(c.ESC_B1_CI_PATHS,
+                         frozenset({"tools/ci/hw4_mem_c7_v2.py",
+                                    "tests/test_hw4_mem_c7.py"}))
         token = self.approved()
+        self.assertEqual(token["po_source_head"], c.ESC_B1_PO_HEAD)
+        self.assertEqual(token["host_blobs"], c.ESC_B1_HOST_BLOBS)
+        self.assertEqual(token["ci_paths"], sorted(c.ESC_B1_CI_PATHS))
         self.assertEqual(token["status"], "AUTHORIZED_ESC_B1_DRAM_BSS_40")
         self.assertEqual(len(token["patch_sha256"]), 64)
         report = c.evaluate(self.b1_metrics(), provenance(), token)
@@ -514,6 +555,9 @@ class EscB1Allocation(Comparator):
             [("provenance", "pr_number", 388)],
             [("live", "state", "closed")],
             [("live", "title", "unrelated")],
+            [("live", "base", {"ref": "main",
+                              "repo": {"full_name": c.ESC_B1_REPO},
+                              "sha": "e" * 40})],
         ]
         for changes in bad:
             with self.subTest(changes=changes), self.assertRaisesRegex(
@@ -521,19 +565,82 @@ class EscB1Allocation(Comparator):
                 self.approved(changes=changes)
         with self.assertRaisesRegex(ValueError, "ancestry"):
             self.approved(anc_ok=False)
-        names = "\n".join(sorted(c.ESC_B1_PATHS))
-        for sequence in (
-            ["missing", "commit"],
-            ["commit", "commit", names, "tools/ci/fake.py"],
-            ["commit", "commit", names, names, "original", "tampered"],
+
+        opts = ("diff", "--binary", "--no-ext-diff", "--no-renames")
+        b1 = ("--", *sorted(c.ESC_B1_PATHS))
+        original_names = "\n".join(sorted(c.ESC_B1_PATHS))
+        closed_names = "\n".join(sorted(c.ESC_B1_PATHS |
+                                         frozenset(c.ESC_B1_HOST_BLOBS) |
+                                         c.ESC_B1_CI_PATHS))
+        tampering = [
+            {("cat-file", "-t", c.ESC_B1_SOURCE_BASE): "missing"},
+            {("cat-file", "-t", c.ESC_B1_PO_HEAD): "missing"},
+            {("diff", "--name-only", "--no-renames",
+              c.ESC_B1_SOURCE_BASE, c.ESC_B1_SOURCE_HEAD): "other.py"},
+            {("diff", "--name-only", "--no-renames",
+              BASE, HEAD): closed_names + "\nother.py"},
+            {(*opts, BASE, HEAD, *b1): "tampered B1 patch"},
+            {("ls-tree", HEAD, "--",
+              "integration/hw4_run_scheduler.c"):
+             "100644 blob " + "f" * 40 +
+             "\tintegration/hw4_run_scheduler.c"},
+        ]
+        for overrides in tampering:
+            with self.subTest(overrides=overrides), self.assertRaises(ValueError):
+                self.approved(git_overrides=overrides)
+
+    def test_host_runner_blob_and_mode_must_match_po_firmware(self):
+        self.assertEqual(c.ESC_B1_PO_HEAD,
+                         "5e44ca338e91283484b2ac41c46a7fcc3b2b0a10")
+        self.assertEqual(c.ESC_B1_HOST_BLOBS,
+                         {"tools/hw4_esc_b1_po_auto.py":
+                          "c14f2772dee0ba1b303098b4d97c18d717e12736"})
+        path, sha = next(iter(c.ESC_B1_HOST_BLOBS.items()))
+        for overrides in (
+            {("ls-tree", HEAD, "--", path):
+             "100644 blob " + "f" * 40 + "\t" + path},
+            {("ls-tree", HEAD, "--", path):
+             "100755 blob " + sha + "\t" + path},
+            {("ls-tree", c.ESC_B1_PO_HEAD, "--", path): ""},
+            {("ls-tree", BASE, "--", path):
+             "100644 blob " + sha + "\t" + path},
         ):
-            with self.subTest(sequence=sequence), self.assertRaises(
-                    (ValueError, StopIteration)):
-                self.approved(git_results=sequence)
+            with self.subTest(overrides=overrides), self.assertRaisesRegex(
+                    ValueError, "host runner"):
+                self.approved(git_overrides=overrides)
+
+    def test_extra_host_script_or_ci_tampering_must_fail(self):
+        expected = c.ESC_B1_PATHS | frozenset(c.ESC_B1_HOST_BLOBS) | c.ESC_B1_CI_PATHS
+        self.assertEqual(len(expected), 13)
+        for injected in ("tools/extra_runner.py", "tools/ci/opt3_routing.py",
+                         "firmware/esp32_display_probe/main/extra.c",
+                         "docs/FORGED-MEMORY.md"):
+            changed = "\n".join(sorted(expected | {injected}))
+            overrides = {("diff", "--name-only", "--no-renames",
+                          BASE, HEAD): changed}
+            with self.subTest(path=injected), self.assertRaisesRegex(
+                    ValueError, "closed file diff mismatch"):
+                self.approved(git_overrides=overrides)
+        for missing in (next(iter(c.ESC_B1_HOST_BLOBS)),
+                        next(iter(c.ESC_B1_CI_PATHS))):
+            changed = "\n".join(sorted(expected - {missing}))
+            with self.subTest(missing=missing), self.assertRaisesRegex(
+                    ValueError, "closed file diff mismatch"):
+                self.approved(git_overrides={
+                    ("diff", "--name-only", "--no-renames", BASE, HEAD): changed})
+        for path in c.ESC_B1_CI_PATHS:
+            with self.subTest(unmodified=path), self.assertRaisesRegex(
+                    ValueError, "CI-only policy/test blob invalid"):
+                self.approved(git_overrides={
+                    ("ls-tree", HEAD, "--", path):
+                    "100644 blob " + "b" * 40 + "\t" + path})
 
     def test_mutated_allocation_ledger_rejected(self):
         token = self.approved()
         for key, val in (("issue", 999), ("source_head", "f" * 40),
+                         ("po_source_head", "f" * 40),
+                         ("host_blobs", {"tools/evil.py": "f" * 40}),
+                         ("ci_paths", ["tools/ci/opt3_routing.py"]),
                          ("pr_number", 388),
                          ("status", "ANY_PR_PLUS_40")):
             trial = dict(token)

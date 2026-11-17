@@ -139,6 +139,13 @@ def audit(b2b, d1):
             for suffix in (".relocs.txt", ".sections-symbols.txt"):
                 demand(z2.read(a + suffix) == z2.read(h + suffix),
                        "IDF prelink relocation/symbol changed: " + name + suffix)
+            # The objdump banner embeds only its capture directory.
+            dis_b = z2.read(a + ".disasm-relocs.txt").decode().replace(
+                "/base/", "/SIDE/")
+            dis_h = z2.read(h + ".disasm-relocs.txt").decode().replace(
+                "/head/", "/SIDE/")
+            demand(dis_b == dis_h,
+                   "system prelink disassembly/relocations changed: " + name)
     demand(changed == ["loco_core/basic_executor.c.obj",
                        "loco_core/basic_session_runtime.c.obj"],
            "application allocated prelink changes differ")
@@ -185,6 +192,7 @@ def audit(b2b, d1):
             "source_elf_allocated_changes": changed,
             "system_elf_allocated_unchanged": 16,
             "system_relocations_identical": 16,
+            "system_prelink_disassembly_identical_after_path_normalization": 16,
             "link_command_normalized_equal": True, "linker_script_normalized_equal": True,
             "archives_sha256_members_verified": {"B2B": 134, "D1": 228},
             "iram_base": 67331, "iram_head": 67551,

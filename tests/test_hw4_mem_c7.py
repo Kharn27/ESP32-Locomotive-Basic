@@ -62,7 +62,8 @@ def elf_image():
 def live():
     return {"number": PR, "state": "open",
             "base": {"ref": "main", "repo": {"full_name": REPO}, "sha": BASE},
-            "head": {"sha": HEAD}}
+            "head": {"sha": HEAD, "ref": "fixture-branch",
+                     "repo": {"full_name": REPO}}}
 
 
 def provenance():

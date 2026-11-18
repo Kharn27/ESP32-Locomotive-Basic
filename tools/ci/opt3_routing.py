@@ -374,13 +374,17 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(FAMILIES) == 5 and len(expected) == 46 and
-           len(set(expected)) == 46,
+    demand(len(FAMILIES) == 5 and len(expected) == 47 and
+           len(set(expected)) == 47,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(CLK06_A1_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
            all(CLK06_A1_WORKFLOW not in names for family, names in
                FAMILIES.items() if family != "CPC_ACQUISITION"),
            "A1_WRONG_FAMILY")
+    demand(CLK06_A2_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
+           all(CLK06_A2_WORKFLOW not in names for family, names in
+               FAMILIES.items() if family != "CPC_ACQUISITION"),
+           "CLK06_A2_WRONG_FAMILY")
     demand(CLK04_A2_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
            all(CLK04_A2_WORKFLOW not in ns for family,ns in FAMILIES.items()
                if family != "CPC_ACQUISITION"), "A2_WRONG_FAMILY")
@@ -633,13 +637,13 @@ def audit(sources):
     # CLK-06-A2: no additional triggers, escalation, cancellation or
     # independent seal/HEAD replay bypass. All guards apply to the real YAML.
     a2 = sources[CLK06_A2_WORKFLOW]
-    paths_a1 = filters(a1)
-    demand(paths_a1 is not None and len(paths_a1) == len(CLK06_A2_PATHS)
-           and set(paths_a1) == set(CLK06_A2_PATHS),
+    paths_a2 = filters(a2)
+    demand(paths_a2 is not None and len(paths_a2) == len(CLK06_A2_PATHS)
+           and set(paths_a2) == set(CLK06_A2_PATHS),
            "A2_FILTER_CONTRACT_MISMATCH")
     a2_events = re.findall(r"(?m)^  ([a-z][\w-]*):",
                            a2.split("\npermissions:", 1)[0])
-    demand(a1_events == ["pull_request", "workflow_dispatch"],
+    demand(a2_events == ["pull_request", "workflow_dispatch"],
            "A2_EVENT_CONTRACT_MISMATCH")
     a2_pre = a2.split("\njobs:", 1)[0]
     demand(a2.count("\npermissions:\n") == 1 and
@@ -647,7 +651,7 @@ def audit(sources):
            not re.search(r"(?m)^\s+[\w-]+: write\s*$", a2) and
            "pull_request_target:" not in a2,
            "A2_PERMISSIONS_MISMATCH")
-    demand("group: clk-06-a1-" in a2_pre and
+    demand("group: clk-06-a2-" in a2_pre and
            "cancel-in-progress: false" in a2_pre and
            a2_pre.count("cancel-in-progress:") == 1,
            "A2_ARCHIVE_CANCEL_RISK")
@@ -2640,7 +2644,7 @@ def clk06_a2_negative_tests(sources):
         try:
             audit(sources)
         except UnsafeRoute as exc:
-            demand(str(exc) == "A2_WRONG_FAMILY",
+            demand(str(exc) == "CLK06_A2_WRONG_FAMILY",
                    "A2_WRONG_FAMILY_REJECTION_" + str(exc))
         else:
             raise UnsafeRoute("A2_MISCLASSIFIED_ACCEPTED")
@@ -2652,8 +2656,8 @@ def clk06_a2_negative_tests(sources):
         ".github/workflows/clk-06-a2-acquisition.yml",
         "tools/clk_06_a2_oracle.py",
         "tests/test_clk_06_a2_oracle.py",
-        "tests/fixtures/cpc6128/clk_06_a2_after_remain/corpus.json",
-        "docs/CLK-06-A2-after-remain-cpc-oracle.md",
+        "tests/fixtures/cpc6128/clk_06_a2_every_ch0/corpus.json",
+        "docs/CLK-06-A2-every-ch0-cpc-oracle.md",
     ):
         demand(CLK06_A2_WORKFLOW in triggered_names([path], sources),
                "A2_REQUIRED_ROUTE_MISSING_" + path)

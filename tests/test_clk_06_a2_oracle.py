@@ -184,7 +184,7 @@ class VerifierTests(unittest.TestCase):
         (self.folder/'manifest.json').write_bytes(oracle.canonical(meta))
         return oracle.digest((self.folder/'manifest.json').read_bytes())
 
-    def test_exact_eight_independent_input_cases(self):
+    def test_exact_six_independent_input_cases(self):
         self.assertEqual(len(self.cases),6)
         self.assertEqual(len({oracle.digest(oracle.source_bytes(c)) for c in self.cases}),8)
         self.assertTrue(all('EVERY ' in '\n'.join(c['lines'])

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLK-06-A2: independent CPC6128 AFTER/REMAIN(0) capture and sealed replay.
+"""CLK-06-A2: independent CPC6128 EVERY channel-0 capture and sealed replay.
 
 Acquisition is never an implementation of the CPC timer. Evidence comes only
 from real Caprice32 processes with pinned ROM and original RAM snapshots.
@@ -30,7 +30,7 @@ IMAGE = ("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
 SESSIONS = ("original", "repeat")
 SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
-CASE_ID = re.compile(r"A0[1-8]_[A-Z_]+\Z")
+CASE_ID = re.compile(r"E0[1-6]_[A-Z_]+\Z")
 PROCESS_PARTS = ("list", "run")
 FORBIDDEN_SUFFIXES = (".sna", ".rom", ".dsk", ".zip")
 

@@ -863,7 +863,7 @@ class VisualObservationHost(unittest.TestCase):
         self.assertEqual(len(visual.SCENARIOS), 4)
         self.assertEqual(planned["visible_basic_lines"], list(visual.VISUAL_COUNTER_LINES))
         self.assertEqual([len(x.encode("ascii")) for x in visual.VISUAL_COUNTER_LINES],
-                         [6, 27, 20])
+                         [6, 10, 19])
         with mock.patch.object(visual, "setup_imports",
                                return_value=(ROOT, fake_po)), \
              redirect_stdout(io.StringIO()), \
@@ -925,10 +925,10 @@ class CounterProgramRouting(unittest.TestCase):
                 pass
 
         self.assertEqual(visual.VISUAL_COUNTER_LINES,
-                         ("5 A%=0", "10 A%=A%+1:PRINT A%:GOTO 20",
-                          '20 PRINT "B":GOTO 10'))
+                         ("5 A%=0", "10 A%=A%+1",
+                          "20 PRINT A%:GOTO 10"))
         self.assertEqual([len(x.encode("ascii")) for x in
-                          visual.VISUAL_COUNTER_LINES], [6, 27, 20])
+                          visual.VISUAL_COUNTER_LINES], [6, 10, 19])
         for enabled in (False, True):
             with self.subTest(enabled=enabled):
                 driver = Probe(enabled)

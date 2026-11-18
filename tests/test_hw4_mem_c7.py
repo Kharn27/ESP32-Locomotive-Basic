@@ -498,6 +498,56 @@ class EscB1Allocation(Comparator):
                        dram=54864 + growth, bss=43792 + bss_growth)
         return self.metrics()
 
+    def test_live_pr_stable_refs_ignore_volatile_repo_metadata(self):
+        initial = live()
+        initial["number"] = c.ESC_B1_PR
+        initial["draft"] = True
+        initial["merged"] = False
+        initial["head"].update({
+            "ref": c.ESC_B1_BRANCH,
+            "repo": {"full_name": c.ESC_B1_REPO,
+                     "pushed_at": "2026-11-18T15:00:00Z",
+                     "open_issues_count": 100}})
+        initial["base"]["repo"].update({
+            "pushed_at": "2026-11-18T15:00:00Z",
+            "open_issues_count": 100})
+        revised = copy.deepcopy(initial)
+        for side in ("head", "base"):
+            revised[side]["repo"]["pushed_at"] = "2026-11-18T17:00:00Z"
+            revised[side]["repo"]["open_issues_count"] = 101
+            revised[side]["repo"]["new_unrelated_field"] = 1
+        # Real HEAD/main refs and branches are unchanged: allow this.
+        self.assertEqual(c.stable_pr_identity(initial),
+                         c.stable_pr_identity(revised))
+        for side, field, value in (
+                ("head", "sha", "f" * 40),
+                ("base", "sha", "f" * 40),
+                ("head", "ref", "evil-branch"),
+                ("base", "ref", "evil-main")):
+            bad = copy.deepcopy(initial)
+            bad[side][field] = value
+            with self.subTest(side=side, field=field):
+                self.assertNotEqual(c.stable_pr_identity(initial),
+                                    c.stable_pr_identity(bad))
+        for side in ("head", "base"):
+            bad = copy.deepcopy(initial)
+            bad[side]["repo"]["full_name"] = "evil/fork"
+            self.assertNotEqual(c.stable_pr_identity(initial),
+                                c.stable_pr_identity(bad))
+            bad[side]["repo"] = None
+            with self.assertRaisesRegex(ValueError, "repository missing"):
+                c.stable_pr_identity(bad)
+        for field, value in (("number", 388), ("state", "closed"),
+                             ("draft", False), ("merged", True)):
+            bad = copy.deepcopy(initial)
+            bad[field] = value
+            self.assertNotEqual(c.stable_pr_identity(initial),
+                                c.stable_pr_identity(bad))
+        bad = copy.deepcopy(initial)
+        bad["head"]["sha"] = "not-a-sha"
+        with self.assertRaises(ValueError):
+            c.stable_pr_identity(bad)
+
     def test_approved_closed_ledger_and_provenance(self):
         self.assertEqual(c.ESC_B1_PR, 387)
         self.assertEqual(c.ESC_B1_ISSUE, 385)

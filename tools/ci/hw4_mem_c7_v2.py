@@ -99,6 +99,30 @@ def git(path, *args):
                                    text=True, stderr=subprocess.PIPE).strip()
 
 
+def stable_pr_identity(live):
+    """Pin mutable PR refs, not volatile GitHub repository snapshots.
+
+    GitHub includes repo counters/timestamps inside base/head; those may change
+    while the five real builds run, without a PR ref/branch/owner transition.
+    The branch, source repository, SHA and PR state still fail closed.
+    """
+    require(isinstance(live, dict), "GitHub PR payload missing")
+    parts = [live.get("number"), live.get("state"), live.get("draft"),
+             live.get("merged")]
+    for side in ("base", "head"):
+        ref = live.get(side)
+        require(isinstance(ref, dict), "GitHub PR " + side + " missing")
+        repo = ref.get("repo")
+        require(isinstance(repo, dict), "GitHub PR " + side + " repository missing")
+        sha, branch, owner = ref.get("sha"), ref.get("ref"), repo.get("full_name")
+        checked_sha(sha)
+        require(isinstance(branch, str) and bool(branch) and
+                isinstance(owner, str) and bool(owner),
+                "GitHub PR " + side + " identity incomplete")
+        parts.extend((sha, branch, owner))
+    return tuple(parts)
+
+
 def verify_provenance(provenance, live, repo, pr_number, base_checkout, head_checkout):
     require(provenance.get("status") == "PROVENANCE_PASS", "missing successful Git provenance")
     require(provenance.get("repo") == repo and provenance.get("pr_number") == pr_number,
@@ -486,9 +510,8 @@ def main(argv=None):
     try:
         p = read_json(args.provenance)
         initial, latest = read_json(args.live_pr_start), read_json(args.live_pr)
-        require(all(initial.get(k) == latest.get(k)
-                    for k in ("number", "state", "base", "head")),
-                "GitHub PR changed during real Xtensa builds")
+        require(stable_pr_identity(initial) == stable_pr_identity(latest),
+                "GitHub PR identity changed during real Xtensa builds")
         base, head = verify_provenance(p, latest, args.repo,
                                        args.pr_number, args.base_checkout,
                                        args.head_checkout)

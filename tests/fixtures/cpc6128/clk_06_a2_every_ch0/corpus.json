@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "mission": "CLK-06-A2",
+  "status": "INPUT_ONLY_NOT_AN_ORACLE",
+  "cases": [
+    {
+      "id": "E01_RECUR_RETURN",
+      "question": "Does EVERY 10,0 deliver at least two handler GOSUB/RETURN events, with main resumption and bounded cancellation?",
+      "run_delays": 12,
+      "lines": [
+        "10 C%=0",
+        "20 PRINT #8,\"E01:BEGIN\"",
+        "30 EVERY 10,0 GOSUB 1000",
+        "40 FOR I%=1 TO 8000",
+        "50 NEXT I%",
+        "60 PRINT #8,\"E01:MAIN=\";C%",
+        "70 R%=REMAIN(0)",
+        "80 PRINT #8,\"E01:CANCEL=\";R%",
+        "90 PRINT #8,\"E01:FINAL=\";C%",
+        "100 END",
+        "1000 C%=C%+1",
+        "1010 IF C%<=4 THEN PRINT #8,\"E01:HIT=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "E02_LONGER_INTERVAL",
+      "question": "Contrast EVERY 40,0 over a bounded longer loop with E01 without asserting timer units",
+      "run_delays": 14,
+      "lines": [
+        "10 C%=0",
+        "20 PRINT #8,\"E02:BEGIN\"",
+        "30 EVERY 40,0 GOSUB 1000",
+        "40 FOR I%=1 TO 11000",
+        "50 NEXT I%",
+        "60 PRINT #8,\"E02:MAIN=\";C%",
+        "70 R%=REMAIN(0)",
+        "80 PRINT #8,\"E02:CANCEL=\";R%",
+        "90 END",
+        "1000 C%=C%+1",
+        "1010 IF C%<=4 THEN PRINT #8,\"E02:HIT=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "E03_REMAIN_CANCEL",
+      "question": "Arm EVERY 2,0, immediately evaluate REMAIN(0), then observe absence of handler after sensitive bounded wait",
+      "run_delays": 12,
+      "lines": [
+        "10 C%=0",
+        "20 PRINT #8,\"E03:BEGIN\"",
+        "30 EVERY 2,0 GOSUB 1000",
+        "40 R%=REMAIN(0)",
+        "50 PRINT #8,\"E03:REMAIN=\";R%",
+        "60 FOR I%=1 TO 8500",
+        "70 NEXT I%",
+        "80 PRINT #8,\"E03:MAIN=\";C%",
+        "90 PRINT #8,\"E03:R2=\";REMAIN(0)",
+        "100 END",
+        "1000 C%=C%+1",
+        "1010 PRINT #8,\"E03:HIT=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "E04_REARM_CHANNEL",
+      "question": "Arm EVERY 5 then rearm EVERY 20 on same channel 0 with distinct handlers and bounded interval",
+      "run_delays": 14,
+      "lines": [
+        "10 A%=0:B%=0",
+        "20 PRINT #8,\"E04:BEGIN\"",
+        "30 EVERY 5,0 GOSUB 1000",
+        "40 EVERY 20,0 GOSUB 1100",
+        "50 FOR I%=1 TO 8500",
+        "60 NEXT I%",
+        "70 PRINT #8,\"E04:MAIN_A=\";A%",
+        "80 PRINT #8,\"E04:MAIN_B=\";B%",
+        "90 R%=REMAIN(0)",
+        "100 PRINT #8,\"E04:CANCEL=\";R%",
+        "110 END",
+        "1000 A%=A%+1",
+        "1010 IF A%<=4 THEN PRINT #8,\"E04:FIRST=\";A%",
+        "1020 RETURN",
+        "1100 B%=B%+1",
+        "1110 IF B%<=4 THEN PRINT #8,\"E04:SECOND=\";B%",
+        "1120 RETURN"
+      ]
+    },
+    {
+      "id": "E05_EVERY_AFTER",
+      "question": "Test EVERY 5 then AFTER 15 on channel 0: counts and order from distinct handlers, no inter-channel claim",
+      "run_delays": 14,
+      "lines": [
+        "10 A%=0:B%=0",
+        "20 PRINT #8,\"E05:BEGIN\"",
+        "30 EVERY 5,0 GOSUB 1000",
+        "40 AFTER 15,0 GOSUB 1100",
+        "50 FOR I%=1 TO 8500",
+        "60 NEXT I%",
+        "70 PRINT #8,\"E05:MAIN_A=\";A%",
+        "80 PRINT #8,\"E05:MAIN_B=\";B%",
+        "90 R%=REMAIN(0)",
+        "100 PRINT #8,\"E05:CANCEL=\";R%",
+        "110 END",
+        "1000 A%=A%+1",
+        "1010 IF A%<=4 THEN PRINT #8,\"E05:EVERY=\";A%",
+        "1020 RETURN",
+        "1100 B%=B%+1",
+        "1110 PRINT #8,\"E05:AFTER=\";B%",
+        "1120 RETURN"
+      ]
+    },
+    {
+      "id": "E06_BAD_ARGUMENT",
+      "question": "Negative EVERY -1,0 GOSUB syntax/argument; exact CPC on-screen diagnostic and locus unknown until capture",
+      "run_delays": 3,
+      "lines": [
+        "10 PRINT #8,\"E06:BEGIN\"",
+        "20 EVERY -1,0 GOSUB 1000",
+        "30 PRINT #8,\"E06:AFTER_BAD\"",
+        "40 END",
+        "1000 PRINT #8,\"E06:HANDLER\"",
+        "1010 RETURN"
+      ]
+    }
+  ]
+}

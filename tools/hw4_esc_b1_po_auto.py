@@ -30,8 +30,8 @@ VISUAL_PROGRESS_SECONDS = 6.0
 # The opt-in visual program changes displayed digits between repaint quanta.
 DEFAULT_AB_LINES = ('10 PRINT "A":GOTO 20', '20 PRINT "B":GOTO 10')
 # Native C99 needs explicit one-shot numeric initialization (not in the loop).
-VISUAL_COUNTER_LINES = ('5 A%=0', '10 A%=A%+1:PRINT A%:GOTO 20',
-                        '20 PRINT "B":GOTO 10')
+VISUAL_COUNTER_LINES = ('5 A%=0', '10 A%=A%+1',
+                        '20 PRINT A%:GOTO 10')
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -408,7 +408,7 @@ class Driver:
         self.run()
         if self.visual_observation:
             self.event("VISUAL", "RUN_VISIBLE",
-                       "RUN_START confirme UART; voir les NOMBRES croitre avec B sur le TFT; "
+                       "RUN_START confirme UART; voir les NOMBRES croitre sur le TFT; "
                        "MANUAL_PO_VISUAL_PENDING")
         y = self.first_yield()
         self.check("VISIBLE_LOOP_PROGRESS", f"YIELD steps={y}")
@@ -499,7 +499,7 @@ def write_report(folder: Path, result: dict) -> None:
     lines += ["", "## Réception physique PO obligatoire", "",
               "- [ ] TFT photographié pendant RUN, PAUSED et BROKEN (2 photos PAUSED espacées)",
               "- [ ] En mode visuel, dernier NOMBRE fige pendant PAUSE 15s",
-               "- [ ] Nombres croissants pendant RUN et RESUME 6s (B intercalaire)",
+               "- [ ] Nombres croissants pendant RUN et RESUME 6s",
               "- [ ] Touche ESC / reprise x / double ESC correspond aux octets TX enregistrés",
               "- [ ] LCD réel : orientation, couleurs, curseur comparés aux PNG logiques",
               "- [ ] Tactile fonctionnel, aucune anomalie FreeRTOS/heap/stack/DMA",

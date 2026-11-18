@@ -989,7 +989,7 @@ static int run_case(const char *first_line, const char *second_line,
     memcpy(original, f.image, sizeof(original));
     CHECK(start_run() == 0);
     hw4_esc_run_control_init(&control);
-    for (i = 0u; i < 12u; ++i) {
+    for (i = 0u; i < 32u; ++i) {
         slice = advance(8u);
         if (slice.state != HW4_RUN_YIELDED)
             fprintf(stderr, "C99 initial run case counter=%d iteration=%zu state=%d executor=%d\n",
@@ -997,7 +997,7 @@ static int run_case(const char *first_line, const char *second_line,
                     (int)f.scheduler.last_result.executor_status);
         CHECK(slice.state == HW4_RUN_YIELDED);
     }
-    CHECK(f.text.scrolls > 25u);
+    CHECK(f.text.scrolls > 25u); /* fill and scroll in both 2- and 3-statement loops */
     memcpy(frame, f.vram, sizeof(frame));
     for (i = 0u; i < 4u; ++i) {
         slice = advance(8u);

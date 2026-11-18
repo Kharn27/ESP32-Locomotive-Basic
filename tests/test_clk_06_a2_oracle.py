@@ -186,7 +186,7 @@ class VerifierTests(unittest.TestCase):
 
     def test_exact_six_independent_input_cases(self):
         self.assertEqual(len(self.cases),6)
-        self.assertEqual(len({oracle.digest(oracle.source_bytes(c)) for c in self.cases}),8)
+        self.assertEqual(len({oracle.digest(oracle.source_bytes(c)) for c in self.cases}),6)
         self.assertTrue(all('EVERY ' in '\n'.join(c['lines'])
                             and 'DI:' not in '\n'.join(c['lines'])
                             and 'EI:' not in '\n'.join(c['lines'])

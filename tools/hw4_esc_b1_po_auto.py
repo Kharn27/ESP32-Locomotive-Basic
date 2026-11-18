@@ -29,7 +29,9 @@ VISUAL_HOLD_SECONDS = 15.0  # Host timing only, never firmware ESC idle threshol
 VISUAL_PROGRESS_SECONDS = 6.0
 # The opt-in visual program changes displayed digits between repaint quanta.
 DEFAULT_AB_LINES = ('10 PRINT "A":GOTO 20', '20 PRINT "B":GOTO 10')
-VISUAL_COUNTER_LINES = ('10 A%=A%+1:PRINT A%:GOTO 20', '20 PRINT "B":GOTO 10')
+# Native C99 needs explicit one-shot numeric initialization (not in the loop).
+VISUAL_COUNTER_LINES = ('5 A%=0', '10 A%=A%+1:PRINT A%:GOTO 20',
+                        '20 PRINT "B":GOTO 10')
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 

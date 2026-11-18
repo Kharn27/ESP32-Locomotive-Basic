@@ -27,6 +27,9 @@ SCENARIOS = ("SILENT_ESC", "VISIBLE_AB", "HOST_BREAK_PAUSED", "HOST_BREAK_LF")
 EXPECTED_PNG = 6
 VISUAL_HOLD_SECONDS = 15.0  # Host timing only, never firmware ESC idle threshold
 VISUAL_PROGRESS_SECONDS = 6.0
+# The opt-in visual program changes displayed digits between repaint quanta.
+DEFAULT_AB_LINES = ('10 PRINT "A":GOTO 20', '20 PRINT "B":GOTO 10')
+VISUAL_COUNTER_LINES = ('10 A%=A%+1:PRINT A%:GOTO 20', '20 PRINT "B":GOTO 10')
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -295,7 +298,7 @@ class Driver:
         if visual_label is not None:
             self.event("VISUAL", visual_label,
                        f"UART_CONFIRMATION steps={steps}; pause {seconds:.0f}s. "
-                       "PO: 2 photos TFT espacees, sans toucher au terminal; "
+                       "PO: dernier NOMBRE fige, 2 photos TFT espacees; "
                        "MANUAL_PO_VISUAL_PENDING")
         self.observe(seconds, forbidden=("HW4-RUN-B YIELD ",
                                          "HW4-RUN-B RUN_TERMINAL ",
@@ -398,12 +401,12 @@ class Driver:
         self.finish_case(cid)
 
         cid = "VISIBLE_AB"
-        self.load(cid, ('10 PRINT "A":GOTO 20', '20 PRINT "B":GOTO 10'))
+        self.load(cid, VISUAL_COUNTER_LINES if self.visual_observation else DEFAULT_AB_LINES)
         self.shot(cid, "BEFORE_RUN")
         self.run()
         if self.visual_observation:
             self.event("VISUAL", "RUN_VISIBLE",
-                       "RUN_START confirme UART; regarder A/B sur le TFT; "
+                       "RUN_START confirme UART; voir les NOMBRES croitre avec B sur le TFT; "
                        "MANUAL_PO_VISUAL_PENDING")
         y = self.first_yield()
         self.check("VISIBLE_LOOP_PROGRESS", f"YIELD steps={y}")
@@ -413,7 +416,7 @@ class Driver:
             self.resume(pause1)
             self.event("VISUAL", "RESUME_CONFIRMED",
                        f"UART_CONFIRMATION steps={pause1}; "
-                       f"regarder A/B pendant {VISUAL_PROGRESS_SECONDS:.0f}s; "
+                       f"regarder les NOMBRES augmenter pendant {VISUAL_PROGRESS_SECONDS:.0f}s; "
                        "TFT NON_VERIFIE")
             progressed = self.observe_progress(VISUAL_PROGRESS_SECONDS, pause1)
             self.event("VISUAL", "RESUME_PROGRESS_CONFIRMED",
@@ -493,7 +496,8 @@ def write_report(folder: Path, result: dict) -> None:
              "dma_timeouts", "dma_fault", "lcd_error")) + " |")
     lines += ["", "## Réception physique PO obligatoire", "",
               "- [ ] TFT photographié pendant RUN, PAUSED et BROKEN (2 photos PAUSED espacées)",
-              "- [ ] Aucun texte A/B nouveau pendant PAUSED",
+              "- [ ] En mode visuel, dernier NOMBRE fige pendant PAUSE 15s",
+               "- [ ] Nombres croissants pendant RUN et RESUME 6s (B intercalaire)",
               "- [ ] Touche ESC / reprise x / double ESC correspond aux octets TX enregistrés",
               "- [ ] LCD réel : orientation, couleurs, curseur comparés aux PNG logiques",
               "- [ ] Tactile fonctionnel, aucune anomalie FreeRTOS/heap/stack/DMA",
@@ -537,7 +541,7 @@ def run(argv=None) -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--visual-observation", action="store_true",
-                    help=("VISIBLE_AB seulement: PAUSE 15s x2 et RESUME 6s; "
+                    help=("VISIBLE_AB seulement: compteur croissant, PAUSE 15s x2 et RESUME 6s; "
                           "photos TFT manuelles, aucun second lecteur UART"))
     args = ap.parse_args(argv)
     if args.self_test:
@@ -549,7 +553,7 @@ def run(argv=None) -> int:
     if not args.dry_run and not (args.flash or args.existing_firmware):
         ap.error("Indiquer explicitement --flash ou --existing-firmware")
     if args.visual_observation:
-        print("[VISUAL] OBSERVATION_MANUELLE: PAUSE 15s x2, RESUME 6s; "
+        print("[VISUAL] COMPTEUR_CROISSANT: NOMBRES croissent pendant RUN/RESUME, figes en PAUSE 15s x2, RESUME 6s; "
               "UART/CRC automatiques, TFT non valide automatiquement", flush=True)
     if min(args.boot_timeout, args.command_timeout, args.shot_timeout) <= 0:
         ap.error("Délais strictement positifs")
@@ -564,7 +568,9 @@ def run(argv=None) -> int:
                            "visual_observation": args.visual_observation,
                            "visual_hold_seconds": VISUAL_HOLD_SECONDS if args.visual_observation else None,
                            "visual_resume_seconds": VISUAL_PROGRESS_SECONDS if args.visual_observation else None,
-                           "manual_visual_status": "MANUAL_PO_VISUAL_PENDING"},
+                           "manual_visual_status": "MANUAL_PO_VISUAL_PENDING",
+                            "visible_basic_lines": list(VISUAL_COUNTER_LINES if args.visual_observation
+                                                        else DEFAULT_AB_LINES)},
                          indent=2, ensure_ascii=False))
         return 0
     folder = None
@@ -578,6 +584,8 @@ def run(argv=None) -> int:
         "visual_observation": args.visual_observation,
         "visual_hold_seconds": VISUAL_HOLD_SECONDS if args.visual_observation else None,
         "visual_resume_seconds": VISUAL_PROGRESS_SECONDS if args.visual_observation else None,
+        "visible_basic_lines": list(VISUAL_COUNTER_LINES if args.visual_observation
+                                    else DEFAULT_AB_LINES),
         "head": head, "expected_main": EXPECTED_MAIN, "port": args.port,
         "mode": "flash" if args.flash else "existing_firmware",
         "expected_png_count": EXPECTED_PNG, "shots": [], "scenarios": [],
@@ -598,6 +606,7 @@ def run(argv=None) -> int:
             "visual_observation": args.visual_observation,
             "visual_hold_seconds": result["visual_hold_seconds"],
             "visual_resume_seconds": result["visual_resume_seconds"],
+            "visible_basic_lines": result["visible_basic_lines"],
             "manual_visual_status": "MANUAL_PO_VISUAL_PENDING",
             "scope": "RUN_ESC_PAUSE_RESUME_DOUBLE_ESC_AND_HOST_FALLBACK",
             "limitations": ["HOME_E3_SHOT_ONLY_WHEN_NOT_RUNNING",

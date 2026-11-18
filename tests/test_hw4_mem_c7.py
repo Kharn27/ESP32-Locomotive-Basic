@@ -6,6 +6,7 @@ import io
 from types import SimpleNamespace
 import hashlib
 import json
+import shutil
 import struct
 import subprocess
 import sys
@@ -467,8 +468,11 @@ class EscB1Allocation(Comparator):
                     if rev == c.ESC_B1_PO_HEAD:
                         return ("100644 blob " + c.ESC_B1_HOST_BLOBS[path] +
                                 "\t" + path)
-                    if rev == HEAD:
+                    if rev == c.ESC_B1_C1_HEAD:
                         return ("100644 blob " + c.ESC_B1_VISUAL_HOST_BLOBS[path] +
+                                "\t" + path)
+                    if rev == HEAD:
+                        return ("100644 blob " + c.ESC_B1_COUNTER_HOST_BLOBS[path] +
                                 "\t" + path)
                 elif path in c.ESC_B1_CI_PATHS:
                     if rev in (BASE, HEAD):
@@ -509,6 +513,9 @@ class EscB1Allocation(Comparator):
         self.assertEqual(token["host_blobs"], c.ESC_B1_HOST_BLOBS)
         self.assertEqual(token["visual_host_blobs"],
                          c.ESC_B1_VISUAL_HOST_BLOBS)
+        self.assertEqual(token["c1_source_head"], c.ESC_B1_C1_HEAD)
+        self.assertEqual(token["counter_host_blobs"],
+                         c.ESC_B1_COUNTER_HOST_BLOBS)
         self.assertEqual(token["ci_paths"], sorted(c.ESC_B1_CI_PATHS))
         self.assertEqual(token["status"], "AUTHORIZED_ESC_B1_DRAM_BSS_40")
         self.assertEqual(len(token["patch_sha256"]), 64)
@@ -611,7 +618,8 @@ class EscB1Allocation(Comparator):
                          {"tools/hw4_esc_b1_po_auto.py":
                           "f26a2dcd39e299f745be7ce339f9eab2d77458a2"})
         path, sha = next(iter(c.ESC_B1_HOST_BLOBS.items()))
-        current = c.ESC_B1_VISUAL_HOST_BLOBS[path]
+        current = c.ESC_B1_COUNTER_HOST_BLOBS[path]
+        c1_blob = c.ESC_B1_VISUAL_HOST_BLOBS[path]
         for overrides in (
             {("ls-tree", HEAD, "--", path):
              "100644 blob " + sha + "\t" + path},  # rollback to PO blob rejected
@@ -622,6 +630,11 @@ class EscB1Allocation(Comparator):
             {("ls-tree", c.ESC_B1_PO_HEAD, "--", path): ""},
             {("ls-tree", c.ESC_B1_PO_HEAD, "--", path):
              "100644 blob " + current + "\t" + path},  # PO history immutable
+            {("ls-tree", c.ESC_B1_C1_HEAD, "--", path):
+             "100644 blob " + current + "\t" + path},  # C1 must remain C1
+            {("ls-tree", c.ESC_B1_C1_HEAD, "--", path):
+             "100755 blob " + c1_blob + "\t" + path},
+            {("ls-tree", c.ESC_B1_C1_HEAD, "--", path): ""},
             {("ls-tree", BASE, "--", path):
              "100644 blob " + sha + "\t" + path},
         ):
@@ -661,6 +674,8 @@ class EscB1Allocation(Comparator):
                          ("po_source_head", "f" * 40),
                          ("host_blobs", {"tools/evil.py": "f" * 40}),
                          ("visual_host_blobs", {"tools/evil.py": "f" * 40}),
+                         ("counter_host_blobs", {"tools/evil.py": "f" * 40}),
+                         ("c1_source_head", "f" * 40),
                          ("ci_paths", ["tools/ci/opt3_routing.py"]),
                          ("pr_number", 388),
                          ("status", "ANY_PR_PLUS_40")):
@@ -846,6 +861,9 @@ class VisualObservationHost(unittest.TestCase):
         self.assertEqual(planned["manual_visual_status"],
                          "MANUAL_PO_VISUAL_PENDING")
         self.assertEqual(len(visual.SCENARIOS), 4)
+        self.assertEqual(planned["visible_basic_lines"], list(visual.VISUAL_COUNTER_LINES))
+        self.assertEqual([len(x.encode("ascii")) for x in visual.VISUAL_COUNTER_LINES],
+                         [27, 20])
         with mock.patch.object(visual, "setup_imports",
                                return_value=(ROOT, fake_po)), \
              redirect_stdout(io.StringIO()), \

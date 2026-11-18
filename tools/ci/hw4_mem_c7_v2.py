@@ -69,7 +69,7 @@ ESC_B1_VISUAL_HOST_BLOBS = {
 }
 ESC_B1_COUNTER_HOST_BLOBS = {
     # B1-PO-VISUAL-C2: opt-in monotonic counter runner at the live PR HEAD
-    "tools/hw4_esc_b1_po_auto.py": "c231489d7c5530d8928ad18e1e5a1e064e1bd5c4",
+    "tools/hw4_esc_b1_po_auto.py": "e334a63a715d1582891e486396287b23a20e681b",
 }
 ESC_B1_CI_PATHS = frozenset({
     "tools/ci/hw4_mem_c7_v2.py",

@@ -872,6 +872,217 @@ class VisualObservationHost(unittest.TestCase):
                         "--expected-head", "f" * 40])
 
 
+
+class CounterProgramRouting(unittest.TestCase):
+    """The official campaign must send the counter ONLY in opt-in visual mode."""
+
+    def test_real_run_cases_use_expected_program_and_keep_scenarios(self):
+        class Probe(visual.Driver):
+            def __init__(self, enabled):
+                super().__init__(po_campaign, None, None, {"scenarios": []}, 70,
+                                 visual_observation=enabled)
+                self.loaded = []
+                self.pauses = 0
+
+            def load(self, cid, numbered_lines):
+                self.loaded.append((cid, numbered_lines))
+
+            def shot(self, *args):
+                pass
+
+            def run(self):
+                pass
+
+            def first_yield(self, *args):
+                return 1000
+
+            def negatives(self):
+                pass
+
+            def pause(self, **kwargs):
+                self.pauses += 1
+                return self.pauses * 10
+
+            def resume(self, *args):
+                pass
+
+            def observe_progress(self, *args):
+                return 1000
+
+            def event(self, *args, **kwargs):
+                pass
+
+            def check(self, *args):
+                pass
+
+            def break_cpc(self, *args):
+                pass
+
+            def break_host(self, *args):
+                pass
+
+            def finish_case(self, *args):
+                pass
+
+        self.assertEqual(visual.VISUAL_COUNTER_LINES,
+                         ("10 A%=A%+1:PRINT A%:GOTO 20", '20 PRINT "B":GOTO 10'))
+        self.assertEqual([len(x.encode("ascii")) for x in
+                          visual.VISUAL_COUNTER_LINES], [27, 20])
+        for enabled in (False, True):
+            with self.subTest(enabled=enabled):
+                driver = Probe(enabled)
+                driver.run_cases()
+                self.assertEqual([x[0] for x in driver.loaded],
+                                 list(visual.SCENARIOS))
+                expected = (visual.VISUAL_COUNTER_LINES if enabled
+                            else visual.DEFAULT_AB_LINES)
+                self.assertEqual(driver.loaded[1][1], expected)
+                self.assertEqual(driver.loaded[0][1], ("10 GOTO 10",))
+                self.assertEqual(driver.loaded[2][1], ("10 GOTO 10",))
+                self.assertEqual(driver.loaded[3][1], ("10 GOTO 10",))
+        self.assertEqual(visual.DEFAULT_AB_LINES,
+                         ('10 PRINT "A":GOTO 20', '20 PRINT "B":GOTO 10'))
+
+
+class NativeC99CounterWitness(unittest.TestCase):
+    """Compiles the unchanged production C99 scheduler, BASIC and VRAM bridge.
+
+    This is a local host test: NO claim of physical CYD/TFT pixel measurements.
+    Reuse the identical B1 C fixture without editing its sealed source file.
+    """
+
+    def test_counter_frames_pause_resume_break_and_periodic_ab_control(self):
+        self.assertIsNotNone(shutil.which("cmake"), "cmake required for real C99")
+        with tempfile.TemporaryDirectory(prefix="b1_c2_native_") as tmp:
+            base = Path(tmp)
+            witness = base / "counter_witness.c"
+            native = r"""
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#define main historical_b1_test_main
+#include "test_hw4_run_break_b.c"
+#undef main
+
+static uint8_t digit_glyph(void *ctx, uint8_t ch, unsigned row)
+{
+    (void)ctx;
+    return row == 0u ? ch : 0u;
+}
+
+static int run_case(const char *first_line, const char *second_line,
+                    bool increasing)
+{
+    uint8_t frame[CPC_VIDEO_BYTES];
+    uint8_t original[sizeof(f.image)];
+    Hw4EscRunControl control;
+    Hw4EscAction actions[2];
+    Hw4RunSlice slice;
+    size_t i, paused_steps;
+    CHECK(setup() == 0);
+    CHECK(cpc_text_init(&f.text, &f.video, digit_glyph, NULL));
+    CHECK(submit(first_line).status == BSR_OK);
+    CHECK(submit(second_line).status == BSR_OK);
+    memcpy(original, f.image, sizeof(original));
+    CHECK(start_run() == 0);
+    hw4_esc_run_control_init(&control);
+    for (i = 0u; i < 12u; ++i)
+        CHECK(advance(8u).state == HW4_RUN_YIELDED);
+    CHECK(f.text.scrolls > 25u);
+    memcpy(frame, f.vram, sizeof(frame));
+    for (i = 0u; i < 4u; ++i) {
+        slice = advance(8u);
+        CHECK(slice.state == HW4_RUN_YIELDED && slice.steps == 8u);
+        if (increasing)
+            CHECK(memcmp(frame, f.vram, sizeof(frame)) != 0);
+        else
+            CHECK(memcmp(frame, f.vram, sizeof(frame)) == 0);
+        memcpy(frame, f.vram, sizeof(frame));
+    }
+    if (!increasing)
+        return 0;
+
+    /* C99 engine has really advanced A%; ESC must freeze the same VRAM. */
+    CHECK(hw4_esc_run_control_feed(&control, 0x1bu, 1000u, false, actions) == 0u);
+    CHECK(hw4_esc_run_control_idle(&control, 51000u) == HW4_ESC_ACTION_PAUSE);
+    paused_steps = f.scheduler.total_steps;
+    CHECK(f.runtime.state == BSR_RUNNING && f.scheduler.stop_calls == 0u);
+    CHECK(hw4_esc_run_control_idle(&control, 15051000u) == HW4_ESC_ACTION_NONE);
+    CHECK(f.scheduler.total_steps == paused_steps);
+    CHECK(memcmp(frame, f.vram, sizeof(frame)) == 0);
+    CHECK(hw4_esc_run_control_feed(&control, (uint8_t)'x', 15052000u,
+                                  false, actions) == 1u);
+    CHECK(actions[0] == HW4_ESC_ACTION_RESUME);
+    CHECK(advance(8u).state == HW4_RUN_YIELDED);
+    CHECK(f.scheduler.total_steps == paused_steps + 8u);
+    CHECK(memcmp(frame, f.vram, sizeof(frame)) != 0);
+    memcpy(frame, f.vram, sizeof(frame));
+    CHECK(hw4_esc_run_control_feed(&control, 0x1bu, 15053000u, false,
+                                  actions) == 0u);
+    CHECK(hw4_esc_run_control_idle(&control, 15103000u) == HW4_ESC_ACTION_PAUSE);
+    paused_steps = f.scheduler.total_steps;
+    CHECK(hw4_esc_run_control_idle(&control, 30103000u) == HW4_ESC_ACTION_NONE);
+    CHECK(f.scheduler.total_steps == paused_steps);
+    CHECK(memcmp(frame, f.vram, sizeof(frame)) == 0);
+    CHECK(hw4_esc_run_control_feed(&control, 0x1bu, 30104000u, false,
+                                  actions) == 0u);
+    CHECK(hw4_esc_run_control_idle(&control, 30154000u)
+          == HW4_ESC_ACTION_BREAK_REQUEST);
+    CHECK(hw4_run_scheduler_request_break(&f.scheduler));
+    slice = advance(8u);
+    CHECK(slice.state == HW4_RUN_BROKEN && slice.steps == 0u);
+    CHECK(f.scheduler.total_steps == paused_steps && f.scheduler.stop_calls == 1u);
+    CHECK(memcmp(original, f.image, sizeof(original)) == 0);
+    CHECK(finish_ready() == 0 && f.ready_count == 1u);
+    CHECK(submit("LIST").status == BSR_OK);
+    CHECK(f.written > 0u);
+    return 0;
+}
+
+int main(void)
+{
+    CHECK(run_case(@LEGACY1@, @LEGACY2@, false) == 0);
+    CHECK(run_case(@COUNTER1@, @COUNTER2@, true) == 0);
+    puts("B1_C2_NATIVE_C99_COUNTER_VRAM_PAUSE_RESUME_BREAK_PASS");
+    return 0;
+}
+"""
+            for tag, line in (
+                    ("@LEGACY1@", visual.DEFAULT_AB_LINES[0]),
+                    ("@LEGACY2@", visual.DEFAULT_AB_LINES[1]),
+                    ("@COUNTER1@", visual.VISUAL_COUNTER_LINES[0]),
+                    ("@COUNTER2@", visual.VISUAL_COUNTER_LINES[1])):
+                native = native.replace(tag, json.dumps(line))
+            witness.write_text(native, encoding="utf-8")
+            cmake_source = """cmake_minimum_required(VERSION 3.13)
+project(b1_c2_native C)
+set(CMAKE_C_STANDARD 99)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+add_subdirectory("{root}" engine EXCLUDE_FROM_ALL)
+add_executable(b1_c2_witness counter_witness.c)
+target_include_directories(b1_c2_witness PRIVATE "{root}/tests" "{root}/integration")
+target_sources(b1_c2_witness PRIVATE "{root}/integration/hw4_cpc_escape_contract.c")
+target_link_libraries(b1_c2_witness PRIVATE
+    hw4_run_break_input hw4_run_scheduler hw4_pen_bridge
+    cpc_diag_policy cpc_ready_policy)
+""".format(root=ROOT.as_posix())
+            (base / "CMakeLists.txt").write_text(cmake_source, encoding="utf-8")
+            build = base / "build"
+            for cmd in (
+                ["cmake", "-S", str(base), "-B", str(build)],
+                ["cmake", "--build", str(build), "--target", "b1_c2_witness",
+                 "--parallel", "2"],
+                [str(build / "b1_c2_witness")],
+            ):
+                completed = subprocess.run(cmd, capture_output=True, text=True,
+                                           timeout=180, check=False)
+                self.assertEqual(completed.returncode, 0,
+                                 "C99 command failed: " + repr(cmd) + "\n" +
+                                 completed.stdout[-2000:] + completed.stderr[-5000:])
+            self.assertIn("B1_C2_NATIVE_C99_COUNTER_VRAM_PAUSE_RESUME_BREAK_PASS",
+                          completed.stdout)
+
+
 class HistoricalWitness(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()

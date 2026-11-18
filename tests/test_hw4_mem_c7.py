@@ -863,7 +863,7 @@ class VisualObservationHost(unittest.TestCase):
         self.assertEqual(len(visual.SCENARIOS), 4)
         self.assertEqual(planned["visible_basic_lines"], list(visual.VISUAL_COUNTER_LINES))
         self.assertEqual([len(x.encode("ascii")) for x in visual.VISUAL_COUNTER_LINES],
-                         [27, 20])
+                         [6, 27, 20])
         with mock.patch.object(visual, "setup_imports",
                                return_value=(ROOT, fake_po)), \
              redirect_stdout(io.StringIO()), \
@@ -925,9 +925,10 @@ class CounterProgramRouting(unittest.TestCase):
                 pass
 
         self.assertEqual(visual.VISUAL_COUNTER_LINES,
-                         ("10 A%=A%+1:PRINT A%:GOTO 20", '20 PRINT "B":GOTO 10'))
+                         ("5 A%=0", "10 A%=A%+1:PRINT A%:GOTO 20",
+                          '20 PRINT "B":GOTO 10'))
         self.assertEqual([len(x.encode("ascii")) for x in
-                          visual.VISUAL_COUNTER_LINES], [27, 20])
+                          visual.VISUAL_COUNTER_LINES], [6, 27, 20])
         for enabled in (False, True):
             with self.subTest(enabled=enabled):
                 driver = Probe(enabled)
@@ -981,13 +982,20 @@ static int run_case(const char *first_line, const char *second_line,
     size_t i, paused_steps;
     CHECK(setup() == 0);
     CHECK(cpc_text_init(&f.text, &f.video, digit_glyph, NULL));
+    if (increasing)
+        CHECK(submit(@INIT@).status == BSR_OK);
     CHECK(submit(first_line).status == BSR_OK);
     CHECK(submit(second_line).status == BSR_OK);
     memcpy(original, f.image, sizeof(original));
     CHECK(start_run() == 0);
     hw4_esc_run_control_init(&control);
-    for (i = 0u; i < 12u; ++i)
-        CHECK(advance(8u).state == HW4_RUN_YIELDED);
+    for (i = 0u; i < 12u; ++i) {
+        slice = advance(8u);
+        if (slice.state != HW4_RUN_YIELDED)
+            fprintf(stderr, "C99 initial run case counter=%d iteration=%zu state=%d executor=%d\n",
+                    (int)increasing, i, (int)slice.state, (int)slice.executor_status);
+        CHECK(slice.state == HW4_RUN_YIELDED);
+    }
     CHECK(f.text.scrolls > 25u);
     memcpy(frame, f.vram, sizeof(frame));
     for (i = 0u; i < 4u; ++i) {
@@ -1050,8 +1058,9 @@ int main(void)
             for tag, line in (
                     ("@LEGACY1@", visual.DEFAULT_AB_LINES[0]),
                     ("@LEGACY2@", visual.DEFAULT_AB_LINES[1]),
-                    ("@COUNTER1@", visual.VISUAL_COUNTER_LINES[0]),
-                    ("@COUNTER2@", visual.VISUAL_COUNTER_LINES[1])):
+                    ("@INIT@", visual.VISUAL_COUNTER_LINES[0]),
+                    ("@COUNTER1@", visual.VISUAL_COUNTER_LINES[1]),
+                    ("@COUNTER2@", visual.VISUAL_COUNTER_LINES[2])):
                 native = native.replace(tag, json.dumps(line))
             witness.write_text(native, encoding="utf-8")
             cmake_source = """cmake_minimum_required(VERSION 3.13)

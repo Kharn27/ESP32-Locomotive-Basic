@@ -59,7 +59,12 @@ ESC_B1_PATHS = frozenset({
 # remains an ancestor; its runner blob must survive byte-for-byte.
 ESC_B1_PO_HEAD = "5e44ca338e91283484b2ac41c46a7fcc3b2b0a10"
 ESC_B1_HOST_BLOBS = {
+    # Physical PO campaign 17/11: immutable original host script
     "tools/hw4_esc_b1_po_auto.py": "c14f2772dee0ba1b303098b4d97c18d717e12736",
+}
+ESC_B1_VISUAL_HOST_BLOBS = {
+    # B1-PO-VISUAL-C1: closed, exact reviewed replacement on PR #387
+    "tools/hw4_esc_b1_po_auto.py": "f26a2dcd39e299f745be7ce339f9eab2d77458a2",
 }
 ESC_B1_CI_PATHS = frozenset({
     "tools/ci/hw4_mem_c7_v2.py",
@@ -191,16 +196,21 @@ def authorize_esc_b1(provenance, live, repo, pr_number, head_checkout):
         require(source.startswith("100644 blob ") and actual == source,
                 "ESC B1 source blob/mode changed: " + path)
 
-    # The one approved host script is pinned to the Git blob from the PO-tested
-    # commit; require absent on base and exactly identical on the new HEAD.
-    for path, sha in ESC_B1_HOST_BLOBS.items():
-        expected_entry = "100644 blob " + sha + "\t" + path
+    # Two independent immutable anchors: the original runner at the PO-flashed
+    # commit and the B1-PO-VISUAL-C1 replacement at this PR HEAD. No generic
+    # tools/** exception and no modification of the physical PO evidence.
+    require(set(ESC_B1_VISUAL_HOST_BLOBS) == set(ESC_B1_HOST_BLOBS),
+            "ESC visual runner inventory differs")
+    for path, historical_sha in ESC_B1_HOST_BLOBS.items():
+        original_entry = "100644 blob " + historical_sha + "\t" + path
+        visual_entry = ("100644 blob " + ESC_B1_VISUAL_HOST_BLOBS[path] +
+                        "\t" + path)
         require(not git(head_checkout, "ls-tree", base, "--", path),
                 "ESC PO host runner unexpectedly exists in main: " + path)
         require(git(head_checkout, "ls-tree", ESC_B1_PO_HEAD, "--", path) ==
-                expected_entry and
-                git(head_checkout, "ls-tree", head, "--", path) == expected_entry,
-                "ESC PO host runner blob/mode changed: " + path)
+                original_entry, "ESC PO historical host runner blob/mode changed: " + path)
+        require(git(head_checkout, "ls-tree", head, "--", path) == visual_entry,
+                "ESC visual host runner blob/mode changed: " + path)
 
     # The two C7 policy/test files are the *only* permitted extra changes.
     # Both must be real modifications of existing 100644 blobs on main.
@@ -216,6 +226,7 @@ def authorize_esc_b1(provenance, live, repo, pr_number, head_checkout):
             "source_head": ESC_B1_SOURCE_HEAD,
             "po_source_head": ESC_B1_PO_HEAD,
             "host_blobs": dict(ESC_B1_HOST_BLOBS),
+            "visual_host_blobs": dict(ESC_B1_VISUAL_HOST_BLOBS),
             "ci_paths": sorted(ESC_B1_CI_PATHS),
             "patch_sha256": digest(original.encode("utf-8")),
             "limit": dict(ESC_B1_LIMIT)}
@@ -336,6 +347,7 @@ def evaluate(memory, provenance, allocation=None):
                 allocation.get("source_head") == ESC_B1_SOURCE_HEAD and
                 allocation.get("po_source_head") == ESC_B1_PO_HEAD and
                 allocation.get("host_blobs") == ESC_B1_HOST_BLOBS and
+                allocation.get("visual_host_blobs") == ESC_B1_VISUAL_HOST_BLOBS and
                 allocation.get("ci_paths") == sorted(ESC_B1_CI_PATHS) and
                 allocation.get("limit") == ESC_B1_LIMIT,
                 "ESC B1 allocation ledger changed")

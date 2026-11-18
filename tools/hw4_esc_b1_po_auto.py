@@ -25,6 +25,8 @@ EXPECTED_HEAD = None  # --expected-head doit être explicitement autorisé
 EXPECTED_MAIN = "91cc6b0856cfb4a05fd3ef3f5e5a2bb6aa523084"
 SCENARIOS = ("SILENT_ESC", "VISIBLE_AB", "HOST_BREAK_PAUSED", "HOST_BREAK_LF")
 EXPECTED_PNG = 6
+VISUAL_HOLD_SECONDS = 15.0  # Host timing only, never firmware ESC idle threshold
+VISUAL_PROGRESS_SECONDS = 6.0
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -94,10 +96,12 @@ def setup_imports():
 
 
 class Driver:
-    def __init__(self, po, session, events, result, command_timeout: float):
+    def __init__(self, po, session, events, result, command_timeout: float,
+                 visual_observation: bool = False):
         self.po, self.s, self.events, self.result = po, session, events, result
         self.timeout = command_timeout
         self.active = None
+        self.visual_observation = visual_observation
 
     def event(self, step: str, state: str, detail: str = ""):
         self.events.log(step, state, detail=detail, scenario=self.active)
@@ -136,6 +140,33 @@ class Driver:
                 if want and want in line:
                     found = True
         return found
+
+    def observe_progress(self, seconds: float, paused_steps: int) -> int:
+        """Monitor real post-RESUME YIELD for a full 6s via sole UART owner."""
+        deadline = time.monotonic() + seconds
+        latest = paused_steps
+        while time.monotonic() < deadline:
+            self.s.pump()
+            while self.s.lines:
+                raw = self.s.lines.popleft()
+                line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+                self.s.inspect(raw, line)  # reboot, fatal, DMA, LCD
+                self.po.require("HW4-RUN-B RUN_TERMINAL " not in line and
+                                "HW4-ESC-BREAK-B1 ESC_TRANSITION " not in line and
+                                "HW4-C2 UART_LINE " not in line,
+                                "UNEXPECTED_RUN_TRANSITION_DURING_RESUME")
+                if "HW4-RUN-B YIELD " in line:
+                    f = parse_fields(line, "HW4-RUN-B YIELD ")
+                    self.po.require(f.get("sha") == EXPECTED_HEAD and
+                                    f.get("steps", "").isdigit(),
+                                    "VISIBLE_PROGRESS_YIELD_INVALID")
+                    steps = int(f["steps"])
+                    self.po.require(steps >= latest, "VISIBLE_STEPS_REGRESSED")
+                    latest = steps
+        self.po.require(latest > paused_steps, "VISIBLE_NO_PROGRESS_AFTER_RESUME")
+        self.check("VISIBLE_PROGRESS_AFTER_RESUME",
+                   f"steps={paused_steps}->{latest} over {seconds}s")
+        return latest
 
     def command(self, cmd: str, transition: str):
         self.s.submit(cmd, transition)
@@ -258,13 +289,23 @@ class Driver:
         self.check("ESC_" + action, "steps=" + str(steps))
         return steps
 
-    def pause(self, *, seconds: float = 1.1) -> int:
+    def pause(self, *, seconds: float = 1.1, visual_label: str | None = None) -> int:
         self.send_raw(b"\x1b", "CPC_ESC_ISOLATED")
         steps = self.transition("PAUSE")
+        if visual_label is not None:
+            self.event("VISUAL", visual_label,
+                       f"UART_CONFIRMATION steps={steps}; pause {seconds:.0f}s. "
+                       "PO: 2 photos TFT espacees, sans toucher au terminal; "
+                       "MANUAL_PO_VISUAL_PENDING")
         self.observe(seconds, forbidden=("HW4-RUN-B YIELD ",
                                          "HW4-RUN-B RUN_TERMINAL ",
                                          "HW4-ESC-BREAK-B1 ESC_TRANSITION "))
-        self.check("PAUSED_STABLE", f"steps={steps}; no subsequent YIELD/TERMINAL for {seconds}s")
+        self.check("PAUSED_STABLE",
+                   f"steps={steps}; no subsequent YIELD/TERMINAL for {seconds}s")
+        if visual_label is not None:
+            self.event("VISUAL", "PAUSE_UART_STABLE",
+                       f"steps={steps}; duration={seconds:.0f}s; "
+                       "aucun YIELD/TERMINAL/ESC_TRANSITION; TFT NON_VERIFIE")
         return steps
 
     def resume(self, paused_steps: int) -> None:
@@ -360,15 +401,37 @@ class Driver:
         self.load(cid, ('10 PRINT "A":GOTO 20', '20 PRINT "B":GOTO 10'))
         self.shot(cid, "BEFORE_RUN")
         self.run()
+        if self.visual_observation:
+            self.event("VISUAL", "RUN_VISIBLE",
+                       "RUN_START confirme UART; regarder A/B sur le TFT; "
+                       "MANUAL_PO_VISUAL_PENDING")
         y = self.first_yield()
         self.check("VISIBLE_LOOP_PROGRESS", f"YIELD steps={y}")
-        pause1 = self.pause(seconds=1.5)
-        self.resume(pause1)
-        progressed = self.first_yield(60)
-        self.po.require(progressed > pause1, "VISIBLE_NO_PROGRESS_AFTER_RESUME")
-        pause2 = self.pause(seconds=1.0)
+        if self.visual_observation:
+            pause1 = self.pause(seconds=VISUAL_HOLD_SECONDS,
+                                visual_label="PAUSE_1_CONFIRMED")
+            self.resume(pause1)
+            self.event("VISUAL", "RESUME_CONFIRMED",
+                       f"UART_CONFIRMATION steps={pause1}; "
+                       f"regarder A/B pendant {VISUAL_PROGRESS_SECONDS:.0f}s; "
+                       "TFT NON_VERIFIE")
+            progressed = self.observe_progress(VISUAL_PROGRESS_SECONDS, pause1)
+            self.event("VISUAL", "RESUME_PROGRESS_CONFIRMED",
+                       f"UART_YIELD steps={pause1}->{progressed}; TFT NON_VERIFIE")
+            pause2 = self.pause(seconds=VISUAL_HOLD_SECONDS,
+                                visual_label="PAUSE_2_CONFIRMED")
+        else:
+            pause1 = self.pause(seconds=1.5)
+            self.resume(pause1)
+            progressed = self.first_yield(60)
+            self.po.require(progressed > pause1, "VISIBLE_NO_PROGRESS_AFTER_RESUME")
+            pause2 = self.pause(seconds=1.0)
         self.po.require(pause2 > pause1, "VISIBLE_NO_STEP_GROWTH")
         self.break_cpc(pause2, {10, 20})
+        if self.visual_observation:
+            self.event("VISUAL", "BREAK_CONFIRMED",
+                       f"UART_CPC_BREAK steps={pause2}; Ready unique confirme; "
+                       "regarder Break in 10/20 et Ready; MANUAL_PO_VISUAL_PENDING")
         self.finish_case(cid)
 
         cid = "HOST_BREAK_PAUSED"
@@ -437,7 +500,9 @@ def write_report(folder: Path, result: dict) -> None:
               "- [ ] Cas ANSI fragmentés conformes aux comportements du terminal réel",
               "- [ ] Pas de faux `Break in N`, un seul Ready, LIST intact",
               "",
-              "Observations et photos PO :", "",
+              "Mode observation longue demande : " + str(result.get("visual_observation", False)),
+               "MANUAL_PO_VISUAL_PENDING (aucun auto-PASS de la dalle)", "",
+               "Observations et photos PO :", "",
               "*(à compléter — aucune qualification ON_DEVICE_PASS automatique)*", "",
               "## Anomalies et limites", ""]
     lines += [f"- {error}" for error in result.get("errors", [])] or ["- Aucune anomalie hôte signalée"]
@@ -471,6 +536,9 @@ def run(argv=None) -> int:
     ap.add_argument("--shot-timeout", type=float, default=160)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--visual-observation", action="store_true",
+                    help=("VISIBLE_AB seulement: PAUSE 15s x2 et RESUME 6s; "
+                          "photos TFT manuelles, aucun second lecteur UART"))
     args = ap.parse_args(argv)
     if args.self_test:
         self_test()
@@ -480,6 +548,9 @@ def run(argv=None) -> int:
     EXPECTED_HEAD = args.expected_head
     if not args.dry_run and not (args.flash or args.existing_firmware):
         ap.error("Indiquer explicitement --flash ou --existing-firmware")
+    if args.visual_observation:
+        print("[VISUAL] OBSERVATION_MANUELLE: PAUSE 15s x2, RESUME 6s; "
+              "UART/CRC automatiques, TFT non valide automatiquement", flush=True)
     if min(args.boot_timeout, args.command_timeout, args.shot_timeout) <= 0:
         ap.error("Délais strictement positifs")
     root, po = setup_imports()
@@ -489,7 +560,11 @@ def run(argv=None) -> int:
     if args.dry_run:
         print(json.dumps({"status": "DRY_RUN_ONLY_NO_DEVICE", "head": head,
                           "scenarios": list(SCENARIOS), "expected_png": EXPECTED_PNG,
-                          "note": "HOME E3 (ESC[H); PNG avant RUN/après BREAK uniquement"},
+                          "note": "HOME E3 (ESC[H); PNG avant RUN/après BREAK uniquement",
+                           "visual_observation": args.visual_observation,
+                           "visual_hold_seconds": VISUAL_HOLD_SECONDS if args.visual_observation else None,
+                           "visual_resume_seconds": VISUAL_PROGRESS_SECONDS if args.visual_observation else None,
+                           "manual_visual_status": "MANUAL_PO_VISUAL_PENDING"},
                          indent=2, ensure_ascii=False))
         return 0
     folder = None
@@ -499,7 +574,10 @@ def run(argv=None) -> int:
     root_out = args.output_root or (root / "cyd-campaigns")
     result = {
         "schema": 1, "campaign": "HW4_ESC_BREAK_B1_PO_AUTO", "status": "INCOMPLETE",
-        "classification": "AUTO_UART_CRC", "manual": "MANUAL_PO_VISUAL",
+        "classification": "AUTO_UART_CRC", "manual": "MANUAL_PO_VISUAL_PENDING",
+        "visual_observation": args.visual_observation,
+        "visual_hold_seconds": VISUAL_HOLD_SECONDS if args.visual_observation else None,
+        "visual_resume_seconds": VISUAL_PROGRESS_SECONDS if args.visual_observation else None,
         "head": head, "expected_main": EXPECTED_MAIN, "port": args.port,
         "mode": "flash" if args.flash else "existing_firmware",
         "expected_png_count": EXPECTED_PNG, "shots": [], "scenarios": [],
@@ -517,6 +595,10 @@ def run(argv=None) -> int:
             "source_branch": "feat/hw4-esc-break-b1-console",
             "scenarios": list(SCENARIOS), "expected_png_count": EXPECTED_PNG,
             "runner_sha256": result["runner_sha256"],
+            "visual_observation": args.visual_observation,
+            "visual_hold_seconds": result["visual_hold_seconds"],
+            "visual_resume_seconds": result["visual_resume_seconds"],
+            "manual_visual_status": "MANUAL_PO_VISUAL_PENDING",
             "scope": "RUN_ESC_PAUSE_RESUME_DOUBLE_ESC_AND_HOST_FALLBACK",
             "limitations": ["HOME_E3_SHOT_ONLY_WHEN_NOT_RUNNING",
                             "NO_SHOT_DURING_RUN_OR_PAUSED",
@@ -581,7 +663,8 @@ def run(argv=None) -> int:
             result["observed_app_version"] = version
             events.log("BOOT", "VERIFIED", f"HEAD={head} version={version}")
             phase = "SCENARIOS"
-            driver = Driver(po, session, events, result, args.command_timeout)
+            driver = Driver(po, session, events, result, args.command_timeout,
+                            visual_observation=args.visual_observation)
             driver.run_cases()
             phase = "VERIFY"
             po.require(po.identity() == head, "SOURCE_CHANGED_DURING_CAMPAIGN")

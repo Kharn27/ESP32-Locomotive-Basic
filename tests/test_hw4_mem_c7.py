@@ -1,5 +1,9 @@
 """HW4-MEM-C7 v2: synthetic adversarial fixtures, NOT firmware measurements."""
 import copy
+from collections import deque
+from contextlib import redirect_stdout
+import io
+from types import SimpleNamespace
 import hashlib
 import json
 import struct
@@ -12,9 +16,12 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools" / "ci"))
+sys.path.insert(0, str(ROOT / "tools"))
 import hw4_mem_c7_v2 as c
 import hw4_mem_c7_provenance as p
 import hw4_mem_c7_legacy as legacy
+import hw4_esc_b1_po_auto as visual
+import cyd_po_campaign as po_campaign
 
 BASE = "e586f0161c73e309291060111335f0b30fc48e84"
 HEAD = "1" * 40
@@ -457,8 +464,11 @@ class EscB1Allocation(Comparator):
                 elif path in c.ESC_B1_HOST_BLOBS:
                     if rev == BASE:
                         return ""
-                    if rev in (c.ESC_B1_PO_HEAD, HEAD):
+                    if rev == c.ESC_B1_PO_HEAD:
                         return ("100644 blob " + c.ESC_B1_HOST_BLOBS[path] +
+                                "\t" + path)
+                    if rev == HEAD:
+                        return ("100644 blob " + c.ESC_B1_VISUAL_HOST_BLOBS[path] +
                                 "\t" + path)
                 elif path in c.ESC_B1_CI_PATHS:
                     if rev in (BASE, HEAD):
@@ -497,6 +507,8 @@ class EscB1Allocation(Comparator):
         token = self.approved()
         self.assertEqual(token["po_source_head"], c.ESC_B1_PO_HEAD)
         self.assertEqual(token["host_blobs"], c.ESC_B1_HOST_BLOBS)
+        self.assertEqual(token["visual_host_blobs"],
+                         c.ESC_B1_VISUAL_HOST_BLOBS)
         self.assertEqual(token["ci_paths"], sorted(c.ESC_B1_CI_PATHS))
         self.assertEqual(token["status"], "AUTHORIZED_ESC_B1_DRAM_BSS_40")
         self.assertEqual(len(token["patch_sha256"]), 64)
@@ -595,13 +607,21 @@ class EscB1Allocation(Comparator):
         self.assertEqual(c.ESC_B1_HOST_BLOBS,
                          {"tools/hw4_esc_b1_po_auto.py":
                           "c14f2772dee0ba1b303098b4d97c18d717e12736"})
+        self.assertEqual(c.ESC_B1_VISUAL_HOST_BLOBS,
+                         {"tools/hw4_esc_b1_po_auto.py":
+                          "f26a2dcd39e299f745be7ce339f9eab2d77458a2"})
         path, sha = next(iter(c.ESC_B1_HOST_BLOBS.items()))
+        current = c.ESC_B1_VISUAL_HOST_BLOBS[path]
         for overrides in (
+            {("ls-tree", HEAD, "--", path):
+             "100644 blob " + sha + "\t" + path},  # rollback to PO blob rejected
             {("ls-tree", HEAD, "--", path):
              "100644 blob " + "f" * 40 + "\t" + path},
             {("ls-tree", HEAD, "--", path):
-             "100755 blob " + sha + "\t" + path},
+             "100755 blob " + current + "\t" + path},
             {("ls-tree", c.ESC_B1_PO_HEAD, "--", path): ""},
+            {("ls-tree", c.ESC_B1_PO_HEAD, "--", path):
+             "100644 blob " + current + "\t" + path},  # PO history immutable
             {("ls-tree", BASE, "--", path):
              "100644 blob " + sha + "\t" + path},
         ):
@@ -640,6 +660,7 @@ class EscB1Allocation(Comparator):
         for key, val in (("issue", 999), ("source_head", "f" * 40),
                          ("po_source_head", "f" * 40),
                          ("host_blobs", {"tools/evil.py": "f" * 40}),
+                         ("visual_host_blobs", {"tools/evil.py": "f" * 40}),
                          ("ci_paths", ["tools/ci/opt3_routing.py"]),
                          ("pr_number", 388),
                          ("status", "ANY_PR_PLUS_40")):
@@ -677,6 +698,160 @@ class EscB1Allocation(Comparator):
                    dram=54905, bss=43833)
         self.assertEqual(c.evaluate(self.metrics(), provenance())["status"],
                          "INCREMENTAL_FAIL")
+
+
+class VisualObservationHost(unittest.TestCase):
+    """Synthetic UART + real Session.inspect: NO physical TFT approval."""
+
+    def setUp(self):
+        self.old_sha = visual.EXPECTED_HEAD
+        visual.EXPECTED_HEAD = HEAD
+        self.addCleanup(setattr, visual, "EXPECTED_HEAD", self.old_sha)
+
+    def stream(self, records=()):
+        class Stream:
+            def __init__(self, records):
+                self.lines = deque()
+                self.pending_records = deque(records)
+                self.inspector = SimpleNamespace(
+                    starts=1, memory=[], awaiting_shot=False)
+
+            def pump(self):
+                if self.pending_records:
+                    self.lines.append((self.pending_records.popleft() + "\n").encode())
+
+            def inspect(self, raw, line):
+                # This is the actual PO-AUTO-01 reboot/FATAL/DMA validator.
+                po_campaign.Session.inspect(self.inspector, raw, line)
+
+        return Stream(records)
+
+    def driver(self, records=()):
+        events = []
+        checks = {"scenarios": [{"id": "VISIBLE_AB", "checks": []}]}
+        d = visual.Driver(
+            po_campaign, self.stream(records),
+            SimpleNamespace(log=lambda *args, **kw: events.append((args, kw))),
+            checks, 60, visual_observation=True)
+        d.active = "VISIBLE_AB"
+        return d, events, checks
+
+    @staticmethod
+    def ticking_clock():
+        ticks = iter(range(100))
+        return lambda: float(next(ticks))
+
+    def test_long_pause_window_and_uart_only_visual_labels(self):
+        d, events, result = self.driver([
+            "HW4-C2 DEVICE_MEMORY stage=run_tick heap8_free=251180 "
+            "heap8_largest=126976 stack_margin_bytes=3448 "
+            "dma_timeouts=0 dma_fault=0 lcd_error=ESP_OK"])
+        with mock.patch.object(visual.time, "monotonic",
+                               side_effect=self.ticking_clock()), \
+             mock.patch.object(d, "send_raw"), \
+             mock.patch.object(d, "transition", return_value=100):
+            self.assertEqual(d.pause(seconds=visual.VISUAL_HOLD_SECONDS,
+                                     visual_label="PAUSE_1_CONFIRMED"), 100)
+        names = [args[1] for args, kw in events]
+        self.assertIn("PAUSE_1_CONFIRMED", names)
+        self.assertIn("PAUSE_UART_STABLE", names)
+        self.assertNotIn("MANUAL_PO_VISUAL_PASS", str(events))
+        self.assertEqual(result["scenarios"][0]["checks"][-1]["name"],
+                         "PAUSED_STABLE")
+        self.assertEqual(visual.VISUAL_HOLD_SECONDS, 15.0)
+
+    def test_pause_rejects_yield_terminal_esc_reboot_and_dma(self):
+        lines = [
+            ("HW4-RUN-B YIELD sha=" + HEAD + " steps=101",
+             "FORBIDDEN_DURING_OBSERVATION"),
+            ("HW4-RUN-B RUN_TERMINAL state=4",
+             "FORBIDDEN_DURING_OBSERVATION"),
+            ("HW4-ESC-BREAK-B1 ESC_TRANSITION action=RESUME ",
+             "FORBIDDEN_DURING_OBSERVATION"),
+            ("HW4-C2 START project=loco_esp32_display_probe",
+             "REBOOT_DURING_CAMPAIGN"),
+            ("HW4-C2 DEVICE_MEMORY stage=run_tick heap8_free=251180 "
+             "heap8_largest=126976 stack_margin_bytes=3448 "
+             "dma_timeouts=1 dma_fault=0 lcd_error=ESP_OK",
+             "DEVICE_MEMORY_FAULT"),
+        ]
+        for record, rejected in lines:
+            with self.subTest(record=record):
+                d, _, _ = self.driver([record])
+                with mock.patch.object(visual.time, "monotonic",
+                                       side_effect=self.ticking_clock()), \
+                     mock.patch.object(d, "send_raw"), \
+                     mock.patch.object(d, "transition", return_value=100), \
+                     self.assertRaisesRegex(po_campaign.Incomplete, rejected):
+                    d.pause(seconds=15, visual_label="PAUSE_2_CONFIRMED")
+
+    def test_resume_six_seconds_requires_real_new_uart_yield(self):
+        d, events, result = self.driver([
+            "HW4-RUN-B YIELD sha=" + HEAD + " steps=112",
+            "HW4-RUN-B YIELD sha=" + HEAD + " steps=128"])
+        with mock.patch.object(visual.time, "monotonic",
+                               side_effect=self.ticking_clock()):
+            advanced = d.observe_progress(visual.VISUAL_PROGRESS_SECONDS, 100)
+        self.assertEqual(advanced, 128)
+        self.assertEqual(visual.VISUAL_PROGRESS_SECONDS, 6.0)
+        self.assertIn("100->128", result["scenarios"][0]["checks"][-1]["details"])
+        self.assertNotIn("MANUAL_PO_VISUAL_PASS", str(events))
+
+    def test_resume_rejects_timeout_wrong_sha_reboot_dma_and_no_steps(self):
+        cases = [
+            ([], "VISIBLE_NO_PROGRESS_AFTER_RESUME"),
+            (["HW4-RUN-B YIELD sha=" + "f" * 40 + " steps=120"],
+             "VISIBLE_PROGRESS_YIELD_INVALID"),
+            (["HW4-RUN-B YIELD sha=" + HEAD + " steps=100"],
+             "VISIBLE_NO_PROGRESS_AFTER_RESUME"),
+            (["HW4-C2 START project=loco_esp32_display_probe"],
+             "REBOOT_DURING_CAMPAIGN"),
+            (["HW4-C2 DEVICE_MEMORY stage=run_tick heap8_free=251180 "
+              "heap8_largest=126976 stack_margin_bytes=3448 "
+              "dma_timeouts=0 dma_fault=1 lcd_error=ESP_OK"],
+             "DEVICE_MEMORY_FAULT"),
+            (["HW4-RUN-B RUN_TERMINAL state=4"],
+             "UNEXPECTED_RUN_TRANSITION_DURING_RESUME"),
+        ]
+        for records, rejected in cases:
+            with self.subTest(records=records):
+                d, _, _ = self.driver(records)
+                with mock.patch.object(visual.time, "monotonic",
+                                       side_effect=self.ticking_clock()), \
+                     self.assertRaisesRegex(po_campaign.Incomplete, rejected):
+                    d.observe_progress(6, 100)
+
+    def test_visual_self_test_and_dry_run_no_hardware(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(visual.run(["--self-test"]), 0)
+        self.assertIn("SELF_TEST PASS", out.getvalue())
+        # self_test uses a synthetic SHA, restore the fixture's real synthetic one
+        visual.EXPECTED_HEAD = HEAD
+        fake_po = SimpleNamespace(identity=lambda: HEAD,
+                                  require=po_campaign.require)
+        out = io.StringIO()
+        with mock.patch.object(visual, "setup_imports",
+                               return_value=(ROOT, fake_po)), \
+             redirect_stdout(out):
+            self.assertEqual(visual.run([
+                "--dry-run", "--visual-observation", "--expected-head", HEAD]), 0)
+        body = out.getvalue()
+        planned = json.loads(body[body.index("{"):])
+        self.assertEqual(planned["status"], "DRY_RUN_ONLY_NO_DEVICE")
+        self.assertEqual(planned["scenarios"], list(visual.SCENARIOS))
+        self.assertEqual(planned["expected_png"], 6)
+        self.assertEqual(planned["visual_hold_seconds"], 15.0)
+        self.assertEqual(planned["visual_resume_seconds"], 6.0)
+        self.assertEqual(planned["manual_visual_status"],
+                         "MANUAL_PO_VISUAL_PENDING")
+        self.assertEqual(len(visual.SCENARIOS), 4)
+        with mock.patch.object(visual, "setup_imports",
+                               return_value=(ROOT, fake_po)), \
+             redirect_stdout(io.StringIO()), \
+             self.assertRaisesRegex(po_campaign.Incomplete, "REFUSE_HEAD"):
+            visual.run(["--dry-run", "--visual-observation",
+                        "--expected-head", "f" * 40])
 
 
 class HistoricalWitness(unittest.TestCase):

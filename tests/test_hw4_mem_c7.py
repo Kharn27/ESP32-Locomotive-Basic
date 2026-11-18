@@ -993,7 +993,8 @@ static int run_case(const char *first_line, const char *second_line,
         slice = advance(8u);
         if (slice.state != HW4_RUN_YIELDED)
             fprintf(stderr, "C99 initial run case counter=%d iteration=%zu state=%d executor=%d\n",
-                    (int)increasing, i, (int)slice.state, (int)slice.executor_status);
+                    (int)increasing, i, (int)slice.state,
+                    (int)f.scheduler.last_result.executor_status);
         CHECK(slice.state == HW4_RUN_YIELDED);
     }
     CHECK(f.text.scrolls > 25u);

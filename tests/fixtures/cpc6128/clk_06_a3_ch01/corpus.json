@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "mission": "CLK-06-A3",
+  "status": "INPUT_ONLY_NOT_AN_ORACLE",
+  "cases": [
+    {
+      "id": "S01_CH1_RECUR_RETURN",
+      "question": "Does EVERY 10,1 deliver two or more channel-1 handler GOSUB/RETURN events in this bounded main loop?",
+      "run_delays": 12,
+      "lines": [
+        "10 C%=0",
+        "20 PRINT #8,\"S01:BEGIN\"",
+        "30 EVERY 10,1 GOSUB 1000",
+        "40 FOR I%=1 TO 8000",
+        "50 NEXT I%",
+        "60 R%=REMAIN(1)",
+        "70 PRINT #8,\"S01:MAIN=\";C%",
+        "80 PRINT #8,\"S01:CANCEL=\";R%",
+        "90 END",
+        "1000 C%=C%+1",
+        "1010 IF C%<=4 THEN PRINT #8,\"S01:HIT=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "S02_CH1_REMAIN_CANCEL",
+      "question": "Does REMAIN(1) directly after EVERY 2,1 print a value and suppress subsequent handler delivery in a finite sensitive window?",
+      "run_delays": 12,
+      "lines": [
+        "10 C%=0",
+        "20 PRINT #8,\"S02:BEGIN\"",
+        "30 EVERY 2,1 GOSUB 1000",
+        "40 R%=REMAIN(1)",
+        "50 PRINT #8,\"S02:REMAIN=\";R%",
+        "60 FOR I%=1 TO 8500",
+        "70 NEXT I%",
+        "80 PRINT #8,\"S02:MAIN=\";C%",
+        "90 PRINT #8,\"S02:R2=\";REMAIN(1)",
+        "100 END",
+        "1000 C%=C%+1",
+        "1010 PRINT #8,\"S02:HIT=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "S03_CH01_COEXIST",
+      "question": "With EVERY 10,0 and EVERY 12,1 on distinct channels, are both handler counters delivered within this bounded window (not a priority test)?",
+      "run_delays": 14,
+      "lines": [
+        "10 A%=0:B%=0",
+        "20 PRINT #8,\"S03:BEGIN\"",
+        "30 EVERY 10,0 GOSUB 1000",
+        "40 EVERY 12,1 GOSUB 1100",
+        "50 FOR I%=1 TO 8500",
+        "60 NEXT I%",
+        "70 R0%=REMAIN(0)",
+        "80 R1%=REMAIN(1)",
+        "90 PRINT #8,\"S03:CH0=\";A%",
+        "100 PRINT #8,\"S03:CH1=\";B%",
+        "110 PRINT #8,\"S03:R0=\";R0%",
+        "120 PRINT #8,\"S03:R1=\";R1%",
+        "130 END",
+        "1000 A%=A%+1",
+        "1010 IF A%<=4 THEN PRINT #8,\"S03:H0=\";A%",
+        "1020 RETURN",
+        "1100 B%=B%+1",
+        "1110 IF B%<=4 THEN PRINT #8,\"S03:H1=\";B%",
+        "1120 RETURN"
+      ]
+    },
+    {
+      "id": "S04_CANCEL_CH1_KEEP_CH0",
+      "question": "After arming both channels, does REMAIN(1) disarm only channel 1 while channel 0 continues during a finite sensitive wait?",
+      "run_delays": 14,
+      "lines": [
+        "10 A%=0:B%=0",
+        "20 PRINT #8,\"S04:BEGIN\"",
+        "30 EVERY 10,0 GOSUB 1000",
+        "40 EVERY 2,1 GOSUB 1100",
+        "50 R1%=REMAIN(1)",
+        "60 PRINT #8,\"S04:REMAIN1=\";R1%",
+        "70 FOR I%=1 TO 8500",
+        "80 NEXT I%",
+        "90 R0%=REMAIN(0)",
+        "100 PRINT #8,\"S04:CH0=\";A%",
+        "110 PRINT #8,\"S04:CH1=\";B%",
+        "120 PRINT #8,\"S04:REMAIN0=\";R0%",
+        "130 PRINT #8,\"S04:R1AGAIN=\";REMAIN(1)",
+        "140 END",
+        "1000 A%=A%+1",
+        "1010 IF A%<=4 THEN PRINT #8,\"S04:H0=\";A%",
+        "1020 RETURN",
+        "1100 B%=B%+1",
+        "1110 IF B%<=4 THEN PRINT #8,\"S04:H1=\";B%",
+        "1120 RETURN"
+      ]
+    }
+  ]
+}

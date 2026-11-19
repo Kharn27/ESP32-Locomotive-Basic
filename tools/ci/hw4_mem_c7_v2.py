@@ -54,6 +54,27 @@ ESC_B1_PATHS = frozenset({
     "tests/test_hw4_cpc_escape_contract.c",
     "tests/test_hw4_run_break_b.c",
 })
+# B1-C7-C2 #385: immutable PO-host runner; CI-only changes are a closed
+# path list, never a blanket tools/** exemption. The PO-tested firmware commit
+# remains an ancestor; its runner blob must survive byte-for-byte.
+ESC_B1_PO_HEAD = "5e44ca338e91283484b2ac41c46a7fcc3b2b0a10"
+ESC_B1_HOST_BLOBS = {
+    # Physical PO campaign 17/11: immutable original host script
+    "tools/hw4_esc_b1_po_auto.py": "c14f2772dee0ba1b303098b4d97c18d717e12736",
+}
+ESC_B1_C1_HEAD = "8d2aa707598a0f3f82c0b4bfcd6467879c9238bc"
+ESC_B1_VISUAL_HOST_BLOBS = {
+    # B1-PO-VISUAL-C1: runner at the PO-tested C1 commit
+    "tools/hw4_esc_b1_po_auto.py": "f26a2dcd39e299f745be7ce339f9eab2d77458a2",
+}
+ESC_B1_COUNTER_HOST_BLOBS = {
+    # B1-PO-VISUAL-C2: opt-in monotonic counter runner at the live PR HEAD
+    "tools/hw4_esc_b1_po_auto.py": "6bbbca0f144f44bcb46dda8f23177104801b9fda",
+}
+ESC_B1_CI_PATHS = frozenset({
+    "tools/ci/hw4_mem_c7_v2.py",
+    "tests/test_hw4_mem_c7.py",
+})
 ESC_B1_LIMIT = {"iram": 0, "dram": 40, "bss": 40}
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -76,6 +97,30 @@ def read_json(path):
 def git(path, *args):
     return subprocess.check_output(["git", "-C", str(path), *args],
                                    text=True, stderr=subprocess.PIPE).strip()
+
+
+def stable_pr_identity(live):
+    """Pin mutable PR refs, not volatile GitHub repository snapshots.
+
+    GitHub includes repo counters/timestamps inside base/head; those may change
+    while the five real builds run, without a PR ref/branch/owner transition.
+    The branch, source repository, SHA and PR state still fail closed.
+    """
+    require(isinstance(live, dict), "GitHub PR payload missing")
+    parts = [live.get("number"), live.get("state"), live.get("draft"),
+             live.get("merged")]
+    for side in ("base", "head"):
+        ref = live.get(side)
+        require(isinstance(ref, dict), "GitHub PR " + side + " missing")
+        repo = ref.get("repo")
+        require(isinstance(repo, dict), "GitHub PR " + side + " repository missing")
+        sha, branch, owner = ref.get("sha"), ref.get("ref"), repo.get("full_name")
+        checked_sha(sha)
+        require(isinstance(branch, str) and bool(branch) and
+                isinstance(owner, str) and bool(owner),
+                "GitHub PR " + side + " identity incomplete")
+        parts.extend((sha, branch, owner))
+    return tuple(parts)
 
 
 def verify_provenance(provenance, live, repo, pr_number, base_checkout, head_checkout):
@@ -145,31 +190,80 @@ def authorize_esc_b1(provenance, live, repo, pr_number, head_checkout):
     checked_sha(base)
     checked_sha(head)
     require(base != head, "ESC allocation empty PR diff")
-    for original in (ESC_B1_SOURCE_BASE, ESC_B1_SOURCE_HEAD):
+    for original in (ESC_B1_SOURCE_BASE, ESC_B1_SOURCE_HEAD, ESC_B1_PO_HEAD,
+                     ESC_B1_C1_HEAD):
         require(git(head_checkout, "cat-file", "-t", original) == "commit",
-                "ESC approved B1 original commit missing")
+                "ESC approved original/PO commit missing")
     for before, after in ((ESC_B1_SOURCE_BASE, ESC_B1_SOURCE_HEAD),
-                          (ESC_B1_SOURCE_HEAD, head)):
+                          (ESC_B1_SOURCE_HEAD, ESC_B1_PO_HEAD),
+                          (ESC_B1_PO_HEAD, ESC_B1_C1_HEAD),
+                           (ESC_B1_C1_HEAD, head)):
         rc = subprocess.run(["git", "-C", str(head_checkout), "merge-base",
                              "--is-ancestor", before, after],
                             capture_output=True)
         require(rc.returncode == 0,
-                "ESC original B1 commit is not in the real Git ancestry")
+                "ESC original B1/PO commit is not in the real Git ancestry")
+
     original_paths = frozenset(git(head_checkout, "diff", "--name-only",
                                    "--no-renames", ESC_B1_SOURCE_BASE,
                                    ESC_B1_SOURCE_HEAD).splitlines())
     current_paths = frozenset(git(head_checkout, "diff", "--name-only",
                                   "--no-renames", base, head).splitlines())
-    require(original_paths == ESC_B1_PATHS and current_paths == ESC_B1_PATHS,
-            "ESC B1 file diff mismatch")
+    expected = ESC_B1_PATHS | frozenset(ESC_B1_HOST_BLOBS) | ESC_B1_CI_PATHS
+    require(original_paths == ESC_B1_PATHS and current_paths == expected,
+            "ESC B1/host/CI closed file diff mismatch")
+
+    # Compare precisely the ten source-file patches, excluding only explicitly
+    # inventoried host-only files. The old B1 patch must remain byte-identical.
     opts = ("diff", "--binary", "--no-ext-diff", "--no-renames")
-    original = git(head_checkout, *opts, ESC_B1_SOURCE_BASE, ESC_B1_SOURCE_HEAD)
-    current = git(head_checkout, *opts, base, head)
+    b1_paths = tuple(sorted(ESC_B1_PATHS))
+    original = git(head_checkout, *opts, ESC_B1_SOURCE_BASE,
+                   ESC_B1_SOURCE_HEAD, "--", *b1_paths)
+    current = git(head_checkout, *opts, base, head, "--", *b1_paths)
     require(original and current == original, "ESC B1 approved patch changed")
+    for path in b1_paths:
+        source = git(head_checkout, "ls-tree", ESC_B1_SOURCE_HEAD, "--", path)
+        actual = git(head_checkout, "ls-tree", head, "--", path)
+        require(source.startswith("100644 blob ") and actual == source,
+                "ESC B1 source blob/mode changed: " + path)
+
+    # Three sealed Git-object identities: PO original, C1 and current C2.
+    require(set(ESC_B1_VISUAL_HOST_BLOBS) == set(ESC_B1_HOST_BLOBS) ==
+            set(ESC_B1_COUNTER_HOST_BLOBS),
+            "ESC runner inventory differs")
+    for path, historical_sha in ESC_B1_HOST_BLOBS.items():
+        original_entry = "100644 blob " + historical_sha + "\t" + path
+        visual_entry = ("100644 blob " + ESC_B1_VISUAL_HOST_BLOBS[path] +
+                        "\t" + path)
+        require(not git(head_checkout, "ls-tree", base, "--", path),
+                "ESC PO host runner unexpectedly exists in main: " + path)
+        require(git(head_checkout, "ls-tree", ESC_B1_PO_HEAD, "--", path) ==
+                original_entry, "ESC PO historical host runner blob/mode changed: " + path)
+        counter_entry = ("100644 blob " + ESC_B1_COUNTER_HOST_BLOBS[path] +
+                         "\t" + path)
+        require(git(head_checkout, "ls-tree", ESC_B1_C1_HEAD, "--", path) ==
+                visual_entry, "ESC C1 historical host runner blob/mode changed: " + path)
+        require(git(head_checkout, "ls-tree", head, "--", path) == counter_entry,
+                "ESC C2 counter host runner blob/mode changed: " + path)
+
+    # The two C7 policy/test files are the *only* permitted extra changes.
+    # Both must be real modifications of existing 100644 blobs on main.
+    for path in sorted(ESC_B1_CI_PATHS):
+        before = git(head_checkout, "ls-tree", base, "--", path)
+        after = git(head_checkout, "ls-tree", head, "--", path)
+        require(before.startswith("100644 blob ") and
+                after.startswith("100644 blob ") and before != after,
+                "ESC C7-only policy/test blob invalid: " + path)
     return {"status": "AUTHORIZED_ESC_B1_DRAM_BSS_40",
             "issue": ESC_B1_ISSUE, "pr_number": ESC_B1_PR,
             "source_base": ESC_B1_SOURCE_BASE,
             "source_head": ESC_B1_SOURCE_HEAD,
+            "po_source_head": ESC_B1_PO_HEAD,
+            "host_blobs": dict(ESC_B1_HOST_BLOBS),
+            "visual_host_blobs": dict(ESC_B1_VISUAL_HOST_BLOBS),
+            "c1_source_head": ESC_B1_C1_HEAD,
+            "counter_host_blobs": dict(ESC_B1_COUNTER_HOST_BLOBS),
+            "ci_paths": sorted(ESC_B1_CI_PATHS),
             "patch_sha256": digest(original.encode("utf-8")),
             "limit": dict(ESC_B1_LIMIT)}
 
@@ -287,6 +381,12 @@ def evaluate(memory, provenance, allocation=None):
                 allocation.get("issue") == ESC_B1_ISSUE and
                 allocation.get("source_base") == ESC_B1_SOURCE_BASE and
                 allocation.get("source_head") == ESC_B1_SOURCE_HEAD and
+                allocation.get("po_source_head") == ESC_B1_PO_HEAD and
+                allocation.get("host_blobs") == ESC_B1_HOST_BLOBS and
+                allocation.get("visual_host_blobs") == ESC_B1_VISUAL_HOST_BLOBS and
+                allocation.get("c1_source_head") == ESC_B1_C1_HEAD and
+                allocation.get("counter_host_blobs") == ESC_B1_COUNTER_HOST_BLOBS and
+                allocation.get("ci_paths") == sorted(ESC_B1_CI_PATHS) and
                 allocation.get("limit") == ESC_B1_LIMIT,
                 "ESC B1 allocation ledger changed")
     base40, head40 = memory["base"]["spi40"], memory["head"]["spi40"]
@@ -410,9 +510,8 @@ def main(argv=None):
     try:
         p = read_json(args.provenance)
         initial, latest = read_json(args.live_pr_start), read_json(args.live_pr)
-        require(all(initial.get(k) == latest.get(k)
-                    for k in ("number", "state", "base", "head")),
-                "GitHub PR changed during real Xtensa builds")
+        require(stable_pr_identity(initial) == stable_pr_identity(latest),
+                "GitHub PR identity changed during real Xtensa builds")
         base, head = verify_provenance(p, latest, args.repo,
                                        args.pr_number, args.base_checkout,
                                        args.head_checkout)

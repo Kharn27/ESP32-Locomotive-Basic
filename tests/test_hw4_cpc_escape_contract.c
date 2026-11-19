@@ -256,10 +256,58 @@ static int run_c1_quarantine(void)
     return 0;
 }
 
+
+/* B1: isolated UART ESC requires a measured idle, NOT packet boundaries.
+ * CSI, SS3 and malformed sequences never turn into phantom BREAK. */
+static int run_b1_transport(void)
+{
+    Hw4EscRunControl c;
+    Hw4EscAction out[2];
+    size_t i;
+    hw4_esc_run_control_init(&c);
+    CHECK(hw4_esc_run_control_feed(&c,0x1bu,1000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&c,50999u)==HW4_ESC_ACTION_NONE);
+    CHECK(hw4_esc_run_control_feed(&c,(uint8_t)'[',51000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&c,1000000u)==HW4_ESC_ACTION_NONE);
+    CHECK(hw4_esc_run_control_feed(&c,(uint8_t)'D',1000001u,false,out)==0u);
+    CHECK(c.phase==HW4_ESC_RUNNING);
+    CHECK(hw4_esc_run_control_feed(&c,0x1bu,1100000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&c,1150000u)==HW4_ESC_ACTION_PAUSE);
+    CHECK(hw4_esc_run_control_feed(&c,0x03u,1151000u,false,out)==0u);
+    CHECK(c.phase==HW4_ESC_PAUSED);
+    CHECK(hw4_esc_run_control_feed(&c,0x1bu,1200000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_feed(&c,(uint8_t)'[',1200001u,false,out)==0u);
+    CHECK(hw4_esc_run_control_feed(&c,(uint8_t)'1',1200002u,false,out)==0u);
+    CHECK(hw4_esc_run_control_feed(&c,0x00u,1200003u,false,out)==0u);
+    CHECK(hw4_esc_run_control_feed(&c,0x1bu,1200004u,false,out)==0u);
+    CHECK(hw4_esc_run_control_feed(&c,(uint8_t)'D',1200005u,false,out)==0u);
+    CHECK(c.phase==HW4_ESC_PAUSED);
+    CHECK(hw4_esc_run_control_idle(&c,1400000u)==HW4_ESC_ACTION_NONE);
+    CHECK(hw4_esc_run_control_feed(&c,0x1bu,1500000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_feed(&c,(uint8_t)'[',1500001u,false,out)==0u);
+    for(i=0u;i<32u;++i)
+        CHECK(hw4_esc_run_control_feed(&c,(uint8_t)'1',
+                                      1500002u+(uint64_t)i,false,out)==0u);
+    CHECK(hw4_esc_run_control_feed(&c,(uint8_t)'D',1600000u,false,out)==0u);
+    CHECK(c.phase==HW4_ESC_PAUSED);
+    CHECK(hw4_esc_run_control_feed(&c,(uint8_t)'x',1610000u,false,out)==1u);
+    CHECK(out[0]==HW4_ESC_ACTION_RESUME && c.phase==HW4_ESC_RUNNING);
+    CHECK(hw4_esc_run_control_feed(&c,0x1bu,1700000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&c,1750000u)==HW4_ESC_ACTION_PAUSE);
+    CHECK(hw4_esc_run_control_feed(&c,0x1bu,1760000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&c,1810000u)==HW4_ESC_ACTION_BREAK_REQUEST);
+    CHECK(c.phase==HW4_ESC_STOPPED);
+    CHECK(hw4_esc_run_control_feed(&c,(uint8_t)'z',1811000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_feed(NULL,0x1bu,0u,false,out)==0u);
+    CHECK(hw4_esc_run_control_feed(&c,0x1bu,0u,false,NULL)==0u);
+    CHECK(hw4_esc_run_control_idle(NULL,0u)==HW4_ESC_ACTION_NONE);
+    return 0;
+}
+
 int main(void)
 {
     if (run_scenarios() != 0 || run_negative() != 0 ||
-        run_c1_quarantine() != 0) return 1;
+        run_c1_quarantine() != 0 || run_b1_transport() != 0) return 1;
     puts("HW4-ESC-BREAK-A/C1 transport + CSI quarantine PASS (NOT CPC oracle)");
     return 0;
 }

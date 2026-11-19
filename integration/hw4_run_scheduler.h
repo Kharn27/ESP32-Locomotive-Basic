@@ -84,4 +84,8 @@ Hw4RunSlice hw4_run_scheduler_slice(Hw4RunScheduler *scheduler,
                                    uint8_t *output, size_t output_capacity,
                                    size_t *written, BEVideoEvent *events,
                                    size_t event_capacity, size_t *event_written);
+/* Read the line at the actual BSR executor cursor during step preflight.
+ * Retain it only on a verified committed step. No quantum/ERR inference. */
+bool hw4_run_scheduler_statement_line(const Hw4RunScheduler *scheduler,
+                                       uint16_t *line_number);
 #endif

@@ -2,6 +2,7 @@
 #define HW4_CPC_ESCAPE_CONTRACT_H
 
 /* HW4-ESC-BREAK-A: host-only C99 experiment. No firmware/BSR integration. */
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -56,5 +57,26 @@ typedef enum {
 
 /* Describes proposed host routing only. No BASIC STOP/CONT/ON BREAK logic. */
 Hw4EscAction hw4_esc_route(Hw4EscPhase *phase, Hw4EscKey key);
+
+/* B1: CONSOLE transport threshold, NOT CPC ROM ESC timing. A raw 0x1b
+ * cannot be identified as ESC until ANSI continuation is excluded.
+ * Only an observed empty UART read permits the idle boundary below. */
+#define HW4_ESC_UART_IDLE_US UINT64_C(50000)
+typedef struct {
+    Hw4EscDecoder decoder;
+    Hw4EscPhase phase;
+    uint64_t pending_since_us;
+    bool pending_valid;
+} Hw4EscRunControl;
+void hw4_esc_run_control_init(Hw4EscRunControl *control);
+/* At most two ordered transitions per input byte; defer_other suppresses
+ * the ordinary-key RESUME while an exact !BREAK prefix is in progress. */
+size_t hw4_esc_run_control_feed(Hw4EscRunControl *control, uint8_t byte,
+                                uint64_t now_us, bool defer_other,
+                                Hw4EscAction actions[2]);
+/* Use ONLY on a proved UART RX idle boundary. Never finish a CSI/SS3 packet
+ * at a read boundary: broken ANSI is quarantined by the decoder. */
+Hw4EscAction hw4_esc_run_control_idle(Hw4EscRunControl *control,
+                                      uint64_t now_us);
 
 #endif

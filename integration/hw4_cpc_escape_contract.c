@@ -131,3 +131,52 @@ Hw4EscAction hw4_esc_route(Hw4EscPhase *phase, Hw4EscKey key)
     }
     return HW4_ESC_ACTION_NONE;
 }
+
+void hw4_esc_run_control_init(Hw4EscRunControl *control)
+{
+    if (control == NULL) return;
+    hw4_esc_decoder_init(&control->decoder);
+    control->phase = HW4_ESC_RUNNING;
+    control->pending_since_us = 0u;
+    control->pending_valid = false;
+}
+
+size_t hw4_esc_run_control_feed(Hw4EscRunControl *control, uint8_t byte,
+                                uint64_t now_us, bool defer_other,
+                                Hw4EscAction actions[2])
+{
+    Hw4EscKey keys[2] = {HW4_ESC_KEY_NONE, HW4_ESC_KEY_NONE};
+    size_t count, i, written = 0u;
+    if (control == NULL || actions == NULL) return 0u;
+    count = hw4_esc_decoder_feed(&control->decoder, byte, keys);
+    if (control->decoder.state == HW4_ESC_PENDING) {
+        /* ESC ESC produces one key plus a new pending ESC prefix. */
+        control->pending_since_us = now_us;
+        control->pending_valid = true;
+    } else {
+        control->pending_valid = false;
+    }
+    for (i = 0u; i < count; ++i) {
+        Hw4EscAction action;
+        if (keys[i] == HW4_ESC_KEY_OTHER &&
+            (defer_other || byte < (uint8_t)' ' || byte > (uint8_t)'~'))
+            continue; /* !BREAK and Ctrl+C cannot resume a paused RUN. */
+        action = hw4_esc_route(&control->phase, keys[i]);
+        if (action != HW4_ESC_ACTION_NONE) actions[written++] = action;
+    }
+    return written;
+}
+
+Hw4EscAction hw4_esc_run_control_idle(Hw4EscRunControl *control,
+                                      uint64_t now_us)
+{
+    Hw4EscKey key;
+    if (control == NULL || !control->pending_valid ||
+        control->decoder.state != HW4_ESC_PENDING ||
+        now_us < control->pending_since_us ||
+        now_us - control->pending_since_us < HW4_ESC_UART_IDLE_US)
+        return HW4_ESC_ACTION_NONE;
+    key = hw4_esc_decoder_release_pending(&control->decoder);
+    control->pending_valid = false;
+    return hw4_esc_route(&control->phase, key);
+}

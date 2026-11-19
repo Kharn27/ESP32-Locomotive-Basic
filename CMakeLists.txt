@@ -63,6 +63,8 @@ if(BUILD_TESTING)
     target_link_libraries(test_hw4_run_break_b PRIVATE
         hw4_run_break_input hw4_run_scheduler hw4_pen_bridge
         cpc_diag_policy cpc_ready_policy)
+    target_sources(test_hw4_run_break_b PRIVATE
+        integration/hw4_cpc_escape_contract.c)
     add_test(NAME hw4_run_break_b_uart_console_contract
         COMMAND test_hw4_run_break_b
           "${CMAKE_CURRENT_SOURCE_DIR}/firmware/esp32_display_probe/main/hw4_c2_console.c")

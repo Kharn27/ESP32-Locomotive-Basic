@@ -3,6 +3,7 @@
  * no emulated ESP-IDF/CYD or invented CPC diagnostic. */
 #include "hw4_run_break_input.h"
 #include "hw4_run_scheduler.h"
+#include "hw4_cpc_escape_contract.h"
 #include "hw4_pen_bridge.h"
 #include "cpc_ready_policy.h"
 #include "cpc_diag_policy.h"
@@ -29,6 +30,8 @@ typedef struct {
     uint8_t vram[CPC_VIDEO_BYTES];
     size_t prints,events_seen;
     bool reject_replay;
+    uint16_t pending_line, last_line;
+    bool pending_valid, last_line_valid;
 } Fixture;
 static Fixture f;
 static uint8_t glyph(void *ctx,uint8_t ch,unsigned row)
@@ -71,6 +74,8 @@ static bool preflight(void *ctx,const uint8_t *bytes,size_t length,
                       const BEVideoEvent *events,size_t count)
 {
     Fixture *p=(Fixture *)ctx;
+    p->pending_valid=hw4_run_scheduler_statement_line(&p->scheduler,
+                                                       &p->pending_line);
     return hw4_pen_preflight(&p->text,bytes,length,events,count)==HW4_PEN_OK;
 }
 static bool replay(void *ctx,const uint8_t *bytes,size_t length,
@@ -80,6 +85,10 @@ static bool replay(void *ctx,const uint8_t *bytes,size_t length,
     if(p->reject_replay) return false;
     if(hw4_pen_replay(&p->text,bytes,length,events,count)!=HW4_PEN_OK)
         return false;
+    if(p->pending_valid) {
+        p->last_line=p->pending_line;
+        p->last_line_valid=true;
+    }
     p->prints+=length;
     p->events_seen+=count;
     return true;
@@ -460,6 +469,117 @@ static int diagnostic_provenance_matrix(void)
 }
 #undef DIAG_CASE
 
+
+/* True BSR and renderer, not a fabricated CPC emulator or quantum line.
+ * CONSOLE applies these very controller actions around scheduler slices. */
+static int esc_break_b1_real_bsr(void)
+{
+    uint8_t original[sizeof(f.image)];
+    Hw4EscRunControl control;
+    Hw4EscAction out[2];
+    Hw4RunSlice slice;
+    size_t steps;
+    uint16_t line=0u;
+    CHECK(setup()==0);
+    CHECK(submit("10 GOTO 10").status==BSR_OK);
+    memcpy(original,f.image,sizeof(original));
+    CHECK(start_run()==0);
+    hw4_esc_run_control_init(&control);
+    CHECK(advance(8u).state==HW4_RUN_YIELDED);
+    CHECK(f.last_line_valid && f.last_line==10u);
+    CHECK(hw4_esc_run_control_feed(&control,0x1bu,1000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&control,50999u)==HW4_ESC_ACTION_NONE);
+    CHECK(hw4_esc_run_control_idle(&control,51000u)==HW4_ESC_ACTION_PAUSE);
+    CHECK(control.phase==HW4_ESC_PAUSED && f.scheduler.stop_calls==0u);
+    steps=f.scheduler.total_steps;
+    /* No slice while paused; the real BSR state and program are stable. */
+    CHECK(f.runtime.state==BSR_RUNNING && f.scheduler.total_steps==steps);
+    CHECK(f.ready_count==0u && memcmp(original,f.image,sizeof(original))==0);
+    CHECK(hw4_esc_run_control_feed(&control,(uint8_t)'x',52000u,false,out)==1u);
+    CHECK(out[0]==HW4_ESC_ACTION_RESUME && control.phase==HW4_ESC_RUNNING);
+    CHECK(advance(8u).state==HW4_RUN_YIELDED);
+    CHECK(f.scheduler.total_steps==steps+8u);
+    CHECK(hw4_esc_run_control_feed(&control,0x1bu,53000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&control,103000u)==HW4_ESC_ACTION_PAUSE);
+    steps=f.scheduler.total_steps;
+    CHECK(hw4_esc_run_control_feed(&control,0x1bu,104000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&control,154000u)==HW4_ESC_ACTION_BREAK_REQUEST);
+    CHECK(control.phase==HW4_ESC_STOPPED);
+    CHECK(hw4_run_scheduler_request_break(&f.scheduler));
+    slice=advance(8u);
+    CHECK(slice.state==HW4_RUN_BROKEN && slice.steps==0u);
+    CHECK(f.scheduler.stop_calls==1u && f.scheduler.total_steps==steps);
+    CHECK(f.last_line_valid && f.last_line==10u);
+    CHECK(memcmp(original,f.image,sizeof(original))==0);
+    CHECK(finish_ready()==0 && f.ready_count==1u);
+    CHECK(advance(8u).state==HW4_RUN_INVALID_ARGUMENT);
+    CHECK(submit("LIST").status==BSR_OK);
+    CHECK(f.written==strlen("10 GOTO 10\n"));
+    CHECK(memcmp(f.output,"10 GOTO 10\n",f.written)==0);
+
+    /* E05-like A/B: the last committed statement was line 20. */
+    CHECK(setup()==0);
+    CHECK(submit("10 PRINT \"A\":GOTO 20").status==BSR_OK);
+    CHECK(submit("20 PRINT \"B\":GOTO 10").status==BSR_OK);
+    CHECK(start_run()==0);
+    hw4_esc_run_control_init(&control);
+    CHECK(advance(1u).state==HW4_RUN_YIELDED);
+    CHECK(f.last_line_valid && f.last_line==10u);
+    CHECK(advance(1u).state==HW4_RUN_YIELDED);
+    CHECK(f.last_line==20u);
+    CHECK(hw4_run_scheduler_statement_line(NULL,&line)==false);
+    CHECK(hw4_run_scheduler_statement_line(&f.scheduler,NULL)==false);
+    CHECK(hw4_esc_run_control_feed(&control,0x1bu,1000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&control,51000u)==HW4_ESC_ACTION_PAUSE);
+    steps=f.scheduler.total_steps;
+    CHECK(hw4_esc_run_control_feed(&control,0x1bu,52000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&control,102000u)==HW4_ESC_ACTION_BREAK_REQUEST);
+    CHECK(hw4_run_scheduler_request_break(&f.scheduler));
+    slice=advance(8u);
+    CHECK(slice.state==HW4_RUN_BROKEN && slice.steps==0u);
+    CHECK(f.scheduler.total_steps==steps && f.scheduler.stop_calls==1u);
+    CHECK(f.last_line_valid && f.last_line==20u);
+    CHECK(finish_ready()==0 && f.ready_count==1u);
+    CHECK(submit("LIST").status==BSR_OK);
+    CHECK(f.written==strlen("10 PRINT \"A\":GOTO 20\n20 PRINT \"B\":GOTO 10\n"));
+    CHECK(f.runtime.state==BSR_IDLE);
+    return 0;
+}
+
+static int esc_break_b1_host_rescue(void)
+{
+    Hw4EscRunControl control;
+    Hw4EscAction out[2];
+    static const char host[]="!BrEaK\r\n";
+    size_t i;
+    CHECK(setup()==0);
+    CHECK(submit("10 GOTO 10").status==BSR_OK);
+    CHECK(start_run()==0);
+    hw4_esc_run_control_init(&control);
+    CHECK(advance(8u).state==HW4_RUN_YIELDED);
+    CHECK(hw4_esc_run_control_feed(&control,0x1bu,1000u,false,out)==0u);
+    CHECK(hw4_esc_run_control_idle(&control,51000u)==HW4_ESC_ACTION_PAUSE);
+    for(i=0u;i<sizeof(host)-1u;++i) {
+        Hw4BreakInputEvent event=hw4_run_break_input_feed(&f.parser,
+                                            (uint8_t)host[i]);
+        bool prefix=i<6u;
+        size_t count=hw4_esc_run_control_feed(&control,(uint8_t)host[i],
+                                              52000u+(uint64_t)i,prefix,out);
+        CHECK(count==0u);
+        if(i<6u) CHECK(event==HW4_BREAK_INPUT_NONE);
+        else if(i==6u) {
+            CHECK(event==HW4_BREAK_INPUT_REQUEST);
+            CHECK(hw4_run_scheduler_request_break(&f.scheduler));
+            control.phase=HW4_ESC_STOPPED;
+        } else CHECK(event==HW4_BREAK_INPUT_NONE);
+    }
+    CHECK(f.scheduler.total_steps==8u);
+    CHECK(advance(8u).state==HW4_RUN_BROKEN);
+    CHECK(f.scheduler.stop_calls==1u);
+    CHECK(finish_ready()==0 && f.ready_count==1u);
+    return 0;
+}
+
 /* Source-level gate: ensure actual production CONSOLE dispatches the
  * independently tested C99 pieces, and cannot restore 256-step cutoff. */
 static int production_wiring(const char *path)
@@ -469,6 +589,12 @@ static int production_wiring(const char *path)
     size_t n;
     static const char *required[]={
         "#include \"hw4_run_break_input.h\"",
+        "#include \"hw4_cpc_escape_contract.h\"",
+        "hw4_esc_run_control_feed(",
+        "hw4_esc_run_control_idle(",
+        "if(s_run_esc.phase==HW4_ESC_PAUSED)",
+        "hw4_run_scheduler_statement_line(",
+        "CPC_ESC_DOUBLE",
         "hw4_run_scheduler_init(&s_run_scheduler",
         "hw4_run_scheduler_slice(&s_run_scheduler",
         "hw4_run_break_input_feed(&s_run_input,byte)",
@@ -499,6 +625,8 @@ int main(int argc,char **argv)
     CHECK(argc==2);
     CHECK(parser_edges()==0);
     CHECK(infinite_run_and_fragmented_break()==0);
+    CHECK(esc_break_b1_real_bsr()==0);
+    CHECK(esc_break_b1_host_rescue()==0);
     CHECK(pen_error_and_video_reject()==0);
     CHECK(diagnostic_provenance_matrix()==0);
     CHECK(inline_end_and_no_reentry()==0);

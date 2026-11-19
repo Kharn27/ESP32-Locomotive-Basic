@@ -62,3 +62,11 @@ python3 tools/clk_06_a4_oracle.py --verify /tmp/clk-06-a4-initial-raw \
 ```
 
 **Dependance non levee** : PR #396 active. Les preuves ROM-backed historiques A4 sont archivees ; **CI-OPT3 A4 reste `UNKNOWN_OR_MISSING_WORKFLOW`** jusqu'a fusion effective #396 et ajout de route A4 exclusivement par DEV1. Toute acquisition sur le futur HEAD de remise devra utiliser son propre sceau et ses propres ZIP, distincts des fichiers historiques.
+
+## CLK-06-A4-C1 — reconciliation A5 et provenance du nouveau HEAD
+
+Le [verdict Pilotage C1 du 19/11/2026](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/397#issuecomment-7010489474) autorise la reconciliation de cette branche avec `main@09036faf4b64e2b281d3d961ff5f48b389c75985`, **apres** la fusion de [#396](https://github.com/Kharn27/ESP32-Locomotive-Basic/pull/396). Le STOP precedent et ses anciennes acquisitions sont conserves comme historique, et **ne constituent pas la preuve du nouveau HEAD**. Les deux ZIP `evidence/run-44520757976-39da63f7-*.zip` demeurent rigoureusement inchanges avec leurs blob SHA1/sha256 precedemment consignes.
+
+Sur C1, la nouvelle route `.github/workflows/clk-06-a4-acquisition.yml` est enregistree **uniquement** dans `CPC_ACQUISITION`, avec cinq filtres nominatifs et la meme liste de familles. Les falsifications `tools/ci/opt3_routing.py` refusent insertion de filtres larges, events/permissions, cancellation, skip de job, defaut d'empreinte HEAD, ROM, commit Caprice32 et image GHCR, absence de sceau hors RAW, et replay non chaine. Aucun filtre A5 n'est modifie ; les protections A4 numeriques et A5 fusionnees restent intactes. `49 workflows / 5 familles` uniquement si main ne change pas de nouveau.
+
+**Re-acquisition requise au HEAD exact final C1** : ne pas assimiler le ZIP historique ni les campagnes intermediaires a ce HEAD. Pour chaque S01-S04, deux boots frais (original, repeat), ROM/Caprice/image epingles, LIST/STOP/RUN et sources RAM/imprimante/PNG, provenance signees par un sceau de manifeste **hors** RAW, puis rejeu en job different. Les captures et les huit CI doivent etre verifies sur le SHA final et lies dans la remise de PR #397. `OBSERVED` reste strictement limite aux quatre fenetres finies ; cadence absolue, priorite universelle, DI/EI et TIMER natif restent `UNVERIFIED`. `ON_DEVICE_NOT_APPLICABLE_A4`.

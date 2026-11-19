@@ -226,6 +226,65 @@ def ram_checked(image: bytes, case: dict) -> dict:
             "sha256": digest(image)}
 
 
+# Verify completion and output shape, never assert hypothetical CPC values.
+MANDATORY = {
+    "S01": ("PRE", "POST", "R2"),
+    "S02": ("PRE", "DI", "EI", "POST", "R2"),
+    "S03": ("PRE", "DI", "EI", "POST", "R2"),
+    "S04": ("PRE2", "PRE3", "DI2", "DI3", "EI2", "EI3",
+            "POST2", "POST3", "R2", "R3"),
+}
+
+
+def run_printer_checked(raw: bytes, case: dict) -> dict:
+    prefix = case["id"].split("_", 1)[0]
+    need(bool(raw) and len(raw) < 65536, "RUN_PRINTER_EMPTY_OR_UNBOUNDED")
+    values, traces, began = {}, [], 0
+    for row in raw.decode("latin-1").replace("\r", "").split("\n"):
+        row = row.strip()
+        if not row:
+            continue
+        if row == prefix + ":BEGIN":
+            began += 1
+            continue
+        match = re.fullmatch(r"(S0[1-4]):([A-Z0-9_]+)=\s*([+-]?\d+)(.*)", row)
+        need(match and match.group(1) == prefix, "RUN_UNEXPECTED_PRINTER_LINE")
+        key, number, tail = match.group(2), int(match.group(3)), match.group(4)
+        need(number >= 0, "RUN_NEGATIVE_COUNT_OR_REMAIN")
+        if key == "ORDER":
+            pair = re.fullmatch(r"\s*,\s*([23])\s*,\s*(\d+)\s*", tail)
+            need(prefix == "S04" and pair, "RUN_ORDER_FORMAT")
+            traces.append((number, int(pair.group(1)), int(pair.group(2))))
+        elif key == "H2":
+            need(prefix != "S04" and not tail.strip(), "RUN_TRACE_FORMAT")
+            traces.append(("H2", number))
+        else:
+            need(not tail.strip() and key not in values, "RUN_DUPLICATE_OR_BAD_VALUE")
+            values[key] = number
+    need(began == 1 and all(key in values for key in MANDATORY[prefix]),
+         "RUN_PRINTER_MISSING_PROBE")
+    need(not set(values).difference(MANDATORY[prefix]), "RUN_UNEXPECTED_PROBE")
+    for suffix in (("2", "3") if prefix == "S04" else ("",)):
+        stages = ["PRE", "POST"] if prefix == "S01" else ["PRE", "DI", "EI", "POST"]
+        vals = [values[name+suffix] for name in stages]
+        need(vals == sorted(vals), "RUN_NONMONOTONIC_EVENT_COUNT")
+    if prefix == "S01":
+        need(values["POST"] > 0, "CONTROL_CALLBACK_MISSING")
+    if prefix != "S04":
+        seen = [n for kind, n in traces if kind == "H2"]
+        need(seen == list(range(1, len(seen)+1)) and len(seen) <= 4,
+             "RUN_EVENT_TRACE_SEQUENCE")
+        need(not values["POST"] or seen, "RUN_EVENT_TRACE_MISSING")
+    else:
+        need(len(traces) <= 8 and [seq for seq, ch, n in traces] ==
+             list(range(1, len(traces)+1)) and
+             all(ch in (2,3) and 1 <= n <= seq for seq, ch, n in traces),
+             "RUN_ORDER_TRACE_SEQUENCE")
+        need(not (values["POST2"] + values["POST3"]) or traces,
+             "RUN_EVENT_TRACE_MISSING")
+    return {"values": values, "first_traces": traces}
+
+
 def inventory(folder: Path) -> dict:
     files = {}
     for item in sorted(folder.rglob("*")):
@@ -312,6 +371,7 @@ def acquire(cap: Path, out: Path, head: str) -> None:
                          "CPC_RUN_PRINTER_MISSING")
                     # Printed bytes (including any CPC numeric representation)
                     # are raw observations. No expected outcome is built in.
+                    run_printer_checked(read(printer), case)
                     result["cases"][label] = {
                         "question": case["question"], "source_sha256": digest(source_bytes(case)),
                         "list": listed, "run": executed, "ram": ram,
@@ -421,6 +481,7 @@ def verify(folder: Path, head: str, seal: str) -> bool:
                  "CPC_LIST_REPLAY_DIFFERENCE")
             need(entry["run_printer_sha256"] == digest(read(directory / "run/printer.dat")),
                  "CPC_RUN_PRINTER_SHA_MISMATCH")
+            run_printer_checked(read(directory / "run/printer.dat"), case)
     return True
 
 

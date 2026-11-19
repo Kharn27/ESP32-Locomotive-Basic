@@ -14,7 +14,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: clk-06-a3-${{ github.event.pull_request.head.sha || github.sha }}
+  group: clk-06-a3-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

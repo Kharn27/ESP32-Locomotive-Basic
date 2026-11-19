@@ -47,6 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_clk_04_a4_fast_route.py' -v
+          python3 -m unittest discover -s tests -p 'test_clk_04_a4_a5_fast_route.py' -v
           python3 tools/ci/clk_04_a4_fast_route.py \
             --event "$EVENT_KIND" --head "$EXPECTED_HEAD" \
             --base "$BASE_SHA" --output "$GITHUB_OUTPUT"

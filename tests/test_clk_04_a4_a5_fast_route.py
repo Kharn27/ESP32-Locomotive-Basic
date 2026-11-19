@@ -118,6 +118,14 @@ class A5Routing(unittest.TestCase):
         with self.assertRaisesRegex(route.RouteError, "A5_HEAD_MISMATCH"):
             route.a5_decision(self.root, "pull_request", self.base, self.base)
 
+    def test_a5_route_test_invocation_cannot_be_silently_removed(self):
+        source = (self.root / route.WORKFLOW).read_text()
+        self.change(route.WORKFLOW, source.replace(
+            "test_clk_04_a4_a5_fast_route.py", "absent_route_tests.py"))
+        with self.assertRaisesRegex(route.RouteError,
+                                    "A5_ROUTE_OUTPUT_OR_TESTS_MISSING"):
+            route.a5_decision(self.root, "pull_request", self.head, self.base)
+
     def test_skipped_replay_and_missing_a5_sources_are_not_evidence(self):
         self.assertEqual(route.a5_decision(self.root, "workflow_dispatch",
                                            self.head)[0], "full")

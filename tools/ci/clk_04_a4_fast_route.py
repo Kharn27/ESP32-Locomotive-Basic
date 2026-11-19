@@ -153,8 +153,9 @@ def a5_wiring(workflow):
     host, capture, replay = (job(workflow, j) for j in A5_JOBS)
     route = job(workflow, "route")
     demand("a5_mode:" in route and
-           "--output \"$GITHUB_OUTPUT\"" in route,
-           "A5_ROUTE_OUTPUT_MISSING")
+           "--output \"$GITHUB_OUTPUT\"" in route and
+           "test_clk_04_a4_a5_fast_route.py" in route,
+           "A5_ROUTE_OUTPUT_OR_TESTS_MISSING")
     demand("test_clk_04_a4_a5_product_ram.py" in host and
            "clk_04_a4_a5_product_ram.py --self-test" in host and
            "09a132467b71aed8c55e9c8691948c350b921dce5b1195f3af26ace0adfd600c" in host,

@@ -1,7 +1,12 @@
 """HW4-MEM-C7 v2: synthetic adversarial fixtures, NOT firmware measurements."""
 import copy
+from collections import deque
+from contextlib import redirect_stdout
+import io
+from types import SimpleNamespace
 import hashlib
 import json
+import shutil
 import struct
 import subprocess
 import sys
@@ -12,9 +17,12 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools" / "ci"))
+sys.path.insert(0, str(ROOT / "tools"))
 import hw4_mem_c7_v2 as c
 import hw4_mem_c7_provenance as p
 import hw4_mem_c7_legacy as legacy
+import hw4_esc_b1_po_auto as visual
+import cyd_po_campaign as po_campaign
 
 BASE = "e586f0161c73e309291060111335f0b30fc48e84"
 HEAD = "1" * 40
@@ -54,7 +62,8 @@ def elf_image():
 def live():
     return {"number": PR, "state": "open",
             "base": {"ref": "main", "repo": {"full_name": REPO}, "sha": BASE},
-            "head": {"sha": HEAD}}
+            "head": {"sha": HEAD, "ref": "fixture-branch",
+                     "repo": {"full_name": REPO}}}
 
 
 def provenance():
@@ -417,7 +426,8 @@ class SingleByte(unittest.TestCase):
 # Synthetic mock Git responses prove both positive and fail-closed branches;
 # no fixture alone creates a deployment authorization.
 class EscB1Allocation(Comparator):
-    def approved(self, changes=None, git_results=None, anc_ok=True):
+    def approved(self, changes=None, git_overrides=None, anc_ok=True):
+        """Simulate Git object/tree commands; override individual hostile answers."""
         pv = provenance()
         pv["pr_number"] = c.ESC_B1_PR
         pv["repo"] = c.ESC_B1_REPO
@@ -430,12 +440,52 @@ class EscB1Allocation(Comparator):
             for location, name, value in changes:
                 (pv if location == "provenance" else
                  lv["head"] if location == "head" else lv)[name] = value
-        names = "\n".join(sorted(c.ESC_B1_PATHS))
-        sequence = git_results or ["commit", "commit", names, names, "approved B1 patch",
-                                   "approved B1 patch"]
-        with mock.patch.object(c, "git", side_effect=sequence), \
+
+        original_paths = "\n".join(sorted(c.ESC_B1_PATHS))
+        closed_paths = "\n".join(sorted(
+            c.ESC_B1_PATHS | frozenset(c.ESC_B1_HOST_BLOBS) |
+            c.ESC_B1_CI_PATHS))
+        opts = ("diff", "--binary", "--no-ext-diff", "--no-renames")
+        patch_paths = ("--", *sorted(c.ESC_B1_PATHS))
+
+        def fake_git(folder, *args):
+            if git_overrides and args in git_overrides:
+                return git_overrides[args]
+            if args[:2] == ("cat-file", "-t"):
+                return "commit"
+            if args[:3] == ("diff", "--name-only", "--no-renames"):
+                return (original_paths if args[3] == c.ESC_B1_SOURCE_BASE
+                        else closed_paths)
+            if args[:4] == opts and args[-len(patch_paths):] == patch_paths:
+                return "approved B1 patch"
+            if len(args) == 4 and args[0] == "ls-tree" and args[2] == "--":
+                rev, path = args[1], args[3]
+                if path in c.ESC_B1_PATHS:
+                    if rev in (c.ESC_B1_SOURCE_HEAD, HEAD):
+                        return "100644 blob " + "a" * 40 + "\t" + path
+                elif path in c.ESC_B1_HOST_BLOBS:
+                    if rev == BASE:
+                        return ""
+                    if rev == c.ESC_B1_PO_HEAD:
+                        return ("100644 blob " + c.ESC_B1_HOST_BLOBS[path] +
+                                "\t" + path)
+                    if rev == c.ESC_B1_C1_HEAD:
+                        return ("100644 blob " + c.ESC_B1_VISUAL_HOST_BLOBS[path] +
+                                "\t" + path)
+                    if rev == HEAD:
+                        return ("100644 blob " + c.ESC_B1_COUNTER_HOST_BLOBS[path] +
+                                "\t" + path)
+                elif path in c.ESC_B1_CI_PATHS:
+                    if rev in (BASE, HEAD):
+                        return ("100644 blob " +
+                                ("b" if rev == BASE else "c") * 40 +
+                                "\t" + path)
+            raise AssertionError("unexpected Git lookup: " + repr(args))
+
+        with mock.patch.object(c, "git", side_effect=fake_git), \
              mock.patch.object(c.subprocess, "run",
-                               return_value=mock.Mock(returncode=0 if anc_ok else 1)):
+                               return_value=mock.Mock(
+                                   returncode=0 if anc_ok else 1)):
             return c.authorize_esc_b1(pv, lv, c.ESC_B1_REPO,
                                       c.ESC_B1_PR, "/verified-head")
 
@@ -449,6 +499,56 @@ class EscB1Allocation(Comparator):
                        dram=54864 + growth, bss=43792 + bss_growth)
         return self.metrics()
 
+    def test_live_pr_stable_refs_ignore_volatile_repo_metadata(self):
+        initial = live()
+        initial["number"] = c.ESC_B1_PR
+        initial["draft"] = True
+        initial["merged"] = False
+        initial["head"].update({
+            "ref": c.ESC_B1_BRANCH,
+            "repo": {"full_name": c.ESC_B1_REPO,
+                     "pushed_at": "2026-11-18T15:00:00Z",
+                     "open_issues_count": 100}})
+        initial["base"]["repo"].update({
+            "pushed_at": "2026-11-18T15:00:00Z",
+            "open_issues_count": 100})
+        revised = copy.deepcopy(initial)
+        for side in ("head", "base"):
+            revised[side]["repo"]["pushed_at"] = "2026-11-18T17:00:00Z"
+            revised[side]["repo"]["open_issues_count"] = 101
+            revised[side]["repo"]["new_unrelated_field"] = 1
+        # Real HEAD/main refs and branches are unchanged: allow this.
+        self.assertEqual(c.stable_pr_identity(initial),
+                         c.stable_pr_identity(revised))
+        for side, field, value in (
+                ("head", "sha", "f" * 40),
+                ("base", "sha", "f" * 40),
+                ("head", "ref", "evil-branch"),
+                ("base", "ref", "evil-main")):
+            bad = copy.deepcopy(initial)
+            bad[side][field] = value
+            with self.subTest(side=side, field=field):
+                self.assertNotEqual(c.stable_pr_identity(initial),
+                                    c.stable_pr_identity(bad))
+        for side in ("head", "base"):
+            bad = copy.deepcopy(initial)
+            bad[side]["repo"]["full_name"] = "evil/fork"
+            self.assertNotEqual(c.stable_pr_identity(initial),
+                                c.stable_pr_identity(bad))
+            bad[side]["repo"] = None
+            with self.assertRaisesRegex(ValueError, "repository missing"):
+                c.stable_pr_identity(bad)
+        for field, value in (("number", 388), ("state", "closed"),
+                             ("draft", False), ("merged", True)):
+            bad = copy.deepcopy(initial)
+            bad[field] = value
+            self.assertNotEqual(c.stable_pr_identity(initial),
+                                c.stable_pr_identity(bad))
+        bad = copy.deepcopy(initial)
+        bad["head"]["sha"] = "not-a-sha"
+        with self.assertRaises(ValueError):
+            c.stable_pr_identity(bad)
+
     def test_approved_closed_ledger_and_provenance(self):
         self.assertEqual(c.ESC_B1_PR, 387)
         self.assertEqual(c.ESC_B1_ISSUE, 385)
@@ -456,7 +556,18 @@ class EscB1Allocation(Comparator):
         self.assertEqual(c.ESC_B1_SOURCE_HEAD,
                          "010e2d1d14941e4e09c097c8599b5cf4d0527f2f")
         self.assertEqual(len(c.ESC_B1_PATHS), 10)
+        self.assertEqual(c.ESC_B1_CI_PATHS,
+                         frozenset({"tools/ci/hw4_mem_c7_v2.py",
+                                    "tests/test_hw4_mem_c7.py"}))
         token = self.approved()
+        self.assertEqual(token["po_source_head"], c.ESC_B1_PO_HEAD)
+        self.assertEqual(token["host_blobs"], c.ESC_B1_HOST_BLOBS)
+        self.assertEqual(token["visual_host_blobs"],
+                         c.ESC_B1_VISUAL_HOST_BLOBS)
+        self.assertEqual(token["c1_source_head"], c.ESC_B1_C1_HEAD)
+        self.assertEqual(token["counter_host_blobs"],
+                         c.ESC_B1_COUNTER_HOST_BLOBS)
+        self.assertEqual(token["ci_paths"], sorted(c.ESC_B1_CI_PATHS))
         self.assertEqual(token["status"], "AUTHORIZED_ESC_B1_DRAM_BSS_40")
         self.assertEqual(len(token["patch_sha256"]), 64)
         report = c.evaluate(self.b1_metrics(), provenance(), token)
@@ -514,6 +625,9 @@ class EscB1Allocation(Comparator):
             [("provenance", "pr_number", 388)],
             [("live", "state", "closed")],
             [("live", "title", "unrelated")],
+            [("live", "base", {"ref": "main",
+                              "repo": {"full_name": c.ESC_B1_REPO},
+                              "sha": "e" * 40})],
         ]
         for changes in bad:
             with self.subTest(changes=changes), self.assertRaisesRegex(
@@ -521,19 +635,99 @@ class EscB1Allocation(Comparator):
                 self.approved(changes=changes)
         with self.assertRaisesRegex(ValueError, "ancestry"):
             self.approved(anc_ok=False)
-        names = "\n".join(sorted(c.ESC_B1_PATHS))
-        for sequence in (
-            ["missing", "commit"],
-            ["commit", "commit", names, "tools/ci/fake.py"],
-            ["commit", "commit", names, names, "original", "tampered"],
+
+        opts = ("diff", "--binary", "--no-ext-diff", "--no-renames")
+        b1 = ("--", *sorted(c.ESC_B1_PATHS))
+        original_names = "\n".join(sorted(c.ESC_B1_PATHS))
+        closed_names = "\n".join(sorted(c.ESC_B1_PATHS |
+                                         frozenset(c.ESC_B1_HOST_BLOBS) |
+                                         c.ESC_B1_CI_PATHS))
+        tampering = [
+            {("cat-file", "-t", c.ESC_B1_SOURCE_BASE): "missing"},
+            {("cat-file", "-t", c.ESC_B1_PO_HEAD): "missing"},
+            {("diff", "--name-only", "--no-renames",
+              c.ESC_B1_SOURCE_BASE, c.ESC_B1_SOURCE_HEAD): "other.py"},
+            {("diff", "--name-only", "--no-renames",
+              BASE, HEAD): closed_names + "\nother.py"},
+            {(*opts, BASE, HEAD, *b1): "tampered B1 patch"},
+            {("ls-tree", HEAD, "--",
+              "integration/hw4_run_scheduler.c"):
+             "100644 blob " + "f" * 40 +
+             "\tintegration/hw4_run_scheduler.c"},
+        ]
+        for overrides in tampering:
+            with self.subTest(overrides=overrides), self.assertRaises(ValueError):
+                self.approved(git_overrides=overrides)
+
+    def test_host_runner_blob_and_mode_must_match_po_firmware(self):
+        self.assertEqual(c.ESC_B1_PO_HEAD,
+                         "5e44ca338e91283484b2ac41c46a7fcc3b2b0a10")
+        self.assertEqual(c.ESC_B1_HOST_BLOBS,
+                         {"tools/hw4_esc_b1_po_auto.py":
+                          "c14f2772dee0ba1b303098b4d97c18d717e12736"})
+        self.assertEqual(c.ESC_B1_VISUAL_HOST_BLOBS,
+                         {"tools/hw4_esc_b1_po_auto.py":
+                          "f26a2dcd39e299f745be7ce339f9eab2d77458a2"})
+        path, sha = next(iter(c.ESC_B1_HOST_BLOBS.items()))
+        current = c.ESC_B1_COUNTER_HOST_BLOBS[path]
+        c1_blob = c.ESC_B1_VISUAL_HOST_BLOBS[path]
+        for overrides in (
+            {("ls-tree", HEAD, "--", path):
+             "100644 blob " + sha + "\t" + path},  # rollback to PO blob rejected
+            {("ls-tree", HEAD, "--", path):
+             "100644 blob " + "f" * 40 + "\t" + path},
+            {("ls-tree", HEAD, "--", path):
+             "100755 blob " + current + "\t" + path},
+            {("ls-tree", c.ESC_B1_PO_HEAD, "--", path): ""},
+            {("ls-tree", c.ESC_B1_PO_HEAD, "--", path):
+             "100644 blob " + current + "\t" + path},  # PO history immutable
+            {("ls-tree", c.ESC_B1_C1_HEAD, "--", path):
+             "100644 blob " + current + "\t" + path},  # C1 must remain C1
+            {("ls-tree", c.ESC_B1_C1_HEAD, "--", path):
+             "100755 blob " + c1_blob + "\t" + path},
+            {("ls-tree", c.ESC_B1_C1_HEAD, "--", path): ""},
+            {("ls-tree", BASE, "--", path):
+             "100644 blob " + sha + "\t" + path},
         ):
-            with self.subTest(sequence=sequence), self.assertRaises(
-                    (ValueError, StopIteration)):
-                self.approved(git_results=sequence)
+            with self.subTest(overrides=overrides), self.assertRaisesRegex(
+                    ValueError, "host runner"):
+                self.approved(git_overrides=overrides)
+
+    def test_extra_host_script_or_ci_tampering_must_fail(self):
+        expected = c.ESC_B1_PATHS | frozenset(c.ESC_B1_HOST_BLOBS) | c.ESC_B1_CI_PATHS
+        self.assertEqual(len(expected), 13)
+        for injected in ("tools/extra_runner.py", "tools/ci/opt3_routing.py",
+                         "firmware/esp32_display_probe/main/extra.c",
+                         "docs/FORGED-MEMORY.md"):
+            changed = "\n".join(sorted(expected | {injected}))
+            overrides = {("diff", "--name-only", "--no-renames",
+                          BASE, HEAD): changed}
+            with self.subTest(path=injected), self.assertRaisesRegex(
+                    ValueError, "closed file diff mismatch"):
+                self.approved(git_overrides=overrides)
+        for missing in (next(iter(c.ESC_B1_HOST_BLOBS)),
+                        next(iter(c.ESC_B1_CI_PATHS))):
+            changed = "\n".join(sorted(expected - {missing}))
+            with self.subTest(missing=missing), self.assertRaisesRegex(
+                    ValueError, "closed file diff mismatch"):
+                self.approved(git_overrides={
+                    ("diff", "--name-only", "--no-renames", BASE, HEAD): changed})
+        for path in c.ESC_B1_CI_PATHS:
+            with self.subTest(unmodified=path), self.assertRaisesRegex(
+                    ValueError, "C7-only policy/test blob invalid"):
+                self.approved(git_overrides={
+                    ("ls-tree", HEAD, "--", path):
+                    "100644 blob " + "b" * 40 + "\t" + path})
 
     def test_mutated_allocation_ledger_rejected(self):
         token = self.approved()
         for key, val in (("issue", 999), ("source_head", "f" * 40),
+                         ("po_source_head", "f" * 40),
+                         ("host_blobs", {"tools/evil.py": "f" * 40}),
+                         ("visual_host_blobs", {"tools/evil.py": "f" * 40}),
+                         ("counter_host_blobs", {"tools/evil.py": "f" * 40}),
+                         ("c1_source_head", "f" * 40),
+                         ("ci_paths", ["tools/ci/opt3_routing.py"]),
                          ("pr_number", 388),
                          ("status", "ANY_PR_PLUS_40")):
             trial = dict(token)
@@ -570,6 +764,384 @@ class EscB1Allocation(Comparator):
                    dram=54905, bss=43833)
         self.assertEqual(c.evaluate(self.metrics(), provenance())["status"],
                          "INCREMENTAL_FAIL")
+
+
+class VisualObservationHost(unittest.TestCase):
+    """Synthetic UART + real Session.inspect: NO physical TFT approval."""
+
+    def setUp(self):
+        self.old_sha = visual.EXPECTED_HEAD
+        visual.EXPECTED_HEAD = HEAD
+        self.addCleanup(setattr, visual, "EXPECTED_HEAD", self.old_sha)
+
+    def stream(self, records=()):
+        class Stream:
+            def __init__(self, records):
+                self.lines = deque()
+                self.pending_records = deque(records)
+                self.inspector = SimpleNamespace(
+                    starts=1, memory=[], awaiting_shot=False)
+
+            def pump(self):
+                if self.pending_records:
+                    self.lines.append((self.pending_records.popleft() + "\n").encode())
+
+            def inspect(self, raw, line):
+                # This is the actual PO-AUTO-01 reboot/FATAL/DMA validator.
+                po_campaign.Session.inspect(self.inspector, raw, line)
+
+        return Stream(records)
+
+    def driver(self, records=()):
+        events = []
+        checks = {"scenarios": [{"id": "VISIBLE_AB", "checks": []}]}
+        d = visual.Driver(
+            po_campaign, self.stream(records),
+            SimpleNamespace(log=lambda *args, **kw: events.append((args, kw))),
+            checks, 60, visual_observation=True)
+        d.active = "VISIBLE_AB"
+        return d, events, checks
+
+    @staticmethod
+    def ticking_clock():
+        ticks = iter(range(100))
+        return lambda: float(next(ticks))
+
+    def test_long_pause_window_and_uart_only_visual_labels(self):
+        d, events, result = self.driver([
+            "HW4-C2 DEVICE_MEMORY stage=run_tick heap8_free=251180 "
+            "heap8_largest=126976 stack_margin_bytes=3448 "
+            "dma_timeouts=0 dma_fault=0 lcd_error=ESP_OK"])
+        with mock.patch.object(visual.time, "monotonic",
+                               side_effect=self.ticking_clock()), \
+             mock.patch.object(d, "send_raw"), \
+             mock.patch.object(d, "transition", return_value=100):
+            self.assertEqual(d.pause(seconds=visual.VISUAL_HOLD_SECONDS,
+                                     visual_label="PAUSE_1_CONFIRMED"), 100)
+        names = [args[1] for args, kw in events]
+        self.assertIn("PAUSE_1_CONFIRMED", names)
+        self.assertIn("PAUSE_UART_STABLE", names)
+        self.assertNotIn("MANUAL_PO_VISUAL_PASS", str(events))
+        self.assertEqual(result["scenarios"][0]["checks"][-1]["name"],
+                         "PAUSED_STABLE")
+        self.assertEqual(visual.VISUAL_HOLD_SECONDS, 15.0)
+
+    def test_pause_rejects_yield_terminal_esc_reboot_and_dma(self):
+        lines = [
+            ("HW4-RUN-B YIELD sha=" + HEAD + " steps=101",
+             "FORBIDDEN_DURING_OBSERVATION"),
+            ("HW4-RUN-B RUN_TERMINAL state=4",
+             "FORBIDDEN_DURING_OBSERVATION"),
+            ("HW4-ESC-BREAK-B1 ESC_TRANSITION action=RESUME ",
+             "FORBIDDEN_DURING_OBSERVATION"),
+            ("HW4-C2 START project=loco_esp32_display_probe",
+             "REBOOT_DURING_CAMPAIGN"),
+            ("HW4-C2 DEVICE_MEMORY stage=run_tick heap8_free=251180 "
+             "heap8_largest=126976 stack_margin_bytes=3448 "
+             "dma_timeouts=1 dma_fault=0 lcd_error=ESP_OK",
+             "DEVICE_MEMORY_FAULT"),
+        ]
+        for record, rejected in lines:
+            with self.subTest(record=record):
+                d, _, _ = self.driver([record])
+                with mock.patch.object(visual.time, "monotonic",
+                                       side_effect=self.ticking_clock()), \
+                     mock.patch.object(d, "send_raw"), \
+                     mock.patch.object(d, "transition", return_value=100), \
+                     self.assertRaisesRegex(po_campaign.Incomplete, rejected):
+                    d.pause(seconds=15, visual_label="PAUSE_2_CONFIRMED")
+
+    def test_resume_six_seconds_requires_real_new_uart_yield(self):
+        d, events, result = self.driver([
+            "HW4-RUN-B YIELD sha=" + HEAD + " steps=112",
+            "HW4-RUN-B YIELD sha=" + HEAD + " steps=128"])
+        with mock.patch.object(visual.time, "monotonic",
+                               side_effect=self.ticking_clock()):
+            advanced = d.observe_progress(visual.VISUAL_PROGRESS_SECONDS, 100)
+        self.assertEqual(advanced, 128)
+        self.assertEqual(visual.VISUAL_PROGRESS_SECONDS, 6.0)
+        self.assertIn("100->128", result["scenarios"][0]["checks"][-1]["details"])
+        self.assertNotIn("MANUAL_PO_VISUAL_PASS", str(events))
+
+    def test_resume_rejects_timeout_wrong_sha_reboot_dma_and_no_steps(self):
+        cases = [
+            ([], "VISIBLE_NO_PROGRESS_AFTER_RESUME"),
+            (["HW4-RUN-B YIELD sha=" + "f" * 40 + " steps=120"],
+             "VISIBLE_PROGRESS_YIELD_INVALID"),
+            (["HW4-RUN-B YIELD sha=" + HEAD + " steps=100"],
+             "VISIBLE_NO_PROGRESS_AFTER_RESUME"),
+            (["HW4-C2 START project=loco_esp32_display_probe"],
+             "REBOOT_DURING_CAMPAIGN"),
+            (["HW4-C2 DEVICE_MEMORY stage=run_tick heap8_free=251180 "
+              "heap8_largest=126976 stack_margin_bytes=3448 "
+              "dma_timeouts=0 dma_fault=1 lcd_error=ESP_OK"],
+             "DEVICE_MEMORY_FAULT"),
+            (["HW4-RUN-B RUN_TERMINAL state=4"],
+             "UNEXPECTED_RUN_TRANSITION_DURING_RESUME"),
+        ]
+        for records, rejected in cases:
+            with self.subTest(records=records):
+                d, _, _ = self.driver(records)
+                with mock.patch.object(visual.time, "monotonic",
+                                       side_effect=self.ticking_clock()), \
+                     self.assertRaisesRegex(po_campaign.Incomplete, rejected):
+                    d.observe_progress(6, 100)
+
+    def test_visual_self_test_and_dry_run_no_hardware(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(visual.run(["--self-test"]), 0)
+        self.assertIn("SELF_TEST PASS", out.getvalue())
+        # self_test uses a synthetic SHA, restore the fixture's real synthetic one
+        visual.EXPECTED_HEAD = HEAD
+        fake_po = SimpleNamespace(identity=lambda: HEAD,
+                                  require=po_campaign.require)
+        out = io.StringIO()
+        with mock.patch.object(visual, "setup_imports",
+                               return_value=(ROOT, fake_po)), \
+             redirect_stdout(out):
+            self.assertEqual(visual.run([
+                "--dry-run", "--visual-observation", "--expected-head", HEAD]), 0)
+        body = out.getvalue()
+        planned = json.loads(body[body.index("{"):])
+        self.assertEqual(planned["status"], "DRY_RUN_ONLY_NO_DEVICE")
+        self.assertEqual(planned["scenarios"], list(visual.SCENARIOS))
+        self.assertEqual(planned["expected_png"], 6)
+        self.assertEqual(planned["visual_hold_seconds"], 15.0)
+        self.assertEqual(planned["visual_resume_seconds"], 6.0)
+        self.assertEqual(planned["manual_visual_status"],
+                         "MANUAL_PO_VISUAL_PENDING")
+        self.assertEqual(len(visual.SCENARIOS), 4)
+        self.assertEqual(planned["visible_basic_lines"], list(visual.VISUAL_COUNTER_LINES))
+        self.assertEqual([len(x.encode("ascii")) for x in visual.VISUAL_COUNTER_LINES],
+                         [6, 10, 19])
+        with mock.patch.object(visual, "setup_imports",
+                               return_value=(ROOT, fake_po)), \
+             redirect_stdout(io.StringIO()), \
+             self.assertRaisesRegex(po_campaign.Incomplete, "REFUSE_HEAD"):
+            visual.run(["--dry-run", "--visual-observation",
+                        "--expected-head", "f" * 40])
+
+
+
+class CounterProgramRouting(unittest.TestCase):
+    """The official campaign must send the counter ONLY in opt-in visual mode."""
+
+    def test_real_run_cases_use_expected_program_and_keep_scenarios(self):
+        class Probe(visual.Driver):
+            def __init__(self, enabled):
+                super().__init__(po_campaign, None, None, {"scenarios": []}, 70,
+                                 visual_observation=enabled)
+                self.loaded = []
+                self.pauses = 0
+
+            def load(self, cid, numbered_lines):
+                self.loaded.append((cid, numbered_lines))
+
+            def shot(self, *args):
+                pass
+
+            def run(self):
+                pass
+
+            def first_yield(self, *args):
+                return 1000
+
+            def negatives(self):
+                pass
+
+            def pause(self, **kwargs):
+                self.pauses += 1
+                return self.pauses * 10
+
+            def resume(self, *args):
+                pass
+
+            def observe_progress(self, *args):
+                return 1000
+
+            def event(self, *args, **kwargs):
+                pass
+
+            def check(self, *args):
+                pass
+
+            def break_cpc(self, *args):
+                pass
+
+            def break_host(self, *args):
+                pass
+
+            def finish_case(self, *args):
+                pass
+
+        self.assertEqual(visual.VISUAL_COUNTER_LINES,
+                         ("5 A%=0", "10 A%=A%+1",
+                          "20 PRINT A%:GOTO 10"))
+        self.assertEqual([len(x.encode("ascii")) for x in
+                          visual.VISUAL_COUNTER_LINES], [6, 10, 19])
+        for enabled in (False, True):
+            with self.subTest(enabled=enabled):
+                driver = Probe(enabled)
+                driver.run_cases()
+                self.assertEqual([x[0] for x in driver.loaded],
+                                 list(visual.SCENARIOS))
+                expected = (visual.VISUAL_COUNTER_LINES if enabled
+                            else visual.DEFAULT_AB_LINES)
+                self.assertEqual(driver.loaded[1][1], expected)
+                self.assertEqual(driver.loaded[0][1], ("10 GOTO 10",))
+                self.assertEqual(driver.loaded[2][1], ("10 GOTO 10",))
+                self.assertEqual(driver.loaded[3][1], ("10 GOTO 10",))
+        self.assertEqual(visual.DEFAULT_AB_LINES,
+                         ('10 PRINT "A":GOTO 20', '20 PRINT "B":GOTO 10'))
+
+
+class NativeC99CounterWitness(unittest.TestCase):
+    """Compiles the unchanged production C99 scheduler, BASIC and VRAM bridge.
+
+    This is a local host test: NO claim of physical CYD/TFT pixel measurements.
+    Reuse the identical B1 C fixture without editing its sealed source file.
+    """
+
+    def test_counter_frames_pause_resume_break_and_periodic_ab_control(self):
+        self.assertIsNotNone(shutil.which("cmake"), "cmake required for real C99")
+        with tempfile.TemporaryDirectory(prefix="b1_c2_native_") as tmp:
+            base = Path(tmp)
+            witness = base / "counter_witness.c"
+            native = r"""
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#define main historical_b1_test_main
+#include "test_hw4_run_break_b.c"
+#undef main
+
+static uint8_t digit_glyph(void *ctx, uint8_t ch, unsigned row)
+{
+    (void)ctx;
+    return row == 0u ? ch : 0u;
+}
+
+static int run_case(const char *first_line, const char *second_line,
+                    bool increasing)
+{
+    uint8_t frame[CPC_VIDEO_BYTES];
+    uint8_t original[sizeof(f.image)];
+    Hw4EscRunControl control;
+    Hw4EscAction actions[2];
+    Hw4RunSlice slice;
+    size_t i, paused_steps;
+    CHECK(setup() == 0);
+    CHECK(cpc_text_init(&f.text, &f.video, digit_glyph, NULL));
+    if (increasing)
+        CHECK(submit(@INIT@).status == BSR_OK);
+    CHECK(submit(first_line).status == BSR_OK);
+    CHECK(submit(second_line).status == BSR_OK);
+    memcpy(original, f.image, sizeof(original));
+    CHECK(start_run() == 0);
+    hw4_esc_run_control_init(&control);
+    for (i = 0u; i < 32u; ++i) {
+        slice = advance(8u);
+        if (slice.state != HW4_RUN_YIELDED)
+            fprintf(stderr, "C99 initial run case counter=%d iteration=%zu state=%d executor=%d\n",
+                    (int)increasing, i, (int)slice.state,
+                    (int)f.scheduler.last_result.executor_status);
+        CHECK(slice.state == HW4_RUN_YIELDED);
+    }
+    CHECK(f.text.scrolls > 25u); /* fill and scroll in both 2- and 3-statement loops */
+    memcpy(frame, f.vram, sizeof(frame));
+    for (i = 0u; i < 4u; ++i) {
+        slice = advance(8u);
+        CHECK(slice.state == HW4_RUN_YIELDED && slice.steps == 8u);
+        if (increasing)
+            CHECK(memcmp(frame, f.vram, sizeof(frame)) != 0);
+        else
+            CHECK(memcmp(frame, f.vram, sizeof(frame)) == 0);
+        memcpy(frame, f.vram, sizeof(frame));
+    }
+    if (!increasing)
+        return 0;
+
+    /* C99 engine has really advanced A%; ESC must freeze the same VRAM. */
+    CHECK(hw4_esc_run_control_feed(&control, 0x1bu, 1000u, false, actions) == 0u);
+    CHECK(hw4_esc_run_control_idle(&control, 51000u) == HW4_ESC_ACTION_PAUSE);
+    paused_steps = f.scheduler.total_steps;
+    CHECK(f.runtime.state == BSR_RUNNING && f.scheduler.stop_calls == 0u);
+    CHECK(hw4_esc_run_control_idle(&control, 15051000u) == HW4_ESC_ACTION_NONE);
+    CHECK(f.scheduler.total_steps == paused_steps);
+    CHECK(memcmp(frame, f.vram, sizeof(frame)) == 0);
+    CHECK(hw4_esc_run_control_feed(&control, (uint8_t)'x', 15052000u,
+                                  false, actions) == 1u);
+    CHECK(actions[0] == HW4_ESC_ACTION_RESUME);
+    CHECK(advance(8u).state == HW4_RUN_YIELDED);
+    CHECK(f.scheduler.total_steps == paused_steps + 8u);
+    CHECK(memcmp(frame, f.vram, sizeof(frame)) != 0);
+    memcpy(frame, f.vram, sizeof(frame));
+    CHECK(hw4_esc_run_control_feed(&control, 0x1bu, 15053000u, false,
+                                  actions) == 0u);
+    CHECK(hw4_esc_run_control_idle(&control, 15103000u) == HW4_ESC_ACTION_PAUSE);
+    paused_steps = f.scheduler.total_steps;
+    CHECK(hw4_esc_run_control_idle(&control, 30103000u) == HW4_ESC_ACTION_NONE);
+    CHECK(f.scheduler.total_steps == paused_steps);
+    CHECK(memcmp(frame, f.vram, sizeof(frame)) == 0);
+    CHECK(hw4_esc_run_control_feed(&control, 0x1bu, 30104000u, false,
+                                  actions) == 0u);
+    CHECK(hw4_esc_run_control_idle(&control, 30154000u)
+          == HW4_ESC_ACTION_BREAK_REQUEST);
+    CHECK(hw4_run_scheduler_request_break(&f.scheduler));
+    slice = advance(8u);
+    CHECK(slice.state == HW4_RUN_BROKEN && slice.steps == 0u);
+    CHECK(f.scheduler.total_steps == paused_steps && f.scheduler.stop_calls == 1u);
+    CHECK(memcmp(original, f.image, sizeof(original)) == 0);
+    CHECK(finish_ready() == 0 && f.ready_count == 1u);
+    CHECK(submit("LIST").status == BSR_OK);
+    CHECK(f.written > 0u);
+    return 0;
+}
+
+int main(void)
+{
+    CHECK(run_case(@LEGACY1@, @LEGACY2@, false) == 0);
+    CHECK(run_case(@COUNTER1@, @COUNTER2@, true) == 0);
+    puts("B1_C2_NATIVE_C99_COUNTER_VRAM_PAUSE_RESUME_BREAK_PASS");
+    return 0;
+}
+"""
+            for tag, line in (
+                    ("@LEGACY1@", visual.DEFAULT_AB_LINES[0]),
+                    ("@LEGACY2@", visual.DEFAULT_AB_LINES[1]),
+                    ("@INIT@", visual.VISUAL_COUNTER_LINES[0]),
+                    ("@COUNTER1@", visual.VISUAL_COUNTER_LINES[1]),
+                    ("@COUNTER2@", visual.VISUAL_COUNTER_LINES[2])):
+                native = native.replace(tag, json.dumps(line))
+            witness.write_text(native, encoding="utf-8")
+            cmake_source = """cmake_minimum_required(VERSION 3.13)
+project(b1_c2_native C)
+set(CMAKE_C_STANDARD 99)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+add_subdirectory("{root}" engine EXCLUDE_FROM_ALL)
+add_executable(b1_c2_witness counter_witness.c)
+target_include_directories(b1_c2_witness PRIVATE "{root}/tests" "{root}/integration")
+target_sources(b1_c2_witness PRIVATE "{root}/integration/hw4_cpc_escape_contract.c")
+target_link_libraries(b1_c2_witness PRIVATE
+    hw4_run_break_input hw4_run_scheduler hw4_pen_bridge
+    cpc_diag_policy cpc_ready_policy)
+""".format(root=ROOT.as_posix())
+            (base / "CMakeLists.txt").write_text(cmake_source, encoding="utf-8")
+            build = base / "build"
+            for cmd in (
+                ["cmake", "-S", str(base), "-B", str(build)],
+                ["cmake", "--build", str(build), "--target", "b1_c2_witness",
+                 "--parallel", "2"],
+                [str(build / "b1_c2_witness")],
+            ):
+                completed = subprocess.run(cmd, capture_output=True, text=True,
+                                           timeout=180, check=False)
+                self.assertEqual(completed.returncode, 0,
+                                 "C99 command failed: " + repr(cmd) + "\n" +
+                                 completed.stdout[-2000:] + completed.stderr[-5000:])
+            self.assertIn("B1_C2_NATIVE_C99_COUNTER_VRAM_PAUSE_RESUME_BREAK_PASS",
+                          completed.stdout)
 
 
 class HistoricalWitness(unittest.TestCase):

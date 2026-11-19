@@ -12,8 +12,10 @@ A4Status a4_integer_to_real5(uint64_t value, uint8_t out[5]);
 A4Status a4_times_two(uint32_t value, uint64_t *result);
 A4Status a4_ge_zero(uint32_t value, int *result);
 A4Status a4_gt_32767(uint32_t value, int *result);
-/* Speculative PRINT-only candidate; NOT CPC evidence or general formatter.
- * -1..999999 only, byte buffer remains untouched on all failures. */
+/* Host-only PRINT candidate: old -1..999999 integers plus the six large
+ * A5 T!/U! inputs; all other upper-range numbers are unsupported. The
+ * formatter does not claim a general CPC decimal/scientific threshold.
+ * Errors preserve all destination bytes and the *used output parameter. */
 A4Status a4_print_candidate(int64_t value, uint8_t *dst,
                             size_t capacity, size_t *used);
 #endif

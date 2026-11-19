@@ -389,5 +389,30 @@ class VerifierTests(unittest.TestCase):
             oracle.verify(self.folder,'a'*40,self.seal(m))
 
 
+    def test_s04_list_wait_protects_long_screen_listing(self):
+        s04 = self.cases[3]
+        s01 = self.cases[0]
+        four = oracle.command_list(s04)
+        one = oracle.command_list(s01)
+        self.assertGreater(four[-3].count("CAP32_DELAY"),
+                           one[-3].count("CAP32_DELAY"))
+        self.assertGreaterEqual(four[-3].count("CAP32_DELAY"), 8)
+        self.assertEqual(four[-2], "LIST #8")
+
+    def test_synthetic_ch23_printer_order_then_mutation(self):
+        # FAKE-only structural test, not an expected CPC output.
+        s04 = self.cases[3]
+        values = ["PRE2", "PRE3", "DI2", "DI3", "EI2", "EI3",
+                  "POST2", "POST3", "R2", "R3"]
+        rows = ["S04:BEGIN"] + ["S04:" + v + "=" +
+                 ("1" if v == "POST2" else "0") for v in values]
+        rows.append("S04:ORDER= 1 ,2, 1")
+        raw = ("\r\n".join(rows) + "\r\n").encode("ascii")
+        checked = oracle.run_printer_checked(raw, s04)
+        self.assertEqual(checked["first_traces"], [(1, 2, 1)])
+        with self.assertRaisesRegex(oracle.OracleError, "RUN_ORDER_TRACE_SEQUENCE"):
+            oracle.run_printer_checked(raw.replace(b"ORDER= 1", b"ORDER= 2"), s04)
+
+
 if __name__=='__main__':
     unittest.main()

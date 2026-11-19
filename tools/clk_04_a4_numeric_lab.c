@@ -44,17 +44,62 @@ A4Status a4_gt_32767(uint32_t value, int *result) {
     *result=value > UINT32_C(32767) ? -1 : 0;
     return A4_OK;
 }
+
+/* A6: domain is a predicate over the sealed A5 samples, NOT a lookup table
+ * of expected printer bytes. Neither the decimal/exponential transition nor
+ * round-half-tie policy is known outside these exact input classes. */
+static unsigned a6_large_sample_class(uint64_t n) {
+    /* A5 proves full decimal digits only for these two large powers of two. */
+    if (n == (UINT64_C(1) << 23) || n == (UINT64_C(1) << 24)) return 1u;
+    /* A5 proves the scientific form for these powers and boundary products. */
+    if (n == (UINT64_C(1) << 31) || n == (UINT64_C(1) << 32) ||
+        n == UINT32_MAX || n == UINT64_C(2) * UINT32_MAX) return 2u;
+    return 0u;
+}
+
 A4Status a4_print_candidate(int64_t value, uint8_t *dst,
                             size_t capacity, size_t *used) {
-    uint64_t n;
+    uint64_t n, mantissa, divisor;
     uint8_t tmp[32], digits[20];
     size_t count=0u, pos=0u;
+    unsigned sample_class=0u, exponent=0u;
     if (!dst || !used) return A4_INVALID;
-    if (value < -1 || value > INT64_C(999999)) return A4_UNSUPPORTED;
+    if (value < -1) return A4_UNSUPPORTED;
+    if (value > INT64_C(999999)) {
+        sample_class=a6_large_sample_class((uint64_t)value);
+        if (!sample_class) return A4_UNSUPPORTED;
+    }
     n = value == -1 ? UINT64_C(1) : (uint64_t)value;
-    do { digits[count++]=(uint8_t)('0' + n%10u); n/=10u; } while(n);
     tmp[pos++]=value < 0 ? (uint8_t)'-' : (uint8_t)' ';
-    while(count) tmp[pos++]=digits[--count];
+    if (sample_class == 2u) {
+        /* All authenticated A5 scientific samples have exponent 9.  Use
+         * decimal integer arithmetic for six significant digits, never
+         * float/double and never textual values from the ROM capture. */
+        divisor=1u;
+        while (n / divisor >= 10u) {
+            divisor*=10u;
+            ++exponent;
+        }
+        if (exponent != 9u) return A4_UNSUPPORTED;
+        divisor/=UINT64_C(100000); /* 10^4 for the observed exponent 9 */
+        mantissa=(n + divisor/2u)/divisor;
+        if (mantissa < UINT64_C(100000) || mantissa > UINT64_C(999999))
+            return A4_UNSUPPORTED;
+        tmp[pos++]=(uint8_t)('0'+mantissa/UINT64_C(100000));
+        tmp[pos++]=(uint8_t)'.';
+        mantissa%=UINT64_C(100000);
+        for (divisor=10000u; divisor; divisor/=10u) {
+            tmp[pos++]=(uint8_t)('0'+mantissa/divisor);
+            mantissa%=divisor;
+        }
+        tmp[pos++]=(uint8_t)'E';
+        tmp[pos++]=(uint8_t)'+';
+        tmp[pos++]=(uint8_t)('0'+exponent/10u);
+        tmp[pos++]=(uint8_t)('0'+exponent%10u);
+    } else {
+        do { digits[count++]=(uint8_t)('0'+n%10u); n/=10u; } while(n);
+        while(count) tmp[pos++]=digits[--count];
+    }
     tmp[pos++]=(uint8_t)' ';
     tmp[pos++]=(uint8_t)'\r';
     tmp[pos++]=(uint8_t)'\n';

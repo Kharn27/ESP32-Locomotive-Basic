@@ -25,6 +25,11 @@ A5_PREFIX = "tests/fixtures/cpc6128/clk_04_a5_product_ram/"
 A5_INPUTS = (
     A5_PREFIX,
     "tools/clk_04_a4_a5_product_ram.py",
+    # A6-C1: the *comparison* is HEAD-bound too. The replay compiles these
+    # exact C99 inputs; editing either must acquire A5 RAW on that HEAD.
+    # Neither belongs to the A4 CPC acquisition fingerprint (INPUTS).
+    "tools/clk_04_a4_numeric_lab.c",
+    "tools/clk_04_a4_numeric_lab.h",
     "tools/clk_04_a4_oracle.py",  # read-only A4 acquisition helpers
     "tools/clk_03_cpc_time.py",
     "tools/clk_04_real5_oracle.py",
@@ -175,6 +180,9 @@ def a5_wiring(workflow):
            "clk_04_a4_a5_product_ram.py --verify" in replay and
            '--seal "$EXTERNAL_SHA"' in replay and
            "a5-external-seal.json" in replay and
+           'test "$CAPTURE_HEAD" = "$EXPECTED_HEAD"' in replay and
+           'test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"' in replay and
+           'data["head"] == sys.argv[3]' in replay and
            "C99" in replay and "actions/upload-artifact@v4" in replay,
            "A5_REPLAY_DEPENDENCY_SEAL_OR_CANDIDATE_GUARD_MISSING")
     demand(all(job(workflow, n) for n in A5_JOBS), "A5_JOBS_MISSING")

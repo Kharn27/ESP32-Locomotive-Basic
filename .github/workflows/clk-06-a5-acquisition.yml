@@ -3,7 +3,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/clk-06-a5-acquisition.yml'
-      - 'tools/clk_06_a4_*'
+      - 'tools/clk_06_a5_*'
       - 'tests/test_clk_06_a5_di_ei_oracle.py'
       - 'tests/fixtures/cpc6128/clk_06_a5_di_ei/**'
       - 'docs/CLK-06-A5*'

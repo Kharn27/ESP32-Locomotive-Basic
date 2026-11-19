@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "mission": "CLK-06-A4",
+  "status": "INPUT_ONLY_NOT_AN_ORACLE",
+  "cases": [
+    {
+      "id": "S01_CH2_RECUR_RETURN",
+      "question": "With EVERY 10,2 GOSUB 1000, does channel 2 deliver at least two callbacks with RETURN, resume main and expose REMAIN(2) in the finite loop?",
+      "run_delays": 12,
+      "lines": [
+        "10 C%=0",
+        "20 PRINT #8,\"S01:BEGIN\"",
+        "30 EVERY 10,2 GOSUB 1000",
+        "40 FOR I%=1 TO 8500",
+        "50 NEXT I%",
+        "60 R%=REMAIN(2)",
+        "70 PRINT #8,\"S01:MAIN=\";C%",
+        "80 PRINT #8,\"S01:CANCEL=\";R%",
+        "90 END",
+        "1000 C%=C%+1",
+        "1010 IF C%<=4 THEN PRINT #8,\"S01:HIT=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "S02_CH3_RECUR_RETURN",
+      "question": "With EVERY 12,3 GOSUB 1000, does channel 3 deliver at least two callbacks with RETURN, resume main and expose REMAIN(3) in the finite loop?",
+      "run_delays": 12,
+      "lines": [
+        "10 C%=0",
+        "20 PRINT #8,\"S02:BEGIN\"",
+        "30 EVERY 12,3 GOSUB 1000",
+        "40 FOR I%=1 TO 9000",
+        "50 NEXT I%",
+        "60 R%=REMAIN(3)",
+        "70 PRINT #8,\"S02:MAIN=\";C%",
+        "80 PRINT #8,\"S02:CANCEL=\";R%",
+        "90 END",
+        "1000 C%=C%+1",
+        "1010 IF C%<=4 THEN PRINT #8,\"S02:HIT=\";C%",
+        "1020 RETURN"
+      ]
+    },
+    {
+      "id": "S03_CH23_COEXIST",
+      "question": "With EVERY 10,2 and EVERY 12,3 and separate handlers, are both channels delivered during this finite window (without claiming priority)?",
+      "run_delays": 14,
+      "lines": [
+        "10 A%=0:B%=0",
+        "20 PRINT #8,\"S03:BEGIN\"",
+        "30 EVERY 10,2 GOSUB 1000",
+        "40 EVERY 12,3 GOSUB 1100",
+        "50 FOR I%=1 TO 9000",
+        "60 NEXT I%",
+        "70 R2%=REMAIN(2)",
+        "80 R3%=REMAIN(3)",
+        "90 PRINT #8,\"S03:CH2=\";A%",
+        "100 PRINT #8,\"S03:CH3=\";B%",
+        "110 PRINT #8,\"S03:R2=\";R2%",
+        "120 PRINT #8,\"S03:R3=\";R3%",
+        "130 END",
+        "1000 A%=A%+1",
+        "1010 IF A%<=4 THEN PRINT #8,\"S03:H2=\";A%",
+        "1020 RETURN",
+        "1100 B%=B%+1",
+        "1110 IF B%<=4 THEN PRINT #8,\"S03:H3=\";B%",
+        "1120 RETURN"
+      ]
+    },
+    {
+      "id": "S04_CANCEL_CH3_KEEP_CH2",
+      "question": "After arming channels 2 and 3, does immediate REMAIN(3) suppress channel 3 while channel 2 remains active during the finite loop, recording REMAIN(2)/(3)?",
+      "run_delays": 14,
+      "lines": [
+        "10 A%=0:B%=0",
+        "20 PRINT #8,\"S04:BEGIN\"",
+        "30 EVERY 10,2 GOSUB 1000",
+        "40 EVERY 2,3 GOSUB 1100",
+        "50 R3%=REMAIN(3)",
+        "60 PRINT #8,\"S04:REMAIN3=\";R3%",
+        "70 FOR I%=1 TO 9000",
+        "80 NEXT I%",
+        "90 R2%=REMAIN(2)",
+        "100 PRINT #8,\"S04:CH2=\";A%",
+        "110 PRINT #8,\"S04:CH3=\";B%",
+        "120 PRINT #8,\"S04:REMAIN2=\";R2%",
+        "130 PRINT #8,\"S04:R3AGAIN=\";REMAIN(3)",
+        "140 END",
+        "1000 A%=A%+1",
+        "1010 IF A%<=4 THEN PRINT #8,\"S04:H2=\";A%",
+        "1020 RETURN",
+        "1100 B%=B%+1",
+        "1110 IF B%<=4 THEN PRINT #8,\"S04:H3=\";B%",
+        "1120 RETURN"
+      ]
+    }
+  ]
+}

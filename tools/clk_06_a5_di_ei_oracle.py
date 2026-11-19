@@ -138,9 +138,14 @@ def source_bytes(case: dict) -> bytes:
 
 
 def command_list(case: dict) -> list[str]:
+    # S04 prints 29 CPC lines: two delays captured the *middle* of screen
+    # LIST, so LIST #8 was lost while the CPC still rendered. Increase only
+    # observation waits, not BASIC source or event timing.
+    wait = 8 if case["id"].startswith("S04_") else 3
     return ["MODE 1", "NEW", *case["lines"], "LIST",
-            "CAP32_DELAY CAP32_DELAY CAP32_SCRNSHOT CAP32_SNAPSHOT",
-            "LIST #8", "CAP32_DELAY CAP32_EXIT"]
+            " ".join(["CAP32_DELAY"] * wait) +
+            " CAP32_SCRNSHOT CAP32_SNAPSHOT",
+            "LIST #8", "CAP32_DELAY CAP32_DELAY CAP32_EXIT"]
 
 
 def command_run(case: dict) -> list[str]:

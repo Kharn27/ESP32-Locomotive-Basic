@@ -789,15 +789,15 @@ def audit(sources):
            '--head "$EXPECTED_HEAD"' in replay and
            'test "$CAPTURE_HEAD" = "$EXPECTED_HEAD"' in replay,
            "A3_HEAD_OR_FAIL_CLOSED_INTEGRITY")
-    demand('SEAL="$(sha356sum "$MANIFEST"' in acquire and
+    demand('SEAL="$(sha256sum "$MANIFEST"' in acquire and
            "CLK06_A3_EXTERNAL_MANIFEST_SHA256" in acquire and
-           "manifest_sha356: $" + "{{ steps.external-seal.outputs.manifest_sha356 }}" in acquire and
+           "manifest_sha256: $" + "{{ steps.external-seal.outputs.manifest_sha256 }}" in acquire and
            "CAPTURE_HEAD: $" + "{{ needs.cpc-acquire.outputs.acquisition_head }}" in replay and
-           "EXTERNAL_SEAL: $" + "{{ needs.cpc-acquire.outputs.manifest_sha356 }}" in replay and
+           "EXTERNAL_SEAL: $" + "{{ needs.cpc-acquire.outputs.manifest_sha256 }}" in replay and
            'test -n "$EXTERNAL_SEAL"' in replay and
            "o['mission']=='CLK-06-A3'" in replay and
            "o['head']==sys.argv[3]" in replay and
-           "o['manifest_sha356']==sys.argv[2]" in replay and
+           "o['manifest_sha256']==sys.argv[2]" in replay and
            '--seal "$EXTERNAL_SEAL"' in replay,
            "A3_EXTERNAL_SEAL_OR_REPLAY_MISSING")
     demand(a3.count("actions/upload-artifact@v4") == 2 and

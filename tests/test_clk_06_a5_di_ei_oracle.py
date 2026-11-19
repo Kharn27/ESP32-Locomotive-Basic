@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 import hashlib
 import json
+import re
 import shutil
 from pathlib import Path
 import sys
@@ -92,6 +93,27 @@ def fake_png():
             png_chunk(b'IDAT',zlib.compress(rows)) + png_chunk(b'IEND',b''))
 
 
+def fake_run_printer(case):
+    """FAKE HOST FIXTURE: this is never a CPC observation."""
+    prefix = case["id"].split("_", 1)[0]
+    rows = []
+    for line in case["lines"]:
+        match = re.search(r'PRINT #8,"(S0[1-4]:[A-Z0-9_]+(?:=)?)"', line)
+        if not match:
+            continue
+        label = match.group(1)
+        if label.endswith(":BEGIN"):
+            rows.append(label)
+        elif label.endswith(":H2="):
+            if prefix == "S01":
+                rows.extend((label + "1", label + "2"))
+        elif label.endswith(":ORDER="):
+            continue
+        else:
+            rows.append(label + ("2" if label == "S01:POST=" else "0"))
+    return ("\r\n".join(rows) + "\r\n").encode("ascii")
+
+
 class VerifierTests(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -162,7 +184,7 @@ class VerifierTests(unittest.TestCase):
                 (base/'program.bin').write_bytes(program)
                 list_printer=('\r\n'.join(case['lines'])+'\r\n').encode()
                 li=proc(base/'list',oracle.command_list(case),printer=list_printer)
-                ru=proc(base/'run',oracle.command_run(case))
+                ru=proc(base/'run',oracle.command_run(case),printer=fake_run_printer(case))
                 info['cases'][ident]={
                     'question':case['question'],
                     'source_sha256':oracle.digest(oracle.source_bytes(case)),
@@ -170,7 +192,7 @@ class VerifierTests(unittest.TestCase):
                     'ram':oracle.ram_checked(program,case),
                     'region':{'fake':True},
                     'list_line_numbers':[int(x.split(' ',1)[0]) for x in case['lines']],
-                    'run_printer_sha256':oracle.digest(b'FAKE:NOT_ORACLE\r\n'),
+                    'run_printer_sha256':oracle.digest(fake_run_printer(case)),
                     'screen_review':'UNVERIFIED',
                     'observation':'RAW_ACQUIRED_UNINTERPRETED'}
             meta['sessions'][session]=info
@@ -343,6 +365,27 @@ class VerifierTests(unittest.TestCase):
         m=self.new_manifest()
         m['sessions']['repeat']['cases']['S02_DI_BEFORE_ARM_CH2']['run']['returncode']=1
         with self.assertRaisesRegex(oracle.OracleError,'EMULATOR_PROCESS_UNVERIFIED'):
+            oracle.verify(self.folder,'a'*40,self.seal(m))
+
+
+    def test_missing_event_trace_rejected_even_with_new_seal(self):
+        m=self.new_manifest()
+        p=self.folder/'original/S01_EI_CONTROL_CH2/run/printer.dat'
+        p.write_bytes(p.read_bytes().replace(b'S01:H2=1\r\n', b''))
+        m['files']=oracle.inventory(self.folder)
+        m['files'].pop('manifest.json', None)
+        m['sessions']['original']['cases']['S01_EI_CONTROL_CH2']['run_printer_sha256']=oracle.digest(p.read_bytes())
+        with self.assertRaisesRegex(oracle.OracleError, 'RUN_EVENT_TRACE_SEQUENCE'):
+            oracle.verify(self.folder,'a'*40,self.seal(m))
+
+    def test_missing_printer_probe_rejected_even_with_new_seal(self):
+        m=self.new_manifest()
+        p=self.folder/'repeat/S04_DI_EI_CH23/run/printer.dat'
+        p.write_bytes(p.read_bytes().replace(b'S04:POST3=0\r\n', b''))
+        m['files']=oracle.inventory(self.folder)
+        m['files'].pop('manifest.json', None)
+        m['sessions']['repeat']['cases']['S04_DI_EI_CH23']['run_printer_sha256']=oracle.digest(p.read_bytes())
+        with self.assertRaisesRegex(oracle.OracleError, 'RUN_PRINTER_MISSING_PROBE'):
             oracle.verify(self.folder,'a'*40,self.seal(m))
 
 

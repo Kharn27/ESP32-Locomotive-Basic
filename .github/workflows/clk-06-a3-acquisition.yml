@@ -1,0 +1,151 @@
+name: CLK-06-A3 isolated CPC6128 EVERY channels 0 and 1 acquisition
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/clk-06-a3-acquisition.yml'
+      - 'tools/clk_06_a3_*'
+      - 'tests/test_clk_06_a3_oracle.py'
+      - 'tests/fixtures/cpc6128/clk_06_a3_every_ch0/**'
+      - 'docs/CLK-06-A3*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: clk-06-a3-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  negative-tests:
+    name: CLK-06-A3 source and falsification tests (HOST_ONLY)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Enforce exact HEAD, four BASIC sources and adversarial replay
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          python3 -m py_compile tools/clk_06_a3_oracle.py tests/test_clk_06_a3_oracle.py
+          python3 tools/clk_06_a3_oracle.py --self-test
+          python3 tools/clk_06_a3_oracle.py --check-sources
+          python3 -m unittest discover -s tests -p 'test_clk_06_a3_oracle.py' -v
+          echo 'CLK-06-A3 HOST_TESTS_PASS - NOT A CPC OBSERVATION'
+
+  cpc-acquire:
+    name: CLK-06-A3 pinned ROM-backed two fresh CPC sessions x four programs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    needs: negative-tests
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      acquisition_head: ${{ steps.external-seal.outputs.acquisition_head }}
+      manifest_sha256: ${{ steps.external-seal.outputs.manifest_sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: recursive
+      - name: Check exact checkout, Caprice32 commit, ROM, image binary and acquire
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d' ' -f1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          printf 'CLK06_CAPRICE_BINARY_SHA256=%s\n' "$(sha256sum /usr/local/bin/cap32 | cut -d' ' -f1)"
+          python3 tools/clk_06_a3_oracle.py --acquire \
+            --caprice tests/oracles/caprice32 \
+            --output "$RUNNER_TEMP/clk06-a3-raw" \
+            --head "$EXPECTED_HEAD"
+          ! find "$RUNNER_TEMP/clk06-a3-raw" -type f \( -name '*.rom' -o -name '*.sna' -o -name '*.dsk' \) | grep .
+      - name: Publish independent manifest SHA256 outside raw evidence
+        id: external-seal
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST="$RUNNER_TEMP/clk06-a3-raw/manifest.json"
+          test -s "$MANIFEST"
+          SEAL="$(sha256sum "$MANIFEST" | awk '{print $1}')"
+          printf 'CLK06_A3_EXTERNAL_MANIFEST_SHA256=%s\n' "$SEAL"
+          printf 'CLK06_A3_ACQUISITION_HEAD=%s\n' "$EXPECTED_HEAD"
+          printf 'manifest_sha256=%s\n' "$SEAL" >> "$GITHUB_OUTPUT"
+          printf 'acquisition_head=%s\n' "$EXPECTED_HEAD" >> "$GITHUB_OUTPUT"
+          printf '{"mission":"CLK-06-A3","head":"%s","manifest_sha256":"%s","class":"PENDING_REPLAY_AND_SCREEN_REVIEW"}\n' \
+            "$EXPECTED_HEAD" "$SEAL" > "$RUNNER_TEMP/clk06-a3-seal.json"
+      - name: Preserve raw evidence even when acquisition is incomplete
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-06-a3-raw
+          path: ${{ runner.temp }}/clk06-a3-raw/
+          retention-days: 90
+          if-no-files-found: warn
+      - name: Upload external seal in independent file
+        if: steps.external-seal.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-06-a3-external-seal
+          path: ${{ runner.temp }}/clk06-a3-seal.json
+          retention-days: 90
+          if-no-files-found: error
+
+  cpc-replay:
+    name: CLK-06-A3 separate-job 8-case sealed raw replay
+    runs-on: ubuntu-24.04
+    needs: cpc-acquire
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: clk-06-a3-raw
+          path: ${{ runner.temp }}/clk06-a3-raw-replay
+      - uses: actions/download-artifact@v4
+        with:
+          name: clk-06-a3-external-seal
+          path: ${{ runner.temp }}/clk06-a3-external
+      - name: Validate independent external SHA and all original files
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          CAPTURE_HEAD: ${{ needs.cpc-acquire.outputs.acquisition_head }}
+          EXTERNAL_SEAL: ${{ needs.cpc-acquire.outputs.manifest_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$CAPTURE_HEAD" = "$EXPECTED_HEAD"
+          test -n "$EXTERNAL_SEAL"
+          python3 - "$RUNNER_TEMP/clk06-a3-external/clk06-a3-seal.json" "$EXTERNAL_SEAL" "$EXPECTED_HEAD" <<'PY'
+          import json,sys
+          o=json.load(open(sys.argv[1]))
+          assert o['mission']=='CLK-06-A3' and o['head']==sys.argv[3] and o['manifest_sha256']==sys.argv[2]
+          PY
+          python3 tools/clk_06_a3_oracle.py --verify "$RUNNER_TEMP/clk06-a3-raw-replay" \
+            --head "$EXPECTED_HEAD" --seal "$EXTERNAL_SEAL"
+          echo 'CLK06_A3_RAW_REPLAY_PASS - SCREEN INTERPRETATION AND ERR/ERL STILL UNVERIFIED'

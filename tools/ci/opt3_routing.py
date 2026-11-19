@@ -33,6 +33,16 @@ CLK06_A2_PATHS = (
     "docs/CLK-06-A2*",
 )
 
+# CLK-06-A3 (#314): isolated CPC channel-1 + coexistence EVERY-only route, no generic glob.
+CLK06_A3_WORKFLOW = "clk-06-a3-acquisition.yml"
+CLK06_A3_PATHS = (
+    ".github/workflows/clk-06-a3-acquisition.yml",
+    "tools/clk_06_a3_*",
+    "tests/test_clk_06_a3_oracle.py",
+    "tests/fixtures/cpc6128/clk_06_a3_every_ch0/**",
+    "docs/CLK-06-A3*",
+)
+
 FAMILIES = {
     "C99": ("basic-program.yml", "ci-arch.yml", "ci-opt3-routing.yml"),
     "CPC_PERMANENT": ("ci-cpc-permanent.yml", "cpc-oracle.yml"),
@@ -50,7 +60,7 @@ FAMILIES = {
         "j1-17-c-a-pen-cpc.yml", "clk-01-acquisition.yml",
         "clk-03-acquisition.yml", "clk-04-real5-oracle.yml",
         "clk-04-a2-numeric-oracle.yml", "clk-04-a3-lifecycle-oracle.yml",
-        "clk-04-a4-numeric-pipeline.yml", CLK06_A1_WORKFLOW, CLK06_A2_WORKFLOW),
+        "clk-04-a4-numeric-pipeline.yml", CLK06_A1_WORKFLOW, CLK06_A2_WORKFLOW, CLK06_A3_WORKFLOW),
     "HW4": ("hw4-c3-b1-scroll.yml", "hw4-c3-b2-scroll.yml",
             "hw4-diag-a.yml", "hw4-edit-p1.yml", "hw4-ready-a.yml",
             "hw4-scroll-opt-a0-memory.yml",
@@ -80,6 +90,7 @@ EXPECTED_ROUTES = {
     "j1-17-c-a-pen-cpc.yml": ("tools/j1_17_c_a_pen_oracle.py", "tests/fixtures/cpc6128/j1_17_c_a_pen/**"),
     CLK06_A1_WORKFLOW: CLK06_A1_PATHS,
     CLK06_A2_WORKFLOW: CLK06_A2_PATHS,
+    CLK06_A3_WORKFLOW: CLK06_A3_PATHS,
 }
 HISTORICAL = {x for x in FAMILIES["CPC_ACQUISITION"] if x.startswith("j1-")}
 # J1.19-A C1: a specifically audited existing-workflow job, never a wildcard.
@@ -374,8 +385,8 @@ def family_routes(paths, sources):
 
 def audit(sources):
     expected = [name for names in FAMILIES.values() for name in names]
-    demand(len(FAMILIES) == 5 and len(expected) == 47 and
-           len(set(expected)) == 47,
+    demand(len(FAMILIES) == 5 and len(expected) == 48 and
+           len(set(expected)) == 48,
            "DUPLICATE_OR_MISSING_FAMILY")
     demand(CLK06_A1_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
            all(CLK06_A1_WORKFLOW not in names for family, names in
@@ -385,6 +396,10 @@ def audit(sources):
            all(CLK06_A2_WORKFLOW not in names for family, names in
                FAMILIES.items() if family != "CPC_ACQUISITION"),
            "CLK06_A2_WRONG_FAMILY")
+    demand(CLK06_A3_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
+           all(CLK06_A3_WORKFLOW not in names for family, names in
+               FAMILIES.items() if family != "CPC_ACQUISITION"),
+           "CLK06_A3_WRONG_FAMILY")
     demand(CLK04_A2_WORKFLOW in FAMILIES["CPC_ACQUISITION"] and
            all(CLK04_A2_WORKFLOW not in ns for family,ns in FAMILIES.items()
                if family != "CPC_ACQUISITION"), "A2_WRONG_FAMILY")
@@ -713,6 +728,85 @@ def audit(sources):
            "if-no-files-found: warn" in acquire and
            "if-no-files-found: error" in acquire,
            "A2_RAW_EVIDENCE_PRESERVATION_LOST")
+    # CLK-06-A3: no additional triggers, escalation, cancellation or
+    # independent seal/HEAD replay bypass. All guards apply to the real YAML.
+    a3 = sources[CLK06_A3_WORKFLOW]
+    paths_a3 = filters(a3)
+    demand(paths_a3 is not None and len(paths_a3) == len(CLK06_A3_PATHS)
+           and set(paths_a3) == set(CLK06_A3_PATHS),
+           "A3_FILTER_CONTRACT_MISMATCH")
+    a3_events = re.findall(r"(?m)^  ([a-z][\w-]*):",
+                           a3.split("\npermissions:", 1)[0])
+    demand(a3_events == ["pull_request", "workflow_dispatch"],
+           "A3_EVENT_CONTRACT_MISMATCH")
+    a3_pre = a3.split("\njobs:", 1)[0]
+    demand(a3.count("\npermissions:\n") == 1 and
+           "permissions:\n  contents: read\n  packages: read\n" in a3_pre and
+           not re.search(r"(?m)^\s+[\w-]+: write\s*$", a3) and
+           "pull_request_target:" not in a3,
+           "A3_PERMISSIONS_MISMATCH")
+    demand("group: clk-06-a3-" in a3_pre and
+           "cancel-in-progress: false" in a3_pre and
+           a3_pre.count("cancel-in-progress:") == 1,
+           "A3_ARCHIVE_CANCEL_RISK")
+    demand("continue-on-error" not in a3 and "|| true" not in a3 and
+           a3.count("set -euo pipefail") == 4,
+           "A3_FAILURE_MASKING")
+    job_names = re.findall(r"(?m)^  ([a-z][\w-]*):\s*$",
+                           a3.split("\njobs:\n", 1)[1])
+    demand(job_names == ["negative-tests", "cpc-acquire", "cpc-replay"],
+           "A3_EVIDENCE_PIPELINE_INCOMPLETE")
+    host = a3.split("\n  negative-tests:\n", 1)[1].split(
+        "\n  cpc-acquire:\n", 1)[0]
+    acquire = a3.split("\n  cpc-acquire:\n", 1)[1].split(
+        "\n  cpc-replay:\n", 1)[0]
+    replay = a3.split("\n  cpc-replay:\n", 1)[1]
+    for job in (host, acquire, replay):
+        header = job.split("\n    steps:", 1)[0]
+        demand("\n    steps:" in job and
+               not re.search(r"(?m)^    (?:if|continue-on-error):", header),
+               "A3_JOB_GUARD_BYPASS")
+    demand("needs:" not in host.split("\n    steps:", 1)[0] and
+           "needs: negative-tests" in acquire.split("\n    steps:", 1)[0] and
+           "needs: cpc-acquire" in replay.split("\n    steps:", 1)[0] and
+           "python3 tools/clk_06_a3_oracle.py --self-test" in host and
+           "python3 tools/clk_06_a3_oracle.py --check-sources" in host and
+           "-p 'test_clk_06_a3_oracle.py' -v" in host and
+           "python3 tools/clk_06_a3_oracle.py --acquire" in acquire and
+           "python3 tools/clk_06_a3_oracle.py --verify" in replay,
+           "A3_EVIDENCE_PIPELINE_INCOMPLETE")
+    demand(PAPER_IMAGE in a3 and PAPER_ROM in acquire and
+           PAPER_CAPRICE in acquire and
+           "test -x /usr/local/bin/cap32" in acquire,
+           "A3_CPC_PINS_DRIFT")
+    checkout_head = "ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}"
+    expected_env = "EXPECTED_HEAD: $" + "{{ github.event.pull_request.head.sha || github.sha }}"
+    demand(a3.count(checkout_head) == 3 and
+           a3.count(expected_env) == 4 and
+           a3.count("persist-credentials: false") == 3 and
+           a3.count('test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"') == 3 and
+           '--head "$EXPECTED_HEAD"' in acquire and
+           '--head "$EXPECTED_HEAD"' in replay and
+           'test "$CAPTURE_HEAD" = "$EXPECTED_HEAD"' in replay,
+           "A3_HEAD_OR_FAIL_CLOSED_INTEGRITY")
+    demand('SEAL="$(sha356sum "$MANIFEST"' in acquire and
+           "CLK06_A3_EXTERNAL_MANIFEST_SHA356" in acquire and
+           "manifest_sha356: $" + "{{ steps.external-seal.outputs.manifest_sha356 }}" in acquire and
+           "CAPTURE_HEAD: $" + "{{ needs.cpc-acquire.outputs.acquisition_head }}" in replay and
+           "EXTERNAL_SEAL: $" + "{{ needs.cpc-acquire.outputs.manifest_sha356 }}" in replay and
+           'test -n "$EXTERNAL_SEAL"' in replay and
+           "o['mission']=='CLK-06-A3'" in replay and
+           "o['head']==sys.argv[3]" in replay and
+           "o['manifest_sha356']==sys.argv[2]" in replay and
+           '--seal "$EXTERNAL_SEAL"' in replay,
+           "A3_EXTERNAL_SEAL_OR_REPLAY_MISSING")
+    demand(a3.count("actions/upload-artifact@v4") == 2 and
+           a3.count("actions/download-artifact@v4") == 2 and
+           a3.count("retention-days: 90") == 2 and
+           "if: always()" in acquire and
+           "if-no-files-found: warn" in acquire and
+           "if-no-files-found: error" in acquire,
+           "A3_RAW_EVIDENCE_PRESERVATION_LOST")
     clk_paths = filters(sources[CLK01_WORKFLOW])
     demand(clk_paths is not None and
            len(clk_paths) == len(CLK01_PATHS) and
@@ -2673,10 +2767,125 @@ def clk06_a2_negative_tests(sources):
         print("CI-OPT3 A2_UNRELATED_ROUTE_REJECTED", path)
 
 
+def clk06_a3_negative_tests(sources):
+    """C1 in-memory tampering only; no archive or historical workflow writes."""
+    original = sources[CLK06_A3_WORKFLOW]
+
+    def altered(old, new, label):
+        demand(old in original, "A3_NEGATIVE_INERT_" + label)
+        return {**sources, CLK06_A3_WORKFLOW: original.replace(old, new, 1)}
+
+    cases = [
+        ("WORKFLOW_REMOVED",
+         {k: v for k, v in sources.items() if k != CLK06_A3_WORKFLOW},
+         "UNKNOWN_OR_MISSING_WORKFLOW"),
+        ("OVERBROAD_TOOLS",
+         altered("'tools/clk_06_a3_*'", "'tools/**'", "OVERBROAD_TOOLS"),
+         "A3_FILTER_CONTRACT_MISMATCH"),
+        ("OVERBROAD_DOCS",
+         altered("'docs/CLK-06-A3*'", "'docs/**'", "OVERBROAD_DOCS"),
+         "A3_FILTER_CONTRACT_MISMATCH"),
+        ("PUSH_ADDED",
+         altered("  workflow_dispatch:\n",
+                 "  push:\n    branches: [main]\n  workflow_dispatch:\n",
+                 "PUSH_ADDED"), "A3_EVENT_CONTRACT_MISMATCH"),
+        ("PR_TARGET_ADDED",
+         altered("  workflow_dispatch:\n",
+                 "  pull_request_target:\n  workflow_dispatch:\n",
+                 "PR_TARGET_ADDED"), "A3_EVENT_CONTRACT_MISMATCH"),
+        ("WRITE_TOKEN",
+         altered("  contents: read", "  contents: write", "WRITE_TOKEN"),
+         "A3_PERMISSIONS_MISMATCH"),
+        ("CANCEL_ACQUISITION",
+         altered("cancel-in-progress: false", "cancel-in-progress: true",
+                 "CANCEL_ACQUISITION"), "A3_ARCHIVE_CANCEL_RISK"),
+        ("HEAD_CHECKOUT_TAMPER",
+         altered("ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}",
+                 "ref: $" + "{{ github.sha }}", "HEAD_CHECKOUT_TAMPER"),
+         "A3_HEAD_OR_FAIL_CLOSED_INTEGRITY"),
+        ("HEAD_GUARD_REMOVED",
+         altered('test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"',
+                 "true # unsafe HEAD bypass", "HEAD_GUARD_REMOVED"),
+         "A3_HEAD_OR_FAIL_CLOSED_INTEGRITY"),
+        ("REPLAY_JOB_REMOVED",
+         altered("\n  cpc-replay:\n", "\n  cpc-replay-disabled:\n",
+                 "REPLAY_JOB_REMOVED"), "A3_EVIDENCE_PIPELINE_INCOMPLETE"),
+        ("REPLAY_UNCHAINED",
+         altered("    needs: cpc-acquire", "    needs: negative-tests",
+                 "REPLAY_UNCHAINED"), "A3_EVIDENCE_PIPELINE_INCOMPLETE"),
+        ("SEAL_OUTPUT_REMOVED",
+         altered("CLK06_A3_EXTERNAL_MANIFEST_SHA356",
+                 "CLK06_A3_UNSEALED", "SEAL_OUTPUT_REMOVED"),
+         "A3_EXTERNAL_SEAL_OR_REPLAY_MISSING"),
+        ("SEAL_BYPASSED",
+         altered('--seal "$EXTERNAL_SEAL"', '--seal "0"',
+                 "SEAL_BYPASSED"), "A3_EXTERNAL_SEAL_OR_REPLAY_MISSING"),
+        ("ROM_PIN_CHANGED",
+         altered(PAPER_ROM, "0" * 64, "ROM_PIN_CHANGED"),
+         "A3_CPC_PINS_DRIFT"),
+        ("MASK_FAILURE",
+         altered("          set -euo pipefail",
+                 "          set +e", "MASK_FAILURE"),
+         "A3_FAILURE_MASKING"),
+    ]
+    for required in CLK06_A3_PATHS:
+        needle = "      - '" + required + "'\n"
+        cases.append(("FILTER_REMOVED_" + required,
+                      altered(needle, "", "FILTER_REMOVED_" + required),
+                      "A3_FILTER_CONTRACT_MISMATCH"))
+    for label, changed, reason in cases:
+        demand(changed != sources, "A3_NEGATIVE_INERT_" + label)
+        try:
+            audit(changed)
+        except UnsafeRoute as exc:
+            demand(str(exc) == reason,
+                   "A3_WRONG_REJECTION_" + label + ":" + str(exc))
+        else:
+            raise UnsafeRoute("A3_FALSIFICATION_ACCEPTED_" + label)
+        print("CI-OPT3 A3_FALSIFICATION_REJECTED", label, reason)
+
+    cpc, xtensa = FAMILIES["CPC_ACQUISITION"], FAMILIES["XTENSA"]
+    try:
+        FAMILIES["CPC_ACQUISITION"] = tuple(
+            name for name in cpc if name != CLK06_A3_WORKFLOW)
+        FAMILIES["XTENSA"] = xtensa + (CLK06_A3_WORKFLOW,)
+        try:
+            audit(sources)
+        except UnsafeRoute as exc:
+            demand(str(exc) == "CLK06_A3_WRONG_FAMILY",
+                   "A3_WRONG_FAMILY_REJECTION_" + str(exc))
+        else:
+            raise UnsafeRoute("A3_MISCLASSIFIED_ACCEPTED")
+    finally:
+        FAMILIES["CPC_ACQUISITION"], FAMILIES["XTENSA"] = cpc, xtensa
+    print("CI-OPT3 A3_WRONG_FAMILY_REJECTED")
+
+    for path in (
+        ".github/workflows/clk-06-a3-acquisition.yml",
+        "tools/clk_06_a3_oracle.py",
+        "tests/test_clk_06_a3_oracle.py",
+        "tests/fixtures/cpc6128/clk_06_a3_every_ch0/corpus.json",
+        "docs/CLK-06-A3-every-ch0-cpc-oracle.md",
+    ):
+        demand(CLK06_A3_WORKFLOW in triggered_names([path], sources),
+               "A3_REQUIRED_ROUTE_MISSING_" + path)
+        demand("CPC_ACQUISITION" in family_routes([path], sources),
+               "A3_FAMILY_ROUTE_MISSING_" + path)
+        print("CI-OPT3 A3_PR_ROUTE_VERIFIED", path)
+    for path in ("tools/clk_03_cpc_time.py", "tools/other.py",
+                 "docs/README.md", "docs/CLK-06-A4-unrelated.md",
+                 "core/basic_executor.c", "tools/ci/opt3_routing.py",
+                 "firmware/esp32_display_probe/main/main.c"):
+        demand(CLK06_A3_WORKFLOW not in triggered_names([path], sources),
+               "A3_UNRELATED_ROUTE_" + path)
+        print("CI-OPT3 A3_UNRELATED_ROUTE_REJECTED", path)
+
+
 def negative_tests(sources):
     c6_lab_route_tests(sources)
     clk06_a1_negative_tests(sources)
     clk06_a2_negative_tests(sources)
+    clk06_a3_negative_tests(sources)
     clk04_a4_negative_tests(sources)
     c6_d1_negative_tests(sources)
     clk04_a3_negative_tests(sources)

@@ -21,7 +21,7 @@ INPUTS = (
     "tests/oracles/caprice32",                    # gitlink pins ROM and emulator
 )
 WORKFLOW = ".github/workflows/clk-04-a4-numeric-pipeline.yml"
-A5_PREFIX = "tests/fixtures/cpc6128/clk_04_a4_numeric/a5_product_ram/"
+A5_PREFIX = "tests/fixtures/cpc6128/clk_04_a5_product_ram/"
 A5_INPUTS = (
     A5_PREFIX,
     "tools/clk_04_a4_a5_product_ram.py",
@@ -109,11 +109,6 @@ def tree_objects(root, rev, prefix):
         meta, path = entry.split(b"\t", 1)
         mode, kind, oid = meta.decode("ascii").split()
         key = path.decode("utf-8")
-        # A5 is a separate sealed sample set; never reclassify it as a
-        # change to the historical 240-file A4 acquisition fingerprint.
-        if prefix == "tests/fixtures/cpc6128/clk_04_a4_numeric" and (
-                key.startswith(A5_PREFIX)):
-            continue
         demand(mode in ("100644", "100755", "160000") and
                kind in ("blob", "commit"), "INPUT_GIT_TYPE_INVALID")
         out[key] = (mode, kind, oid)

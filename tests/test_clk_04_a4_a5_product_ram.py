@@ -22,6 +22,8 @@ def rejected(call, label):
 
 class Corpus(unittest.TestCase):
     def test_freeze_and_separate_capture_sources(self):
+        self.assertEqual(a5.CORPUS.as_posix().rsplit("/", 2)[-2],
+                         "clk_04_a5_product_ram")
         cases = a5.source_cases()
         self.assertEqual([int(c["value"]) for c in cases], list(a5.VALUES))
         self.assertEqual(a5.sha(a5.read(a5.CORPUS)), a5.CORPUS_SHA)

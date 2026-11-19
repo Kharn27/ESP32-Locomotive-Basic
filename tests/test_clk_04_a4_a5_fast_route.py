@@ -67,6 +67,24 @@ class A5Routing(unittest.TestCase):
         self.assertEqual(route.a5_decision(self.root, "pull_request",
                                            self.head, self.base)[0], "full")
 
+    def test_a5_archive_is_separate_from_sealed_a4(self):
+        self.assertEqual(route.A5_PREFIX,
+                         "tests/fixtures/cpc6128/clk_04_a5_product_ram/")
+        self.assertNotIn(route.A5_PREFIX, route.INPUTS)
+        self.assertEqual(route.decision(self.root, "pull_request",
+                                        self.head, self.base)[0], "fast")
+        self.assertEqual(route.a5_decision(self.root, "pull_request",
+                                           self.head, self.base)[0], "full")
+
+    def test_new_child_of_historical_a4_still_forces_historical_full(self):
+        before = self.sha()
+        self.change("tests/fixtures/cpc6128/clk_04_a4_numeric/forgery.json",
+                    "unapproved old archive extension")
+        self.assertEqual(route.decision(self.root, "pull_request",
+                                        self.head, before)[0], "full")
+        self.assertEqual(route.a5_decision(self.root, "pull_request",
+                                           self.head, before)[0], "fast")
+
     def test_a5_only_new_source_diff_after_first_merge(self):
         baseline = self.sha()
         self.change("tools/clk_04_a4_a5_product_ram.py", "modified A5 reader")

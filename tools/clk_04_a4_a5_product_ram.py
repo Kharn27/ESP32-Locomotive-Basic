@@ -22,7 +22,7 @@ import clk_04_a4_oracle as a4
 prior, a1 = a4.prior, a4.a1
 need, sha, read, canonical = prior.need, prior.sha, prior.read, prior.canonical
 ROOT = Path(__file__).resolve().parents[1]
-CORPUS = ROOT / "tests/fixtures/cpc6128/clk_04_a4_numeric/a5_product_ram/corpus.json"
+CORPUS = ROOT / "tests/fixtures/cpc6128/clk_04_a5_product_ram/corpus.json"
 CORPUS_SHA = "09a132467b71aed8c55e9c8691948c350b921dce5b1195f3af26ace0adfd600c"
 VALUES = (0, 1, 32767, 32768, 65536, 8388608, 2147483648, 4294967295)
 PINS = a4.PINS

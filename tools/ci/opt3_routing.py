@@ -262,6 +262,7 @@ CLK04_A4_PATHS = (
     "tools/clk_04_a4_*",
     "tests/test_clk_04_a4_*",
     "tests/fixtures/cpc6128/clk_04_a4_numeric/**",
+    "tests/fixtures/cpc6128/clk_04_a5_product_ram/**",
     "docs/CLK-04-A4*",
     "tools/ci/opt3_routing.py",
     "tools/ci/clk_04_a4_fast_route.py",
@@ -809,13 +810,28 @@ def audit(sources):
            "A4_FAST_ROUTE_CONDITIONAL")
     demand(re.search(r"(?m)^    (?:if|needs):", host_job) is None,
            "A4_FAST_HOST_CONDITIONAL")
-    demand("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
-           "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c"
-           in a4 and
-           "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
-           in a4 and
-           "8c778bf072a06fb7c23b9cccd179041db7f79a52" in a4,
-           "A4_CPC_PINS_DRIFT")
+    # C1: authenticate exact GHCR/ROM/Caprice pins INSIDE EACH capture job.
+    # A valid A5 pin must never mask tampering to the separate A4 job.
+    for acquire_name, reject in (("cpc-acquire", "A4_CPC_PINS_DRIFT"),
+                                 ("a5-acquire", "A5_CPC_PINS_DRIFT")):
+        marker = "\n  " + acquire_name + ":\n"
+        demand(a4.count(marker) == 1, reject)
+        section = a4.split(marker, 1)[1]
+        boundary = re.search(r"(?m)^  [a-zA-Z][\w-]*:\s*$", section)
+        if boundary:
+            section = section[:boundary.start()]
+        expected_pins = (
+            "    container:\n      image: "
+            "ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
+            "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c",
+            'test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = '
+            '8c778bf072a06fb7c23b9cccd179041db7f79a52',
+            'test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d\' \' -f1)" = '
+            '31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562',
+            'test "$(cat /usr/local/share/loco-caprice32-source.sha)" = '
+            '8c778bf072a06fb7c23b9cccd179041db7f79a52',
+        )
+        demand(all(section.count(pin) == 1 for pin in expected_pins), reject)
     demand("persist-credentials: false" in a4 and
            a4.count("ref: $" + "{{ github.event.pull_request.head.sha || github.sha }}") == 4
            and "continue-on-error" not in a4 and "|| true" not in a4
@@ -2243,6 +2259,50 @@ def clk04_a4_negative_tests(sources):
             demand(str(exc)==code,"A4_WRONG_REASON_"+label+":"+str(exc))
         else:raise UnsafeRoute("A4_FALSIFICATION_ACCEPTED_"+label)
         print("CI-OPT3 A4_FALSIFICATION_REJECTED",label,code)
+    # The original A4 PINS falsifier above remains unchanged (RED -> GREEN).
+    # Mutate each pin in each job independently; the other job keeps its
+    # genuine pins, deliberately reproducing the original masking risk.
+    ghcr_sha = "7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c"
+    rom_sha = "31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562"
+    cap_sha = "8c778bf072a06fb7c23b9cccd179041db7f79a52"
+    needles = (
+        ("GHCR", "      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
+         + ghcr_sha, "      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
+         + "0"*64),
+        ("ROM", 'test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d\' \' -f1)" = '
+         + rom_sha, 'test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d\' \' -f1)" = '
+         + "0"*64),
+        ("CAP_GIT", 'test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = '
+         + cap_sha, 'test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = '
+         + "0"*40),
+        ("CAP_IMAGE", 'test "$(cat /usr/local/share/loco-caprice32-source.sha)" = '
+         + cap_sha, 'test "$(cat /usr/local/share/loco-caprice32-source.sha)" = '
+         + "0"*40),
+    )
+    for job_name, rejection in (("cpc-acquire", "A4_CPC_PINS_DRIFT"),
+                                ("a5-acquire", "A5_CPC_PINS_DRIFT")):
+        marker = "\n  " + job_name + ":\n"
+        demand(orig.count(marker) == 1, "A4_A5_NEGATIVE_JOB_MISSING_" + job_name)
+        before, section_tail = orig.split(marker, 1)
+        boundary = re.search(r"(?m)^  [a-zA-Z][\w-]*:\s*$", section_tail)
+        section = section_tail[:boundary.start()] if boundary else section_tail
+        rest = section_tail[boundary.start():] if boundary else ""
+        for label, needle, forgery in needles:
+            demand(section.count(needle) == 1,
+                   "A4_A5_NEGATIVE_PIN_NOT_UNIQUE_" + job_name + "_" + label)
+            mutant = {**sources, CLK04_A4_WORKFLOW:
+                      before + marker + section.replace(needle, forgery, 1) + rest}
+            try:
+                audit(mutant)
+            except UnsafeRoute as exc:
+                demand(str(exc) == rejection,
+                       "A4_A5_NEGATIVE_WRONG_REJECTION_" + job_name + "_" + label
+                       + ":" + str(exc))
+            else:
+                raise UnsafeRoute("A4_A5_PIN_FALSIFICATION_ACCEPTED_" + job_name
+                                  + "_" + label)
+            print("CI-OPT3 A4_A5_PIN_FALSIFICATION_REJECTED",
+                  job_name, label, rejection)
     cpc=FAMILIES["CPC_ACQUISITION"];xt=FAMILIES["XTENSA"]
     try:
         FAMILIES["CPC_ACQUISITION"]=tuple(x for x in cpc if x!=CLK04_A4_WORKFLOW)
@@ -2261,6 +2321,12 @@ def clk04_a4_negative_tests(sources):
         "tools/ci/opt3_routing.py"):
         demand(CLK04_A4_WORKFLOW in triggered_names([path],sources),
                "A4_REQUIRED_ROUTE_MISSING_"+path)
+    demand(CLK04_A4_WORKFLOW in triggered_names(
+           ["tests/fixtures/cpc6128/clk_04_a5_product_ram/corpus.json"],
+           sources), "A5_NEW_ARCHIVE_ROUTE_MISSING")
+    demand(CLK04_A4_WORKFLOW not in triggered_names(
+           ["tests/fixtures/cpc6128/clk_04_a5_product_ram_sibling/corpus.json"],
+           sources), "A5_NEW_ARCHIVE_ROUTE_OVERBROAD")
     for path in ("core/basic_executor.c",
                  "firmware/esp32_display_probe/main/main.c",
                  "docs/CLK-04-A3-time-lifecycle.md"):

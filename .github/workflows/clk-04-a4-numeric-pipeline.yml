@@ -6,6 +6,7 @@ on:
       - 'tools/clk_04_a4_*'
       - 'tests/test_clk_04_a4_*'
       - 'tests/fixtures/cpc6128/clk_04_a4_numeric/**'
+      - 'tests/fixtures/cpc6128/clk_04_a5_product_ram/**'
       - 'docs/CLK-04-A4*'
       - 'tools/ci/opt3_routing.py'
       - 'tools/ci/clk_04_a4_fast_route.py'
@@ -224,7 +225,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          echo '09a132467b71aed8c55e9c8691948c350b921dce5b1195f3af26ace0adfd600c  tests/fixtures/cpc6128/clk_04_a4_numeric/a5_product_ram/corpus.json' | sha256sum --check --status
+          echo '09a132467b71aed8c55e9c8691948c350b921dce5b1195f3af26ace0adfd600c  tests/fixtures/cpc6128/clk_04_a5_product_ram/corpus.json' | sha256sum --check --status
           python3 -m unittest discover -s tests -p 'test_clk_04_a4_a5_product_ram.py' -v
           python3 tools/clk_04_a4_a5_product_ram.py --self-test
           for CC in gcc clang; do
@@ -272,7 +273,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          echo '09a132467b71aed8c55e9c8691948c350b921dce5b1195f3af26ace0adfd600c  tests/fixtures/cpc6128/clk_04_a4_numeric/a5_product_ram/corpus.json' | sha256sum --check --status
+          echo '09a132467b71aed8c55e9c8691948c350b921dce5b1195f3af26ace0adfd600c  tests/fixtures/cpc6128/clk_04_a5_product_ram/corpus.json' | sha256sum --check --status
           test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
           test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d' ' -f1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
           test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52

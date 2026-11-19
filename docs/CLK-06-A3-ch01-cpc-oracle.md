@@ -25,4 +25,26 @@ Les quatre programmes sont dans `tests/fixtures/cpc6128/clk_06_a3_ch01/{corpus.j
 
 `UNVERIFIED` avant acquisition independante, inventaire/scellement, comparaison des huit sorties et inspection des PNG boot/LIST/RUN. `RAW_REPLAY_PASS` n'autorise pas a lui seul `OBSERVED`. Toute capture invalide ou contradictoire demeure `INCONCLUSIVE`. L'archivage perenne des **deux ZIP originaux** (RAW et sceau externe) avec leur SHA-256 et **HEAD d'acquisition distinct** est obligatoire avant acceptation Pilotage.
 
-**Hors perimetre :** canaux 2/3, DI/EI, priorite generale, EVENEMENT simultane force, interpretation 1/50 Hz, TIME natif, CYD. `ON_DEVICE_NOT_APPLICABLE_A3` ; aucun flash physique PO. Statut documentaire initial : `UNVERIFIED` jusqu'a audit contradictoire.
+**Hors perimetre :** canaux 2/3, DI/EI, priorite generale, EVENEMENT simultane force, interpretation 1/50 Hz, TIME natif, CYD. `ON_DEVICE_NOT_APPLICABLE_A3` ; aucun flash physique PO. Statut documentaire initial (avant acquisition) : `UNVERIFIED` jusqu'a audit contradictoire.
+
+## Audit contradictoire POST-acquisition du HEAD historique `8b66637e8023f5632291a930fae92bd48333417b`
+
+**Sondage authentique, non test synthetique.** La campagne [GitHub Actions #44510663988](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/44510663988) s'est terminee par trois jobs `SUCCESS` (tests hote, huit RUN CPC ROM-backed et relecture separee). Cette observation correspond au HEAD **historique 8b66637e**, pas au HEAD du commit documentaire courant.
+
+- [Artifact ZIP RAW #14522149201](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/44510663988/artifacts/14522149201), SHA-256 du ZIP original `adc917e2f6f4eb5a25378a215cbea1499db63baf742c14994a0598dd36d7c6de`, 185245 octets.
+- [Artifact ZIP sceau externe #14522653895](https://github.com/Kharn27/ESP32-Locomotive-Basic/actions/runs/44510663988/artifacts/14522653895), SHA-256 du ZIP original `cdc13cc0cac8f5ae9104dfb832e435d5b861de70369cba13a9151423c202d912`, 322 octets.
+- SHA-256 des octets originaux `manifest.json` : `5d5a0356e6e912c1b6d050b4b3261e4003c87e058502bd5c05d691dc5c56eb8e`. Le sceau JSON **separe** refere le meme `mission=CLK-06-A3`, le meme HEAD historique et le meme SHA du manifeste.
+- **118/118 fichiers originaux** conformes en taille et SHA-256, 119 entrees ZIP RAW incluant le manifeste, aucune ROM complete ni SNA archivee. Programme RAM tokenise, LIST imprime, captures LIST/RUN PNG et sortie RUN imprimante **identiques octet par octet** entre `original` et `repeat` pour chacun des quatre cas ; quatre paires de resultats.
+- Les deux captures de boot affichent `Amstrad 128K Microcomputer`, `BASIC 1.1` et `Ready` ; boots distincts horodates `2026-11-19T10:59:48.088611+00:00` et `2026-11-19T11:05:12.266112+00:00`. Controle `TIME` CPC par seconde hote : `300.329382` et `300.392493`, sans inference sur la periode `EVERY`. L'operateur a examine les images reelles des deux boots et les quatre ecrans LIST/RUN ; les paires de PNG LIST/RUN sont byte-identiques.
+- Le manifeste RAW reste `ACQUIRED_PENDING_SCREEN_REVIEW` et `screen_review=UNVERIFIED` **sans alteration**. L'audit ci-dessous est une interpretation documentaire independante des octets originaux ; le rejeu automatique seul ne prouve pas l'affichage.
+
+| Sonde | Observations imprimante CPC, identiques dans les deux sessions | Qualification limitee |
+| --- | --- | --- |
+| `S01_CH1_RECUR_RETURN` | `S01:HIT=1..4` imprimes, `S01:MAIN=19`, `S01:CANCEL=2`; `Ready` a l'ecran RUN | **OBSERVED**, 19 livraisons comptees, RETURN et reprise du principal pendant la seule boucle de 8000 tours |
+| `S02_CH1_REMAIN_CANCEL` | `S02:REMAIN=2`, `S02:MAIN=0`, `S02:R2=0`, aucun `S02:HIT` | **OBSERVED**, absence de livraison dans cette seule fenetre de 8500 tours avec desarmement immediat |
+| `S03_CH01_COEXIST` | `S03:H0=1..4` / `S03:H1=1..4`, `S03:CH0=21`, `S03:CH1=18`, `R0=4`, `R1=12` | **OBSERVED**, deux canaux servis dans cette fenetre de 8500 tours, **pas** preuve d'ordre ou de priorite generale |
+| `S04_CANCEL_CH1_KEEP_CH0` | `S04:REMAIN1=2`, `S04:CH0=21`, `S04:CH1=0`, `S04:REMAIN0=9`, `S04:R1AGAIN=0`; aucun `S04:H1` | **OBSERVED**, canal 0 maintenu et canal 1 desarme dans cette seule fenetre de 8500 tours |
+
+Les `HIT/H0/H1` visibles sont plafonnes volontairement a quatre **lignes** ; les compteurs principaux restituent les nombres d'evenements. La comparaison est celle de fichiers binaires authentiques, non d'une sortie reconstruite a partir du corpus. **`UNVERIFIED`** : canaux 2/3, DI/EI, interruptions simultanees forcees, priorite universelle, vitesse absolue du ticker, erreurs non sondees, semantique native ESP32.
+
+**BARRIERE PERMANENCE :** les artifacts GitHub ci-dessus ont une retention de 90 jours, ils **ne remplacent pas** la copie permanente, bit a bit, des deux ZIP sous le namespace A3. `PERMANENT_GIT_ARCHIVE_PENDING` tant que les fichiers et SHA ne sont pas effectivement commits sur la branche. Si le HEAD change, les deux ZIP gardent l'identite historique `8b66637e...` ; toute acquisition du nouveau HEAD possede ses propres artifacts et son nouveau sceau. **Aucune auto-acceptation ; revue Pilotage requise.**

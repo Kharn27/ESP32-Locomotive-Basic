@@ -39,7 +39,7 @@ CLK06_A3_PATHS = (
     ".github/workflows/clk-06-a3-acquisition.yml",
     "tools/clk_06_a3_*",
     "tests/test_clk_06_a3_oracle.py",
-    "tests/fixtures/cpc6128/clk_06_a3_every_ch0/**",
+    "tests/fixtures/cpc6128/clk_06_a3_ch01/**",
     "docs/CLK-06-A3*",
 )
 
@@ -790,7 +790,7 @@ def audit(sources):
            'test "$CAPTURE_HEAD" = "$EXPECTED_HEAD"' in replay,
            "A3_HEAD_OR_FAIL_CLOSED_INTEGRITY")
     demand('SEAL="$(sha356sum "$MANIFEST"' in acquire and
-           "CLK06_A3_EXTERNAL_MANIFEST_SHA356" in acquire and
+           "CLK06_A3_EXTERNAL_MANIFEST_SHA256" in acquire and
            "manifest_sha356: $" + "{{ steps.external-seal.outputs.manifest_sha356 }}" in acquire and
            "CAPTURE_HEAD: $" + "{{ needs.cpc-acquire.outputs.acquisition_head }}" in replay and
            "EXTERNAL_SEAL: $" + "{{ needs.cpc-acquire.outputs.manifest_sha356 }}" in replay and
@@ -2814,7 +2814,7 @@ def clk06_a3_negative_tests(sources):
          altered("    needs: cpc-acquire", "    needs: negative-tests",
                  "REPLAY_UNCHAINED"), "A3_EVIDENCE_PIPELINE_INCOMPLETE"),
         ("SEAL_OUTPUT_REMOVED",
-         altered("CLK06_A3_EXTERNAL_MANIFEST_SHA356",
+         altered("CLK06_A3_EXTERNAL_MANIFEST_SHA256",
                  "CLK06_A3_UNSEALED", "SEAL_OUTPUT_REMOVED"),
          "A3_EXTERNAL_SEAL_OR_REPLAY_MISSING"),
         ("SEAL_BYPASSED",
@@ -2864,8 +2864,8 @@ def clk06_a3_negative_tests(sources):
         ".github/workflows/clk-06-a3-acquisition.yml",
         "tools/clk_06_a3_oracle.py",
         "tests/test_clk_06_a3_oracle.py",
-        "tests/fixtures/cpc6128/clk_06_a3_every_ch0/corpus.json",
-        "docs/CLK-06-A3-every-ch0-cpc-oracle.md",
+        "tests/fixtures/cpc6128/clk_06_a3_ch01/corpus.json",
+        "docs/CLK-06-A3-ch01-cpc-oracle.md",
     ):
         demand(CLK06_A3_WORKFLOW in triggered_names([path], sources),
                "A3_REQUIRED_ROUTE_MISSING_" + path)
@@ -3029,7 +3029,7 @@ def main():
     if a.base_sha:
         demand(re.fullmatch(r"[0-9a-f]{40}", a.base_sha), "BAD_BASE_SHA")
         check_diff(a.base_sha, sources)
-    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=47 FAMILIES=5")
+    print("CI-OPT3 ROUTE_GATE_PASS WORKFLOWS=48 FAMILIES=5")
 
 
 if __name__ == "__main__":

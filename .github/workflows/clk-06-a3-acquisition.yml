@@ -5,7 +5,7 @@ on:
       - '.github/workflows/clk-06-a3-acquisition.yml'
       - 'tools/clk_06_a3_*'
       - 'tests/test_clk_06_a3_oracle.py'
-      - 'tests/fixtures/cpc6128/clk_06_a3_every_ch0/**'
+      - 'tests/fixtures/cpc6128/clk_06_a3_ch01/**'
       - 'docs/CLK-06-A3*'
   workflow_dispatch:
 

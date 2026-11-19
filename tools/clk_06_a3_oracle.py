@@ -30,7 +30,7 @@ IMAGE = ("ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:"
 SESSIONS = ("original", "repeat")
 SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
-CASE_ID = re.compile(r"S0[1-4]_[A-Z_]+\Z")
+CASE_ID = re.compile(r"S0[1-4]_[A-Z0-9_]+\Z")
 PROCESS_PARTS = ("list", "run")
 FORBIDDEN_SUFFIXES = (".sna", ".rom", ".dsk", ".zip")
 

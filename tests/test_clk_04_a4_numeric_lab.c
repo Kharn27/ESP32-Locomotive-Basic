@@ -60,4 +60,64 @@ static void test_all(void) {
     assert(length==10 && memcmp(out," 999999 \r\n",10)==0);
     assert(a4_print_candidate(1000000,out,sizeof out,&length)==A4_UNSUPPORTED);
 }
-int main(void){test_all();negative_tests();puts("A4 HOST C99 TESTS PASS (CANDIDATE_NOT_CPC)");return 0;}
+
+/* A6: exact original PRINT #8 bytes (including leading/trailing spaces and
+ * CRLF), not strings reconstructed from numbers. Evidence:
+ * A5 run 44520635627 / HEAD 3fab7321653916c4838314a72ee99d26218ff5e9
+ * external SHA e6af41ce2e6fcccee1446216bb5f9a1a44e5d21cf9a39f966cbf2d3943ae6b1a.
+ * Expected bytes are deliberately confined to tests, NEVER production code. */
+static void a6_observed_bytes(int64_t v, const char *expected) {
+    uint8_t out[32];
+    size_t used=77u, n=strlen(expected);
+    memset(out,0x56,sizeof out);
+    assert(a4_print_candidate(v,out,sizeof out,&used)==A4_OK);
+    assert(used==n && memcmp(out,expected,n)==0);
+    for(size_t i=n;i<sizeof out;i++) assert(out[i]==0x56u);
+    /* An exact-fit buffer succeeds without appending a NUL. */
+    memset(out,0x56,sizeof out);used=77u;
+    assert(a4_print_candidate(v,out,n,&used)==A4_OK);
+    assert(used==n && memcmp(out,expected,n)==0);
+    memset(out,0x56,sizeof out);used=77u;
+    assert(a4_print_candidate(v,out,n-1u,&used)==A4_NO_SPACE);
+    assert(used==77u);
+    for(size_t i=0;i<sizeof out;i++) assert(out[i]==0x56u);
+}
+static void a6_refuse_untested(int64_t v) {
+    uint8_t out[32];size_t used=77u;
+    memset(out,0x56,sizeof out);
+    assert(a4_print_candidate(v,out,sizeof out,&used)==A4_UNSUPPORTED);
+    assert(used==77u);
+    for(size_t i=0;i<sizeof out;i++) assert(out[i]==0x56u);
+}
+static void a6_bounded_real5_print_tests(void) {
+    a6_observed_bytes(0," 0 \r\n");
+    a6_observed_bytes(1," 1 \r\n");
+    a6_observed_bytes(32767," 32767 \r\n");
+    a6_observed_bytes(32768," 32768 \r\n");
+    a6_observed_bytes(65534," 65534 \r\n");
+    a6_observed_bytes(65536," 65536 \r\n");
+    a6_observed_bytes(131072," 131072 \r\n");
+    a6_observed_bytes(8388608," 8388608 \r\n");
+    a6_observed_bytes(16777216," 16777216 \r\n");
+    a6_observed_bytes(INT64_C(2147483648)," 2.14748E+09 \r\n");
+    a6_observed_bytes(INT64_C(4294967295)," 4.29497E+09 \r\n");
+    a6_observed_bytes(INT64_C(4294967296)," 4.29497E+09 \r\n");
+    a6_observed_bytes(INT64_C(8589934590)," 8.58993E+09 \r\n");
+    a6_observed_bytes(-1,"-1 \r\n");
+    a6_refuse_untested(-2);
+    a6_refuse_untested(1000000);
+    a6_refuse_untested(8388607);
+    a6_refuse_untested(8388609);
+    a6_refuse_untested(16777215);
+    a6_refuse_untested(16777217);
+    a6_refuse_untested(INT64_C(2147483647));
+    a6_refuse_untested(INT64_C(2147483649));
+    a6_refuse_untested(INT64_C(4294967294));
+    a6_refuse_untested(INT64_C(4294967297));
+    a6_refuse_untested(INT64_C(8589934589));
+    a6_refuse_untested(INT64_C(8589934591));
+    a6_refuse_untested(INT64_MAX);
+    a6_refuse_untested(INT64_MIN);
+}
+
+int main(void){test_all();negative_tests();a6_bounded_real5_print_tests();puts("A4 HOST C99 TESTS PASS (CANDIDATE_NOT_CPC)");return 0;}

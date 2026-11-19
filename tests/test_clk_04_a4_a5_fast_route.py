@@ -37,6 +37,8 @@ class A5Routing(unittest.TestCase):
         self.base = self.sha()
         self.write(route.A5_PREFIX + "corpus.json", "new A5 source")
         self.write("tools/clk_04_a4_a5_product_ram.py", "A5 native reader")
+        self.write("tools/clk_04_a4_numeric_lab.c", "baseline C99 candidate")
+        self.write("tools/clk_04_a4_numeric_lab.h", "baseline C99 header")
         self.git("add", ".")
         self.git("commit", "-qm", "A5 source")
         self.head = self.sha()
@@ -93,11 +95,58 @@ class A5Routing(unittest.TestCase):
         self.assertEqual(route.a5_decision(self.root, "pull_request",
                                            self.head, baseline)[0], "full")
 
-    def test_a5_candidate_only_change_is_fast(self):
+    def test_a5_candidate_only_change_forces_full_without_a4_reacquisition(self):
         baseline = self.sha()
         self.change("tools/clk_04_a4_numeric_lab.c", "C99 candidate change")
+        self.assertEqual(route.decision(self.root, "pull_request",
+                                        self.head, baseline)[0], "fast")
+        self.assertEqual(route.a5_decision(self.root, "pull_request",
+                                           self.head, baseline)[0], "full")
+
+    def test_a5_candidate_header_change_also_forces_full(self):
+        baseline = self.sha()
+        self.change("tools/clk_04_a4_numeric_lab.h", "candidate ABI header change")
+        self.assertEqual(route.decision(self.root, "pull_request",
+                                        self.head, baseline)[0], "fast")
+        self.assertEqual(route.a5_decision(self.root, "pull_request",
+                                           self.head, baseline)[0], "full")
+
+    def test_documentation_and_tests_only_are_fast_for_both(self):
+        baseline = self.sha()
+        self.change("docs/CLK-04-A6-real5-print-lab.md", "documentation change")
+        self.assertEqual(route.decision(self.root, "pull_request",
+                                        self.head, baseline)[0], "fast")
         self.assertEqual(route.a5_decision(self.root, "pull_request",
                                            self.head, baseline)[0], "fast")
+        baseline = self.sha()
+        self.change("tests/test_clk_04_a4_numeric_lab.c", "new host test")
+        self.assertEqual(route.decision(self.root, "pull_request",
+                                        self.head, baseline)[0], "fast")
+        self.assertEqual(route.a5_decision(self.root, "pull_request",
+                                           self.head, baseline)[0], "fast")
+
+    def test_stale_cpc_head_or_raw_reuse_guard_cannot_be_dropped(self):
+        source = (self.root / route.WORKFLOW).read_text()
+        self.assertIn('test "$CAPTURE_HEAD" = "$EXPECTED_HEAD"', source)
+        self.assertIn('data["head"] == sys.argv[3]', source)
+        baseline = self.sha()
+        self.change(route.WORKFLOW, source.replace(
+            'test "$CAPTURE_HEAD" = "$EXPECTED_HEAD"',
+            'test -n "$CAPTURE_HEAD"'))
+        with self.assertRaisesRegex(
+                route.RouteError, "A5_REPLAY_DEPENDENCY_SEAL_OR_CANDIDATE_GUARD_MISSING"):
+            route.a5_decision(self.root, "pull_request", self.head, baseline)
+        # The seal's own identity must also be checked (not only the job output).
+        self.change(route.WORKFLOW, source.replace(
+            'data["head"] == sys.argv[3]', 'bool(data["head"])'))
+        with self.assertRaisesRegex(
+                route.RouteError, "A5_REPLAY_DEPENDENCY_SEAL_OR_CANDIDATE_GUARD_MISSING"):
+            route.a5_decision(self.root, "pull_request", self.head, baseline)
+
+    def test_wrong_head_is_not_accepted_as_fresh_a5_evidence(self):
+        with self.assertRaisesRegex(route.RouteError, "A5_HEAD_MISMATCH"):
+            route.a5_decision(self.root, "pull_request", self.base, self.base)
+
 
     def test_changed_a4_historical_input_still_forces_full_a4(self):
         baseline = self.sha()

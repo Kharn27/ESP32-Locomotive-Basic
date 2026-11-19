@@ -47,4 +47,21 @@ Les quatre programmes sont dans `tests/fixtures/cpc6128/clk_06_a3_ch01/{corpus.j
 
 Les `HIT/H0/H1` visibles sont plafonnes volontairement a quatre **lignes** ; les compteurs principaux restituent les nombres d'evenements. La comparaison est celle de fichiers binaires authentiques, non d'une sortie reconstruite a partir du corpus. **`UNVERIFIED`** : canaux 2/3, DI/EI, interruptions simultanees forcees, priorite universelle, vitesse absolue du ticker, erreurs non sondees, semantique native ESP32.
 
-**BARRIERE PERMANENCE :** les artifacts GitHub ci-dessus ont une retention de 90 jours, ils **ne remplacent pas** la copie permanente, bit a bit, des deux ZIP sous le namespace A3. `PERMANENT_GIT_ARCHIVE_PENDING` tant que les fichiers et SHA ne sont pas effectivement commits sur la branche. Si le HEAD change, les deux ZIP gardent l'identite historique `8b66637e...` ; toute acquisition du nouveau HEAD possede ses propres artifacts et son nouveau sceau. **Aucune auto-acceptation ; revue Pilotage requise.**
+**Archivage permanent effectif sous le namespace A3 (deux ZIP originaux immuables) :** les deux artifacts GitHub ci-dessus ont ete copies **octet par octet** dans ce depot en tant que blobs Git, avec verification de leur Git blob SHA-1 contre `git hash-object` calcule sur les fichiers d'origine. Les deux archives conservees sont :
+
+- `tests/fixtures/cpc6128/clk_06_a3_ch01/evidence/run-44510663988-8b66637e-raw.zip` — ZIP original, SHA-256 `adc917e2f6f4eb5a25378a215cbea1499db63baf742c14994a0598dd36d7c6de`, Git blob `497f2c5edfa00be0ae41f8efe7a9f4894ff13f61`.
+- `tests/fixtures/cpc6128/clk_06_a3_ch01/evidence/run-44510663988-8b66637e-external-seal.zip` — sceau ZIP original, SHA-256 `cdc13cc0cac8f5ae9104dfb832e435d5b861de70369cba13a9151423c202d912`, Git blob `57e2c9203818a1762f70efcbbbdffcde50fdfc76`.
+
+Verification depuis le checkout de la PR :
+
+```sh
+sha256sum tests/fixtures/cpc6128/clk_06_a3_ch01/evidence/*.zip
+git hash-object tests/fixtures/cpc6128/clk_06_a3_ch01/evidence/*.zip
+mkdir -p /tmp/clk06-a3-historical-raw
+unzip -q tests/fixtures/cpc6128/clk_06_a3_ch01/evidence/run-44510663988-8b66637e-raw.zip -d /tmp/clk06-a3-historical-raw
+python3 tools/clk_06_a3_oracle.py --verify /tmp/clk06-a3-historical-raw \
+  --head 8b66637e8023f5632291a930fae92bd48333417b \
+  --seal 5d5a0356e6e912c1b6d050b4b3261e4003c87e058502bd5c05d691dc5c56eb8e
+```
+
+Le contenu de chaque ZIP **reste attribue uniquement au HEAD historique d'acquisition `8b66637e...`**, pas au commit qui a archive les ZIP ; aucune piece interne ni sceau n'a ete modifie. Le HEAD courant doit conserver une campagne distincte, avec son propre sceau. Le pilote seul decide l'acceptation et la fusion ; **aucune auto-acceptation**.

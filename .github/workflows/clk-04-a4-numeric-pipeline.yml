@@ -6,6 +6,7 @@ on:
       - 'tools/clk_04_a4_*'
       - 'tests/test_clk_04_a4_*'
       - 'tests/fixtures/cpc6128/clk_04_a4_numeric/**'
+      - 'tests/fixtures/cpc6128/clk_04_a5_product_ram/**'
       - 'docs/CLK-04-A4*'
       - 'tools/ci/opt3_routing.py'
       - 'tools/ci/clk_04_a4_fast_route.py'
@@ -27,6 +28,9 @@ jobs:
       mode: ${{ steps.classify.outputs.mode }}
       inputs_sha256: ${{ steps.classify.outputs.inputs_sha256 }}
       provenance: ${{ steps.classify.outputs.provenance }}
+      a5_mode: ${{ steps.classify.outputs.a5_mode }}
+      a5_inputs_sha256: ${{ steps.classify.outputs.a5_inputs_sha256 }}
+      a5_provenance: ${{ steps.classify.outputs.a5_provenance }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,6 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_clk_04_a4_fast_route.py' -v
+          python3 -m unittest discover -s tests -p 'test_clk_04_a4_a5_fast_route.py' -v
           python3 tools/ci/clk_04_a4_fast_route.py \
             --event "$EVENT_KIND" --head "$EXPECTED_HEAD" \
             --base "$BASE_SHA" --output "$GITHUB_OUTPUT"
@@ -204,3 +209,160 @@ jobs:
           path: ${{ runner.temp }}/clk04-a4-comparison.json
           if-no-files-found: warn
           retention-days: 90
+
+  a5-host:
+    name: CLK-04-A5 independent host falsifiers and candidate C99 (NOT CPC)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+      - name: Pin A5 corpus and test hostile RAW and independent candidate comparison
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          echo '09a132467b71aed8c55e9c8691948c350b921dce5b1195f3af26ace0adfd600c  tests/fixtures/cpc6128/clk_04_a5_product_ram/corpus.json' | sha256sum --check --status
+          python3 -m unittest discover -s tests -p 'test_clk_04_a4_a5_product_ram.py' -v
+          python3 tools/clk_04_a4_a5_product_ram.py --self-test
+          for CC in gcc clang; do
+            for FLAGS in '-O2' '-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined'; do
+              $CC -std=c99 -Wall -Wextra -Werror -pedantic $FLAGS \
+                tools/clk_04_a4_numeric_lab.c tests/test_clk_04_a4_numeric_lab.c \
+                -o "$RUNNER_TEMP/clk04-a5-c99-test"
+              "$RUNNER_TEMP/clk04-a5-c99-test"
+              $CC -std=c99 -Wall -Wextra -Werror -pedantic $FLAGS \
+                tools/clk_04_a4_numeric_lab.c tests/test_clk_04_a4_numeric_cli.c \
+                -o "$RUNNER_TEMP/clk04-a5-candidate"
+              "$RUNNER_TEMP/clk04-a5-candidate" 0 1 32767 32768 65536 8388608 2147483648 4294967295 \
+                > "$RUNNER_TEMP/c99-a5-candidates.tsv"
+              test "$(wc -l < "$RUNNER_TEMP/c99-a5-candidates.tsv")" -eq 8
+            done
+          done
+
+  a5-acquire:
+    name: CLK-04-A5 CPC6128 authentic T and U scalar REAL5 acquisition
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    needs: [route, a5-host]
+    if: needs.route.outputs.a5_mode == 'full'
+    container:
+      image: ghcr.io/kharn27/esp32-locomotive-basic-caprice32@sha256:7c2ac82df92a2df5c7305cc0bd70dc95124249fb46b2d893449f3d48395ced8c
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      manifest_sha256: ${{ steps.a5-external-seal.outputs.manifest_sha256 }}
+      acquisition_head: ${{ steps.a5-external-seal.outputs.acquisition_head }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: recursive
+      - name: Pin ROM and Caprice32 HEAD then acquire T and U RAM only
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/tests/oracles/caprice32"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          echo '09a132467b71aed8c55e9c8691948c350b921dce5b1195f3af26ace0adfd600c  tests/fixtures/cpc6128/clk_04_a5_product_ram/corpus.json' | sha256sum --check --status
+          test "$(git -C tests/oracles/caprice32 rev-parse HEAD)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test "$(sha256sum tests/oracles/caprice32/rom/cpc6128.rom | cut -d' ' -f1)" = 31c3668c67bea027dab698ece233c9434d9324f9ba7dac84db58f400b6689562
+          test "$(cat /usr/local/share/loco-caprice32-source.sha)" = 8c778bf072a06fb7c23b9cccd179041db7f79a52
+          test -x /usr/local/bin/cap32
+          cp /usr/local/bin/cap32 tests/oracles/caprice32/cap32
+          python3 tools/clk_04_a4_a5_product_ram.py --acquire \
+            --caprice tests/oracles/caprice32 \
+            --output "$RUNNER_TEMP/clk04-a5-cpc-raw" --head "$EXPECTED_HEAD"
+          ! find "$RUNNER_TEMP/clk04-a5-cpc-raw" -type f \( -name '*.sna' -o -name '*.rom' \) | grep .
+      - name: Export independent seal OUTSIDE RAW after real acquisition
+        id: a5-external-seal
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="$RUNNER_TEMP/clk04-a5-cpc-raw/manifest.json"
+          test -s "$FILE"
+          SEAL="$(sha256sum "$FILE" | awk '{print $1}')"
+          printf 'CLK04_A5_EXTERNAL_MANIFEST_SHA256=%s\n' "$SEAL"
+          printf 'manifest_sha256=%s\n' "$SEAL" >> "$GITHUB_OUTPUT"
+          printf 'acquisition_head=%s\n' "$EXPECTED_HEAD" >> "$GITHUB_OUTPUT"
+          printf '{"mission":"CLK-04-A5","head":"%s","manifest_sha256":"%s","status":"PENDING_REPLAY_PNG_REVIEW"}\n' \
+            "$EXPECTED_HEAD" "$SEAL" > "$RUNNER_TEMP/a5-external-seal.json"
+      - name: Save partial A5 RAW on failure without promoting it to proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-04-a5-cpc-raw
+          path: ${{ runner.temp }}/clk04-a5-cpc-raw/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Publish independent A5 external seal
+        if: steps.a5-external-seal.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-04-a5-external-seal
+          path: ${{ runner.temp }}/a5-external-seal.json
+          if-no-files-found: error
+          retention-days: 90
+
+  a5-replay:
+    name: CLK-04-A5 separate sealed RAW replay and byte-to-byte C99 comparison
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: a5-acquire
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: clk-04-a5-cpc-raw
+          path: ${{ runner.temp }}/clk04-a5-replay
+      - uses: actions/download-artifact@v4
+        with:
+          name: clk-04-a5-external-seal
+          path: ${{ runner.temp }}/clk04-a5-seal
+      - name: Authenticate external seal and all RAM RAW BEFORE candidate C99
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          CAPTURE_HEAD: ${{ needs.a5-acquire.outputs.acquisition_head }}
+          EXTERNAL_SHA: ${{ needs.a5-acquire.outputs.manifest_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$CAPTURE_HEAD" = "$EXPECTED_HEAD"
+          test -n "$EXTERNAL_SHA"
+          python3 - "$RUNNER_TEMP/clk04-a5-seal/a5-external-seal.json" "$EXTERNAL_SHA" "$EXPECTED_HEAD" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1]))
+          assert data["mission"] == "CLK-04-A5" and data["head"] == sys.argv[3] and data["manifest_sha256"] == sys.argv[2]
+          PY
+          gcc -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+            tools/clk_04_a4_numeric_lab.c tests/test_clk_04_a4_numeric_cli.c \
+            -o "$RUNNER_TEMP/clk04-a5-C99-candidate"
+          python3 tools/clk_04_a4_a5_product_ram.py --verify "$RUNNER_TEMP/clk04-a5-replay" \
+            --head "$EXPECTED_HEAD" --seal "$EXTERNAL_SHA" \
+            --candidate "$RUNNER_TEMP/clk04-a5-C99-candidate" \
+            --report "$RUNNER_TEMP/clk04-a5-comparison.json"
+      - name: Export candidate comparison as separate non-RAW evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clk-04-a5-c99-comparison
+          path: ${{ runner.temp }}/clk04-a5-comparison.json
+          if-no-files-found: warn
+          retention-days: 90
+

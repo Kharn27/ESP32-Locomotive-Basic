@@ -1,0 +1,174 @@
+{
+  "cases": [
+    {
+      "arithmetic": null,
+      "id": "P01",
+      "lines": [
+        "10 T!=0",
+        "20 U!=T!*2",
+        "90 STOP",
+        "100 PRINT #8,@T!",
+        "110 PRINT #8,@U!",
+        "120 PRINT #8,T!",
+        "130 PRINT #8,U!",
+        "140 PRINT #8,T!*2",
+        "150 END"
+      ],
+      "printer_numeric_count": 5,
+      "value": "0"
+    },
+    {
+      "arithmetic": null,
+      "id": "P02",
+      "lines": [
+        "10 T!=1",
+        "20 U!=T!*2",
+        "90 STOP",
+        "100 PRINT #8,@T!",
+        "110 PRINT #8,@U!",
+        "120 PRINT #8,T!",
+        "130 PRINT #8,U!",
+        "140 PRINT #8,T!*2",
+        "150 END"
+      ],
+      "printer_numeric_count": 5,
+      "value": "1"
+    },
+    {
+      "arithmetic": null,
+      "id": "P03",
+      "lines": [
+        "10 T!=32767",
+        "20 U!=T!*2",
+        "90 STOP",
+        "100 PRINT #8,@T!",
+        "110 PRINT #8,@U!",
+        "120 PRINT #8,T!",
+        "130 PRINT #8,U!",
+        "140 PRINT #8,T!*2",
+        "150 END"
+      ],
+      "printer_numeric_count": 5,
+      "value": "32767"
+    },
+    {
+      "arithmetic": "2^15",
+      "id": "P04",
+      "lines": [
+        "10 T!=32768",
+        "20 U!=T!*2",
+        "30 R!=2^15",
+        "90 STOP",
+        "100 PRINT #8,@T!",
+        "110 PRINT #8,@U!",
+        "120 PRINT #8,T!",
+        "130 PRINT #8,U!",
+        "140 PRINT #8,T!*2",
+        "150 PRINT #8,@R!",
+        "160 PRINT #8,R!",
+        "170 PRINT #8,T!=R!",
+        "180 PRINT #8,(R!+1)-R!",
+        "190 PRINT #8,R!-(R!-1)",
+        "200 END"
+      ],
+      "printer_numeric_count": 10,
+      "value": "32768"
+    },
+    {
+      "arithmetic": "2^16",
+      "id": "P05",
+      "lines": [
+        "10 T!=65536",
+        "20 U!=T!*2",
+        "30 R!=2^16",
+        "90 STOP",
+        "100 PRINT #8,@T!",
+        "110 PRINT #8,@U!",
+        "120 PRINT #8,T!",
+        "130 PRINT #8,U!",
+        "140 PRINT #8,T!*2",
+        "150 PRINT #8,@R!",
+        "160 PRINT #8,R!",
+        "170 PRINT #8,T!=R!",
+        "180 PRINT #8,(R!+1)-R!",
+        "190 PRINT #8,R!-(R!-1)",
+        "200 END"
+      ],
+      "printer_numeric_count": 10,
+      "value": "65536"
+    },
+    {
+      "arithmetic": "2^23",
+      "id": "P06",
+      "lines": [
+        "10 T!=8388608",
+        "20 U!=T!*2",
+        "30 R!=2^23",
+        "90 STOP",
+        "100 PRINT #8,@T!",
+        "110 PRINT #8,@U!",
+        "120 PRINT #8,T!",
+        "130 PRINT #8,U!",
+        "140 PRINT #8,T!*2",
+        "150 PRINT #8,@R!",
+        "160 PRINT #8,R!",
+        "170 PRINT #8,T!=R!",
+        "180 PRINT #8,(R!+1)-R!",
+        "190 PRINT #8,R!-(R!-1)",
+        "200 END"
+      ],
+      "printer_numeric_count": 10,
+      "value": "8388608"
+    },
+    {
+      "arithmetic": "2^31",
+      "id": "P07",
+      "lines": [
+        "10 T!=2147483648",
+        "20 U!=T!*2",
+        "30 R!=2^31",
+        "90 STOP",
+        "100 PRINT #8,@T!",
+        "110 PRINT #8,@U!",
+        "120 PRINT #8,T!",
+        "130 PRINT #8,U!",
+        "140 PRINT #8,T!*2",
+        "150 PRINT #8,@R!",
+        "160 PRINT #8,R!",
+        "170 PRINT #8,T!=R!",
+        "180 PRINT #8,(R!+1)-R!",
+        "190 PRINT #8,R!-(R!-1)",
+        "200 END"
+      ],
+      "printer_numeric_count": 10,
+      "value": "2147483648"
+    },
+    {
+      "arithmetic": "(2^32)-1",
+      "id": "P08",
+      "lines": [
+        "10 T!=4294967295",
+        "20 U!=T!*2",
+        "30 R!=(2^32)-1",
+        "90 STOP",
+        "100 PRINT #8,@T!",
+        "110 PRINT #8,@U!",
+        "120 PRINT #8,T!",
+        "130 PRINT #8,U!",
+        "140 PRINT #8,T!*2",
+        "150 PRINT #8,@R!",
+        "160 PRINT #8,R!",
+        "170 PRINT #8,T!=R!",
+        "180 PRINT #8,(R!+1)-R!",
+        "190 PRINT #8,R!-(R!-1)",
+        "200 END"
+      ],
+      "printer_numeric_count": 10,
+      "value": "4294967295"
+    }
+  ],
+  "mission": "CLK-04-A5",
+  "schema": 1,
+  "scope": "REAL5_PRODUCT_TWO_ROM_BACKED_SESSIONS_ONLY",
+  "status": "SEALED_INPUTS_NOT_OBSERVATIONS"
+}
